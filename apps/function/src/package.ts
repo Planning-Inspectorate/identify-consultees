@@ -22,8 +22,8 @@ async function replaceLocalPackages() {
 	const srcFiles = files.filter(isSourceFile);
 	for (const srcFile of srcFiles) {
 		await replaceInFile(srcFile, [
-			{ replace: '@pins/service-name-lib', with: '#pins/service-name-lib' },
-			{ replace: '@pins/service-name-database', with: '#pins/service-name-database' }
+			{ replace: '@pins/identify-consultees-lib', with: '#pins/identify-consultees-lib' },
+			{ replace: '@pins/identify-consultees-database', with: '#pins/identify-consultees-database' }
 		]);
 	}
 }

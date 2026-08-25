@@ -1,6 +1,6 @@
 import type { ManageService } from '#service';
-import { createMonitoringRoutes } from '@pins/service-name-lib/controllers/monitoring.ts';
-import { cacheNoCacheMiddleware } from '@pins/service-name-lib/middleware/cache.ts';
+import { createMonitoringRoutes } from '@pins/identify-consultees-lib/controllers/monitoring.ts';
+import { cacheNoCacheMiddleware } from '@pins/identify-consultees-lib/middleware/cache.ts';
 import type { IRouter } from 'express';
 import { Router as createRouter } from 'express';
 import { createRoutesAndGuards as createAuthRoutesAndGuards } from './auth/router.ts';

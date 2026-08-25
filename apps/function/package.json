@@ -1,5 +1,5 @@
 {
-  "name": "service-name-function",
+  "name": "identify-consultees-function",
   "version": "1.0.0",
   "description": "Function app for handling integrations",
   "main": "src/functions/*.ts",
@@ -12,12 +12,12 @@
   "private": true,
   "dependencies": {
     "@azure/functions": "*",
-    "@pins/service-name-database": "^0.0.0",
-    "@pins/service-name-lib": "^0.0.0"
+    "@pins/identify-consultees-database": "^0.0.0",
+    "@pins/identify-consultees-lib": "^0.0.0"
   },
   "imports": {
-    "#pins/service-name-lib/*": "./src/packages/service-name-lib/*",
-    "#pins/service-name-database": "./src/packages/service-name-database/src/index.ts",
-    "#pins/service-name-database/*": "./src/packages/service-name-database/*"
+    "#pins/identify-consultees-lib/*": "./src/packages/identify-consultees-lib/*",
+    "#pins/identify-consultees-database": "./src/packages/identify-consultees-database/src/index.ts",
+    "#pins/identify-consultees-database/*": "./src/packages/identify-consultees-database/*"
   }
 }

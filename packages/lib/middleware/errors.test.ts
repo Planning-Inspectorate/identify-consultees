@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { Prisma } from '@pins/service-name-database/src/client/client.ts';
+import { Prisma } from '@pins/identify-consultees-database/src/client/client.ts';
 import { strict as assert } from 'node:assert';
 import { describe, mock, test } from 'node:test';
 import { ClientClosedError, ClientOfflineError } from 'redis';

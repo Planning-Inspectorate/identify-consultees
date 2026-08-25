@@ -1,5 +1,5 @@
-import { initDatabaseClient } from '@pins/service-name-database';
-import type { PrismaClient } from '@pins/service-name-database/src/client/client.ts';
+import { initDatabaseClient } from '@pins/identify-consultees-database';
+import type { PrismaClient } from '@pins/identify-consultees-database/src/client/client.ts';
 import type { Logger } from 'pino';
 import { initRedis } from '../redis/index.ts';
 import type { RedisClient } from '../redis/redis-client.ts';
@@ -30,7 +30,7 @@ export class BaseService {
 	/**
 	 * Alias of dbClient
 	 *
-	 * @returns {import('@pins/service-name-database/src/client/client.ts').PrismaClient}
+	 * @returns {import('@pins/identify-consultees-database/src/client/client.ts').PrismaClient}
 	 */
 	get db() {
 		return this.dbClient;

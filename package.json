@@ -1,5 +1,5 @@
 {
-  "name": "service-name",
+  "name": "identify-consultees",
   "version": "1.0.0",
   "license": "MIT",
   "private": true,
@@ -15,11 +15,11 @@
   "scripts": {
     "check-types": "npx tsc",
     "commitlint": "commitlint --from=$(git rev-parse $(git cherry origin/main | head -n 1 | cut -c 3-)^1)",
-    "db-migrate-dev": "npm run migrate-dev --workspace @pins/service-name-database",
-    "db-migrate-prod": "npm run migrate-prod --workspace @pins/service-name-database",
-    "db-generate": "npm run generate --workspace @pins/service-name-database",
-    "db-seed": "npm run seed --workspace @pins/service-name-database",
-    "db-seed-prod": "npm run seed-prod --workspace @pins/service-name-database",
+    "db-migrate-dev": "npm run migrate-dev --workspace @pins/identify-consultees-database",
+    "db-migrate-prod": "npm run migrate-prod --workspace @pins/identify-consultees-database",
+    "db-generate": "npm run generate --workspace @pins/identify-consultees-database",
+    "db-seed": "npm run seed --workspace @pins/identify-consultees-database",
+    "db-seed-prod": "npm run seed-prod --workspace @pins/identify-consultees-database",
     "format": "npm run format-prettier && npm run format-css",
     "format-css": "stylelint \"**/*.{css,scss}\" --fix",
     "format-prettier": "prettier --write .",

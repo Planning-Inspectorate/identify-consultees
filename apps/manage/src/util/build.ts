@@ -1,4 +1,4 @@
-import { runBuild } from '@pins/service-name-lib/util/build.ts';
+import { runBuild } from '@pins/identify-consultees-lib/util/build.ts';
 import { createRequire } from 'node:module';
 import path from 'node:path';
 import { loadBuildConfig } from '../app/config.ts';

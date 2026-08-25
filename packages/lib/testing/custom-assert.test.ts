@@ -1,4 +1,4 @@
-import { assertRenders404Page } from '@pins/service-name-lib/testing/custom-asserts.ts';
+import { assertRenders404Page } from '@pins/identify-consultees-lib/testing/custom-asserts.ts';
 import assert from 'node:assert';
 import { describe, it } from 'node:test';
 import { notFoundHandler } from '../middleware/errors.ts';

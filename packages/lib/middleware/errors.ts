@@ -1,4 +1,4 @@
-import { Prisma } from '@pins/service-name-database/src/client/client.ts';
+import { Prisma } from '@pins/identify-consultees-database/src/client/client.ts';
 import type { ErrorRequestHandler, Request, Response } from 'express';
 import type { Logger } from 'pino';
 import { ClientClosedError, ClientOfflineError } from 'redis';

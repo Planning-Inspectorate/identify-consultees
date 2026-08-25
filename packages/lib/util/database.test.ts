@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { Prisma } from '@pins/service-name-database/src/client/client.ts';
+import { Prisma } from '@pins/identify-consultees-database/src/client/client.ts';
 import assert from 'node:assert';
 import { describe, it } from 'node:test';
 import { mockLogger } from '../testing/mock-logger.ts';

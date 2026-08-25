@@ -1,5 +1,5 @@
-import { newDatabaseClient } from '@pins/service-name-database';
-import type { PrismaClient } from '@pins/service-name-database/src/client/client.ts';
+import { newDatabaseClient } from '@pins/identify-consultees-database';
+import type { PrismaClient } from '@pins/identify-consultees-database/src/client/client.ts';
 import type { Config } from './config.ts';
 
 /**

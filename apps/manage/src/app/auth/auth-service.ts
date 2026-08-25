@@ -1,7 +1,7 @@
 import { buildMsalConfig } from '#util/auth.ts';
 import type { AccountInfo, AuthenticationResult, Configuration } from '@azure/msal-node';
 import { ConfidentialClientApplication } from '@azure/msal-node';
-import type { RedisClient } from '@pins/service-name-lib/redis/redis-client.ts';
+import type { RedisClient } from '@pins/identify-consultees-lib/redis/redis-client.ts';
 import type { RequestHandler } from 'express';
 import type { Logger } from 'pino';
 import type { Config } from '../config.ts';

@@ -1,4 +1,4 @@
-import { mockLogger } from '@pins/service-name-lib/testing/mock-logger.ts';
+import { mockLogger } from '@pins/identify-consultees-lib/testing/mock-logger.ts';
 import assert from 'node:assert';
 import { describe, it, mock } from 'node:test';
 import { configureNunjucks } from '../../../nunjucks.ts';

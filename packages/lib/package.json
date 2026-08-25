@@ -1,5 +1,5 @@
 {
-  "name": "@pins/service-name-lib",
+  "name": "@pins/identify-consultees-lib",
   "version": "0.0.0",
   "private": true,
   "main": "index.ts",
@@ -11,7 +11,7 @@
   "dependencies": {
     "@azure/identity": "*",
     "@azure/msal-node": "*",
-    "@pins/service-name-database": "*",
+    "@pins/identify-consultees-database": "*",
     "@redis/entraid": "*",
     "connect-redis": "*",
     "express-session": "*",
