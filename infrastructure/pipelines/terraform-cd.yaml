@@ -15,7 +15,7 @@ resources:
       type: github
       endpoint: Planning-Inspectorate
       name: Planning-Inspectorate/common-pipeline-templates
-      ref: refs/tags/release/3.23.0
+      ref: refs/tags/release/3.30.0
 
 extends:
   template: pipelines/terraform_plan_apply.yml@templates
@@ -34,6 +34,6 @@ extends:
     serviceConnectionPrefix: Azure DevOps Pipelines - Identify Consultees - Infrastructure
     storageAccountName: pinssttfstateconsultees
     resourceGroupName: pins-rg-shared-terraform-uks
-    containerPrefix: terraform-state-pinssttfstateconsultees
+    containerPrefix: terraform-state-consultees-
     workingDirectory: $(Build.Repository.LocalPath)/infrastructure
     environmentVarFilePath: $(Build.Repository.LocalPath)/infrastructure/environments
