@@ -1,0 +1,154 @@
+
+resource "azurerm_log_analytics_workspace" "main" {
+  name                = "${local.org}-log-${local.resource_suffix}"
+  location            = module.primary_region.location
+  resource_group_name = azurerm_resource_group.primary.name
+  sku                 = "PerGB2018"
+  retention_in_days   = 30
+  daily_quota_gb      = var.monitoring_config.log_daily_cap
+
+  tags = local.tags
+}
+
+resource "azurerm_application_insights" "main" {
+  name                 = "${local.org}-ai-${local.resource_suffix}"
+  location             = module.primary_region.location
+  resource_group_name  = azurerm_resource_group.primary.name
+  workspace_id         = azurerm_log_analytics_workspace.main.id
+  application_type     = "web"
+  daily_data_cap_in_gb = 10
+
+  tags = local.tags
+}
+
+# availability test for the web app
+resource "azurerm_application_insights_standard_web_test" "web" {
+  count = var.monitoring_config.app_insights_web_test_enabled ? 1 : 0
+
+  name                    = "${local.org}-ai-swt-${local.resource_suffix}"
+  resource_group_name     = azurerm_resource_group.primary.name
+  location                = module.primary_region.location
+  application_insights_id = azurerm_application_insights.main.id
+  geo_locations = [
+    "emea-se-sto-edge", # UK West
+    "emea-ru-msa-edge", # UK South
+    "emea-gb-db3-azr",  # North Europe
+    "emea-nl-ams-azr"   # West Europe
+  ]
+  retry_enabled = true
+  enabled       = true
+
+  request {
+    # applications list page
+    url = "https://${var.web_domains.web}/"
+  }
+  validation_rules {
+    ssl_check_enabled           = true
+    ssl_cert_remaining_lifetime = 30
+  }
+
+  tags = local.tags
+}
+
+resource "azurerm_monitor_metric_alert" "web_availability" {
+  count = var.monitoring_config.app_insights_web_test_enabled ? 1 : 0
+
+  name                = "web Availablity - ${local.resource_suffix}"
+  resource_group_name = azurerm_resource_group.primary.name
+  scopes = [
+    azurerm_application_insights_standard_web_test.web[0].id,
+    azurerm_application_insights.main.id
+  ]
+  description = "Metric alert for standard web test (availability) for the web app - which also checks the certificate"
+
+  application_insights_web_test_location_availability_criteria {
+    web_test_id           = azurerm_application_insights_standard_web_test.web[0].id
+    component_id          = azurerm_application_insights.main.id
+    failed_location_count = 1
+  }
+
+  action {
+    action_group_id = local.action_group_ids.tech
+  }
+
+  action {
+    action_group_id = local.action_group_ids.service_manager
+  }
+
+  action {
+    action_group_id = local.action_group_ids.its
+  }
+}
+
+# Log cap alert using scheduled query rules
+resource "azurerm_monitor_scheduled_query_rules_alert_v2" "log_cap" {
+  count = var.environment == "prod" ? 1 : 0
+
+  name         = "Log cap Alert"
+  display_name = "Daily logging limit (${var.monitoring_config.log_daily_cap}GB) reached for ${local.service_name} in PROD"
+  description  = "Triggered when the log Data cap is reached."
+
+  location            = module.primary_region.location
+  resource_group_name = azurerm_resource_group.primary.name
+  scopes              = [azurerm_log_analytics_workspace.main.id]
+
+  enabled                 = true
+  auto_mitigation_enabled = false
+
+  evaluation_frequency = "PT5M"
+  window_duration      = "PT5M"
+
+  criteria {
+    query                   = <<-QUERY
+      _LogOperation
+      | where Category =~ "Ingestion" | where Detail contains "OverQuota"
+      QUERY
+    time_aggregation_method = "Count"
+    threshold               = 0
+    operator                = "GreaterThan"
+  }
+
+  severity = 2
+  action {
+    action_groups = [local.action_group_ids.tech]
+  }
+}
+
+resource "azurerm_key_vault_secret" "app_insights_connection_string" {
+  #checkov:skip=CKV_AZURE_41: expiration not valid
+
+  key_vault_id = azurerm_key_vault.main.id
+  name         = "${local.service_name}-app-insights-connection-string"
+  value        = azurerm_application_insights.main.connection_string
+  content_type = "connection-string"
+
+  tags = local.tags
+}
+
+resource "azurerm_monitor_action_group" "consultees_tech" {
+  name                = "pins-ag-consultees-tech-${var.environment}"
+  resource_group_name = azurerm_resource_group.primary.name
+  short_name          = "consulteDev" # needs to be under 12 characters
+  tags                = local.tags
+
+  # we set emails in the action groups in Azure web - to avoid needing to manage emails in terraform
+  lifecycle {
+    ignore_changes = [
+      email_receiver
+    ]
+  }
+}
+
+resource "azurerm_monitor_action_group" "consultees_service_manager" {
+  name                = "pins-ag-consultees-service-manager-${var.environment}"
+  resource_group_name = azurerm_resource_group.primary.name
+  short_name          = "consulteDev" # needs to be under 12 characters
+  tags                = local.tags
+
+  # we set emails in the action groups in Azure web - to avoid needing to manage emails in terraform
+  lifecycle {
+    ignore_changes = [
+      email_receiver
+    ]
+  }
+}
