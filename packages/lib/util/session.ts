@@ -5,6 +5,9 @@ import type { RedisClient } from '../redis/redis-client.ts';
 
 const DEFAULT_SESSION_FIELD = 'cases';
 
+type SessionFieldData = Record<string, Record<string, unknown>>;
+type SessionRecord = Record<string, SessionFieldData>;
+
 interface InitSessionOptions {
 	redis: RedisClient | null;
 	secure: boolean;
@@ -49,13 +52,14 @@ export function initSessionMiddlewareWithCsrf(opts: {
 export function addSessionData(
 	req: Request,
 	id: string,
-	data: Record<string, any>,
+	data: Record<string, unknown>,
 	sessionField: string = DEFAULT_SESSION_FIELD
 ) {
 	if (!req.session) {
 		throw new Error('request session required');
 	}
-	const field = req.session[sessionField] || (req.session[sessionField] = {});
+	const session = req.session as unknown as SessionRecord;
+	const field = session[sessionField] || (session[sessionField] = {});
 	const fieldProps = field[id] || (field[id] = {});
 	Object.assign(fieldProps, data);
 }
@@ -73,8 +77,9 @@ export function readSessionData<T>(
 	if (!req.session) {
 		return false;
 	}
-	const fieldProps = (req.session[sessionField] && req.session[sessionField][id]) || {};
-	return fieldProps[field] || defaultValue;
+	const sessionFieldData = req.session[sessionField] as SessionFieldData | undefined;
+	const fieldProps: Record<string, unknown> = (sessionFieldData && sessionFieldData[id]) || {};
+	return (fieldProps[field] as T) || defaultValue;
 }
 
 /**
@@ -89,14 +94,15 @@ export function clearSessionData(
 	if (!req.session) {
 		return; // no need to error here
 	}
+	const sessionFieldData = req.session[sessionField] as SessionFieldData | undefined;
 	if (fieldOrFields instanceof Array) {
 		fieldOrFields.forEach((field) => {
-			const fieldProps = (req.session[sessionField] && req.session[sessionField][id]) || {};
+			const fieldProps: Record<string, unknown> = (sessionFieldData && sessionFieldData[id]) || {};
 			delete fieldProps[field];
 		});
 		return;
 	}
 
-	const fieldProps = (req.session[sessionField] && req.session[sessionField][id]) || {};
+	const fieldProps: Record<string, unknown> = (sessionFieldData && sessionFieldData[id]) || {};
 	delete fieldProps[fieldOrFields];
 }
