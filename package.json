@@ -29,7 +29,8 @@
     "lint-ts": "npx eslint .",
     "prepare": "node .husky/install.mjs",
     "test": "node --test",
-    "test-coverage": "node --test --experimental-test-coverage"
+    "test-coverage": "node --test --experimental-test-coverage",
+    "test:govuk-components": "node --test packages/lib/testing/govuk-frontend-components.test.ts"
   },
   "dependencies": {
     "@azure/functions": "^4.16.2",

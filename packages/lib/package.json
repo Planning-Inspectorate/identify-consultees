@@ -5,7 +5,8 @@
   "main": "index.ts",
   "type": "module",
   "scripts": {
-    "test": "node --test"
+    "test": "node --test",
+    "test:govuk-components": "node --test testing/govuk-frontend-components.test.ts"
   },
   "license": "MIT",
   "dependencies": {
