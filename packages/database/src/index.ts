@@ -1,6 +1,6 @@
 import type { Prisma } from '@pins/identify-consultees-database/src/client/client.d.ts';
 import { PrismaClient } from '@pins/identify-consultees-database/src/client/client.ts';
-import type { DatabaseConfig } from '@pins/identify-consultees-lib/app/config-types.js';
+import type { DatabaseConfig } from '@planning-inspectorate/core/app';
 import { PrismaMssql } from '@prisma/adapter-mssql';
 import type { Logger } from 'pino';
 
