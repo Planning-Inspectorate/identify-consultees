@@ -36,11 +36,13 @@ extends:
             displayName: Cache NPM
           - template: ../steps/node_script.yml
             parameters:
+              displayName: 'npm ci'
               nodeVersion: 22
               script: npm ci
               environmentVariables:
                 npm_config_cache: $(Pipeline.Workspace)/.npm
           - template: ../steps/node_script.yml
             parameters:
+              displayName: 'npm run commitlint'
               nodeVersion: 22
               script: npm run commitlint
