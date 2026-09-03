@@ -1,8 +1,7 @@
-resource "azurerm_mssql_server" "primary" { # create pins-odt-sql-<env>-scheduling
-
-  # checkov:skip=CKV2_AZURE_2: ADD REASON
-  # checkov:skip=CKV_AZURE_23: Auditing to be added later
-  # checkov:skip=CKV_AZURE_24: Auditing to be added later
+resource "azurerm_mssql_server" "primary" {
+  # checkov:skip=CKV2_AZURE_2: "Ensure that Vulnerability Assessment (VA) is enabled on a SQL server by setting a Storage Account"
+  # checkov:skip=CKV_AZURE_23: "Ensure that 'Auditing' is set to 'On' for SQL servers"
+  # checkov:skip=CKV_AZURE_24: "Ensure that 'Auditing' Retention is 'greater than 90 days' for SQL servers"
 
   name                          = "${local.org}-sql-${local.service_name}-primary-${var.environment}"
   resource_group_name           = azurerm_resource_group.primary.name
@@ -48,8 +47,8 @@ resource "azurerm_private_endpoint" "sql_primary" {
 
 resource "azurerm_mssql_database" "primary" {
 
-  # checkov:skip=CKV_AZURE_229: ADD REASON
-  # checkov:skip=CKV_AZURE_224: TODO: Ensure that the Ledger feature is enabled on database that requires cryptographic proof and nonrepudiation of data integrity
+  # checkov:skip=CKV_AZURE_229: "Ensure the Azure SQL Database Namespace is zone redundant"
+  # checkov:skip=CKV_AZURE_224: "Ensure that the Ledger feature is enabled on database that requires cryptographic proof and nonrepudiation of data integrity"
 
   name        = "${local.org}-sqldb-${local.resource_suffix}"
   server_id   = azurerm_mssql_server.primary.id

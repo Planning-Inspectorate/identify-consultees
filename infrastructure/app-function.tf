@@ -1,13 +1,11 @@
 resource "azurerm_storage_account" "functions" {
-  #checkov:skip=CKV_AZURE_33: Logging not implemented yet
-  #checkov:skip=CKV_AZURE_43: "Ensure Storage Accounts adhere to the naming rules"
-  #checkov:skip=CKV_AZURE_206: "Ensure that Storage Accounts use replication"
-  #checkov:skip=CKV2_AZURE_1: Customer Managed Keys not implemented yet
-  #checkov:skip=CKV2_AZURE_8: Logging not implemented yet
-  #checkov:skip=CKV2_AZURE_18: Customer Managed Keys not implemented yet
-  #checkov:skip=CKV2_AZURE_38: "Ensure soft-delete is enabled on Azure storage account"
-  #checkov:skip=CKV2_AZURE_40: "Ensure storage account is not configured with Shared Key authorization"
-  #checkov:skip=CKV2_AZURE_41: "Ensure storage account is configured with SAS expiration policy"
+  # checkov:skip=CKV_AZURE_33: "Ensure Storage logging is enabled for Queue service for read, write and delete requests"
+  # checkov:skip=CKV2_AZURE_40: "Ensure storage account is not configured with Shared Key authorization
+  # checkov:skip=CKV2_AZURE_41: "Ensure storage account is configured with SAS expiration policy"
+  # checkov:skip=CKV2_AZURE_38: "Ensure soft-delete is enabled on Azure storage account"
+  # checkov:skip=CKV2_AZURE_1: "Ensure storage for critical data are encrypted with Customer Managed Key"
+  # checkov:skip=CKV_AZURE_43: "Ensure Storage Accounts adhere to the naming rules"
+
   name                             = "pinsstfuncconsultee${local.environment}"
   resource_group_name              = azurerm_resource_group.primary.name
   location                         = module.primary_region.location

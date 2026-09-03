@@ -1,17 +1,11 @@
 
 resource "azurerm_storage_account" "sql_server" {
-
-  # checkov:skip=CKV_AZURE_35:  Network access restrictions
-  # checkov:skip=CKV_AZURE_33:  Not using queues, could implement example commented out
-  # checkov:skip=CKV_AZURE_43:  Ensure Storage Accounts adhere to the naming rules
-  # checkov:skip=CKV_AZURE_59:  TODO: Ensure that Storage accounts disallow public access
-  # checkov:skip=CKV2_AZURE_1:  Customer Managed Keys not implemented yet
-  # checkov:skip=CKV2_AZURE_18: Customer Managed Keys not implemented yet
-  # checkov:skip=CKV2_AZURE_21: Logging not implemented yet
-  # checkov:skip=CKV2_AZURE_33: ADD REASON
-  # checkov:skip=CKV2_AZURE_38: ADD REASON
-  # checkov:skip=CKV2_AZURE_40: ADD REASON
-  # checkov:skip=CKV2_AZURE_41: ADD REASON
+  # checkov:skip=CKV_AZURE_33: "Ensure Storage logging is enabled for Queue service for read, write and delete requests"
+  # checkov:skip=CKV2_AZURE_40: "Ensure storage account is not configured with Shared Key authorization
+  # checkov:skip=CKV2_AZURE_41: "Ensure storage account is configured with SAS expiration policy"
+  # checkov:skip=CKV2_AZURE_38: "Ensure soft-delete is enabled on Azure storage account"
+  # checkov:skip=CKV2_AZURE_1: "Ensure storage for critical data are encrypted with Customer Managed Key"
+  # checkov:skip=CKV_AZURE_43: "Ensure Storage Accounts adhere to the naming rules"
 
   name                             = "pinsstsqlconsultee${local.environment}"
   resource_group_name              = azurerm_resource_group.primary.name
@@ -59,8 +53,7 @@ resource "azurerm_private_endpoint" "sql_storage" {
 
 resource "azurerm_storage_container" "sql_server" {
 
-  # checkov:skip=CKV2_AZURE_21 Logging not implemented yet
-
+  # checkov:skip=CKV2_AZURE_21: "Ensure Storage logging is enabled for Blob service for read requests"
   name                  = "sqlvulnerabilityassessment"
   storage_account_id    = azurerm_storage_account.sql_server.id
   container_access_type = "private"
@@ -99,9 +92,9 @@ resource "azurerm_mssql_server_security_alert_policy" "sql_server" {
 resource "azurerm_mssql_server_vulnerability_assessment" "consultees_sql_server" {
   count = var.alerts_enabled ? 1 : 0
 
-  #checkov:skip=CKV2_AZURE_3: scans enabled by env
-  #checkov:skip=CKV2_AZURE_4: false positive?
-  #checkov:skip=CKV2_AZURE_5: false positive?
+  #checkov:skip=CKV2_AZURE_3: "Ensure that VA setting Periodic Recurring Scans is enabled on a SQL server"
+  #checkov:skip=CKV2_AZURE_4: "Ensure Azure SQL server ADS VA Send scan reports to is configured"
+  #checkov:skip=CKV2_AZURE_5: "Ensure that VA setting 'Also send email notifications to admins and subscription owners' is set for a SQL server"
 
   server_security_alert_policy_id = azurerm_mssql_server_security_alert_policy.sql_server.id
   storage_container_path          = "${azurerm_storage_account.sql_server.primary_blob_endpoint}${azurerm_storage_container.sql_server.name}/"
