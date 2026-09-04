@@ -4,8 +4,20 @@ import { createMonitoringRoutes } from '@planning-inspectorate/core/controllers'
 import { cacheNoCacheMiddleware } from '@planning-inspectorate/core/middleware';
 import type { IRouter } from 'express';
 import { Router as createRouter } from 'express';
+import rateLimit from 'express-rate-limit';
 import { createRoutes as createItemRoutes } from './views/items/index.ts';
 import { createErrorRoutes } from './views/static/error/index.ts';
+
+/**
+ * Limit auth endpoints to reduce abuse of MSAL sign-in and redirect handlers.
+ * @see https://codeql.github.com/codeql-query-help/javascript/js-missing-rate-limiting/
+ */
+const authRateLimiter = rateLimit({
+	windowMs: 15 * 60 * 1000,
+	limit: 100,
+	standardHeaders: 'draft-8',
+	legacyHeaders: false
+});
 
 /**
  * Main app router
@@ -26,7 +38,7 @@ export function buildRouter(service: ManageService): IRouter {
 
 	if (!service.authDisabled) {
 		service.logger.info('registering auth routes');
-		router.use('/auth', authRoutes);
+		router.use('/auth', authRateLimiter, authRoutes);
 
 		// all subsequent routes require auth
 
