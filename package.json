@@ -46,6 +46,7 @@
     "date-fns": "^4.4.0",
     "date-fns-tz": "^3.2.0",
     "express": "^5.2.1",
+    "express-rate-limit": "^8.7.0",
     "express-session": "^1.19.0",
     "express-validator": "^7.3.2",
     "govuk-frontend": "^6.5.0",
