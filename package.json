@@ -96,5 +96,11 @@
     "*.{js,ts,json,md,prisma,yml,yaml,scss}": [
       "prettier --write"
     ]
+  },
+  "overrides": {
+    "mysql2": "^3.22.0",
+    "fast-uri": "^3.1.7",
+    "qs": "^6.16.0",
+    "@humanfs/node": "^0.16.8"
   }
 }
