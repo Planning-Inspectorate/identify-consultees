@@ -106,6 +106,16 @@ variable "sql_config" {
   })
 }
 
+variable "storage" {
+  description = "Configuration for the storage account"
+  type = object({
+    replication_type = string
+  })
+  default = {
+    replication_type = "LRS"
+  }
+}
+
 variable "tags" {
   description = "A collection of tags to assign to taggable resources"
   type        = map(string)

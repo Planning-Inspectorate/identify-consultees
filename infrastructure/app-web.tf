@@ -64,6 +64,10 @@ module "app_web" {
     # sessions
     MANAGED_REDIS_URL = local.managed_redis_url
     SESSION_SECRET    = local.key_vault_refs["session-secret-web"]
+
+    #storage
+    BLOB_STORE_HOST      = azurerm_storage_account.data.primary_blob_endpoint
+    BLOB_STORE_CONTAINER = azurerm_storage_container.data.name
   }
 
   providers = {

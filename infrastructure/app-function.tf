@@ -86,6 +86,10 @@ module "function_orchestrator" {
   app_settings = {
     NODE_ENV              = var.apps_config.node_environment
     SQL_CONNECTION_STRING = local.key_vault_refs["sql-app-connection-string"]
+
+    #storage
+    BLOB_STORE_HOST      = azurerm_storage_account.data.primary_blob_endpoint
+    BLOB_STORE_CONTAINER = azurerm_storage_container.data.name
   }
 }
 
