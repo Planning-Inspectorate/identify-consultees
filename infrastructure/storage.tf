@@ -20,6 +20,10 @@ resource "azurerm_storage_account" "data" {
   https_traffic_only_enabled       = true
   min_tls_version                  = "TLS1_2"
   public_network_access_enabled    = false
+  # Entra/RBAC only for access
+  shared_access_key_enabled = false
+  # default to Entra auth for Portal access
+  default_to_oauth_authentication = true
 
   network_rules {
     default_action = "Deny"
