@@ -21,4 +21,52 @@ datasource db {
 // while we don't rely on that for security, it adds an extra layer
 // not everything needs this, but easier to make them all consistent and the increase in size (vs int) is negligible
 
-// TODO: add models here!
+// Spatial columns (`geometry`) are declared as `Unsupported("geography")` because Prisma has no
+// native geometry type. They're excluded from the generated client and must be read/written with
+// raw SQL ($queryRaw/$executeRaw) - see src/geospatial/ and src/README.md for the pattern, and the
+// migration for the hand-added spatial index + geometry_type CHECK constraint (Prisma can't
+// express either of those declaratively).
+
+/// Consultee catchment/consultation-area geometries. CaseBoundary geometries are screened against
+/// these to work out which consultees are relevant to a case.
+model ConsulteeArea {
+  id                String                   @id @default(dbgenerated("newid()")) @db.UniqueIdentifier
+  geometry          Unsupported("geography")
+  geometryType      String                   @db.NVarChar(50)
+  consulteeCategory String?                  @db.NVarChar(200)
+  consultee         String?                  @db.NVarChar(200)
+  region            String?                  @db.NVarChar(100)
+  // loose link by value, not an enforced foreign key - an area can relate to several case parts
+  // sharing one reference, so this isn't unique and can't be an FK target
+  caseReference     String?                  @db.NVarChar(50)
+  documentId        String?                  @db.UniqueIdentifier
+  consulteeId       String?                  @db.UniqueIdentifier
+  organisationId    String?                  @db.UniqueIdentifier
+  currentVersion    Int                      @default(1)
+  // JSON catch-all for anything not promoted to a named column above - SQL Server has no native
+  // JSON column type; query it with JSON_VALUE()/OPENJSON().
+  metadata          String                   @default("{}") @db.NVarChar(Max)
+  lastUpdated       DateTime                 @default(now())
+
+  @@index([caseReference])
+  @@index([consulteeCategory])
+  @@map("consultee_area")
+}
+
+/// Case/application site-boundary geometries - the subject geometries screened against
+/// ConsulteeArea.
+model CaseBoundary {
+  id            String                   @id @default(dbgenerated("newid()")) @db.UniqueIdentifier
+  geometry      Unsupported("geography")
+  geometryType  String                   @db.NVarChar(50)
+  caseReference String                   @db.NVarChar(50)
+  caseName      String                   @db.NVarChar(500)
+  fileName      String?                  @db.NVarChar(500)
+  receivedDate  DateTime?
+  acceptance    String?                  @db.NVarChar(50)
+  metadata      String                   @default("{}") @db.NVarChar(Max)
+  lastUpdated   DateTime                 @default(now())
+
+  @@index([caseReference])
+  @@map("case_boundary")
+}
