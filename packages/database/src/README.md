@@ -38,3 +38,36 @@ We follow Prisma's suggested conventions, see [naming-conventions](https://www.p
 ## Strings
 
 The default `String` type in Prisma is `nvarchar(1000)` in MSSQL. Use a more specific type if you need a larger (or smaller) string, by adding an `@db.` attribute, such as `@db.NVarChar(2000)`. See [prisma-schema-reference#microsoft-sql-server](https://www.prisma.io/docs/reference/api-reference/prisma-schema-reference#microsoft-sql-server).
+
+## Geometry columns (GEOGRAPHY)
+
+`ConsulteeArea` and `CaseBoundary` store GIS boundaries in SQL Server's native `GEOGRAPHY` type
+(WGS84 / SRID 4326). This needs the full SQL Server image locally (`docker-compose.yml`) - Azure
+SQL Edge does not support spatial types.
+
+Prisma has no native geometry type, so these columns are declared as `Unsupported("geography")`.
+That means:
+
+* They're excluded from the generated Prisma Client - there's no `prisma.consulteeArea.create(...)`
+  for the `geometry` field. Read and write them with raw SQL (`$queryRaw`/`$executeRaw`) instead -
+  see [geospatial/consultee-areas.ts](./geospatial/consultee-areas.ts) and
+  [geospatial/case-boundaries.ts](./geospatial/case-boundaries.ts) for the pattern (GeoJSON in,
+  `geography::STGeomFromText(wkt, 4326)` to write, `.STAsText()` back to GeoJSON to read).
+* Prisma can't express a spatial index or a `CHECK` constraint on `geometryType` declaratively, so
+  both are hand-added directly to the generated migration SQL after `prisma migrate dev
+  --create-only` - see the `add_geometry_tables` migration for the pattern to follow when adding
+  another geometry column. Without the spatial index (`CREATE SPATIAL INDEX ... USING
+  GEOGRAPHY_AUTO_GRID`), `STDistance`/`STIntersects` queries full-scan the table.
+
+Other things worth knowing before touching this code:
+
+* [geospatial/wkt.ts](./geospatial/wkt.ts) converts GeoJSON to/from WKT, including correcting ring
+  winding (SQL Server requires exterior rings counter-clockwise, holes clockwise, and doesn't
+  reliably reject a backwards ring - it can silently treat it as its geometric complement instead).
+  Don't skip this when writing geometry from a new source.
+* `STDistance` returns true great-circle **metres** for `geography` columns - don't compare raw
+  WGS84 degrees as if they were a distance unit, a degree of longitude is a very different distance
+  depending on latitude.
+* `caseReference` on `ConsulteeArea` is a loose link by value, not an enforced foreign key - an area
+  can relate to several boundary parts sharing one reference, so it isn't unique and can't be an FK
+  target.
