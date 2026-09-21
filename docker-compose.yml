@@ -1,17 +1,29 @@
 services:
   mssql:
-    image: mcr.microsoft.com/azure-sql-edge:latest
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    # No official arm64 Linux build - runs under amd64 emulation on Apple
+    # Silicon (Rosetta/QEMU). Slower but works; no native alternative exists.
+    # Needed (over azure-sql-edge) because Azure SQL Edge does not support
+    # the spatial (GEOGRAPHY/GEOMETRY) data type, which this project relies on.
+    platform: linux/amd64
     container_name: identify-consultees-mssql
-    platform: linux/amd64 # force platform, so ARM machines to use emulation
-    cap_add: ['SYS_PTRACE']
-    user: root
     init: true
     environment:
       - 'ACCEPT_EULA=1'
       - 'MSSQL_SA_PASSWORD=DockerDatabaseP@22word!'
     ports:
-      - 1433:1433
+      # host port 1434 (not 1433) to avoid clashing with other local SQL Server containers
+      - 1434:1433
     hostname: mssql
     volumes:
-      - ./packages/database/src/configuration/mssql.conf:/var/opt/mssql/mssql.conf
       - ./tmp/mssql-data:/var/opt/mssql/data
+    healthcheck:
+      test:
+        [
+          'CMD-SHELL',
+          "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P \"$$MSSQL_SA_PASSWORD\" -C -Q 'SELECT 1' || exit 1",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
