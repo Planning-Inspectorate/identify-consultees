@@ -1,0 +1,13 @@
+{
+	"recommendations": [
+		"dbaeumer.vscode-eslint",
+		"esbenp.prettier-vscode",
+		"editorconfig.editorconfig",
+		"stylelint.vscode-stylelint",
+		"prisma.prisma",
+		"mikestead.dotenv",
+		"hashicorp.terraform",
+		"ms-azuretools.vscode-docker",
+		"eseom.nunjucks-template"
+	]
+}
