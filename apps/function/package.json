@@ -11,10 +11,10 @@
   },
   "private": true,
   "dependencies": {
-    "@azure/functions": "4.16.2",
-    "@pins/identify-consultees-database": "0.0.0",
-    "@pins/identify-consultees-lib": "0.0.0",
-    "@planning-inspectorate/core": "1.2.0"
+    "@azure/functions": "*",
+    "@pins/identify-consultees-database": "^0.0.0",
+    "@pins/identify-consultees-lib": "^0.0.0",
+    "@planning-inspectorate/core": "*"
   },
   "imports": {
     "#pins/identify-consultees-lib/*": "./src/packages/identify-consultees-lib/*",
