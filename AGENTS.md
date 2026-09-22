@@ -1,5 +1,7 @@
 # Agent guidance
 
+This file is the single source of truth for agent instructions in this repository. [`CLAUDE.md`](./CLAUDE.md) points here.
+
 ## GitHub and pull request practices (PINS)
 
 PINS expects specific GitHub practices on their repos. Follow these for every PR in this project (and when preparing a branch for review).
@@ -44,3 +46,78 @@ When opening a PR with `gh pr create` (user-requested):
 - [ ] Summary explains the change or outcome; test plan is concrete.
 - [ ] No secrets, `.env`, or production data dumps in the diff.
 - [ ] No AI self-identification in the PR description, commits, or diff.
+
+## Building a GDS-compliant government service
+
+This service is a public-sector product. Features, UI, and technical choices should align with GDS guidance. Prefer existing GOV.UK patterns already used in this repo over inventing new ones.
+
+### Authoritative sources
+
+| Source                                                                                     | Use it for                                                                        |
+| ------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------- |
+| [GOV.UK Design System](https://design-system.service.gov.uk/)                              | Styles, components, patterns, accessibility, and frontend implementation          |
+| [Service Manual](https://www.gov.uk/service-manual)                                        | How to design, build, and run services (agile, research, technology, assessments) |
+| [Service Standard](https://www.gov.uk/service-manual/service-standard)                     | The 14 points a good government service must meet                                 |
+| [Technology Code of Practice](https://www.gov.uk/guidance/the-technology-code-of-practice) | Criteria for designing, building, and buying technology                           |
+
+Read the relevant guidance before proposing or implementing user-facing or architectural changes. Do not invent bespoke UI when a Design System component or pattern exists.
+
+### GOV.UK Design System
+
+When changing UI or frontend behaviour:
+
+- Use [GOV.UK Frontend](https://design-system.service.gov.uk/) styles, components, and patterns (via `govuk-frontend` / Nunjucks macros already in this repo).
+- Prefer documented components (for example button, error summary, text input, radios, table, notification banner) and [patterns](https://design-system.service.gov.uk/patterns/) (for example question pages, check answers, validation errors).
+- Follow Design System guidance for labels/legends, error messages, focus states, and typography — do not restyle GOV.UK components to look “custom”.
+- Keep pages accessible by default: correct heading order, accessible names, keyboard operation, and visible focus. Treat accessibility as a requirement, not a polish step.
+- Prototype and production guidance on the Design System site applies; this manage app is a production-style service, not a one-off prototype.
+
+### Service Standard (apply when building features)
+
+Use these points as a practical checklist for product and engineering work. Fuller detail: [Service Standard](https://www.gov.uk/service-manual/service-standard).
+
+1. **Understand users and their needs** — design from user research and real tasks, not internal process alone.
+2. **Solve a whole problem for users** — end-to-end journeys; avoid fragmented half-solutions.
+3. **Joined-up experience across channels** — consistent language and outcomes where users also use other channels.
+4. **Make the service simple to use** — plain language, clear questions, progressive disclosure.
+5. **Make sure everyone can use the service** — WCAG-oriented UI, inclusive content, assisted digital considerations where relevant.
+6. **Multidisciplinary team** — changes should be explainable to design, content, and ops — not only engineers.
+7. **Agile ways of working** — small increments; ship thin vertical slices.
+8. **Iterate and improve frequently** — prefer reversible releases and feedback loops over big-bang redesigns.
+9. **Secure service that protects privacy** — authz, least privilege, safe handling of personal data; see also TCoP security/privacy points.
+10. **Define success and performance data** — consider how success will be observed when adding significant journeys.
+11. **Choose the right tools and technology** — reuse existing stack and platform choices in this monorepo unless there is a clear need to change.
+12. **Make new source code open** — this repo is public; do not commit secrets, personal data, or non-disclosable material.
+13. **Use and contribute to open standards, common components and patterns** — Design System, shared PINS packages, open standards over one-offs.
+14. **Operate a reliable service** — health checks, logging, sensible failure modes, and supportable config.
+
+### Technology Code of Practice (engineering defaults)
+
+Align technical decisions with the [Technology Code of Practice](https://www.gov.uk/guidance/the-technology-code-of-practice), especially:
+
+- **User needs first** — technology serves the journey, not the other way around.
+- **Accessible and inclusive** — infrastructure and interfaces must not exclude users.
+- **Open source and open standards** — prefer open libraries and interoperable formats already accepted in government.
+- **Cloud first** — stay consistent with the existing Azure / cloud deployment model unless directed otherwise.
+- **Secure by design** — threat-aware defaults, dependency hygiene, no secrets in git.
+- **Privacy integral** — minimise personal data; do not log sensitive payloads.
+- **Share, reuse, collaborate** — reuse `@planning-inspectorate/core`, GOV.UK Frontend, and existing patterns before adding new frameworks.
+- **Integrate and adapt** — fit the monorepo (`apps/*`, `packages/*`) and existing pipelines.
+- **Sustainable and supportable** — simple, documented, testable changes over clever abstractions.
+- **Meet the Service Standard** — TCoP point 13: service work must still satisfy the Service Standard above.
+
+### Service Manual (delivery context)
+
+Use the [Service Manual](https://www.gov.uk/service-manual) for wider delivery topics when relevant to the task: accessibility and assisted digital, agile delivery, design, measuring success, service assessments, technology, team working, and user research. If a change would affect assessment posture (accessibility, security, reliability, openness), call that out in the PR summary.
+
+### Agent checklist for GDS-aligned changes
+
+Before implementing or opening a PR that affects users or architecture:
+
+- [ ] Checked Design System for an existing component/pattern before adding custom UI.
+- [ ] Used existing GOV.UK Frontend / Nunjucks patterns already in this codebase where possible.
+- [ ] Content is plain language; errors follow Design System error patterns.
+- [ ] Accessibility considered (semantics, focus, contrast via Design System defaults, keyboard use).
+- [ ] Security and privacy considered (auth, validation, data minimisation, no secrets).
+- [ ] Reused shared packages/patterns rather than introducing a parallel stack.
+- [ ] PR summary notes any Service Standard / TCoP impact when material.
