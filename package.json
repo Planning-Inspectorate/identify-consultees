@@ -28,6 +28,7 @@
     "lint-css": "stylelint \"**/*.{css,scss}\"",
     "lint-ts": "npx eslint .",
     "prepare": "node .husky/install.mjs",
+    "start": "node scripts/start-local.mjs",
     "test": "node --test",
     "test-coverage": "node --test --experimental-test-coverage"
   },

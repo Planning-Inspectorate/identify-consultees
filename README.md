@@ -7,12 +7,9 @@ This is the monorepo for the Identify consultees service. This is a GIS tool for
 * install Node 22+ (see `.nvmrc`)
 * install Docker
 * `npm i`
-* `docker compose up` (to start a database)
-* copy `packages/database/.env.example` to `.env`
-* copy `apps/manage/.env.example` to `.env`
-* Get the `AUTH_*` env vars from a dev and add to `apps/manage/.env` (or set `AUTH_DISABLED=true`)
-* run `npm run db-migrate-dev` to setup the database
-* run `apps/manage>npm run dev` to start the manage app
+* `npm start` — creates local `.env` files if missing, starts SQL Server, runs migrations, and launches the manage app at http://localhost:8090
+
+For Entra auth locally, set `AUTH_DISABLED=false` in `apps/manage/.env` and fill in the `AUTH_*` values from a teammate.
 
 For contribution guidelines see [CONTRIBUTING.md](./CONTRIBUTING.md). To report a security vulnerability see [SECURITY.md](./SECURITY.md).
 
