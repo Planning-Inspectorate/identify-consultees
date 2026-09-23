@@ -6,7 +6,6 @@
 		"allowJs": true,
 		"allowSyntheticDefaultImports": true,
 		"checkJs": false,
-		"erasableSyntaxOnly": true,
 		"esModuleInterop": true,
 		"module": "NodeNext",
 		"moduleResolution": "nodenext",
