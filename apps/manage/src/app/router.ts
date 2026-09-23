@@ -2,31 +2,45 @@ import type { ManageService } from '#service';
 import { createRoutesAndGuards as createAuthRoutesAndGuards } from '@planning-inspectorate/core/auth';
 import { createMonitoringRoutes } from '@planning-inspectorate/core/controllers';
 import { cacheNoCacheMiddleware } from '@planning-inspectorate/core/middleware';
-import type { IRouter } from 'express';
+import type { IRouter, RequestHandler } from 'express';
 import { Router as createRouter } from 'express';
 import rateLimit from 'express-rate-limit';
 import { createRoutes as createItemRoutes } from './views/items/index.ts';
 import { createErrorRoutes } from './views/static/error/index.ts';
 
+export type AuthRateLimiterOptions = {
+	windowMs?: number;
+	limit?: number;
+};
+
 /**
  * Limit auth endpoints to reduce abuse of MSAL sign-in and redirect handlers.
  * @see https://codeql.github.com/codeql-query-help/javascript/js-missing-rate-limiting/
  */
-const authRateLimiter = rateLimit({
-	windowMs: 15 * 60 * 1000,
-	limit: 100,
-	standardHeaders: 'draft-8',
-	legacyHeaders: false
-});
+export function buildAuthRateLimiter(options: AuthRateLimiterOptions = {}): RequestHandler {
+	return rateLimit({
+		windowMs: options.windowMs ?? 15 * 60 * 1000,
+		limit: options.limit ?? 100,
+		standardHeaders: 'draft-8',
+		legacyHeaders: false,
+		// Tests and local setups often omit X-Forwarded-For
+		validate: { xForwardedForHeader: false }
+	});
+}
+
+export type BuildRouterOptions = {
+	authRateLimiter?: RequestHandler;
+};
 
 /**
  * Main app router
  */
-export function buildRouter(service: ManageService): IRouter {
+export function buildRouter(service: ManageService, options: BuildRouterOptions = {}): IRouter {
 	const router = createRouter();
 	const monitoringRoutes = createMonitoringRoutes(service);
 	const { router: authRoutes, guards: authGuards } = createAuthRoutesAndGuards(service);
 	const itemsRoutes = createItemRoutes(service);
+	const authRateLimiter = options.authRateLimiter ?? buildAuthRateLimiter();
 
 	router.use('/', monitoringRoutes);
 

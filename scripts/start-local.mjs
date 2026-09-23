@@ -11,8 +11,9 @@ import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
+// Host port 1434 matches docker-compose.yml (avoids clashing with other local SQL Server containers)
 const sqlConnectionString =
-	'sqlserver://localhost:1433;database=identify-consultees;user=sa;password=DockerDatabaseP@22word!;trustServerCertificate=true';
+	'sqlserver://localhost:1434;database=identify-consultees;user=sa;password=DockerDatabaseP@22word!;trustServerCertificate=true';
 
 async function exists(filePath) {
 	try {
@@ -93,8 +94,8 @@ async function main() {
 	console.log('Starting database container...');
 	await run('docker', ['compose', 'up', '-d']);
 
-	console.log('Waiting for SQL Server on localhost:1433...');
-	await waitForPort(1433);
+	console.log('Waiting for SQL Server on localhost:1434...');
+	await waitForPort(1434);
 
 	// SQL Edge can accept TCP before it is ready for logins/migrations.
 	await new Promise((resolve) => setTimeout(resolve, 5000));
