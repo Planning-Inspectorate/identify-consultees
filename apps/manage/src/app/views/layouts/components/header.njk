@@ -1,23 +1,50 @@
+{% from "govuk/components/generic-header/macro.njk" import govukGenericHeader %}
 {% from "govuk/components/service-navigation/macro.njk" import govukServiceNavigation %}
-{% from "ui/header/pins-header.njk" import pinsHeader %}
 
-{% macro header(serviceName) %}
-    {{ pinsHeader({isExternal: false}) }}
+{#
+  PINS branded chrome shared by all manage pages.
 
-    {{ govukServiceNavigation({
-        serviceName: serviceName,
-        serviceUrl: "/",
-        classes: 'pins-service-navigation',
-        navigation: [
-            {
-                href: "/",
-                text: "Home",
-                active: true
-            },
-            {
-                href: "/auth/signout",
-                text: "Sign out"
-            }
-        ]
-    }) }}
+  Header: GOV.UK Frontend `govukGenericHeader` + PINS landscape logo + govuk-overrides styles.
+  (Do not use `govukHeader` — GOV.UK Frontend 6 reserves that for services on GOV.UK.)
+
+  Navigation: GOV.UK Frontend `govukServiceNavigation`.
+#}
+
+{% macro pinsServiceHeader() %}
+	{% set pinsLogo %}
+		<span class="govuk-visually-hidden">Planning Inspectorate</span>
+		<span aria-hidden="true">
+			{% include "ui/header/pins-landscape-logo.njk" %}
+		</span>
+	{% endset %}
+
+	{{ govukGenericHeader({
+		url: "/",
+		classes: "pins-header",
+		logoHtml: pinsLogo
+	}) }}
+{% endmacro %}
+
+{% macro pinsServiceNavigation(serviceName, hideSignOut = false) %}
+	{% set navigationItems = [
+		{
+			href: "/",
+			text: "Home",
+			active: not hideSignOut
+		}
+	] %}
+
+	{% if not hideSignOut %}
+		{% set navigationItems = (navigationItems.push({
+			href: "/auth/signout",
+			text: "Sign out"
+		}), navigationItems) %}
+	{% endif %}
+
+	{{ govukServiceNavigation({
+		serviceName: serviceName,
+		serviceUrl: "/",
+		classes: "pins-service-navigation",
+		navigation: navigationItems
+	}) }}
 {% endmacro %}

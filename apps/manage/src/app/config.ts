@@ -123,7 +123,7 @@ export function loadConfig(): Config {
 				applicationAccess: AUTH_GROUP_APPLICATION_ACCESS || ''
 			},
 			redirectUri: `${protocol}${APP_HOSTNAME}/auth/redirect`,
-			signoutUrl: 'https://login.microsoftonline.com/common/oauth2/v2.0/logout'
+			signoutUrl: `https://login.microsoftonline.com/common/oauth2/v2.0/logout?post_logout_redirect_uri=${encodeURIComponent(`${protocol}${APP_HOSTNAME}/signed-out`)}`
 		},
 		cacheControl: {
 			maxAge: CACHE_CONTROL_MAX_AGE || '1d'

@@ -6,8 +6,9 @@ $font-family: arial, helvetica, sans-serif;
 	// https://www.gov.uk/service-manual/design/making-your-service-look-like-govuk#if-your-service-isnt-on-govuk
 	$govuk-font-family: $font-family
 );
-@use 'node_modules/@planning-inspectorate/core/dist/ui/header/pins-header';
-@use 'node_modules/@planning-inspectorate/core/dist/ui/footer/pins-footer';
+
+// PINS branding for GOV.UK Frontend macros (header/nav) and PINS footer
+@use 'govuk-overrides';
 
 // set font-family for any autocomplete menu items
 /* stylelint-disable-next-line selector-class-pattern */
@@ -23,4 +24,26 @@ $font-family: arial, helvetica, sans-serif;
 
 .pins-white-space-pre-wrap {
 	white-space: pre-wrap;
+}
+
+// Align a GOV.UK input and button on one row (search pattern)
+.pins-inline-search {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0 15px;
+	align-items: flex-end;
+
+	&__field {
+		flex: 1 1 16rem;
+		min-width: min(100%, 16rem);
+		max-width: 30rem;
+	}
+
+	&__input {
+		width: 100%;
+	}
+
+	&__button {
+		margin-bottom: 2px;
+	}
 }

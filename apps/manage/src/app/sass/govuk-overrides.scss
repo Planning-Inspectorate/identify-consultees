@@ -1,0 +1,46 @@
+// PINS branding overrides for GOV.UK Frontend components used off GOV.UK.
+// Prefer these over hand-rolled component HTML where a GOV.UK macro exists.
+@use 'node_modules/@planning-inspectorate/core/dist/ui/brand/pins-colors' as brand;
+@use 'node_modules/@planning-inspectorate/core/dist/ui/footer/pins-footer';
+@use 'node_modules/govuk-frontend/dist/govuk/index' as govuk;
+
+// ---------------------------------------------------------------------------
+// Header — styles `govukGenericHeader` to match existing PINS manage chrome
+// ---------------------------------------------------------------------------
+.govuk-generic-header.pins-header {
+	min-height: 60px;
+	padding: 1rem 1rem 0;
+	background: brand.$pins-grey-100;
+	border-bottom: 0.5rem solid brand.$pins-green-200;
+
+	.govuk-generic-header__homepage-link {
+		display: inline-block;
+		text-decoration: none;
+	}
+
+	svg {
+		display: block;
+		height: 40px;
+
+		rect {
+			fill: brand.$pins-mhclg-green;
+		}
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Service navigation — match PINS internal manage apps
+// ---------------------------------------------------------------------------
+.govuk-service-navigation.pins-service-navigation {
+	background: brand.$pins-grey-100;
+	border-bottom: none;
+
+	.govuk-service-navigation__item {
+		border-color: govuk.govuk-colour('black');
+	}
+
+	.govuk-service-navigation__link,
+	.govuk-service-navigation__link:hover {
+		color: govuk.govuk-colour('black');
+	}
+}

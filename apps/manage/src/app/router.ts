@@ -6,6 +6,7 @@ import type { IRouter, RequestHandler } from 'express';
 import { Router as createRouter } from 'express';
 import rateLimit from 'express-rate-limit';
 import { createRoutes as createConsulteeAreasPythonRoutes } from './views/consultee-areas-python/index.ts';
+import { createRoutes as createHomeRoutes } from './views/home/index.ts';
 import { createRoutes as createItemRoutes } from './views/items/index.ts';
 import { createErrorRoutes } from './views/static/error/index.ts';
 
@@ -40,6 +41,7 @@ export function buildRouter(service: ManageService, options: BuildRouterOptions 
 	const router = createRouter();
 	const monitoringRoutes = createMonitoringRoutes(service);
 	const { router: authRoutes, guards: authGuards } = createAuthRoutesAndGuards(service);
+	const homeRoutes = createHomeRoutes(service);
 	const itemsRoutes = createItemRoutes(service);
 	const consulteeAreasPythonRoutes = createConsulteeAreasPythonRoutes(service);
 	const authRateLimiter = options.authRateLimiter ?? buildAuthRateLimiter();
@@ -51,6 +53,12 @@ export function buildRouter(service: ManageService, options: BuildRouterOptions 
 	router.use(cacheNoCacheMiddleware);
 
 	router.get('/unauthenticated', (req, res) => res.status(401).render('views/errors/401.njk'));
+
+	router.get('/signed-out', (_req, res) => {
+		res.render('views/signed-out/view.njk', {
+			signInHref: service.authDisabled ? '/' : '/auth/signin'
+		});
+	});
 
 	if (!service.authDisabled) {
 		service.logger.info('registering auth routes');
@@ -64,9 +72,22 @@ export function buildRouter(service: ManageService, options: BuildRouterOptions 
 		router.use(authGuards.assertGroupAccess);
 	} else {
 		service.logger.warn('auth disabled; auth routes and guards skipped');
+
+		// Keep the header "Sign out" link working locally without Entra
+		router.get('/auth/signout', (req, res, next) => {
+			req.session.destroy((error) => {
+				if (error) {
+					next(error);
+					return;
+				}
+				res.setHeader('Clear-Site-Data', '*');
+				res.clearCookie('connect.sid', { path: '/' });
+				res.redirect('/signed-out');
+			});
+		});
 	}
 
-	router.get('/', (req, res) => res.redirect('/items'));
+	router.use('/', homeRoutes);
 	router.use('/items', itemsRoutes);
 	router.use('/consultee-areas-python', consulteeAreasPythonRoutes);
 	router.use('/error', createErrorRoutes(service));

@@ -2,7 +2,8 @@
 
 {% from "govuk/components/back-link/macro.njk" import govukBackLink %}
 {% from "govuk/components/error-summary/macro.njk" import govukErrorSummary %}
-{% from "views/layouts/components/header.njk" import header %}
+{% from "govuk/components/phase-banner/macro.njk" import govukPhaseBanner %}
+{% from "views/layouts/components/header.njk" import pinsServiceHeader, pinsServiceNavigation %}
 {% from "ui/footer/pins-footer.njk" import pinsFooter %}
 
 {% block head %}
@@ -18,14 +19,35 @@
 	{% endif %}
 {% endblock %}
 
-{% block header %}
-	{{ header(config.headerTitle) }}
+{#
+  Header chrome:
+  - `govukGenericHeader` (via pinsServiceHeader) + govuk-overrides.scss
+  - `govukServiceNavigation` (via pinsServiceNavigation)
+
+  Footer chrome:
+  - `pinsFooter` from @planning-inspectorate/core (raw HTML macro).
+    There is no GOV.UK generic footer; `govukFooter` is only for services on GOV.UK.
+#}
+{% block govukHeader %}
+	{{ pinsServiceHeader() }}
+{% endblock %}
+
+{% block govukServiceNavigation %}
+	{{ pinsServiceNavigation(config.headerTitle, hideSignOut) }}
 {% endblock %}
 
 {% block containerStart %}
 	<script {% if cspNonce %}nonce={{ cspNonce }}{% endif %}>
 		document.body.className += ' js-enabled' + ('noModule' in HTMLScriptElement.prototype ? ' govuk-frontend-supported' : '');
 	</script>
+	{% block phaseBanner %}
+		{{ govukPhaseBanner({
+			tag: {
+				text: "Beta"
+			},
+			html: 'This is a new service. Help us improve it and <a class="govuk-link" href="https://www.gov.uk/government/organisations/planning-inspectorate" rel="noreferrer noopener" target="_blank">give your feedback (opens in a new tab)</a>.'
+		}) }}
+	{% endblock %}
 	{% block backLink %}
 		{% if backLinkUrl and backLinkText %}
 			{{ govukBackLink({ text: backLinkText, href: backLinkUrl }) }}
@@ -72,6 +94,10 @@
 	{% endblock %}
 
 {% block footer %}
+	{#
+	  pinsFooter renders its own <footer>, so replace the whole footer block
+	  (do not nest inside govuk-template__footer).
+	#}
 	{{ pinsFooter(config.footerLinks) }}
 
 	<script type="module" {% if cspNonce %}nonce={{ cspNonce }}{% endif %} src="/assets/js/govuk-frontend.min.js"></script>
