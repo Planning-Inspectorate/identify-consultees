@@ -1,4 +1,11 @@
 import { eslintConfig } from '@planning-inspectorate/coding-standards';
 import { defineConfig } from 'eslint/config';
 
-export default defineConfig(eslintConfig);
+export default defineConfig([
+	{
+		// Python app, not JS/TS - its local .venv (present after local setup, see its README)
+		// contains vendored JS files that ESLint would otherwise try to lint
+		ignores: ['apps/function-python/**']
+	},
+	eslintConfig
+]);
