@@ -34,6 +34,13 @@ export const ENVIRONMENT_NAME: ENVIRONMENT_NAMES = Object.freeze({
 let config: Config | undefined;
 
 /**
+ * Clear cached config. Used by unit tests when mutating process.env between cases.
+ */
+export function resetConfigCache(): void {
+	config = undefined;
+}
+
+/**
  * Load configuration from the environment
  */
 export function loadConfig(): Config {
