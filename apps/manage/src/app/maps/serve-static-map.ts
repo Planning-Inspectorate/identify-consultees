@@ -3,19 +3,19 @@
  */
 
 import {
-	buildGoogleStaticMapUrl,
-	fetchOsmBasemapTiles,
-	googleMapsApiKeyFromEnv,
-	renderStaticMapSvg,
-	type StaticMapBuildOptions
-} from './static-map.ts';
-import {
 	STATIC_MAP_CACHE_CONTROL,
 	buildStaticMapFingerprint,
 	etagFromFingerprint,
 	etagMatches,
 	type StaticMapFingerprintInput
 } from './static-map-cache.ts';
+import {
+	buildGoogleStaticMapUrl,
+	fetchOsmBasemapTiles,
+	googleMapsApiKeyFromEnv,
+	renderStaticMapSvg,
+	type StaticMapBuildOptions
+} from './static-map.ts';
 
 export type StaticMapResponseBody = {
 	status: number;

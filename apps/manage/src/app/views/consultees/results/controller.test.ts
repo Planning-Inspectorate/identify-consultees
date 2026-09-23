@@ -54,10 +54,7 @@ describe('consultees results page', () => {
 
 		try {
 			const handler = buildSectionStaticMap({ logger: mockLogger() }, true);
-			await handler(
-				{ params: { geometryId: 'geo-1', sectionId: 'ambulance-trusts' }, headers: {} },
-				mockRes
-			);
+			await handler({ params: { geometryId: 'geo-1', sectionId: 'ambulance-trusts' }, headers: {} }, mockRes);
 			assert.strictEqual(mockRes.status.mock.calls[0].arguments[0], 200);
 			assert.match(String(mockRes.type.mock.calls[0].arguments[0]), /image\/svg\+xml/);
 			assert.match(String(mockRes.set.mock.calls[0].arguments[0]['Cache-Control']), /max-age=/);

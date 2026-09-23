@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import { describe, it, mock } from 'node:test';
+import { buildConsulteeAreaGeojson, buildProjectSiteGeojson } from './sample-geojson.ts';
 import { buildConsulteeStaticMapResponse } from './serve-static-map.ts';
 import { clearOsmTileCacheForTests, osmTileCacheSizeForTests } from './static-map.ts';
-import { buildProjectSiteGeojson, buildConsulteeAreaGeojson } from './sample-geojson.ts';
 
 const tinyPng = Buffer.from(
 	'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
@@ -32,8 +32,7 @@ describe('serve-static-map', () => {
 			sectionId: 'ambulance-trusts',
 			map,
 			forceSvg: true,
-			fetchImpl: async () =>
-				new Response(tinyPng, { status: 200, headers: { 'content-type': 'image/png' } })
+			fetchImpl: async () => new Response(tinyPng, { status: 200, headers: { 'content-type': 'image/png' } })
 		});
 		assert.equal(first.status, 200);
 

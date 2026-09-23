@@ -90,7 +90,8 @@ describe('manage loadConfig', () => {
 		setBaseEnv({
 			AUTH_DISABLED: 'true',
 			NODE_ENV: 'production',
-			AUTH_CLIENT_ID: undefined
+			// Empty string (not delete): loadEnvFile must not restore values from a local .env
+			AUTH_CLIENT_ID: ''
 		});
 		assert.throws(() => loadConfig(), /AUTH_CLIENT_ID must be a non-empty string/);
 	});
@@ -98,7 +99,7 @@ describe('manage loadConfig', () => {
 	test('requires auth fields when auth is enabled', () => {
 		setBaseEnv({
 			AUTH_DISABLED: 'false',
-			AUTH_CLIENT_ID: undefined
+			AUTH_CLIENT_ID: ''
 		});
 		assert.throws(() => loadConfig(), /AUTH_CLIENT_ID must be a non-empty string/);
 	});
@@ -114,7 +115,8 @@ describe('manage loadConfig', () => {
 
 describe('manage loadEnvironmentConfig', () => {
 	test('throws when ENVIRONMENT is missing', () => {
-		delete process.env.ENVIRONMENT;
+		// Empty string (not delete): loadEnvFile must not restore values from a local .env
+		process.env.ENVIRONMENT = '';
 		assert.throws(() => loadEnvironmentConfig(), /ENVIRONMENT is required/);
 	});
 
