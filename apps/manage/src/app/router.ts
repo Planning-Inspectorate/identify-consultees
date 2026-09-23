@@ -5,6 +5,7 @@ import { cacheNoCacheMiddleware } from '@planning-inspectorate/core/middleware';
 import type { IRouter, RequestHandler } from 'express';
 import { Router as createRouter } from 'express';
 import rateLimit from 'express-rate-limit';
+import { createRoutes as createConsulteeAreasPythonRoutes } from './views/consultee-areas-python/index.ts';
 import { createRoutes as createItemRoutes } from './views/items/index.ts';
 import { createErrorRoutes } from './views/static/error/index.ts';
 
@@ -40,6 +41,7 @@ export function buildRouter(service: ManageService, options: BuildRouterOptions 
 	const monitoringRoutes = createMonitoringRoutes(service);
 	const { router: authRoutes, guards: authGuards } = createAuthRoutesAndGuards(service);
 	const itemsRoutes = createItemRoutes(service);
+	const consulteeAreasPythonRoutes = createConsulteeAreasPythonRoutes(service);
 	const authRateLimiter = options.authRateLimiter ?? buildAuthRateLimiter();
 
 	router.use('/', monitoringRoutes);
@@ -66,6 +68,7 @@ export function buildRouter(service: ManageService, options: BuildRouterOptions 
 
 	router.get('/', (req, res) => res.redirect('/items'));
 	router.use('/items', itemsRoutes);
+	router.use('/consultee-areas-python', consulteeAreasPythonRoutes);
 	router.use('/error', createErrorRoutes(service));
 
 	return router;
