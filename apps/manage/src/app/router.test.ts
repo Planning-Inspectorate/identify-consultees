@@ -100,11 +100,48 @@ describe('manage router wiring', () => {
 		assert.match(response.text, /Police Force Areas/);
 	});
 
+	test('GET /consultees/:id/sections/:sectionId/static-map returns a cached image', async () => {
+		const originalFetch = globalThis.fetch;
+		globalThis.fetch = async () =>
+			new Response(Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64'), {
+				status: 200,
+				headers: { 'content-type': 'image/png' }
+			});
+
+		try {
+			const response = await request(authDisabledApp).get('/consultees/geo-1/sections/ambulance-trusts/static-map');
+			assert.equal(response.status, 200);
+			assert.match(response.headers['content-type'] || '', /image\/(svg\+xml|png)/);
+			assert.match(response.headers['cache-control'] || '', /max-age=/);
+			assert.ok(response.headers.etag);
+
+			const cached = await request(authDisabledApp)
+				.get('/consultees/geo-1/sections/ambulance-trusts/static-map')
+				.set('If-None-Match', response.headers.etag);
+			assert.equal(cached.status, 304);
+		} finally {
+			globalThis.fetch = originalFetch;
+		}
+	});
+
 	test('GET /consultees/:id/sections/:sectionId/static-map.svg returns svg', async () => {
-		const response = await request(authDisabledApp).get('/consultees/geo-1/sections/ambulance-trusts/static-map.svg');
-		assert.equal(response.status, 200);
-		assert.match(response.headers['content-type'] || '', /image\/svg\+xml/);
-		assert.match(response.body.toString(), /<svg/);
+		const originalFetch = globalThis.fetch;
+		globalThis.fetch = async () =>
+			new Response(Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64'), {
+				status: 200,
+				headers: { 'content-type': 'image/png' }
+			});
+
+		try {
+			const response = await request(authDisabledApp).get(
+				'/consultees/geo-1/sections/ambulance-trusts/static-map.svg'
+			);
+			assert.equal(response.status, 200);
+			assert.match(response.headers['content-type'] || '', /image\/svg\+xml/);
+			assert.match(response.body.toString(), /<svg/);
+		} finally {
+			globalThis.fetch = originalFetch;
+		}
 	});
 
 	test('GET /unauthenticated returns 401', async () => {

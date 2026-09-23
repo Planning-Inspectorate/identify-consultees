@@ -4,7 +4,7 @@
  * Pattern ported from PINS-data-spike `uploads-map.js` / `case-map.js`:
  * - datasetsPlugin + mapKeyPlugin for layers and legend
  * - OpenFreeMap Liberty basemap
- * - Static SVG fallback via data-static-map-src when interactive init fails
+ * - Static map fallback (PNG or SVG) via data-static-map-src when interactive init fails
  */
 
 const CONSULTEE_COLOURS = ['#55A868', '#4C72B0', '#DD8452', '#8172B2', '#C44E52'];

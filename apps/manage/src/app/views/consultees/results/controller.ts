@@ -1,13 +1,13 @@
 import type { ManageService } from '#service';
 import type { AsyncRequestHandler } from '@planning-inspectorate/core/util';
 import { findDummyGeometry, findRulesetLabel } from '../../../data/dummy-geometries.ts';
+import { buildConsulteeStaticMapResponse } from '../../../maps/serve-static-map.ts';
 import {
 	buildConsulteeAreaGeojson,
 	buildProjectSiteGeojson,
 	MAP_VIEWPORT,
 	mapViewForCollections
 } from '../../../maps/sample-geojson.ts';
-import { buildStaticMapSvg } from '../../../maps/static-map-svg.ts';
 import type { ConsulteeMapSection, ConsulteesResultsViewModel } from './view-model.ts';
 
 type SectionDefinition = {
@@ -70,17 +70,11 @@ function firstQueryValue(value: unknown): string {
 	return typeof value === 'string' ? value : '';
 }
 
-function buildSectionAssets(definition: SectionDefinition, reference: string, caseName: string, geometryId: string) {
+function buildSectionMapContext(definition: SectionDefinition, reference: string, caseName: string, geometryId: string) {
 	const projectGeojson = buildProjectSiteGeojson(reference, caseName);
 	const consulteeGeojson = buildConsulteeAreaGeojson(definition.distanceLabel, definition.areas);
 	const view = mapViewForCollections(projectGeojson, consulteeGeojson);
 	const mapLabel = `${definition.distanceLabel} for ${caseName} (${reference})`;
-	const staticSvg = buildStaticMapSvg({
-		center: view.center,
-		zoom: view.zoom,
-		projectGeojson,
-		consulteeGeojson
-	});
 
 	const mapConfig = {
 		center: view.center,
@@ -100,14 +94,26 @@ function buildSectionAssets(definition: SectionDefinition, reference: string, ca
 		mapTitle: mapLabel,
 		mapRegionLabel: mapLabel,
 		consultees: definition.consultees,
-		staticMapSrc: `/consultees/${encodeURIComponent(geometryId)}/sections/${definition.id}/static-map.svg`,
+		staticMapSrc: `/consultees/${encodeURIComponent(geometryId)}/sections/${definition.id}/static-map`,
 		staticMapAlt: `Static map showing ${mapLabel}`,
 		mapWidth: MAP_VIEWPORT.width,
 		mapHeight: MAP_VIEWPORT.height,
 		mapConfigJson: JSON.stringify(mapConfig)
 	};
 
-	return { section, staticSvg };
+	return {
+		section,
+		map: {
+			center: view.center,
+			zoom: view.zoom,
+			projectGeojson,
+			consulteeGeojson,
+			width: MAP_VIEWPORT.width,
+			height: MAP_VIEWPORT.height,
+			title: `Static map of ${mapLabel}`,
+			description: `Static map showing ${mapLabel}`
+		}
+	};
 }
 
 export function buildConsulteesResultsPage(service: ManageService): AsyncRequestHandler {
@@ -127,7 +133,7 @@ export function buildConsulteesResultsPage(service: ManageService): AsyncRequest
 		logger.info({ geometryId, reference: geometry.reference }, 'consultees results page');
 
 		const sections = SECTION_DEFINITIONS.map(
-			(definition) => buildSectionAssets(definition, geometry.reference, geometry.caseName, geometry.id).section
+			(definition) => buildSectionMapContext(definition, geometry.reference, geometry.caseName, geometry.id).section
 		);
 
 		const viewModel: ConsulteesResultsViewModel = {
@@ -147,7 +153,7 @@ export function buildConsulteesResultsPage(service: ManageService): AsyncRequest
 	};
 }
 
-export function buildSectionStaticMap(service: ManageService): AsyncRequestHandler {
+export function buildSectionStaticMap(service: ManageService, forceSvg = false): AsyncRequestHandler {
 	const { logger } = service;
 
 	return async (req, res) => {
@@ -161,9 +167,30 @@ export function buildSectionStaticMap(service: ManageService): AsyncRequestHandl
 			return;
 		}
 
-		logger.debug({ geometryId, sectionId }, 'serving static consultee map svg');
-		const { staticSvg } = buildSectionAssets(definition, geometry.reference, geometry.caseName, geometry.id);
+		logger.debug({ geometryId, sectionId, forceSvg }, 'serving static consultee map');
+		const { map } = buildSectionMapContext(definition, geometry.reference, geometry.caseName, geometry.id);
+		const ifNoneMatch = typeof req.headers['if-none-match'] === 'string' ? req.headers['if-none-match'] : undefined;
+		const image = await buildConsulteeStaticMapResponse({
+			geometryId,
+			sectionId,
+			map,
+			forceSvg,
+			ifNoneMatch
+		});
 
-		res.status(200).type('image/svg+xml').set('Cache-Control', 'public, max-age=300').send(staticSvg);
+		res
+			.status(image.status)
+			.set({
+				'Cache-Control': image.cacheControl,
+				ETag: image.etag
+			})
+			.type(image.contentType);
+
+		if (image.status === 304) {
+			res.end();
+			return;
+		}
+
+		res.send(image.body);
 	};
 }

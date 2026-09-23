@@ -124,3 +124,31 @@ Before implementing or opening a PR that affects users or architecture:
 - [ ] Security and privacy considered (auth, validation, data minimisation, no secrets).
 - [ ] Reused shared packages/patterns rather than introducing a parallel stack.
 - [ ] PR summary notes any Service Standard / TCoP impact when material.
+- [ ] Static / tile map usage follows the caching rules below (no uncached hot-linking of OSM or commercial static image servers).
+
+## Maps (interactive and static)
+
+The manage app follows the PINS-data-spike pattern: **Defra Interactive Map** when JavaScript works, plus a **server-rendered static map** for noscript / progressive-enhancement failure.
+
+### Formats
+
+Non-JS / fallback maps are **not always SVG**. Depending on configuration they may be:
+
+| Format | Typical source |
+| ------ | -------------- |
+| `image/png` (or JPEG) | Google Maps Static API, or other hosted static-image endpoints |
+| `image/svg+xml` | Local SVG that embeds OpenStreetMap (or similar) **raster tiles** as PNG data URIs |
+
+Treat static maps as **binary or markup images served by our app**, never as a reason for browsers to hit third-party tile hosts directly.
+
+### Static map / tile server usage (required)
+
+OpenStreetMap tile servers and commercial static-map APIs rate-limit and block abusive clients. Agents and contributors **must**:
+
+1. **Proxy through our app** — serve `/…/static-map` (and optional `/…/static-map.svg`) from Express; do not put `tile.openstreetmap.org` (or equivalent) URLs in page HTML/CSS/JS for the static fallback.
+2. **Cache heavily** — responses must send long-lived `Cache-Control` (and preferably `ETag`). Matching `If-None-Match` must return **`304` and skip upstream Google/OSM fetches**. Prefer an in-process tile cache so repeat renders of the same viewport do not re-hit tile servers.
+3. **Keep concurrency low** when fetching tiles (small batches; identifying `User-Agent` naming this service and repo).
+4. **Only load static `<img>` when needed** — put the image in `<noscript>` and/or inject from `data-static-map-src` after interactive-map failure; never eager-load static images for JS-capable users who will use the interactive map.
+5. **Do not invent uncached polling or prefetch** of static maps or tiles (e.g. pre-warming every section on every page view without cache).
+
+When changing static-map code, preserve ETag fingerprinting of framing + geometry so validators continue to avoid unnecessary upstream work.

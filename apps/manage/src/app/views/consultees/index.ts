@@ -15,6 +15,7 @@ export function createRoutes(service: ManageService): IRouter {
 	const router = createRouter({ mergeParams: true });
 	const resultsPage = buildConsulteesResultsPage(service);
 	const staticMap = buildSectionStaticMap(service);
+	const staticMapSvg = buildSectionStaticMap(service, true);
 
 	router.get('/', (req, res) => {
 		const geometryId = firstQueryValue(req.query.geometryId);
@@ -32,7 +33,8 @@ export function createRoutes(service: ManageService): IRouter {
 		res.redirect(`/consultees/${encodeURIComponent(geometryId)}${suffix}`);
 	});
 
-	router.get('/:geometryId/sections/:sectionId/static-map.svg', asyncHandler(staticMap));
+	router.get('/:geometryId/sections/:sectionId/static-map.svg', asyncHandler(staticMapSvg));
+	router.get('/:geometryId/sections/:sectionId/static-map', asyncHandler(staticMap));
 	router.get('/:geometryId', asyncHandler(resultsPage));
 
 	return router;
