@@ -1,0 +1,24 @@
+{% extends "views/layouts/main.njk" %}
+
+{% from "govuk/components/button/macro.njk" import govukButton %}
+
+{% set hideSignOut = true %}
+{% set pageHeading = "You have signed out" %}
+
+{% block pageTitle %}
+	You have signed out - {{ config.headerTitle }}
+{% endblock %}
+
+{% block pageContent %}
+	<p class="govuk-body">
+		You have successfully signed out of Identify consultees.
+	</p>
+	<p class="govuk-body">
+		You can close this page, or sign in again to continue.
+	</p>
+
+	{{ govukButton({
+		text: "Sign in again",
+		href: signInHref
+	}) }}
+{% endblock %}

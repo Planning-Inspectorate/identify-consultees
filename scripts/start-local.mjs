@@ -24,6 +24,23 @@ async function exists(filePath) {
 	}
 }
 
+/**
+ * Older local setups used host port 1433; compose maps SQL to 1434.
+ * Rewrite only the local docker connection strings so migrate/dev can connect.
+ */
+async function repairLocalSqlPort(envPath) {
+	if (!(await exists(envPath))) {
+		return;
+	}
+
+	const contents = await readFile(envPath, 'utf8');
+	const repaired = contents.replaceAll('localhost:1433', 'localhost:1434');
+	if (repaired !== contents) {
+		await writeFile(envPath, repaired);
+		console.log(`Updated SQL host port to 1434 in ${path.relative(root, envPath)}`);
+	}
+}
+
 async function ensureEnvFiles() {
 	const databaseEnv = path.join(root, 'packages/database/.env');
 	const databaseExample = path.join(root, 'packages/database/.env.example');
@@ -46,6 +63,9 @@ async function ensureEnvFiles() {
 		await writeFile(manageEnv, contents);
 		console.log('Created apps/manage/.env (AUTH_DISABLED=true)');
 	}
+
+	await repairLocalSqlPort(databaseEnv);
+	await repairLocalSqlPort(manageEnv);
 }
 
 function run(command, args, options = {}) {

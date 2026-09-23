@@ -7,7 +7,7 @@ import { configureNunjucks } from './nunjucks.ts';
 const pageLocals = {
 	config: {
 		styleFile: 'style.css',
-		headerTitle: 'Manage template',
+		headerTitle: 'Identify consultees',
 		footerLinks: []
 	},
 	cspNonce: 'test-nonce'
@@ -73,6 +73,52 @@ describe('manage page accessibility smoke', () => {
 				{ task: 'Create new service', done: true },
 				{ task: 'Implement a new feature', done: false }
 			]
+		});
+		await assertNoSeriousA11yViolations(html);
+	});
+
+	test('home page has no serious a11y violations', async () => {
+		const html = nunjucks.render('views/home/view.njk', {
+			...pageLocals,
+			pageHeading: 'Identify consultees for an infrastructure project',
+			rulesets: [{ value: 'post-apr-2025-england-wales', text: 'Post Apr 2025 England & Wales' }],
+			selectedRuleset: 'post-apr-2025-england-wales',
+			searchQuery: 'EN01',
+			pageSize: 25,
+			pageSizeOptions: [25, 50, 100],
+			resultsFrom: 1,
+			resultsTo: 3,
+			resultsTotal: 3889,
+			selectedGeometryId: 'geo-1',
+			geometries: [
+				{
+					id: 'geo-1',
+					reference: 'EN0110036',
+					caseName: 'Gwynt Glas Offshore Wind Farm',
+					geometryProjectStage: 'Acceptance',
+					version: '3',
+					received: '03/03/2026',
+					uploadedToCbos: '10/03/2026 00:00:00'
+				},
+				{
+					id: 'geo-2',
+					reference: 'EN0110036',
+					caseName: 'Gwynt Glas Offshore Wind Farm',
+					geometryProjectStage: 'Scoping',
+					version: '2',
+					received: '15/01/2026',
+					uploadedToCbos: '20/01/2026 00:00:00'
+				}
+			]
+		});
+		await assertNoSeriousA11yViolations(html);
+	});
+
+	test('signed out page has no serious a11y violations', async () => {
+		const html = nunjucks.render('views/signed-out/view.njk', {
+			...pageLocals,
+			hideSignOut: true,
+			signInHref: '/'
 		});
 		await assertNoSeriousA11yViolations(html);
 	});

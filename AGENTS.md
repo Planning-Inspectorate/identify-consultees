@@ -66,7 +66,9 @@ Read the relevant guidance before proposing or implementing user-facing or archi
 
 When changing UI or frontend behaviour:
 
-- Use [GOV.UK Frontend](https://design-system.service.gov.uk/) styles, components, and patterns (via `govuk-frontend` / Nunjucks macros already in this repo).
+- **HTML must come from GOV.UK Frontend macros only.** Build page markup with Nunjucks macros from `govuk-frontend` (for example `govukButton`, `govukInput`, `govukSelect`, `govukTable`, `govukRadios`, `govukPhaseBanner`). Do not hand-write equivalent component HTML. This maximises accessibility, GDS compliance, and web performance (consistent markup, shared assets, and fewer bespoke patterns).
+- **Header / footer chrome:** Prefer GOV.UK Frontend macros plus `apps/manage/src/app/sass/govuk-overrides.scss` for PINS branding. Use `govukGenericHeader` (not `govukHeader`) with the PINS landscape logo, and `govukServiceNavigation`. Use `pinsFooter` from `@planning-inspectorate/core` for the footer — there is no GOV.UK generic footer, and `govukFooter` is only for services on GOV.UK (Frontend 6).
+- Layout wrappers that use Design System classes (for example `govuk-grid-row`, `govuk-width-container`, `govuk-heading-*`) and plain content text are fine; interactive and presentational UI components must still be macros.
 - Prefer documented components (for example button, error summary, text input, radios, table, notification banner) and [patterns](https://design-system.service.gov.uk/patterns/) (for example question pages, check answers, validation errors).
 - Follow Design System guidance for labels/legends, error messages, focus states, and typography — do not restyle GOV.UK components to look “custom”.
 - Keep pages accessible by default: correct heading order, accessible names, keyboard operation, and visible focus. Treat accessibility as a requirement, not a polish step.
@@ -115,6 +117,7 @@ Use the [Service Manual](https://www.gov.uk/service-manual) for wider delivery t
 Before implementing or opening a PR that affects users or architecture:
 
 - [ ] Checked Design System for an existing component/pattern before adding custom UI.
+- [ ] Page HTML uses GOV.UK Frontend macros only for UI components (no hand-rolled component markup).
 - [ ] Used existing GOV.UK Frontend / Nunjucks patterns already in this codebase where possible.
 - [ ] Content is plain language; errors follow Design System error patterns.
 - [ ] Accessibility considered (semantics, focus, contrast via Design System defaults, keyboard use).

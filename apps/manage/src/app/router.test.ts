@@ -63,10 +63,32 @@ describe('manage router wiring', () => {
 		await authDisabledService.db.$disconnect().catch(() => undefined);
 	});
 
-	test('GET / redirects to /items', async () => {
+	test('GET / renders the identify consultees home page', async () => {
 		const response = await request(authDisabledApp).get('/');
+		assert.equal(response.status, 200);
+		assert.match(response.text, /Identify consultees for an infrastructure project/);
+		assert.match(response.text, /Choose a ruleset/);
+		assert.match(response.text, /Gwynt Glas Offshore Wind Farm/);
+	});
+
+	test('GET /signed-out renders the signed out page', async () => {
+		const response = await request(authDisabledApp).get('/signed-out');
+		assert.equal(response.status, 200);
+		assert.match(response.text, /You have signed out/);
+		assert.match(response.text, /Sign in again/);
+	});
+
+	test('GET /auth/signout redirects to /signed-out when auth is disabled', async () => {
+		const response = await request(authDisabledApp).get('/auth/signout');
 		assert.equal(response.status, 302);
-		assert.equal(response.headers.location, '/items');
+		assert.equal(response.headers.location, '/signed-out');
+	});
+
+	test('GET /?pageSize=50 returns fifty geometry rows', async () => {
+		const response = await request(authDisabledApp).get('/?pageSize=50');
+		assert.equal(response.status, 200);
+		assert.match(response.text, /Showing 1 to 50 of 3889 results/);
+		assert.match(response.text, />50</);
 	});
 
 	test('GET /unauthenticated returns 401', async () => {
