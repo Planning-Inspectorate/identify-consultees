@@ -1,5 +1,6 @@
 import { eslintConfig } from '@planning-inspectorate/coding-standards';
 import { defineConfig } from 'eslint/config';
+import globals from 'globals';
 
 export default defineConfig([
 	{
@@ -7,5 +8,13 @@ export default defineConfig([
 		// contains vendored JS files that ESLint would otherwise try to lint
 		ignores: ['apps/function-python/**']
 	},
-	eslintConfig
+	eslintConfig,
+	{
+		files: ['apps/manage/src/public/javascripts/**/*.{js,mjs}'],
+		languageOptions: {
+			globals: {
+				...globals.browser
+			}
+		}
+	}
 ]);

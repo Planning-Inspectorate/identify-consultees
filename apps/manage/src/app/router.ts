@@ -5,7 +5,9 @@ import { cacheNoCacheMiddleware } from '@planning-inspectorate/core/middleware';
 import type { IRouter, RequestHandler } from 'express';
 import { Router as createRouter } from 'express';
 import rateLimit from 'express-rate-limit';
+import { createDefraVendorRouter } from './maps/vendor.ts';
 import { createRoutes as createConsulteeAreasPythonRoutes } from './views/consultee-areas-python/index.ts';
+import { createRoutes as createConsulteeRoutes } from './views/consultees/index.ts';
 import { createRoutes as createHomeRoutes } from './views/home/index.ts';
 import { createRoutes as createItemRoutes } from './views/items/index.ts';
 import { createErrorRoutes } from './views/static/error/index.ts';
@@ -42,11 +44,13 @@ export function buildRouter(service: ManageService, options: BuildRouterOptions 
 	const monitoringRoutes = createMonitoringRoutes(service);
 	const { router: authRoutes, guards: authGuards } = createAuthRoutesAndGuards(service);
 	const homeRoutes = createHomeRoutes(service);
+	const consulteeRoutes = createConsulteeRoutes(service);
 	const itemsRoutes = createItemRoutes(service);
 	const consulteeAreasPythonRoutes = createConsulteeAreasPythonRoutes(service);
 	const authRateLimiter = options.authRateLimiter ?? buildAuthRateLimiter();
 
 	router.use('/', monitoringRoutes);
+	router.use(createDefraVendorRouter());
 
 	// don't cache responses, note no-cache allows some caching, but with revalidation
 	// see https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Cache-Control#no-cache
@@ -88,6 +92,7 @@ export function buildRouter(service: ManageService, options: BuildRouterOptions 
 	}
 
 	router.use('/', homeRoutes);
+	router.use('/consultees', consulteeRoutes);
 	router.use('/items', itemsRoutes);
 	router.use('/consultee-areas-python', consulteeAreasPythonRoutes);
 	router.use('/error', createErrorRoutes(service));

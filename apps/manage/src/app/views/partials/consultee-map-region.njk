@@ -1,0 +1,33 @@
+{#
+  Progressive-enhancement map region (ported from PINS-data-spike case-map-region).
+  Requires: mapId, mapRegionLabel, staticMapSrc, staticMapAlt, mapWidth, mapHeight, mapConfigJson
+#}
+<div
+	id="{{ mapId }}"
+	class="app-case-map"
+	role="region"
+	aria-label="{{ mapRegionLabel }}"
+	data-consultee-map
+	data-static-map-src="{{ staticMapSrc }}"
+	data-static-map-alt="{{ staticMapAlt }}"
+	data-map-width="{{ mapWidth }}"
+	data-map-height="{{ mapHeight }}"
+>
+	<noscript>
+		<img
+			class="app-case-map-static"
+			src="{{ staticMapSrc }}"
+			width="{{ mapWidth }}"
+			height="{{ mapHeight }}"
+			alt="{{ staticMapAlt }}"
+		>
+	</noscript>
+</div>
+<noscript>
+	<p class="govuk-body app-case-map-js-hint">
+		This static map shows the same project site and consultee areas without JavaScript.
+		You can also review the consultee list below.
+	</p>
+</noscript>
+
+<script type="application/json" id="{{ mapId }}-data">{{ mapConfigJson | safe }}</script>

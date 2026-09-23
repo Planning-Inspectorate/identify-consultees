@@ -92,6 +92,21 @@ describe('manage router wiring', () => {
 		assert.match(response.text, />50</);
 	});
 
+	test('GET /consultees/:id renders consultees results page', async () => {
+		const response = await request(authDisabledApp).get('/consultees/geo-1');
+		assert.equal(response.status, 200);
+		assert.match(response.text, /Consultees identified for/);
+		assert.match(response.text, /Ambulance Trusts/);
+		assert.match(response.text, /Police Force Areas/);
+	});
+
+	test('GET /consultees/:id/sections/:sectionId/static-map.svg returns svg', async () => {
+		const response = await request(authDisabledApp).get('/consultees/geo-1/sections/ambulance-trusts/static-map.svg');
+		assert.equal(response.status, 200);
+		assert.match(response.headers['content-type'] || '', /image\/svg\+xml/);
+		assert.match(response.body.toString(), /<svg/);
+	});
+
 	test('GET /unauthenticated returns 401', async () => {
 		const response = await request(authDisabledApp).get('/unauthenticated');
 		assert.equal(response.status, 401);

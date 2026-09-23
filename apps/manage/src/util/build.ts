@@ -1,4 +1,5 @@
 import { runBuild } from '@planning-inspectorate/core/util';
+import { cp, mkdir } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import path from 'node:path';
 import { loadBuildConfig } from '../app/config.ts';
@@ -22,6 +23,11 @@ async function run(): Promise<void> {
 		accessibleAutocompleteRoot,
 		localsFile
 	});
+
+	const javascriptsSource = path.join(config.srcDir, 'public', 'javascripts');
+	const javascriptsDestination = path.join(config.staticDir, 'javascripts');
+	await mkdir(javascriptsDestination, { recursive: true });
+	await cp(javascriptsSource, javascriptsDestination, { recursive: true });
 }
 
 // run the build, and write any errors to console

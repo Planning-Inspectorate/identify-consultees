@@ -13,6 +13,7 @@
   "license": "MIT",
   "dependencies": {
     "@azure/msal-node": "*",
+    "@defra/interactive-map": "*",
     "@microsoft/microsoft-graph-client": "*",
     "@pins/identify-consultees-database": "^0.0.0",
     "@pins/identify-consultees-lib": "^0.0.0",
