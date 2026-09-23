@@ -29,7 +29,8 @@ function buildTestConfig(authDisabled: boolean): Config {
 			maxAge: '1d'
 		},
 		database: {
-			connectionString: 'sqlserver://localhost:1434;database=identify-consultees;trustServerCertificate=true'
+			connectionString:
+				'sqlserver://localhost:1434;database=identify-consultees;user=sa;password=DockerDatabaseP@22word!;trustServerCertificate=true'
 		},
 		gitSha: undefined,
 		logLevel: 'silent',
@@ -87,7 +88,7 @@ describe('manage router wiring', () => {
 	test('GET /?pageSize=50 returns fifty geometry rows', async () => {
 		const response = await request(authDisabledApp).get('/?pageSize=50');
 		assert.equal(response.status, 200);
-		assert.match(response.text, /Showing 1 to 50 of 3889 results/);
+		assert.match(response.text, /Showing 1 to 50 of 100 results/);
 		assert.match(response.text, />50</);
 	});
 

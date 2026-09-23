@@ -88,7 +88,7 @@ describe('manage page accessibility smoke', () => {
 			pageSizeOptions: [25, 50, 100],
 			resultsFrom: 1,
 			resultsTo: 3,
-			resultsTotal: 3889,
+			resultsTotal: 100,
 			selectedGeometryId: 'geo-1',
 			geometries: [
 				{
