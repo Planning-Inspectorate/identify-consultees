@@ -68,6 +68,9 @@ module "app_web" {
     #storage
     BLOB_STORE_HOST      = azurerm_storage_account.data.primary_blob_endpoint
     BLOB_STORE_CONTAINER = azurerm_storage_container.data.name
+
+    # Python function (see infrastructure/app-function.tf)
+    PYTHON_FUNCTION_URL = "https://${azurerm_linux_function_app.function_orchestrator.default_hostname}/api/consultee-areas"
   }
 
   providers = {

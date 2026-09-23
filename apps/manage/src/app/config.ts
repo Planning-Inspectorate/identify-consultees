@@ -78,6 +78,10 @@ export function loadConfig(): Config {
 		throw new Error('SESSION_SECRET is required');
 	}
 
+	if (!PYTHON_FUNCTION_URL) {
+		throw new Error('PYTHON_FUNCTION_URL is required');
+	}
+
 	let httpPort = 8090;
 	if (PORT) {
 		// PORT is set by App Service
@@ -109,8 +113,7 @@ export function loadConfig(): Config {
 
 	config = {
 		appHostname: APP_HOSTNAME || '',
-		// defaults to the local Azure Functions Core Tools URL for apps/function-python
-		pythonFunctionUrl: PYTHON_FUNCTION_URL || 'http://localhost:7071/api/consultee-areas',
+		pythonFunctionUrl: PYTHON_FUNCTION_URL,
 		auth: {
 			authority: `https://login.microsoftonline.com/${AUTH_TENANT_ID}`,
 			clientId: AUTH_CLIENT_ID || '',

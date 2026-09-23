@@ -20,6 +20,7 @@ const managedKeys = [
 	'ENVIRONMENT',
 	'NODE_ENV',
 	'PORT',
+	'PYTHON_FUNCTION_URL',
 	'SESSION_SECRET',
 	'SQL_CONNECTION_STRING'
 ] as const;
@@ -46,6 +47,7 @@ function setBaseEnv(overrides: Record<string, string | undefined> = {}) {
 	process.env.NODE_ENV = 'development';
 	process.env.APP_HOSTNAME = 'localhost';
 	process.env.SQL_CONNECTION_STRING = 'sqlserver://localhost:1434;database=test';
+	process.env.PYTHON_FUNCTION_URL = 'http://localhost:7071/api/consultee-areas';
 	for (const [key, value] of Object.entries({ ...requiredAuthEnv, ...overrides })) {
 		if (value === undefined) {
 			delete process.env[key];
@@ -59,6 +61,11 @@ describe('manage loadConfig', () => {
 	test('throws when SESSION_SECRET is missing', () => {
 		setBaseEnv({ SESSION_SECRET: '' });
 		assert.throws(() => loadConfig(), /SESSION_SECRET is required/);
+	});
+
+	test('throws when PYTHON_FUNCTION_URL is missing', () => {
+		setBaseEnv({ PYTHON_FUNCTION_URL: '' });
+		assert.throws(() => loadConfig(), /PYTHON_FUNCTION_URL is required/);
 	});
 
 	test('throws when PORT is not an integer', () => {
