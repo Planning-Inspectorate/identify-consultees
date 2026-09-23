@@ -20,6 +20,7 @@ describe('consultees results page', () => {
 		assert.match(viewModel.pageHeading, /Consultees identified for/);
 		assert.ok(viewModel.sections.length >= 2);
 		assert.ok(viewModel.sections[0].mapConfigJson.includes('FeatureCollection'));
+		assert.match(viewModel.sections[0].staticMapSrc, /\/static-map$/);
 	});
 
 	it('should 404 for an unknown geometry', async () => {
@@ -32,17 +33,38 @@ describe('consultees results page', () => {
 		assert.strictEqual(mockRes.status.mock.calls[0].arguments[0], 404);
 	});
 
-	it('should serve a static SVG map for a section', async () => {
+	it('should serve a static map with cache headers for a section', async () => {
+		const originalFetch = globalThis.fetch;
+		globalThis.fetch = async () =>
+			new Response(
+				Buffer.from(
+					'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
+					'base64'
+				),
+				{ status: 200, headers: { 'content-type': 'image/png' } }
+			);
+
 		const mockRes = {
 			status: mock.fn(() => mockRes),
 			type: mock.fn(() => mockRes),
 			set: mock.fn(() => mockRes),
-			send: mock.fn()
+			send: mock.fn(),
+			end: mock.fn()
 		};
-		const handler = buildSectionStaticMap({ logger: mockLogger() });
-		await handler({ params: { geometryId: 'geo-1', sectionId: 'ambulance-trusts' } }, mockRes);
-		assert.strictEqual(mockRes.status.mock.calls[0].arguments[0], 200);
-		assert.strictEqual(mockRes.type.mock.calls[0].arguments[0], 'image/svg+xml');
-		assert.match(mockRes.send.mock.calls[0].arguments[0], /<svg/);
+
+		try {
+			const handler = buildSectionStaticMap({ logger: mockLogger() }, true);
+			await handler(
+				{ params: { geometryId: 'geo-1', sectionId: 'ambulance-trusts' }, headers: {} },
+				mockRes
+			);
+			assert.strictEqual(mockRes.status.mock.calls[0].arguments[0], 200);
+			assert.match(String(mockRes.type.mock.calls[0].arguments[0]), /image\/svg\+xml/);
+			assert.match(String(mockRes.set.mock.calls[0].arguments[0]['Cache-Control']), /max-age=/);
+			assert.ok(mockRes.set.mock.calls[0].arguments[0].ETag);
+			assert.match(String(mockRes.send.mock.calls[0].arguments[0]), /<svg/);
+		} finally {
+			globalThis.fetch = originalFetch;
+		}
 	});
 });
