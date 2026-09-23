@@ -20,6 +20,7 @@
     "db-generate": "npm run generate --workspace @pins/identify-consultees-database",
     "db-seed": "npm run seed --workspace @pins/identify-consultees-database",
     "db-seed-prod": "npm run seed-prod --workspace @pins/identify-consultees-database",
+    "deps:patch-maplibre": "node --experimental-strip-types scripts/patch-maplibre-sanitize.ts",
     "format": "npm run format-prettier && npm run format-css",
     "format-css": "stylelint \"**/*.{css,scss}\" --fix",
     "format-prettier": "prettier --write .",
@@ -28,6 +29,7 @@
     "lint-css": "stylelint \"**/*.{css,scss}\"",
     "lint-ts": "npx eslint .",
     "prepare": "node .husky/install.mjs",
+    "postinstall": "npm run deps:patch-maplibre",
     "start": "node scripts/start-local.mjs",
     "test": "node --test",
     "test-coverage": "node --test --experimental-test-coverage"
@@ -36,6 +38,7 @@
     "@azure/functions": "^4.16.2",
     "@azure/identity": "^4.13.3",
     "@azure/msal-node": "^6.0.0",
+    "@defra/interactive-map": "^0.0.42-fmp-5",
     "@planning-inspectorate/core": "^1.11.0",
     "@prisma/adapter-mssql": "^7.10.0",
     "@prisma/client": "^7.10.0",
@@ -109,6 +112,7 @@
     "mysql2": "^3.22.0",
     "fast-uri": "^3.1.7",
     "qs": "^6.16.0",
-    "@humanfs/node": "^0.16.8"
+    "@humanfs/node": "^0.16.8",
+    "maplibre-gl": "6.6.0"
   }
 }

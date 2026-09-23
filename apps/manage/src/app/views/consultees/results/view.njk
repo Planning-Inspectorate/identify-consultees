@@ -1,0 +1,82 @@
+{% extends "views/layouts/main.njk" %}
+
+{% from "govuk/components/button/macro.njk" import govukButton %}
+{% from "govuk/components/table/macro.njk" import govukTable %}
+
+{% block pageTitle %}
+	{{ pageHeading }} - {{ config.headerTitle }}
+{% endblock %}
+
+{% block head %}
+	{{ super() }}
+	<link rel="stylesheet" href="/vendor/interactive-map/css/index.css">
+	<link rel="stylesheet" href="/vendor/datasets-plugin/css/index.css">
+	<link rel="stylesheet" href="/vendor/map-key-plugin/css/index.css">
+{% endblock %}
+
+{% block pageContent %}
+	<p class="govuk-body">
+		Rule set used: {{ rulesetLabel }}
+	</p>
+
+	<p class="govuk-body">
+		<a class="govuk-link" href="{{ downloadSummaryHref }}">Download consultee list summary report</a>
+	</p>
+	<p class="govuk-body">
+		<a class="govuk-link" href="{{ downloadMapsHref }}">Download all maps as image files</a>
+	</p>
+
+	<nav class="govuk-!-margin-top-6 govuk-!-margin-bottom-6" aria-label="Consultee map sections">
+		<h2 class="govuk-heading-m">Consultee maps on this page</h2>
+		<ul class="govuk-list govuk-list--bullet">
+			{% for section in sections %}
+				<li>
+					<a class="govuk-link" href="#{{ section.id }}">{{ section.heading }}</a>
+				</li>
+			{% endfor %}
+		</ul>
+	</nav>
+
+	{% for section in sections %}
+		<section id="{{ section.id }}" class="govuk-!-margin-bottom-9">
+			<h2 class="govuk-heading-l">{{ section.heading }}</h2>
+			<h3 class="govuk-heading-m">{{ section.mapTitle }}</h3>
+
+			{% set mapId = "map-" + section.id %}
+			{% set mapRegionLabel = section.mapRegionLabel %}
+			{% set staticMapSrc = section.staticMapSrc %}
+			{% set staticMapAlt = section.staticMapAlt %}
+			{% set mapWidth = section.mapWidth %}
+			{% set mapHeight = section.mapHeight %}
+			{% set mapConfigJson = section.mapConfigJson %}
+			{% include "views/partials/consultee-map-region.njk" %}
+
+			<h3 class="govuk-heading-s govuk-!-margin-top-6">{{ section.heading }}</h3>
+			{% set tableRows = [] %}
+			{% for consultee in section.consultees %}
+				{% set tableRows = (tableRows.push([{ text: consultee }]), tableRows) %}
+			{% endfor %}
+			{{ govukTable({
+				caption: section.heading + " consultees",
+				captionClasses: "govuk-visually-hidden",
+				firstCellIsHeader: false,
+				head: [{ text: "Organisation" }],
+				rows: tableRows
+			}) }}
+		</section>
+	{% endfor %}
+
+	{{ govukButton({
+		text: "Back to project geometry search",
+		href: backLinkUrl,
+		classes: "govuk-button--secondary"
+	}) }}
+{% endblock %}
+
+{% block bodyEnd %}
+	<script defer src="/vendor/interactive-map/js/index.js"></script>
+	<script defer src="/vendor/maplibre-provider/js/index.js"></script>
+	<script defer src="/vendor/datasets-plugin/js/index.js"></script>
+	<script defer src="/vendor/map-key-plugin/js/index.js"></script>
+	<script type="module" src="/javascripts/consultees-map.js"></script>
+{% endblock %}

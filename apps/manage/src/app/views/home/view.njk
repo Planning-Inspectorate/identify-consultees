@@ -70,10 +70,10 @@
 			</p>
 		</div>
 
-		<form method="get" action="/">
-			<input type="hidden" name="q" value="{{ searchQuery }}">
+		<form method="get" action="/consultees">
 			<input type="hidden" name="ruleset" value="{{ selectedRuleset }}">
 			<input type="hidden" name="pageSize" value="{{ pageSize }}">
+			<input type="hidden" name="q" value="{{ searchQuery }}">
 
 			{% set tableRows = [] %}
 			{% for geometry in geometries %}

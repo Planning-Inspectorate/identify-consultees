@@ -10,6 +10,27 @@ $font-family: arial, helvetica, sans-serif;
 // PINS branding for GOV.UK Frontend macros (header/nav) and PINS footer
 @use 'govuk-overrides';
 
+// Defra Interactive Map viewport (aligned with PINS-data-spike)
+.app-case-map {
+	width: 100%;
+	max-width: 960px;
+	height: 516px;
+	box-sizing: border-box;
+	overflow: hidden;
+	background: #f5f5f0;
+}
+
+.app-case-map-static {
+	display: block;
+	width: 100%;
+	max-width: 960px;
+	height: auto;
+}
+
+.app-case-map-js-hint {
+	margin-top: 15px;
+}
+
 // set font-family for any autocomplete menu items
 /* stylelint-disable-next-line selector-class-pattern */
 .autocomplete__menu {
