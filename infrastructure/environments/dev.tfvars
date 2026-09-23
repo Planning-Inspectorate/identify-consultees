@@ -19,8 +19,6 @@ apps_config = {
     # }
   }
 
-  functions_node_version = 22
-
   logging = {
     level = "info"
   }
