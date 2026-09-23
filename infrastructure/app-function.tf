@@ -46,56 +46,105 @@ resource "azurerm_private_endpoint" "functions_storage" {
   tags = local.tags
 }
 
-module "function_orchestrator" {
-  #checkov:skip=CKV_TF_1: Use of commit hash are not required for our Terraform modules
-  source = "github.com/Planning-Inspectorate/infrastructure-modules.git//modules/node-function-app?ref=1.57"
+# This was the Node "orchestrator" function app, provisioned through the shared
+# infrastructure-modules//modules/node-function-app module. apps/function (its Node source) was
+# unused boilerplate - never had real functions beyond a placeholder example - so this has been
+# repurposed to run apps/function-python instead, rather than provisioning a second Function App.
+#
+# The shared module hardcodes `application_stack { node_version = ... }` (Azure's application_stack
+# block only accepts one runtime, and the module never exposed a Python option - confirmed by
+# reading the module's source directly), so this is a plain resource here instead of a module call.
+# The `moved` blocks below tell Terraform this is the same underlying Function App/private endpoint
+# that used to be tracked under `module.function_orchestrator`, not a new resource.
+#
+# IMPORTANT: switching an existing Function App's application_stack from Node to Python may or may
+# not be an in-place update depending on the AzureRM provider's handling of that change - this has
+# not been verified against real state (no Azure credentials available while drafting this). Run
+# `terraform plan` and confirm it does not show an unexpected destroy/recreate before applying.
+#
+# Also note: the shared module provided monitoring/alerting internally (action_group_ids,
+# log_analytics_workspace_id, monitoring_alerts_enabled) - that isn't replicated here, so this
+# Function App currently has no equivalent alerts. Follow-up, not attempted blind.
+moved {
+  from = module.function_orchestrator.azurerm_linux_function_app.function_app
+  to   = azurerm_linux_function_app.function_orchestrator
+}
 
-  resource_group_name = azurerm_resource_group.primary.name
-  location            = module.primary_region.location
+moved {
+  from = module.function_orchestrator.azurerm_private_endpoint.private_endpoint[0]
+  to   = azurerm_private_endpoint.function_orchestrator
+}
 
-  # naming
-  app_name        = "orchestrator"
-  resource_suffix = var.environment
-  service_name    = local.service_name
-  tags            = local.tags
+resource "azurerm_linux_function_app" "function_orchestrator" {
+  # checkov:skip=CKV_AZURE_221: Ensure that Azure Function App public network access is disabled - it is (see public_network_access_enabled below)
 
-  # service plan
-  app_service_plan_id = azurerm_service_plan.apps.id
+  name                          = "pins-func-${local.service_name}-orchestrator-${var.environment}"
+  location                      = module.primary_region.location
+  resource_group_name           = azurerm_resource_group.primary.name
+  service_plan_id               = azurerm_service_plan.apps.id
+  storage_account_name          = azurerm_storage_account.functions.name
+  storage_account_access_key    = azurerm_storage_account.functions.primary_access_key
+  https_only                    = true
+  public_network_access_enabled = false
 
-  # storage
-  function_apps_storage_account            = azurerm_storage_account.functions.name
-  function_apps_storage_account_access_key = azurerm_storage_account.functions.primary_access_key
-
-  # networking
-  integration_subnet_id      = azurerm_subnet.apps.id
-  outbound_vnet_connectivity = true
-  inbound_vnet_connectivity  = true
-  private_endpoint = {
-    private_dns_zone_id = data.azurerm_private_dns_zone.app_service.id
-    subnet_id           = azurerm_subnet.main.id
+  app_settings = {
+    # matches the shared module's own defaults (modules/node-function-app/locals.tf)
+    SCM_DO_BUILD_DURING_DEPLOYMENT = false
+    WEBSITE_RUN_FROM_PACKAGE       = 1
+    SQL_CONNECTION_STRING          = local.key_vault_refs["sql-app-connection-string"]
   }
 
-  # monitoring
-  action_group_ids            = local.action_group_ids
-  app_insights_instrument_key = azurerm_application_insights.main.instrumentation_key
-  log_analytics_workspace_id  = azurerm_log_analytics_workspace.main.id
-  monitoring_alerts_enabled   = var.alerts_enabled
+  identity {
+    type = "SystemAssigned"
+  }
 
-  # settings
-  function_node_version = var.apps_config.functions_node_version
-  app_settings = {
-    NODE_ENV              = var.apps_config.node_environment
-    SQL_CONNECTION_STRING = local.key_vault_refs["sql-app-connection-string"]
+  site_config {
+    always_on     = true
+    http2_enabled = true
 
-    #storage
-    BLOB_STORE_HOST      = azurerm_storage_account.data.primary_blob_endpoint
-    BLOB_STORE_CONTAINER = azurerm_storage_container.data.name
+    application_stack {
+      python_version = "3.12"
+    }
+
+    application_insights_key = azurerm_application_insights.main.instrumentation_key
+  }
+
+  tags = local.tags
+
+  virtual_network_subnet_id = azurerm_subnet.apps.id
+
+  lifecycle {
+    ignore_changes = [
+      # ignore any changes to "hidden-link" and other tags
+      # see https://github.com/hashicorp/terraform-provider-azurerm/issues/16569
+      tags
+    ]
   }
 }
 
+resource "azurerm_private_endpoint" "function_orchestrator" {
+  name                = "${local.org}-pe-${local.service_name}-orchestrator-${var.environment}"
+  location            = module.primary_region.location
+  resource_group_name = azurerm_resource_group.primary.name
+  subnet_id           = azurerm_subnet.main.id
+
+  private_dns_zone_group {
+    name                 = "appserviceprivatednszone"
+    private_dns_zone_ids = [data.azurerm_private_dns_zone.app_service.id]
+  }
+
+  private_service_connection {
+    name                           = "privateendpointconnection"
+    private_connection_resource_id = azurerm_linux_function_app.function_orchestrator.id
+    subresource_names              = ["sites"]
+    is_manual_connection           = false
+  }
+
+  tags = local.tags
+}
 
 resource "azurerm_role_assignment" "function_orchestrator_secrets_user" {
   scope                = azurerm_key_vault.main.id
   role_definition_name = "Key Vault Secrets User"
-  principal_id         = module.function_orchestrator.principal_id
+  principal_id         = azurerm_linux_function_app.function_orchestrator.identity[0].principal_id
 }

@@ -62,12 +62,6 @@ resource "azurerm_storage_container" "data" {
   container_access_type = "private"
 }
 
-resource "azurerm_role_assignment" "storage_function" {
-  scope                = azurerm_storage_container.data.id
-  role_definition_name = "Storage Blob Data Contributor"
-  principal_id         = module.function_orchestrator.principal_id
-}
-
 resource "azurerm_role_assignment" "storage_app" {
   scope                = azurerm_storage_container.data.id
   role_definition_name = "Storage Blob Data Contributor"

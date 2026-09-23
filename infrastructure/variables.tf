@@ -27,8 +27,6 @@ variable "apps_config" {
       # })
     })
 
-    functions_node_version = number
-
     logging = object({
       level = string
     })
