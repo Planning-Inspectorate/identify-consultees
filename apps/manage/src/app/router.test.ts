@@ -14,6 +14,7 @@ function buildTestConfig(authDisabled: boolean): Config {
 	const buildConfig = loadBuildConfig();
 	return {
 		appHostname: 'localhost',
+		pythonFunctionUrl: 'http://localhost:7071/api/consultee-areas',
 		auth: {
 			authority: 'https://login.microsoftonline.com/tenant-id',
 			clientId: 'client-id',
@@ -103,10 +104,16 @@ describe('manage router wiring', () => {
 	test('GET /consultees/:id/sections/:sectionId/static-map returns a cached image', async () => {
 		const originalFetch = globalThis.fetch;
 		globalThis.fetch = async () =>
-			new Response(Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64'), {
-				status: 200,
-				headers: { 'content-type': 'image/png' }
-			});
+			new Response(
+				Buffer.from(
+					'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
+					'base64'
+				),
+				{
+					status: 200,
+					headers: { 'content-type': 'image/png' }
+				}
+			);
 
 		try {
 			const response = await request(authDisabledApp).get('/consultees/geo-1/sections/ambulance-trusts/static-map');
@@ -127,15 +134,19 @@ describe('manage router wiring', () => {
 	test('GET /consultees/:id/sections/:sectionId/static-map.svg returns svg', async () => {
 		const originalFetch = globalThis.fetch;
 		globalThis.fetch = async () =>
-			new Response(Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64'), {
-				status: 200,
-				headers: { 'content-type': 'image/png' }
-			});
+			new Response(
+				Buffer.from(
+					'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
+					'base64'
+				),
+				{
+					status: 200,
+					headers: { 'content-type': 'image/png' }
+				}
+			);
 
 		try {
-			const response = await request(authDisabledApp).get(
-				'/consultees/geo-1/sections/ambulance-trusts/static-map.svg'
-			);
+			const response = await request(authDisabledApp).get('/consultees/geo-1/sections/ambulance-trusts/static-map.svg');
 			assert.equal(response.status, 200);
 			assert.match(response.headers['content-type'] || '', /image\/svg\+xml/);
 			assert.match(response.body.toString(), /<svg/);

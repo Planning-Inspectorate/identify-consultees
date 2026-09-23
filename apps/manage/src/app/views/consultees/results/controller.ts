@@ -1,13 +1,13 @@
 import type { ManageService } from '#service';
 import type { AsyncRequestHandler } from '@planning-inspectorate/core/util';
 import { findDummyGeometry, findRulesetLabel } from '../../../data/dummy-geometries.ts';
-import { buildConsulteeStaticMapResponse } from '../../../maps/serve-static-map.ts';
 import {
 	buildConsulteeAreaGeojson,
 	buildProjectSiteGeojson,
 	MAP_VIEWPORT,
 	mapViewForCollections
 } from '../../../maps/sample-geojson.ts';
+import { buildConsulteeStaticMapResponse } from '../../../maps/serve-static-map.ts';
 import type { ConsulteeMapSection, ConsulteesResultsViewModel } from './view-model.ts';
 
 type SectionDefinition = {
@@ -70,7 +70,12 @@ function firstQueryValue(value: unknown): string {
 	return typeof value === 'string' ? value : '';
 }
 
-function buildSectionMapContext(definition: SectionDefinition, reference: string, caseName: string, geometryId: string) {
+function buildSectionMapContext(
+	definition: SectionDefinition,
+	reference: string,
+	caseName: string,
+	geometryId: string
+) {
 	const projectGeojson = buildProjectSiteGeojson(reference, caseName);
 	const consulteeGeojson = buildConsulteeAreaGeojson(definition.distanceLabel, definition.areas);
 	const view = mapViewForCollections(projectGeojson, consulteeGeojson);

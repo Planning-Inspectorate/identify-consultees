@@ -23,10 +23,7 @@ describe('static-map-cache', () => {
 		};
 
 		assert.equal(buildStaticMapFingerprint(input), buildStaticMapFingerprint(input));
-		assert.notEqual(
-			buildStaticMapFingerprint(input),
-			buildStaticMapFingerprint({ ...input, forceSvg: true })
-		);
+		assert.notEqual(buildStaticMapFingerprint(input), buildStaticMapFingerprint({ ...input, forceSvg: true }));
 	});
 
 	it('matches If-None-Match lists against the response ETag', () => {

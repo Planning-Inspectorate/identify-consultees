@@ -134,10 +134,10 @@ The manage app follows the PINS-data-spike pattern: **Defra Interactive Map** wh
 
 Non-JS / fallback maps are **not always SVG**. Depending on configuration they may be:
 
-| Format | Typical source |
-| ------ | -------------- |
-| `image/png` (or JPEG) | Google Maps Static API, or other hosted static-image endpoints |
-| `image/svg+xml` | Local SVG that embeds OpenStreetMap (or similar) **raster tiles** as PNG data URIs |
+| Format                | Typical source                                                                     |
+| --------------------- | ---------------------------------------------------------------------------------- |
+| `image/png` (or JPEG) | Google Maps Static API, or other hosted static-image endpoints                     |
+| `image/svg+xml`       | Local SVG that embeds OpenStreetMap (or similar) **raster tiles** as PNG data URIs |
 
 Treat static maps as **binary or markup images served by our app**, never as a reason for browsers to hit third-party tile hosts directly.
 

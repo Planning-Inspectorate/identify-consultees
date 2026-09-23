@@ -35,8 +35,7 @@ export type StaticMapBuildOptions = {
 
 const GOOGLE_STATIC_MAP_MAX_URL_LENGTH = 16_384;
 const OSM_TILE_SIZE = 256;
-const OSM_USER_AGENT =
-	'identify-consultees/0.1 (+https://github.com/Planning-Inspectorate/identify-consultees)';
+const OSM_USER_AGENT = 'identify-consultees/0.1 (+https://github.com/Planning-Inspectorate/identify-consultees)';
 const OSM_TILE_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 const OSM_TILE_FETCH_CONCURRENCY = 2;
 
@@ -261,10 +260,7 @@ function appendGooglePath(
 		return;
 	}
 	const encoded = encodeGooglePolyline(ring);
-	params.append(
-		'path',
-		`fillcolor:${colours.googleFill}|color:${colours.googleStroke}|weight:2|enc:${encoded}`
-	);
+	params.append('path', `fillcolor:${colours.googleFill}|color:${colours.googleStroke}|weight:2|enc:${encoded}`);
 }
 
 export function escapeXml(value: string): string {
@@ -302,10 +298,7 @@ function pathForFeature(
  * Render SVG with optional OSM PNG tiles as a basemap.
  * When tile fetch fails, polygons still draw on a plain background.
  */
-export function renderStaticMapSvg(
-	options: StaticMapBuildOptions,
-	basemapTiles: OsmBasemapTile[] = []
-): string {
+export function renderStaticMapSvg(options: StaticMapBuildOptions, basemapTiles: OsmBasemapTile[] = []): string {
 	const width = options.width ?? MAP_VIEWPORT.width;
 	const height = options.height ?? MAP_VIEWPORT.height;
 	const zoom = Math.round(options.zoom);
