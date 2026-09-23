@@ -15,7 +15,9 @@ For contribution guidelines see [CONTRIBUTING.md](./CONTRIBUTING.md). To report 
 
 ## Editor setup
 
-VS Code / Cursor settings in `.vscode` point the TypeScript language service at the workspace compiler (`node_modules/@typescript/old/lib`). When prompted, choose **Use Workspace Version** so options such as `erasableSyntaxOnly` are recognised.
+The root [`tsconfig.json`](./tsconfig.json) stays compatible with Cursor / VS Code’s bundled TypeScript language service. Stricter checks such as `erasableSyntaxOnly` live in [`tsconfig.check.json`](./tsconfig.check.json) and run via `npm run check-types` (TypeScript 7 from `@typescript/native`).
+
+Optional: `.vscode` points `typescript.tsdk` at `node_modules/@typescript/old/lib`. If prompted, choose **Use Workspace Version** for workspace-aligned IntelliSense.
 
 ## WebStorm Run Configurations
 
