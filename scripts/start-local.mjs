@@ -68,20 +68,25 @@ async function ensureEnvFiles() {
 	await repairLocalSqlPort(manageEnv);
 }
 
+function isCleanShutdown(code, signal) {
+	return signal === 'SIGINT' || signal === 'SIGTERM' || code === 130 || code === 143;
+}
+
 function run(command, args, options = {}) {
+	const { allowSignalExit = false, ...spawnOptions } = options;
 	return new Promise((resolve, reject) => {
 		const child = spawn(command, args, {
 			cwd: root,
 			stdio: 'inherit',
 			shell: process.platform === 'win32',
-			...options
+			...spawnOptions
 		});
 		child.on('error', reject);
-		child.on('exit', (code) => {
-			if (code === 0) {
+		child.on('exit', (code, signal) => {
+			if (code === 0 || (allowSignalExit && isCleanShutdown(code, signal))) {
 				resolve();
 			} else {
-				reject(new Error(`${command} ${args.join(' ')} exited with code ${code}`));
+				reject(new Error(`${command} ${args.join(' ')} exited with code ${code ?? signal}`));
 			}
 		});
 	});
@@ -124,7 +129,9 @@ async function main() {
 	await run('npm', ['run', 'db-migrate-dev']);
 
 	console.log('Starting manage app on http://localhost:8090 ...');
-	await run('npm', ['run', 'dev', '--workspace', 'identify-consultees-manage']);
+	await run('npm', ['run', 'dev', '--workspace', 'identify-consultees-manage'], {
+		allowSignalExit: true
+	});
 }
 
 main().catch((error) => {
