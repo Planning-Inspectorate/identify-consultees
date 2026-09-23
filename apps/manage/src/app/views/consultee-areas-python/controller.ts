@@ -26,8 +26,7 @@ export function buildRunConsulteeAreasPython(service: ManageService): AsyncReque
 			viewModel.rows = body.rows;
 		} catch (error) {
 			logger.error({ error }, 'Failed to call Python function');
-			viewModel.error =
-				'Could not reach the Python function. Is it running locally? See apps/function-python/README.md.';
+			viewModel.error = 'Could not reach the Python function.';
 		}
 
 		return res.render(VIEW, viewModel);
