@@ -1,0 +1,55 @@
+{% extends "views/layouts/main.njk" %}
+
+{% from "govuk/components/button/macro.njk" import govukButton %}
+{% from "govuk/components/error-message/macro.njk" import govukErrorMessage %}
+{% from "govuk/components/table/macro.njk" import govukTable %}
+
+{% block pageTitle %}
+    {{ pageHeading }} - {{ config.headerTitle }}
+{% endblock %}
+
+{% block pageContent %}
+    <h1 class="govuk-heading-l">{{ pageHeading }}</h1>
+
+    <p class="govuk-body">
+        Calls the Python Azure Function in <code>apps/function-python</code>, which runs a SQL
+        query against the <code>consultee_area</code> table and returns the results below.
+    </p>
+
+    <form method="post" action="/consultee-areas-python/run" novalidate>
+        <input type="hidden" name="_csrf" value="{{ _csrf }}">
+        {{ govukButton({ text: "Run query" }) }}
+    </form>
+
+    {% if error %}
+        {{ govukErrorMessage({ text: error }) }}
+    {% endif %}
+
+    {% if rows %}
+        {% if rows.length == 0 %}
+            <p class="govuk-body">No consultee areas found.</p>
+        {% else %}
+            {% set tableRows = [] %}
+            {% for row in rows %}
+                {% set tableRows = (tableRows.push([
+                    { text: row.consultee | default("") },
+                    { text: row.consulteeCategory | default("") },
+                    { text: row.region | default("") },
+                    { text: row.geometryType },
+                    { text: row.lastUpdated | default("") }
+                ]), tableRows) %}
+            {% endfor %}
+
+            {{ govukTable({
+                head: [
+                    { text: "Consultee" },
+                    { text: "Category" },
+                    { text: "Region" },
+                    { text: "Geometry type" },
+                    { text: "Last updated" }
+                ],
+                rows: tableRows
+            }) }}
+        {% endif %}
+    {% endif %}
+{% endblock %}

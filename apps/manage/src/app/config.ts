@@ -4,6 +4,8 @@ import { loadEnvFile } from 'node:process';
 
 export interface Config extends BaseConfig {
 	appHostname: string;
+	// the URL of the Python function app's consultee-areas endpoint - see apps/function-python
+	pythonFunctionUrl: string;
 	auth: {
 		authority: string;
 		clientId: string;
@@ -65,6 +67,7 @@ export function loadConfig(): Config {
 		PORT,
 		MANAGED_REDIS_URL,
 		NODE_ENV,
+		PYTHON_FUNCTION_URL,
 		SESSION_SECRET,
 		SQL_CONNECTION_STRING
 	} = process.env;
@@ -106,6 +109,8 @@ export function loadConfig(): Config {
 
 	config = {
 		appHostname: APP_HOSTNAME || '',
+		// defaults to the local Azure Functions Core Tools URL for apps/function-python
+		pythonFunctionUrl: PYTHON_FUNCTION_URL || 'http://localhost:7071/api/consultee-areas',
 		auth: {
 			authority: `https://login.microsoftonline.com/${AUTH_TENANT_ID}`,
 			clientId: AUTH_CLIENT_ID || '',
