@@ -13,12 +13,21 @@ This is the monorepo for the Identify consultees service — a GIS tool for iden
 
 ## Prerequisites
 
-- **Node.js 22+** (see [`.nvmrc`](./.nvmrc); `package.json` engines require `>=22.21.0`)
-- **npm** (ships with Node)
+- **Node.js 22.23.2** (see [`.nvmrc`](./.nvmrc); `package.json` engines and Azure Pipelines use the same version)
+- **npm 10.9.8** (ships with Node 22.23.2 — do not use npm 11 / Node 24 for this repo)
 - **Docker** (local SQL Server with spatial types — see [`docker-compose.yml`](./docker-compose.yml))
 - Git access to this repository
 
 On Apple Silicon, the SQL Server image runs under `linux/amd64` emulation. That is expected and required: Azure SQL Edge does not support the `GEOGRAPHY` type this project uses.
+
+Confirm the toolchain after install:
+
+```bash
+nvm use
+node -v    # v22.23.2
+npm -v     # 10.9.8
+npm run check-toolchain
+```
 
 ## Getting started (new developer)
 
@@ -27,8 +36,8 @@ From a clean clone, these steps are enough to run the manage app locally:
 ```bash
 git clone git@github.com:Planning-Inspectorate/identify-consultees.git
 cd identify-consultees
-nvm use   # or otherwise install Node 22+
-npm i
+nvm use   # Node 22.23.2 from .nvmrc
+npm ci
 npm start
 ```
 

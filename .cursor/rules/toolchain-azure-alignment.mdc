@@ -1,0 +1,12 @@
+---
+description: Keep Node/npm and package-lock peers aligned with Azure Pipelines
+alwaysApply: true
+---
+
+# Toolchain and lockfile (Azure alignment)
+
+- Use **Node 22.23.2** and **npm 10.9.8** (see `.nvmrc`, `packageManager`, `engines`). Do not regenerate `package-lock.json` with Node 24 or npm 11.
+- Prefer `npm ci` after a clean clone (same as CI). Use `npm install` only when intentionally changing dependencies, still on npm 10.9.8.
+- After any lockfile change, run `npm run check-toolchain` and ensure `package-lock.json` still contains `node_modules/react`, `node_modules/react-dom`, and `node_modules/scheduler` (Prisma Studio peers). Losing them breaks Azure `npm ci` (see PR #53 / commit `2e4f99d`).
+- Keep those packages listed under root `optionalDependencies` so regenerating the lockfile does not drop them.
+- Do not set `SKIP_TOOLCHAIN_CHECK=1` in normal PR work.

@@ -4,9 +4,10 @@ Thank you for contributing to Identify consultees. This guide covers how to set 
 
 ## Prerequisites
 
-- Node.js 22 or later (see `.nvmrc` and the `engines` field in `package.json`)
-- npm (comes with Node)
+- Node.js **22.23.2** and npm **10.9.8** (see `.nvmrc` and `package.json` `engines` / `packageManager` — same as Azure Pipelines)
 - Docker (for the local database)
+
+Use `nvm use` then `npm ci`. Do not regenerate the lockfile with Node 24 or npm 11. Run `npm run check-toolchain` if unsure. Toolchain rules for agents are in [AGENTS.md](./AGENTS.md).
 
 ## Getting started
 
@@ -32,6 +33,7 @@ Keep commits focused. Before requesting review, squash noisy WIP or fixup commit
 ### Checks to run locally
 
 ```bash
+npm run check-toolchain
 npm run playwright:install   # once, for browser tests
 npm run lint
 npm run format-prettier-check

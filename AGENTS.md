@@ -47,6 +47,37 @@ When opening a PR with `gh pr create` (user-requested):
 - [ ] No secrets, `.env`, or production data dumps in the diff.
 - [ ] No AI self-identification in the PR description, commits, or diff.
 
+## Node and npm toolchain (match Azure Pipelines)
+
+Local installs must use the **same Node and npm** as CI so `package-lock.json` stays compatible with `npm ci`.
+
+| Tool    | Required version | Where it is pinned                                                                         |
+| ------- | ---------------- | ------------------------------------------------------------------------------------------ |
+| Node.js | **22.23.2**      | `.nvmrc`, `.node-version`, `.tool-versions`, `package.json` `engines`, Azure `nodeVersion` |
+| npm     | **10.9.8**       | Bundled with Node 22.23.2; also `packageManager` + `engines.npm`                           |
+
+Azure jobs use PINS `node_script.yml` with `nodeVersion: 22.23.2` (see `.azure/pipelines/pr.yml` and `infrastructure/pipelines/terraform-ci-commit.yaml`). That Node release ships **npm 10.9.8**.
+
+### Agent rules for the toolchain
+
+- Before changing dependencies or regenerating the lockfile: `nvm use` (or equivalent) so Node is **22.23.2** and `npm -v` is **10.9.8**. Do **not** run `npm install` under Node 24 / npm 11 against this repo.
+- Prefer `npm ci` for a clean tree (same command as CI). Use `npm install` only when intentionally updating dependencies.
+- After any `package-lock.json` change, run `npm run check-toolchain` (also runs at the end of `postinstall`).
+- Keep root `optionalDependencies` on `react@19.3.0`, `react-dom@19.3.0`, and `scheduler@0.28.0`. They are not used by app code; they satisfy Prisma Studio / Radix peers so Azure `npm ci` does not fail with “Missing: react@… from lock file” (see PR #53 / commit `2e4f99d`). Never remove those entries or the matching `node_modules/react` (etc.) lockfile packages without replacing the guard.
+- `.npmrc` sets `engine-strict=true`. Do not weaken that to work around a wrong local Node version — switch Node instead.
+- Emergency bypass only: `SKIP_TOOLCHAIN_CHECK=1` (do not use for normal PR work).
+
+### Switching locally
+
+```bash
+nvm install   # reads .nvmrc → 22.23.2
+nvm use
+node -v       # v22.23.2
+npm -v        # 10.9.8
+npm ci
+npm run check-toolchain
+```
+
 ## Building a GDS-compliant government service
 
 This service is a public-sector product. Features, UI, and technical choices should align with GDS guidance. Prefer existing GOV.UK patterns already used in this repo over inventing new ones.
