@@ -9,4 +9,5 @@ alwaysApply: true
 - Prefer `npm ci` after a clean clone (same as CI). Use `npm install` only when intentionally changing dependencies, still on npm 10.9.8.
 - After any lockfile change, run `npm run check-toolchain` and ensure `package-lock.json` still contains `node_modules/react`, `node_modules/react-dom`, and `node_modules/scheduler` (Prisma Studio peers). Losing them breaks Azure `npm ci` (see PR #53 / commit `2e4f99d`).
 - Keep those packages listed under root `optionalDependencies` so regenerating the lockfile does not drop them.
+- Keep `overrides.preact` (`^10.29.8`) and `.npmrc` `legacy-peer-deps=false`. Do not enable legacy peer deps — it masks the accessible-autocomplete vs Defra map `preact` conflict that breaks Azure `npm ci`.
 - Do not set `SKIP_TOOLCHAIN_CHECK=1` in normal PR work.

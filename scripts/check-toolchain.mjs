@@ -64,6 +64,21 @@ if (!resolvedNpm || !versionsEqual(resolvedNpm, REQUIRED_NPM)) {
 	);
 }
 
+try {
+	const { execFileSync } = await import('node:child_process');
+	const legacyPeerDeps = execFileSync('npm', ['config', 'get', 'legacy-peer-deps'], {
+		encoding: 'utf8',
+		cwd: root
+	}).trim();
+	if (legacyPeerDeps === 'true') {
+		errors.push(
+			`legacy-peer-deps is true (must be false to match Azure). Check repo .npmrc and run npm config delete legacy-peer-deps if set in your user config.`
+		);
+	}
+} catch {
+	// ignore config probe failures
+}
+
 const lockPath = path.join(root, 'package-lock.json');
 let lock;
 try {
@@ -80,6 +95,18 @@ if (lock?.packages) {
 			);
 		}
 	}
+}
+
+try {
+	const pkg = JSON.parse(readFileSync(path.join(root, 'package.json'), 'utf8'));
+	const preactOverride = pkg.overrides?.preact;
+	if (!preactOverride || !String(preactOverride).startsWith('^10.')) {
+		errors.push(
+			`package.json overrides.preact must be ^10.x (Defra interactive map). Without it Azure npm ci fails on accessible-autocomplete's preact@8 peer.`
+		);
+	}
+} catch {
+	// ignore
 }
 
 if (errors.length > 0) {

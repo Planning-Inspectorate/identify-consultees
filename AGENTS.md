@@ -64,7 +64,8 @@ Azure jobs use PINS `node_script.yml` with `nodeVersion: 22.23.2` (see `.azure/p
 - Prefer `npm ci` for a clean tree (same command as CI). Use `npm install` only when intentionally updating dependencies.
 - After any `package-lock.json` change, run `npm run check-toolchain` (also runs at the end of `postinstall`).
 - Keep root `optionalDependencies` on `react@19.3.0`, `react-dom@19.3.0`, and `scheduler@0.28.0`. They are not used by app code; they satisfy Prisma Studio / Radix peers so Azure `npm ci` does not fail with “Missing: react@… from lock file” (see PR #53 / commit `2e4f99d`). Never remove those entries or the matching `node_modules/react` (etc.) lockfile packages without replacing the guard.
-- `.npmrc` sets `engine-strict=true`. Do not weaken that to work around a wrong local Node version — switch Node instead.
+- `.npmrc` sets `engine-strict=true` and `legacy-peer-deps=false` (Azure default). Do not enable `legacy-peer-deps` locally — it hides the `preact` 8 vs 10 peer conflict (`accessible-autocomplete` vs `@defra/interactive-map`) that breaks Azure `npm ci`.
+- Keep the root `overrides.preact` on `^10.29.8` so that conflict resolves to Defra’s preact 10 line in the lockfile.
 - Emergency bypass only: `SKIP_TOOLCHAIN_CHECK=1` (do not use for normal PR work).
 
 ### Switching locally
