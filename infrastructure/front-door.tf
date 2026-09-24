@@ -49,6 +49,17 @@ resource "azurerm_cdn_frontdoor_custom_domain" "web" {
   }
 }
 
+# HTTP/3 (QUIC) readiness
+# ------------------------
+# Optimum browser ↔ edge performance for HTTP/3 must be enabled on Azure Front Door
+# (this shared profile / route), not in the Node App Service origin.
+#
+# Today Front Door Standard/Premium supports HTTP and HTTPS with HTTP/2 for client
+# connections; origin fetch remains HTTP/1.1. When Microsoft exposes HTTP/3 on
+# Front Door (portal / ARM / azurerm), enable it here (or on the shared tooling
+# profile that owns this endpoint) and verify UDP/443 + TLS 1.3 negotiation.
+# Until then, do not run experimental Node QUIC listeners or advertise Alt-Svc h3
+# from the origin. See AGENTS.md "HTTP protocols and Azure Front Door".
 resource "azurerm_cdn_frontdoor_route" "web" {
   name                          = "${local.org}-fd-${local.service_name}-web-${var.environment}"
   cdn_frontdoor_endpoint_id     = data.azurerm_cdn_frontdoor_endpoint.shared.id
