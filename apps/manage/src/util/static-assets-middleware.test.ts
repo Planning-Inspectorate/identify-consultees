@@ -8,7 +8,12 @@ import path from 'node:path';
 import { after, describe, test } from 'node:test';
 import { brotliCompressSync } from 'node:zlib';
 import request from 'supertest';
-import { createStaticAssetsMiddleware, staticAssetCacheControl } from './static-assets-middleware.ts';
+import {
+	buildStaticAssetsRateLimiter,
+	createStaticAssetsMiddleware,
+	staticAssetCacheControl,
+	staticAssetRequestKey
+} from './static-assets-middleware.ts';
 
 describe('static-assets-middleware', () => {
 	/** @type {string | undefined} */
@@ -18,6 +23,13 @@ describe('static-assets-middleware', () => {
 		if (tempDir) {
 			await rm(tempDir, { recursive: true, force: true });
 		}
+	});
+
+	test('staticAssetRequestKey rejects traversal attempts', () => {
+		assert.equal(staticAssetRequestKey('/assets/js/app.js'), 'assets/js/app.js');
+		assert.equal(staticAssetRequestKey('/../etc/passwd'), null);
+		assert.equal(staticAssetRequestKey('/%2e%2e/etc/passwd'), null);
+		assert.equal(staticAssetRequestKey('/assets/../../etc/passwd'), null);
 	});
 
 	test('serves fingerprinted assets with immutable cache and optional Brotli', async () => {
@@ -30,7 +42,11 @@ describe('static-assets-middleware', () => {
 		await writeFile(`${absolute}.br`, brotliCompressSync(body));
 
 		const app = express();
-		app.use(createStaticAssetsMiddleware(tempDir));
+		app.use(
+			createStaticAssetsMiddleware(tempDir, {
+				rateLimiter: buildStaticAssetsRateLimiter({ limit: 100, windowMs: 60_000 })
+			})
+		);
 		app.use((_req, res) => res.status(404).end());
 
 		const plain = await request(app).get(`/${fingerprinted}`);
@@ -54,12 +70,32 @@ describe('static-assets-middleware', () => {
 		await writeFile(absolute, Buffer.from([137, 80, 78, 71]));
 
 		const app = express();
-		app.use(createStaticAssetsMiddleware(tempDir));
+		app.use(
+			createStaticAssetsMiddleware(tempDir, {
+				rateLimiter: buildStaticAssetsRateLimiter({ limit: 100, windowMs: 60_000 })
+			})
+		);
 		app.use((_req, res) => res.status(404).end());
 
 		const response = await request(app).get(`/${relative}`);
 		assert.equal(response.status, 200);
 		assert.equal(response.headers['cache-control'], staticAssetCacheControl.unfingerprinted);
+	});
+
+	test('does not serve path traversal requests', async () => {
+		tempDir = await mkdtemp(path.join(tmpdir(), 'static-assets-mw-traverse-'));
+		await writeFile(path.join(tempDir, 'safe-aabbccdd.js'), 'ok');
+
+		const app = express();
+		app.use(
+			createStaticAssetsMiddleware(tempDir, {
+				rateLimiter: buildStaticAssetsRateLimiter({ limit: 100, windowMs: 60_000 })
+			})
+		);
+		app.use((_req, res) => res.status(404).end());
+
+		const response = await request(app).get('/../safe-aabbccdd.js');
+		assert.equal(response.status, 404);
 	});
 
 	test('integrates ahead of createBaseApp empty static mount', async () => {
@@ -82,7 +118,11 @@ describe('static-assets-middleware', () => {
 		const app = createBaseApp({
 			service,
 			router: express.Router(),
-			middlewares: [createStaticAssetsMiddleware(tempDir)]
+			middlewares: [
+				createStaticAssetsMiddleware(tempDir, {
+					rateLimiter: buildStaticAssetsRateLimiter({ limit: 100, windowMs: 60_000 })
+				})
+			]
 		});
 
 		const response = await request(app).get(`/${relative}`);
