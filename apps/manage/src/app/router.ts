@@ -10,6 +10,7 @@ import { createRoutes as createConsulteeAreasPythonRoutes } from './views/consul
 import { createRoutes as createConsulteeRoutes } from './views/consultees/index.ts';
 import { createRoutes as createHomeRoutes } from './views/home/index.ts';
 import { createRoutes as createItemRoutes } from './views/items/index.ts';
+import { createRoutes as createMapLayersDemoRoutes } from './views/map-layers-demo/index.ts';
 import { createErrorRoutes } from './views/static/error/index.ts';
 
 export type AuthRateLimiterOptions = {
@@ -45,6 +46,7 @@ export function buildRouter(service: ManageService, options: BuildRouterOptions 
 	const { router: authRoutes, guards: authGuards } = createAuthRoutesAndGuards(service);
 	const homeRoutes = createHomeRoutes(service);
 	const consulteeRoutes = createConsulteeRoutes(service);
+	const mapLayersDemoRoutes = createMapLayersDemoRoutes();
 	const itemsRoutes = createItemRoutes(service);
 	const consulteeAreasPythonRoutes = createConsulteeAreasPythonRoutes(service);
 	const authRateLimiter = options.authRateLimiter ?? buildAuthRateLimiter();
@@ -93,6 +95,7 @@ export function buildRouter(service: ManageService, options: BuildRouterOptions 
 
 	router.use('/', homeRoutes);
 	router.use('/consultees', consulteeRoutes);
+	router.use('/map-layers-demo', mapLayersDemoRoutes);
 	router.use('/items', itemsRoutes);
 	router.use('/consultee-areas-python', consulteeAreasPythonRoutes);
 	router.use('/error', createErrorRoutes(service));

@@ -1,0 +1,84 @@
+{% extends "views/layouts/main.njk" %}
+
+{% from "govuk/components/back-link/macro.njk" import govukBackLink %}
+{% from "govuk/components/inset-text/macro.njk" import govukInsetText %}
+{% from "govuk/components/table/macro.njk" import govukTable %}
+
+{% block pageTitle %}
+	{{ pageHeading }} - {{ config.headerTitle }}
+{% endblock %}
+
+{% block head %}
+	{{ super() }}
+	<link rel="stylesheet" href="/vendor/interactive-map/css/index.css">
+	<link rel="stylesheet" href="/vendor/datasets-plugin/css/index.css">
+	<link rel="stylesheet" href="/vendor/map-key-plugin/css/index.css">
+{% endblock %}
+
+{% block beforeContent %}
+	{{ govukBackLink({
+		text: "Back to home",
+		href: "/"
+	}) }}
+{% endblock %}
+
+{% block pageContent %}
+	{{ govukInsetText({
+		text: "Prototype for UX research. Use the map’s Layers control to show or hide each overlay. These are sample GeoJSON features, not live OpenStreetMap rail or road tiles."
+	}) }}
+
+	<p class="govuk-body">
+		Open the <strong>Layers</strong> panel (top left of the map) to toggle project site, railway lines, road network, and flood risk area. The <strong>Key</strong> panel shows the legend for visible layers.
+	</p>
+
+	{% set mapRegionLabel = mapRegionLabel %}
+	{% set staticMapSrc = "" %}
+	{% set staticMapAlt = "" %}
+	{% set mapWidth = mapWidth %}
+	{% set mapHeight = mapHeight %}
+	{% set mapConfigJson = mapConfigJson %}
+
+	<div
+		id="{{ mapId }}"
+		class="app-case-map"
+		role="region"
+		aria-label="{{ mapRegionLabel }}"
+		data-map-layers-demo
+		data-map-width="{{ mapWidth }}"
+		data-map-height="{{ mapHeight }}"
+	>
+		<noscript>
+			<p class="govuk-body">
+				JavaScript is required for this layers demo. Without it, overlay toggles cannot be shown.
+			</p>
+		</noscript>
+	</div>
+	<script type="application/json" id="{{ mapId }}-data">{{ mapConfigJson | safe }}</script>
+
+	<h2 class="govuk-heading-m govuk-!-margin-top-6">Overlay layers on this map</h2>
+	{% set tableRows = [] %}
+	{% for layer in layerSummaries %}
+		{% set tableRows = (tableRows.push([
+			{ text: layer.label },
+			{ text: layer.description }
+		]), tableRows) %}
+	{% endfor %}
+	{{ govukTable({
+		caption: "Overlay layers on this map",
+		captionClasses: "govuk-visually-hidden",
+		firstCellIsHeader: true,
+		head: [
+			{ text: "Layer" },
+			{ text: "What it shows" }
+		],
+		rows: tableRows
+	}) }}
+{% endblock %}
+
+{% block bodyEnd %}
+	<script defer src="/vendor/interactive-map/js/index.js"></script>
+	<script defer src="/vendor/maplibre-provider/js/index.js"></script>
+	<script defer src="/vendor/datasets-plugin/js/index.js"></script>
+	<script defer src="/vendor/map-key-plugin/js/index.js"></script>
+	<script type="module" src="/javascripts/map-layers-demo.js"></script>
+{% endblock %}
