@@ -1,5 +1,6 @@
 import { ManageService } from '#service';
 import { addLocalsConfiguration } from '#util/config-middleware.ts';
+import { createStaticAssetsMiddleware } from '#util/static-assets-middleware.ts';
 import { createBaseApp } from '@planning-inspectorate/core/app';
 import { mockLogger } from '@planning-inspectorate/core/testing';
 import assert from 'node:assert/strict';
@@ -53,7 +54,7 @@ function createTestApp(service: ManageService, authRateLimiter = buildAuthRateLi
 		service,
 		configureNunjucks,
 		router: buildRouter(service, { authRateLimiter }),
-		middlewares: [addLocalsConfiguration()]
+		middlewares: [createStaticAssetsMiddleware(service.assetsStaticDir), addLocalsConfiguration()]
 	});
 }
 
