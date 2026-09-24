@@ -101,6 +101,17 @@ describe('manage router wiring', () => {
 		assert.match(response.text, /Police Force Areas/);
 	});
 
+	test('GET /map-layers-demo renders the layer toggles prototype', async () => {
+		const response = await request(authDisabledApp).get('/map-layers-demo');
+		assert.equal(response.status, 200);
+		assert.match(response.text, /Map layers demo/);
+		assert.match(response.text, /Railway lines/);
+		assert.match(response.text, /Road network/);
+		assert.match(response.text, /Flood risk area/);
+		assert.match(response.text, /map-layers-demo\.js/);
+		assert.match(response.text, /data-map-layers-demo/);
+	});
+
 	test('GET /consultees/:id/sections/:sectionId/static-map returns a cached image', async () => {
 		const originalFetch = globalThis.fetch;
 		globalThis.fetch = async () =>

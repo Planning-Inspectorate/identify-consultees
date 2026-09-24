@@ -122,4 +122,23 @@ describe('manage page accessibility smoke', () => {
 		});
 		await assertNoSeriousA11yViolations(html);
 	});
+
+	test('map layers demo page has no serious a11y violations', async () => {
+		const html = nunjucks.render('views/map-layers-demo/view.njk', {
+			...pageLocals,
+			pageHeading: 'Map layers demo',
+			mapId: 'map-layers-demo',
+			mapRegionLabel: 'Interactive map with toggleable overlay layers',
+			mapWidth: 960,
+			mapHeight: 516,
+			mapConfigJson: '{"center":[-1.78,50.62],"zoom":11}',
+			layerSummaries: [
+				{ label: 'Project site', description: 'Polygon overlay for the indicative project boundary.' },
+				{ label: 'Railway lines', description: 'Line overlays representing train tracks.' },
+				{ label: 'Road network', description: 'Line overlays representing roads.' },
+				{ label: 'Flood risk area', description: 'Polygon overlay for a constraint.' }
+			]
+		});
+		await assertNoSeriousA11yViolations(html);
+	});
 });

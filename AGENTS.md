@@ -132,9 +132,9 @@ Before implementing or opening a PR that affects users or architecture:
 
 When the user mentions maps in conversation or tickets, interpret wording as follows:
 
-| User says | Means |
-| --------- | ----- |
-| **map** (unqualified) | The **JS-on interactive map** (Defra Interactive Map / client-side map when JavaScript works). |
+| User says                                 | Means                                                                                                                                                 |
+| ----------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **map** (unqualified)                     | The **JS-on interactive map** (Defra Interactive Map / client-side map when JavaScript works).                                                        |
 | **static map** or **non-interactive map** | A **server-rendered image** of a map (PNG/JPEG/SVG served by our app), used for noscript / progressive-enhancement failure — not the interactive map. |
 
 Do not assume “map” alone refers to the static fallback; only treat it as static when they say static or non-interactive (or clearly point at the image/fallback path).
