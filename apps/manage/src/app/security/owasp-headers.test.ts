@@ -7,6 +7,21 @@ import {
 	buildContentSecurityPolicyDirectives
 } from './owasp-headers.ts';
 
+function httpsHostnamesFromCspSources(sources: Iterable<unknown>): string[] {
+	const hostnames: string[] = [];
+	for (const source of sources) {
+		if (typeof source !== 'string' || !/^https?:\/\//i.test(source)) {
+			continue;
+		}
+		try {
+			hostnames.push(new URL(source).hostname);
+		} catch {
+			// Ignore non-URL CSP tokens such as 'self'
+		}
+	}
+	return hostnames;
+}
+
 describe('OWASP / map-aware CSP directives', () => {
 	test('allows OpenFreeMap for tiles, fonts and images', () => {
 		const directives = buildContentSecurityPolicyDirectives({ isProduction: true });
@@ -17,19 +32,27 @@ describe('OWASP / map-aware CSP directives', () => {
 		assert.ok(directives.imgSrc.includes('blob:'));
 		assert.ok(directives.workerSrc.includes('blob:'));
 		assert.ok(directives.childSrc.includes('blob:'));
+		assert.equal(new URL(OPENFREEMAP_ORIGIN).hostname, 'tiles.openfreemap.org');
 	});
 
 	test('does not allow third-party static map hosts in client CSP', () => {
 		const directives = buildContentSecurityPolicyDirectives({ isProduction: true });
-		const joined = [
+		const hostnames = httpsHostnamesFromCspSources([
 			...directives.connectSrc,
 			...directives.imgSrc,
 			...directives.fontSrc,
-			...directives.scriptSrc.filter((value): value is string => typeof value === 'string')
-		].join(' ');
+			...directives.scriptSrc
+		]);
 
-		assert.equal(joined.includes('tile.openstreetmap.org'), false);
-		assert.equal(joined.includes('maps.googleapis.com'), false);
+		assert.equal(
+			hostnames.some((hostname) => hostname === 'tile.openstreetmap.org'),
+			false
+		);
+		assert.equal(
+			hostnames.some((hostname) => hostname === 'maps.googleapis.com'),
+			false
+		);
+		assert.ok(hostnames.some((hostname) => hostname === 'tiles.openfreemap.org'));
 	});
 
 	test('enables upgrade-insecure-requests only in production', () => {
