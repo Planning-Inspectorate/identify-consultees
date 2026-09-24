@@ -41,6 +41,29 @@ async function repairLocalSqlPort(envPath) {
 	}
 }
 
+const defaultPythonFunctionUrl = 'http://localhost:7071/api/consultee-areas';
+
+/**
+ * Older local .env files predate PYTHON_FUNCTION_URL; manage won't start without it.
+ */
+async function ensurePythonFunctionUrl(envPath) {
+	if (!(await exists(envPath))) {
+		return;
+	}
+
+	const contents = await readFile(envPath, 'utf8');
+	if (/^PYTHON_FUNCTION_URL=/m.test(contents)) {
+		return;
+	}
+
+	const separator = contents.endsWith('\n') ? '' : '\n';
+	await writeFile(
+		envPath,
+		`${contents}${separator}\n# see apps/function-python - local Azure Functions Core Tools default\nPYTHON_FUNCTION_URL=${defaultPythonFunctionUrl}\n`
+	);
+	console.log(`Added PYTHON_FUNCTION_URL to ${path.relative(root, envPath)}`);
+}
+
 async function ensureEnvFiles() {
 	const databaseEnv = path.join(root, 'packages/database/.env');
 	const databaseExample = path.join(root, 'packages/database/.env.example');
@@ -66,6 +89,7 @@ async function ensureEnvFiles() {
 
 	await repairLocalSqlPort(databaseEnv);
 	await repairLocalSqlPort(manageEnv);
+	await ensurePythonFunctionUrl(manageEnv);
 }
 
 function isCleanShutdown(code, signal) {
