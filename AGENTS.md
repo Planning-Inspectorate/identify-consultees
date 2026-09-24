@@ -125,6 +125,7 @@ Before implementing or opening a PR that affects users or architecture:
 - [ ] Reused shared packages/patterns rather than introducing a parallel stack.
 - [ ] PR summary notes any Service Standard / TCoP impact when material.
 - [ ] Static / tile map usage follows the caching rules below (no uncached hot-linking of OSM or commercial static image servers).
+- [ ] Map overlay colours, fills, hatches, and label styling follow the GIS Tool Styling tables in the Maps section below.
 
 ## Maps (interactive and static)
 
@@ -132,12 +133,98 @@ Before implementing or opening a PR that affects users or architecture:
 
 When the user mentions maps in conversation or tickets, interpret wording as follows:
 
-| User says | Means |
-| --------- | ----- |
-| **map** (unqualified) | The **JS-on interactive map** (Defra Interactive Map / client-side map when JavaScript works). |
+| User says                                 | Means                                                                                                                                                 |
+| ----------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **map** (unqualified)                     | The **JS-on interactive map** (Defra Interactive Map / client-side map when JavaScript works).                                                        |
 | **static map** or **non-interactive map** | A **server-rendered image** of a map (PNG/JPEG/SVG served by our app), used for noscript / progressive-enhancement failure — not the interactive map. |
 
 Do not assume “map” alone refers to the static fallback; only treat it as static when they say static or non-interactive (or clearly point at the image/fallback path).
+
+### GIS Tool Styling (map overlays — required)
+
+Source: **GIS Tool Styling** (last updated 12/09/2024, Jo Gerulaitis). Agents and contributors **must** use these styles whenever implementing or changing map overlays (interactive layers, legends/keys, and static-map drawings of the same features). Do not invent new colours or fill patterns for these layer types.
+
+#### All layers — labels and buffers
+
+Applies to label styling on all map overlays:
+
+| Property       | Value     |
+| -------------- | --------- |
+| Font name      | Arial     |
+| Font size      | 10pt      |
+| Colour         | `#424145` |
+| Buffer width   | 2mm       |
+| Buffer colour  | `#ffffff` |
+| Buffer opacity | `0.9`     |
+
+#### All projects layer — by `geometryStage`
+
+Solid fill; fill opacity `0.6`; border opacity `1`.
+
+| Layer                 | Column          | Colour    | Description |
+| --------------------- | --------------- | --------- | ----------- |
+| Scoping               | `geometryStage` | `#3c51ab` | Solid fill  |
+| Acceptance            | `geometryStage` | `#bd2327` | Solid fill  |
+| Consultation adequacy | `geometryStage` | `#ee853e` | Solid fill  |
+| DCO consent           | `geometryStage` | `#85a54e` | Solid fill  |
+| Built                 | `geometryStage` | `#4c888e` | Solid fill  |
+
+#### All projects — by type (`Sector`)
+
+Solid fill; fill opacity `0.6`; border opacity `1`.
+
+| Layer                  | Column   | Colour    | Description |
+| ---------------------- | -------- | --------- | ----------- |
+| Transport              | `Sector` | `#da7c7e` | Solid fill  |
+| Business or Commercial | `Sector` | `#782e98` | Solid fill  |
+| Energy                 | `Sector` | `#e0a620` | Solid fill  |
+| Waste                  | `Sector` | `#874927` | Solid fill  |
+| Waste water            | `Sector` | `#418335` | Solid fill  |
+| Water                  | `Sector` | `#85b6b1` | Solid fill  |
+| Other                  | `Sector` | `#77767b` | Solid fill  |
+
+#### Energy projects — by subtype (`subType`)
+
+Diagonal hatch (`Hatched /`); fill opacity `1`; border opacity `1`.
+
+| Layer             | Column    | Colour    | Description |
+| ----------------- | --------- | --------- | ----------- |
+| Natural gas       | `subType` | `#da7c7e` | Hatched /   |
+| Energy from waste | `subType` | `#782e98` | Hatched /   |
+| Solar             | `subType` | `#e0a620` | Hatched /   |
+| Offshore wind     | `subType` | `#3b629b` | Hatched /   |
+| Biomass           | `subType` | `#418335` | Hatched /   |
+| Nuclear           | `subType` | `#85a54e` | Hatched /   |
+| Tidal             | `subType` | `#4c888e` | Hatched /   |
+| Hydrogen          | `subType` | `#85b6b1` | Hatched /   |
+| Onshore wind      | `subType` | `#77767b` | Hatched /   |
+| Other             | `subType` | `#874927` | Hatched /   |
+
+#### MOD low flying areas
+
+Cross hatch (`Hatched X`); fill opacity `1`; border opacity `1`.
+
+| Layer | Colour    | Description |
+| ----- | --------- | ----------- |
+| Green | `#418335` | Hatched X   |
+| Amber | `#e0a620` | Hatched X   |
+| Red   | `#bd2327` | Hatched X   |
+| Blue  | `#2068e4` | Hatched X   |
+
+#### MOD safeguarding areas
+
+Cross hatch (`Hatched X`); fill opacity `1`; border opacity `1`.
+
+| Layer  | Colour    | Description |
+| ------ | --------- | ----------- |
+| Purple | `#782e98` | Hatched X   |
+
+#### Agent rules for overlay styling
+
+- Prefer shared constants / a single style module over hard-coding hex values in multiple views.
+- Match legend/key swatches to the same colour and fill pattern as the map layer.
+- When a new overlay type is needed and is not listed above, ask product/design rather than inventing a palette.
+- Static-map fallbacks that draw the same features should use the same colours and opacities where the render path allows.
 
 ### Architecture
 
