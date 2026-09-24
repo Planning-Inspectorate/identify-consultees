@@ -6,34 +6,26 @@ import { createBaseApp } from '@planning-inspectorate/core/app';
 import type { Express } from 'express';
 import { configureNunjucks } from './nunjucks.ts';
 import { buildRouter } from './router.ts';
-
-const OPENFREEMAP_ORIGIN = 'https://tiles.openfreemap.org';
-
-/**
- * CSP defaults extended for Defra Interactive Map + OpenFreeMap
- * (same widenings as PINS-data-spike map pages).
- */
-const mapAwareCspDirectives = {
-	scriptSrc: ["'self'", (req: unknown, res: { locals?: { cspNonce?: string } }) => `'nonce-${res.locals?.cspNonce}'`],
-	defaultSrc: ["'self'"],
-	connectSrc: ["'self'", OPENFREEMAP_ORIGIN],
-	fontSrc: ["'self'", OPENFREEMAP_ORIGIN],
-	imgSrc: ["'self'", 'data:', OPENFREEMAP_ORIGIN],
-	styleSrc: ["'self'", "'unsafe-inline'"],
-	workerSrc: ["'self'", 'blob:']
-};
+import { buildContentSecurityPolicyDirectives } from './security/owasp-headers.ts';
+import { buildOwaspSecurityHeadersMiddleware } from './security/security-headers-middleware.ts';
 
 export async function prepareStaticAssetServing(service: ManageService): Promise<void> {
 	await ensureEmptyStaticMountDir(service.staticDir);
 }
 
 export function createApp(service: ManageService): Express {
+	const isProduction = service.secureSession;
 	const router = buildRouter(service);
+
 	return createBaseApp({
 		service,
 		configureNunjucks,
 		router,
-		middlewares: [createStaticAssetsMiddleware(service.assetsStaticDir), addLocalsConfiguration()],
-		cspDirectives: mapAwareCspDirectives
+		middlewares: [
+			createStaticAssetsMiddleware(service.assetsStaticDir),
+			buildOwaspSecurityHeadersMiddleware({ isProduction }),
+			addLocalsConfiguration()
+		],
+		cspDirectives: buildContentSecurityPolicyDirectives({ isProduction })
 	});
 }
