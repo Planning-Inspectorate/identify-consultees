@@ -37,12 +37,17 @@ extends:
           - template: ../steps/node_script.yml
             parameters:
               displayName: 'npm ci'
-              nodeVersion: 22
+              nodeVersion: 22.23.2
               script: npm ci
               environmentVariables:
                 npm_config_cache: $(Pipeline.Workspace)/.npm
           - template: ../steps/node_script.yml
             parameters:
+              displayName: 'npm run check-toolchain'
+              nodeVersion: 22.23.2
+              script: npm run check-toolchain
+          - template: ../steps/node_script.yml
+            parameters:
               displayName: 'npm run commitlint'
-              nodeVersion: 22
+              nodeVersion: 22.23.2
               script: npm run commitlint
