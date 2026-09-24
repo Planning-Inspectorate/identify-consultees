@@ -26,7 +26,7 @@ export class ManageService extends BaseService<PrismaClient> {
 		return this.#config.auth.disabled;
 	}
 
-	get pythonFunctionUrl(): string {
+	get pythonFunctionUrl(): string | undefined {
 		return this.#config.pythonFunctionUrl;
 	}
 

@@ -63,9 +63,11 @@ describe('manage loadConfig', () => {
 		assert.throws(() => loadConfig(), /SESSION_SECRET is required/);
 	});
 
-	test('throws when PYTHON_FUNCTION_URL is missing', () => {
-		setBaseEnv({ PYTHON_FUNCTION_URL: '' });
-		assert.throws(() => loadConfig(), /PYTHON_FUNCTION_URL is required/);
+	test('does not throw when PYTHON_FUNCTION_URL is missing', () => {
+		// only the consultee-areas-python page needs this - its absence shouldn't crash the app at boot
+		setBaseEnv({ PYTHON_FUNCTION_URL: undefined });
+		const config = loadConfig();
+		assert.strictEqual(config.pythonFunctionUrl, undefined);
 	});
 
 	test('throws when PORT is not an integer', () => {

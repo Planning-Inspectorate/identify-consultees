@@ -58,4 +58,15 @@ describe('consultee areas python', () => {
 
 		assert.ok(res.render.mock.calls[0].arguments[1].error);
 	});
+
+	it('renders an error without calling fetch when PYTHON_FUNCTION_URL is not configured', async (t) => {
+		const fetchMock = t.mock.method(globalThis, 'fetch', async () => ({ ok: true, json: async () => ({ rows: [] }) }));
+
+		const res = newRes();
+		const run = buildRunConsulteeAreasPython({ ...newService(), pythonFunctionUrl: undefined });
+		await run({}, res);
+
+		assert.strictEqual(fetchMock.mock.callCount(), 0);
+		assert.ok(res.render.mock.calls[0].arguments[1].error);
+	});
 });
