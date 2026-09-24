@@ -54,6 +54,46 @@ function buildTestConfig(nodeEnv: Config['NODE_ENV']): Config {
 	};
 }
 
+/**
+ * Split a CSP header into directive name → source tokens without regex host matching.
+ */
+function cspDirectiveSources(cspHeader: string, directiveName: string): string[] {
+	for (const part of cspHeader.split(';')) {
+		const trimmed = part.trim();
+		if (!trimmed.startsWith(`${directiveName} `) && trimmed !== directiveName) {
+			continue;
+		}
+		return trimmed.slice(directiveName.length).trim().split(/\s+/).filter(Boolean);
+	}
+	return [];
+}
+
+function assertCspAllowsOpenFreeMap(cspHeader: string, directiveName: string): void {
+	const sources = cspDirectiveSources(cspHeader, directiveName);
+	assert.ok(
+		sources.includes(OPENFREEMAP_ORIGIN),
+		`Expected ${directiveName} to include ${OPENFREEMAP_ORIGIN}, got: ${sources.join(' ')}`
+	);
+}
+
+function assertCspExcludesHost(cspHeader: string, hostname: string): void {
+	for (const part of cspHeader.split(';')) {
+		for (const token of part.trim().split(/\s+/)) {
+			if (!/^https?:\/\//i.test(token)) {
+				continue;
+			}
+			try {
+				assert.notEqual(new URL(token).hostname, hostname);
+			} catch (error) {
+				if (error instanceof assert.AssertionError) {
+					throw error;
+				}
+				// Ignore non-URL tokens
+			}
+		}
+	}
+}
+
 describe('HTML security response headers', () => {
 	const developmentService = new ManageService(buildTestConfig('development'));
 	const productionService = new ManageService(buildTestConfig('production'));
@@ -84,13 +124,13 @@ describe('HTML security response headers', () => {
 
 		const csp = response.headers['content-security-policy'];
 		assert.ok(typeof csp === 'string');
-		assert.match(csp, new RegExp(`connect-src[^;]*${OPENFREEMAP_ORIGIN}`));
-		assert.match(csp, new RegExp(`img-src[^;]*${OPENFREEMAP_ORIGIN}`));
-		assert.match(csp, /worker-src[^;]*blob:/);
-		assert.match(csp, /script-src[^;]*'nonce-/);
-		assert.doesNotMatch(csp, /upgrade-insecure-requests/);
-		assert.doesNotMatch(csp, /tile\.openstreetmap\.org/);
-		assert.doesNotMatch(csp, /maps\.googleapis\.com/);
+		assertCspAllowsOpenFreeMap(csp, 'connect-src');
+		assertCspAllowsOpenFreeMap(csp, 'img-src');
+		assert.ok(cspDirectiveSources(csp, 'worker-src').includes('blob:'));
+		assert.ok(cspDirectiveSources(csp, 'script-src').some((source) => source.startsWith("'nonce-")));
+		assert.equal(csp.includes('upgrade-insecure-requests'), false);
+		assertCspExcludesHost(csp, 'tile.openstreetmap.org');
+		assertCspExcludesHost(csp, 'maps.googleapis.com');
 	});
 
 	test('production HTML responses enable HSTS and upgrade-insecure-requests', async () => {
@@ -100,8 +140,8 @@ describe('HTML security response headers', () => {
 
 		const csp = response.headers['content-security-policy'];
 		assert.ok(typeof csp === 'string');
-		assert.match(csp, /upgrade-insecure-requests/);
-		assert.match(csp, new RegExp(`connect-src[^;]*${OPENFREEMAP_ORIGIN}`));
+		assert.ok(csp.split(';').some((part) => part.trim() === 'upgrade-insecure-requests'));
+		assertCspAllowsOpenFreeMap(csp, 'connect-src');
 	});
 
 	test('consultees results page keeps map-aware CSP', async () => {
@@ -109,7 +149,7 @@ describe('HTML security response headers', () => {
 		assert.equal(response.status, 200);
 		const csp = response.headers['content-security-policy'];
 		assert.ok(typeof csp === 'string');
-		assert.match(csp, new RegExp(`font-src[^;]*${OPENFREEMAP_ORIGIN}`));
-		assert.match(csp, /child-src[^;]*blob:/);
+		assertCspAllowsOpenFreeMap(csp, 'font-src');
+		assert.ok(cspDirectiveSources(csp, 'child-src').includes('blob:'));
 	});
 });
