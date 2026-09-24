@@ -151,6 +151,7 @@ export async function applyAssetManifestToLocalsFile(localsFile: string, manifes
 	const replacements: { logical: string; property: string }[] = [
 		{ logical: 'assets/js/govuk-frontend.min.js', property: 'govukFrontendJs' },
 		{ logical: 'javascripts/consultees-map.js', property: 'consulteesMapJs' },
+		{ logical: 'javascripts/map-layers-demo.js', property: 'mapLayersDemoJs' },
 		{ logical: 'assets/js/accessible-autocomplete.min.js', property: 'accessibleAutocompleteJs' },
 		{ logical: 'assets/css/accessible-autocomplete.min.css', property: 'accessibleAutocompleteCss' }
 	];

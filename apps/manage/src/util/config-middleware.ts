@@ -10,6 +10,7 @@ export function addLocalsConfiguration(): Handler {
 			styleFile: 'style-635ae645.css',
 			govukFrontendJs: 'assets/js/govuk-frontend.min-38b6270a.js',
 			consulteesMapJs: 'javascripts/consultees-map-edecec94.js',
+			mapLayersDemoJs: 'javascripts/map-layers-demo-5c32a650.js',
 			accessibleAutocompleteJs: 'assets/js/accessible-autocomplete.min-5e8c6959.js',
 			accessibleAutocompleteCss: 'assets/css/accessible-autocomplete.min-08028661.css',
 			headerTitle: 'Identify consultees',
