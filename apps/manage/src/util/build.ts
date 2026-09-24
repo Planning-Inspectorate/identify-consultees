@@ -1,8 +1,9 @@
 import { runBuild } from '@planning-inspectorate/core/util';
-import { cp, mkdir } from 'node:fs/promises';
+import { cp, mkdir, rm } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import path from 'node:path';
 import { loadBuildConfig } from '../app/config.ts';
+import { applyAssetManifestToLocalsFile, fingerprintAndCompressStaticAssets } from './fingerprint-assets.ts';
 
 /**
  * Do all steps to run the build
@@ -26,8 +27,15 @@ async function run(): Promise<void> {
 
 	const javascriptsSource = path.join(config.srcDir, 'public', 'javascripts');
 	const javascriptsDestination = path.join(config.staticDir, 'javascripts');
+	await rm(javascriptsDestination, { recursive: true, force: true });
 	await mkdir(javascriptsDestination, { recursive: true });
-	await cp(javascriptsSource, javascriptsDestination, { recursive: true });
+	await cp(javascriptsSource, javascriptsDestination, {
+		recursive: true,
+		filter: (source) => !source.endsWith('.test.js')
+	});
+
+	const manifest = await fingerprintAndCompressStaticAssets(config.staticDir);
+	await applyAssetManifestToLocalsFile(localsFile, manifest);
 }
 
 // run the build, and write any errors to console

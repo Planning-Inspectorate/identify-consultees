@@ -1,5 +1,7 @@
 import type { ManageService } from '#service';
 import { addLocalsConfiguration } from '#util/config-middleware.ts';
+import { ensureEmptyStaticMountDir } from '#util/fingerprint-assets.ts';
+import { createStaticAssetsMiddleware } from '#util/static-assets-middleware.ts';
 import { createBaseApp } from '@planning-inspectorate/core/app';
 import type { Express } from 'express';
 import { configureNunjucks } from './nunjucks.ts';
@@ -21,13 +23,17 @@ const mapAwareCspDirectives = {
 	workerSrc: ["'self'", 'blob:']
 };
 
+export async function prepareStaticAssetServing(service: ManageService): Promise<void> {
+	await ensureEmptyStaticMountDir(service.staticDir);
+}
+
 export function createApp(service: ManageService): Express {
 	const router = buildRouter(service);
 	return createBaseApp({
 		service,
 		configureNunjucks,
 		router,
-		middlewares: [addLocalsConfiguration()],
+		middlewares: [createStaticAssetsMiddleware(service.assetsStaticDir), addLocalsConfiguration()],
 		cspDirectives: mapAwareCspDirectives
 	});
 }

@@ -1,6 +1,7 @@
 import { initDatabaseClient } from '@pins/identify-consultees-database';
 import type { PrismaClient } from '@pins/identify-consultees-database/src/client/client.ts';
 import { BaseService } from '@planning-inspectorate/core/app';
+import path from 'node:path';
 import type { Config } from './config.ts';
 
 /**
@@ -27,5 +28,20 @@ export class ManageService extends BaseService<PrismaClient> {
 
 	get pythonFunctionUrl(): string {
 		return this.#config.pythonFunctionUrl;
+	}
+
+	/**
+	 * Built asset root (fingerprinted + Brotli sidecars). Used by our static middleware.
+	 */
+	get assetsStaticDir(): string {
+		return this.#config.staticDir;
+	}
+
+	/**
+	 * Empty mount used by `@planning-inspectorate/core` `createBaseApp` `express.static`
+	 * so asset responses are owned by {@link createStaticAssetsMiddleware} instead.
+	 */
+	override get staticDir(): string {
+		return path.join(this.#config.staticDir, '.core-static-noop');
 	}
 }

@@ -1,10 +1,11 @@
 import { ManageService } from '#service';
-import { createApp } from './app/app.ts';
+import { createApp, prepareStaticAssetServing } from './app/app.ts';
 import { loadConfig } from './app/config.ts';
 
 const config = loadConfig();
 const service = new ManageService(config);
 
+await prepareStaticAssetServing(service);
 const app = createApp(service);
 
 // Trust proxy, because our application is behind Front Door
