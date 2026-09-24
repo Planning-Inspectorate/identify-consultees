@@ -104,6 +104,8 @@ Useful npm scripts from the repo root:
 | `npm run db-seed` | Seed the database |
 | `npm run lint` / `npm test` / `npm run check-types` | Local quality checks |
 
+Frontend testing (unit, GOV.UK fixtures, a11y, Playwright e2e, coverage gate, and optional visual regression) is documented in [`docs/frontend-testing.md`](./docs/frontend-testing.md). Install Chromium once with `npm run playwright:install` before browser tests.
+
 For contribution workflow (branches, commits, PRs) see [CONTRIBUTING.md](./CONTRIBUTING.md). To report a security vulnerability see [SECURITY.md](./SECURITY.md). Agent / GDS guidance for this repo lives in [AGENTS.md](./AGENTS.md).
 
 ## Editor setup

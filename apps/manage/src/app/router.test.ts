@@ -1,66 +1,13 @@
 import { ManageService } from '#service';
-import { addLocalsConfiguration } from '#util/config-middleware.ts';
-import { createStaticAssetsMiddleware } from '#util/static-assets-middleware.ts';
-import { createBaseApp } from '@planning-inspectorate/core/app';
-import { mockLogger } from '@planning-inspectorate/core/testing';
 import assert from 'node:assert/strict';
 import { after, describe, test } from 'node:test';
 import request from 'supertest';
-import type { Config } from './config.ts';
-import { loadBuildConfig } from './config.ts';
-import { configureNunjucks } from './nunjucks.ts';
-import { buildAuthRateLimiter, buildRouter } from './router.ts';
-
-function buildTestConfig(authDisabled: boolean): Config {
-	const buildConfig = loadBuildConfig();
-	return {
-		appHostname: 'localhost',
-		pythonFunctionUrl: 'http://localhost:7071/api/consultee-areas',
-		auth: {
-			authority: 'https://login.microsoftonline.com/tenant-id',
-			clientId: 'client-id',
-			clientSecret: 'client-secret',
-			disabled: authDisabled,
-			groups: {
-				applicationAccess: 'group-id'
-			},
-			redirectUri: 'http://localhost/auth/redirect',
-			signoutUrl: 'https://login.microsoftonline.com/common/oauth2/v2.0/logout'
-		},
-		cacheControl: {
-			maxAge: '1d'
-		},
-		database: {
-			connectionString:
-				'sqlserver://localhost:1434;database=identify-consultees;user=sa;password=DockerDatabaseP@22word!;trustServerCertificate=true'
-		},
-		gitSha: undefined,
-		logLevel: 'silent',
-		NODE_ENV: 'development',
-		httpPort: 8090,
-		srcDir: buildConfig.srcDir,
-		session: {
-			redisPrefix: 'manage:',
-			redis: undefined,
-			secret: 'test-session-secret-at-least-32-chars'
-		},
-		staticDir: buildConfig.staticDir
-	};
-}
-
-function createTestApp(service: ManageService, authRateLimiter = buildAuthRateLimiter()) {
-	service.logger = mockLogger();
-	return createBaseApp({
-		service,
-		configureNunjucks,
-		router: buildRouter(service, { authRateLimiter }),
-		middlewares: [createStaticAssetsMiddleware(service.assetsStaticDir), addLocalsConfiguration()]
-	});
-}
+import { buildAuthRateLimiter } from './router.ts';
+import { buildManageTestConfig, createManageTestApp, createManageTestService } from './testing/create-test-app.ts';
 
 describe('manage router wiring', () => {
-	const authDisabledService = new ManageService(buildTestConfig(true));
-	const authDisabledApp = createTestApp(authDisabledService);
+	const authDisabledService = createManageTestService(true);
+	const authDisabledApp = createManageTestApp(authDisabledService);
 
 	after(async () => {
 		await authDisabledService.db.$disconnect().catch(() => undefined);
@@ -102,6 +49,48 @@ describe('manage router wiring', () => {
 		assert.match(response.text, /Police Force Areas/);
 	});
 
+	test('GET /consultees redirects to results when geometryId is provided', async () => {
+		const response = await request(authDisabledApp).get(
+			'/consultees?geometryId=geo-1&ruleset=post-30-apr-2024-england-wales'
+		);
+		assert.equal(response.status, 302);
+		assert.equal(response.headers.location, '/consultees/geo-1?ruleset=post-30-apr-2024-england-wales');
+	});
+
+	test('GET /consultees redirects to results without ruleset when only geometryId is set', async () => {
+		const response = await request(authDisabledApp).get('/consultees?geometryId=geo-1');
+		assert.equal(response.status, 302);
+		assert.equal(response.headers.location, '/consultees/geo-1');
+	});
+
+	test('GET /auth/signout forwards session destroy errors', async () => {
+		const express = (await import('express')).default;
+		const service = createManageTestService(true);
+		service.logger = (await import('@planning-inspectorate/core/testing')).mockLogger();
+		const { buildRouter } = await import('./router.ts');
+		const app = express();
+		app.use((req, _res, next) => {
+			req.session = {
+				destroy(callback) {
+					callback(new Error('destroy failed'));
+				}
+			};
+			next();
+		});
+		app.use(buildRouter(service));
+		app.use((error, _req, res, _next) => {
+			res.status(500).send(String(error.message || error));
+		});
+
+		try {
+			const response = await request(app).get('/auth/signout');
+			assert.equal(response.status, 500);
+			assert.match(response.text, /destroy failed/);
+		} finally {
+			await service.db.$disconnect().catch(() => undefined);
+		}
+	});
+
 	test('GET /map-layers-demo renders the layer toggles prototype', async () => {
 		const response = await request(authDisabledApp).get('/map-layers-demo');
 		assert.equal(response.status, 200);
@@ -109,7 +98,7 @@ describe('manage router wiring', () => {
 		assert.match(response.text, /Railway lines/);
 		assert.match(response.text, /Road network/);
 		assert.match(response.text, /Flood risk area/);
-		assert.match(response.text, /map-layers-demo\.js/);
+		assert.match(response.text, /map-layers-demo(?:-[0-9a-f]{8})?\.js/);
 		assert.match(response.text, /data-map-layers-demo/);
 	});
 
@@ -180,8 +169,10 @@ describe('manage router wiring', () => {
 	});
 
 	test('GET /auth is rate limited when auth is enabled', async () => {
-		const service = new ManageService(buildTestConfig(false));
-		const app = createTestApp(service, buildAuthRateLimiter({ limit: 2, windowMs: 60_000 }));
+		const service = new ManageService(buildManageTestConfig(false));
+		const app = createManageTestApp(service, {
+			authRateLimiter: buildAuthRateLimiter({ limit: 2, windowMs: 60_000 })
+		});
 
 		try {
 			const first = await request(app).get('/auth/signin');

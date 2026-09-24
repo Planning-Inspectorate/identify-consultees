@@ -33,6 +33,12 @@ temp
 coverage
 .nyc_output
 
+# Playwright
+apps/manage/test-results
+apps/manage/playwright-report
+apps/manage/blob-report
+apps/manage/playwright/.cache
+
 # Logs
 logs
 *.log

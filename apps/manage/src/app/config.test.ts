@@ -111,6 +111,21 @@ describe('manage loadConfig', () => {
 		assert.equal(config.auth.clientId, 'client-id');
 		assert.equal(config.httpPort, 8090);
 	});
+
+	test('returns cached config on subsequent calls', () => {
+		setBaseEnv({ AUTH_DISABLED: 'true', PORT: '8111' });
+		const first = loadConfig();
+		process.env.PORT = '8222';
+		const second = loadConfig();
+		assert.equal(first, second);
+		assert.equal(second.httpPort, 8111);
+	});
+
+	test('parses a valid PORT override', () => {
+		setBaseEnv({ AUTH_DISABLED: 'true', PORT: '9001' });
+		const config = loadConfig();
+		assert.equal(config.httpPort, 9001);
+	});
 });
 
 describe('manage loadEnvironmentConfig', () => {

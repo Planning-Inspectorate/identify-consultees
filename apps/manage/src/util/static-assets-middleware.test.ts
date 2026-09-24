@@ -30,6 +30,38 @@ describe('static-assets-middleware', () => {
 		assert.equal(staticAssetRequestKey('/../etc/passwd'), null);
 		assert.equal(staticAssetRequestKey('/%2e%2e/etc/passwd'), null);
 		assert.equal(staticAssetRequestKey('/assets/../../etc/passwd'), null);
+		assert.equal(staticAssetRequestKey('/'), null);
+		assert.equal(staticAssetRequestKey('/%E0%A4%A'), null);
+		assert.equal(staticAssetRequestKey('/\0file.js'), null);
+		assert.equal(staticAssetRequestKey('/C:/Windows/system32'), null);
+	});
+
+	test('serves HEAD responses and ignores non-GET methods', async () => {
+		tempDir = await mkdtemp(path.join(tmpdir(), 'static-assets-mw-head-'));
+		const relative = 'assets/js/app-aabbccdd.js';
+		const absolute = path.join(tempDir, ...relative.split('/'));
+		await mkdir(path.dirname(absolute), { recursive: true });
+		await writeFile(absolute, 'export const value = 1;\n');
+		await writeFile(path.join(tempDir, 'unknown.dat'), 'bin');
+
+		const app = express();
+		app.use(
+			createStaticAssetsMiddleware(tempDir, {
+				rateLimiter: buildStaticAssetsRateLimiter({ limit: 100, windowMs: 60_000 })
+			})
+		);
+		app.use((_req, res) => res.status(404).end());
+
+		const head = await request(app).head(`/${relative}`);
+		assert.equal(head.status, 200);
+		assert.equal(head.headers['cache-control'], staticAssetCacheControl.fingerprinted);
+
+		const post = await request(app).post(`/${relative}`);
+		assert.equal(post.status, 404);
+
+		const unknownType = await request(app).get('/unknown.dat');
+		assert.equal(unknownType.status, 200);
+		assert.match(unknownType.headers['content-type'] || '', /octet-stream/);
 	});
 
 	test('serves fingerprinted assets with immutable cache and optional Brotli', async () => {
@@ -96,6 +128,34 @@ describe('static-assets-middleware', () => {
 
 		const response = await request(app).get('/../safe-aabbccdd.js');
 		assert.equal(response.status, 404);
+	});
+
+	test('forwards stream errors when the asset disappears after indexing', async () => {
+		tempDir = await mkdtemp(path.join(tmpdir(), 'static-assets-mw-gone-'));
+		const relative = 'assets/js/app-aabbccdd.js';
+		const absolute = path.join(tempDir, ...relative.split('/'));
+		await mkdir(path.dirname(absolute), { recursive: true });
+		await writeFile(absolute, 'export const value = 1;\n');
+
+		const app = express();
+		app.use(
+			createStaticAssetsMiddleware(tempDir, {
+				rateLimiter: buildStaticAssetsRateLimiter({ limit: 100, windowMs: 60_000 })
+			})
+		);
+		app.use((error, _req, res, _next) => {
+			res.status(500).send(String(error?.code || error?.message || error));
+		});
+		app.use((_req, res) => res.status(404).end());
+
+		await rm(absolute);
+		await assert.rejects(
+			() => request(app).get(`/${relative}`),
+			(error) => {
+				assert.match(String(error?.code || error?.message || error), /ECONNRESET|socket hang up|ENOENT/);
+				return true;
+			}
+		);
 	});
 
 	test('integrates ahead of createBaseApp empty static mount', async () => {

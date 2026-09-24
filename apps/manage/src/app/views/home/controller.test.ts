@@ -101,4 +101,38 @@ describe('home page', () => {
 		assert.strictEqual(pageSize100.geometries.length, 100);
 		assert.strictEqual(pageSize100.resultsTo, 100);
 	});
+
+	it('should read the first value from array query params', async () => {
+		const mockRes = { render: mock.fn() };
+		const homePage = buildHomePage({ logger: mockLogger(), db: createMockDb(0) });
+		await homePage({ query: { q: ['A66', 'ignored'], pageSize: ['50'] } }, mockRes);
+		const viewModel = mockRes.render.mock.calls[0].arguments[1];
+		assert.strictEqual(viewModel.searchQuery, 'A66');
+		assert.strictEqual(viewModel.pageSize, 50);
+	});
+
+	it('should ignore non-string array query values', async () => {
+		const mockRes = { render: mock.fn() };
+		const homePage = buildHomePage({ logger: mockLogger(), db: createMockDb(0) });
+		await homePage({ query: { q: [1], pageSize: [{}] } }, mockRes);
+		const viewModel = mockRes.render.mock.calls[0].arguments[1];
+		assert.strictEqual(viewModel.searchQuery, '');
+		assert.strictEqual(viewModel.pageSize, 25);
+	});
+
+	it('should fall back to dummy size when case_boundary count throws', async () => {
+		const mockRes = { render: mock.fn() };
+		const homePage = buildHomePage({
+			logger: mockLogger(),
+			db: {
+				caseBoundary: {
+					count: mock.fn(async () => {
+						throw new Error('db down');
+					})
+				}
+			}
+		});
+		await homePage({ query: {} }, mockRes);
+		assert.strictEqual(mockRes.render.mock.calls[0].arguments[1].resultsTotal, 100);
+	});
 });

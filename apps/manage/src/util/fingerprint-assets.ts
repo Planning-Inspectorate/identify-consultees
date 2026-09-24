@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { createReadStream, createWriteStream } from 'node:fs';
-import { readdir, readFile, rename, rm, stat, writeFile } from 'node:fs/promises';
+import { readdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { pipeline } from 'node:stream/promises';
 import { createBrotliCompress, constants as zlibConstants } from 'node:zlib';
@@ -97,6 +97,14 @@ async function brotliCompressFile(absolutePath: string): Promise<void> {
  * Fingerprint selected assets, write Brotli sidecars for fingerprinted compressible files,
  * and emit `asset-manifest.json` for template wiring.
  */
+export function shouldFingerprintRelativePath(relativePosixPath: string): boolean {
+	return shouldFingerprint(relativePosixPath);
+}
+
+export function shouldBrotliRelativePath(relativePosixPath: string): boolean {
+	return shouldBrotli(relativePosixPath);
+}
+
 export async function fingerprintAndCompressStaticAssets(staticDir: string): Promise<AssetManifest> {
 	const allFiles = await walkFiles(staticDir);
 	const manifest: AssetManifest = { assets: {} };
@@ -182,8 +190,4 @@ export async function ensureEmptyStaticMountDir(mountDir: string): Promise<void>
 	await rm(mountDir, { recursive: true, force: true });
 	const { mkdir } = await import('node:fs/promises');
 	await mkdir(mountDir, { recursive: true });
-	const probe = await stat(mountDir);
-	if (!probe.isDirectory()) {
-		throw new Error(`Expected empty static mount directory at ${mountDir}`);
-	}
 }
