@@ -64,4 +64,40 @@ describe('consultees results page', () => {
 			globalThis.fetch = originalFetch;
 		}
 	});
+
+	it('should accept array ruleset query values', async () => {
+		const mockRes = {
+			status: mock.fn(() => mockRes),
+			render: mock.fn()
+		};
+		const handler = buildConsulteesResultsPage({ logger: mockLogger() });
+		await handler({ params: { geometryId: 'geo-1' }, query: { ruleset: ['post-30-apr-2024-england-wales'] } }, mockRes);
+		assert.strictEqual(mockRes.render.mock.calls[0].arguments[1].rulesetLabel.includes('England'), true);
+	});
+
+	it('should ignore non-string array ruleset values', async () => {
+		const mockRes = {
+			status: mock.fn(() => mockRes),
+			render: mock.fn()
+		};
+		const handler = buildConsulteesResultsPage({ logger: mockLogger() });
+		await handler({ params: { geometryId: 'geo-1' }, query: { ruleset: [1] } }, mockRes);
+		assert.ok(mockRes.render.mock.calls[0].arguments[1].rulesetLabel);
+	});
+
+	it('should 404 static maps for unknown geometry or section', async () => {
+		const mockRes = {
+			status: mock.fn(() => mockRes),
+			type: mock.fn(() => mockRes),
+			send: mock.fn(),
+			set: mock.fn(() => mockRes),
+			end: mock.fn()
+		};
+		const handler = buildSectionStaticMap({ logger: mockLogger() });
+		await handler({ params: { geometryId: 'missing', sectionId: 'ambulance-trusts' }, headers: {} }, mockRes);
+		assert.strictEqual(mockRes.status.mock.calls[0].arguments[0], 404);
+
+		await handler({ params: { geometryId: 'geo-1', sectionId: 'missing' }, headers: {} }, mockRes);
+		assert.strictEqual(mockRes.status.mock.calls[1].arguments[0], 404);
+	});
 });

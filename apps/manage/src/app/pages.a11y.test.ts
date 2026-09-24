@@ -146,4 +146,65 @@ describe('manage page accessibility smoke', () => {
 		});
 		await assertNoSeriousA11yViolations(html);
 	});
+
+	test('consultees results page has no serious a11y violations', async () => {
+		const html = nunjucks.render('views/consultees/results/view.njk', {
+			...pageLocals,
+			pageHeading: 'Consultees identified for Example Project (EN01)',
+			backLinkUrl: '/',
+			backLinkText: 'Back to project geometry search',
+			rulesetLabel: 'Post 30 Apr 2024 England & Wales',
+			reference: 'EN01',
+			caseName: 'Example Project',
+			geometryId: 'geo-1',
+			downloadSummaryHref: '#',
+			downloadMapsHref: '#',
+			sections: [
+				{
+					id: 'ambulance-trusts',
+					heading: 'Ambulance Trusts (within 1km of the site)',
+					mapTitle: 'Ambulance Trust within 1km of the project site',
+					mapRegionLabel: 'Ambulance Trust within 1km of the project site',
+					consultees: ['South Central Ambulance Service'],
+					staticMapSrc: '/consultees/geo-1/sections/ambulance-trusts/static-map',
+					staticMapAlt: 'Static map showing ambulance trusts',
+					mapWidth: 960,
+					mapHeight: 516,
+					mapConfigJson: '{"center":[-1.78,50.62],"zoom":11}'
+				}
+			]
+		});
+		await assertNoSeriousA11yViolations(html);
+	});
+
+	test('firewall error page has no serious a11y violations', async () => {
+		const html = nunjucks.render('views/static/error/firewall-error.njk', {
+			...pageLocals,
+			pageHeading: 'Sorry, there is a problem with the service'
+		});
+		await assertNoSeriousA11yViolations(html);
+	});
+
+	test('consultee areas python page has no serious a11y violations', async () => {
+		const html = nunjucks.render('views/consultee-areas-python/view.njk', {
+			...pageLocals,
+			pageHeading: 'Consultee areas (Python function)',
+			_csrf: 'test-csrf',
+			rows: [
+				{
+					id: '1',
+					geometryType: 'Polygon',
+					consulteeCategory: 'Statutory',
+					consultee: 'Example Trust',
+					region: 'South West',
+					caseReference: 'EN01',
+					currentVersion: 1,
+					metadata: '{}',
+					lastUpdated: '2026-01-01',
+					geometryWkt: 'POLYGON((0 0,1 0,1 1,0 1,0 0))'
+				}
+			]
+		});
+		await assertNoSeriousA11yViolations(html);
+	});
 });

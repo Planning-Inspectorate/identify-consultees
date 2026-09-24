@@ -31,8 +31,12 @@
     "prepare": "node .husky/install.mjs",
     "postinstall": "npm run deps:patch-maplibre",
     "start": "node scripts/start-local.mjs",
-    "test": "node --test",
-    "test-coverage": "node --test --experimental-test-coverage"
+    "test": "node --test && npm run test:frontend-coverage && npm run test:e2e --workspace identify-consultees-manage",
+    "test:e2e": "npm run test:e2e --workspace identify-consultees-manage",
+    "test:visual": "npm run test:visual --workspace identify-consultees-manage",
+    "test:frontend-coverage": "npm run test:coverage --workspace identify-consultees-manage",
+    "test-coverage": "node --test --experimental-test-coverage && npm run test:e2e --workspace identify-consultees-manage && npm run test:frontend-coverage",
+    "playwright:install": "npm run playwright:install --workspace identify-consultees-manage"
   },
   "dependencies": {
     "@azure/functions": "^4.16.2",
@@ -62,11 +66,13 @@
     "redis": "^6.2.1"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.13.0",
     "@commitlint/cli": "^21.2.2",
     "@commitlint/config-conventional": "^21.0.2",
     "@eslint/js": "^10.0.1",
     "@microsoft/microsoft-graph-types": "^2.43.1",
     "@planning-inspectorate/coding-standards": "^1.2.0",
+    "@playwright/test": "^1.63.0",
     "@types/express": "^5.0.6",
     "@types/express-session": "^1.19.0",
     "@types/jsdom": "^30.0.0",

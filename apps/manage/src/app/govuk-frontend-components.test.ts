@@ -40,4 +40,11 @@ describe('GOV.UK Frontend component fixtures', () => {
 			}
 		});
 	}
+
+	it('formatGovukHtmlMismatch describes the first differing character', () => {
+		const message = formatGovukHtmlMismatch('<div>a</div>', '<div>b</div>');
+		assert.match(message, /First difference at character/);
+		assert.match(message, /Expected:/);
+		assert.match(message, /Actual:/);
+	});
 });

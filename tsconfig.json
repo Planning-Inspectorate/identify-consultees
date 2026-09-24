@@ -1,6 +1,6 @@
 {
 	"include": ["**/*.ts"],
-	"exclude": ["node_modules", "packages/database/src/client/**", "**/*.test.ts"],
+	"exclude": ["node_modules", "packages/database/src/client/**", "**/*.test.ts", "apps/manage/e2e/**"],
 	"compilerOptions": {
 		"allowImportingTsExtensions": true,
 		"allowJs": true,

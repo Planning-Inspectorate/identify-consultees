@@ -32,11 +32,14 @@ Keep commits focused. Before requesting review, squash noisy WIP or fixup commit
 ### Checks to run locally
 
 ```bash
+npm run playwright:install   # once, for browser tests
 npm run lint
 npm run format-prettier-check
 npm run check-types
 npm test
 ```
+
+`npm test` runs unit/integration tests (including GOV.UK Frontend fixtures and jsdom a11y smoke), the manage frontend 100% line coverage gate, and Playwright e2e + browser a11y. Visual regression is opt-in (`npm run test:visual`) — see [`docs/frontend-testing.md`](./docs/frontend-testing.md).
 
 Husky runs lint-staged and commit-message checks on commit.
 

@@ -1,12 +1,15 @@
 import assert from 'node:assert/strict';
-import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { after, describe, test } from 'node:test';
 import {
 	applyAssetManifestToLocalsFile,
+	ensureEmptyStaticMountDir,
 	fingerprintAndCompressStaticAssets,
-	isFingerprintedAssetPath
+	isFingerprintedAssetPath,
+	shouldBrotliRelativePath,
+	shouldFingerprintRelativePath
 } from './fingerprint-assets.ts';
 
 describe('fingerprint-assets', () => {
@@ -25,6 +28,16 @@ describe('fingerprint-assets', () => {
 		assert.equal(isFingerprintedAssetPath('govuk-frontend.min-abcdef12.js.br'), true);
 		assert.equal(isFingerprintedAssetPath('govuk-frontend.min.js'), false);
 		assert.equal(isFingerprintedAssetPath('style.css'), false);
+	});
+
+	test('shouldFingerprintRelativePath and shouldBrotliRelativePath guard sidecars', () => {
+		assert.equal(shouldFingerprintRelativePath('javascripts/app.js.br'), false);
+		assert.equal(shouldFingerprintRelativePath('javascripts/app.test.js'), false);
+		assert.equal(shouldFingerprintRelativePath('javascripts/app-aabbccdd.js'), false);
+		assert.equal(shouldFingerprintRelativePath('javascripts/app.js'), true);
+		assert.equal(shouldBrotliRelativePath('style.css.br'), false);
+		assert.equal(shouldBrotliRelativePath('style.css'), true);
+		assert.equal(shouldBrotliRelativePath('image.png'), false);
 	});
 
 	test('fingerprintAndCompressStaticAssets hashes JS/CSS and writes Brotli sidecars', async () => {
@@ -88,5 +101,28 @@ describe('fingerprint-assets', () => {
 		assert.match(updated, /govukFrontendJs: 'assets\/js\/govuk-frontend\.min-cafebabe\.js'/);
 		assert.match(updated, /consulteesMapJs: 'javascripts\/consultees-map-01234567\.js'/);
 		assert.match(updated, /mapLayersDemoJs: 'javascripts\/map-layers-demo-89abcdef\.js'/);
+	});
+
+	test('fingerprintAndCompressStaticAssets skips test files, sidecars, and already-hashed assets', async () => {
+		tempDir = await mkdtemp(path.join(tmpdir(), 'fingerprint-skip-'));
+		await mkdir(path.join(tempDir, 'javascripts'), { recursive: true });
+		await writeFile(path.join(tempDir, 'javascripts', 'map-layers-demo.test.js'), 'export const test = true;\n');
+		await writeFile(path.join(tempDir, 'javascripts', 'already-aabbccdd.js'), 'export const hashed = true;\n');
+		await writeFile(path.join(tempDir, 'javascripts', 'already-aabbccdd.js.br'), 'br');
+		await writeFile(path.join(tempDir, 'readme.txt'), 'plain text');
+
+		const manifest = await fingerprintAndCompressStaticAssets(tempDir);
+		assert.equal(manifest.assets['javascripts/map-layers-demo.test.js'], undefined);
+		assert.equal(manifest.assets['javascripts/already-aabbccdd.js'], undefined);
+		assert.equal(manifest.assets['readme.txt'], undefined);
+	});
+
+	test('ensureEmptyStaticMountDir recreates an empty directory', async () => {
+		tempDir = await mkdtemp(path.join(tmpdir(), 'empty-mount-'));
+		const nested = path.join(tempDir, 'child.txt');
+		await writeFile(nested, 'x');
+		await ensureEmptyStaticMountDir(tempDir);
+		const stats = await stat(tempDir);
+		assert.equal(stats.isDirectory(), true);
 	});
 });
