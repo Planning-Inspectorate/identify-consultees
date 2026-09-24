@@ -9,6 +9,7 @@ const pageLocals = {
 		styleFile: 'style.css',
 		govukFrontendJs: 'assets/js/govuk-frontend.min.js',
 		consulteesMapJs: 'javascripts/consultees-map.js',
+		mapLayersDemoJs: 'javascripts/map-layers-demo.js',
 		accessibleAutocompleteJs: 'assets/js/accessible-autocomplete.min.js',
 		accessibleAutocompleteCss: 'assets/css/accessible-autocomplete.min.css',
 		headerTitle: 'Identify consultees',
