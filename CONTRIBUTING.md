@@ -10,32 +10,7 @@ Thank you for contributing to Identify consultees. This guide covers how to set 
 
 ## Getting started
 
-1. Clone the repository and install dependencies:
-
-   ```bash
-   npm i
-   ```
-
-2. Start the local database:
-
-   ```bash
-   docker compose up
-   ```
-
-3. Copy environment files and configure auth:
-
-   - Copy `packages/database/.env.example` to `packages/database/.env`
-   - Copy `apps/manage/.env.example` to `apps/manage/.env`
-   - Add `AUTH_*` values from a teammate, or set `AUTH_DISABLED=true` for local work without Entra
-
-4. Set up the database and start the manage app:
-
-   ```bash
-   npm run db-migrate-dev
-   npm run dev --workspace identify-consultees-manage
-   ```
-
-More detail is in the [README](./README.md).
+Follow the day-one setup in the [README](./README.md) (`npm i` then `npm start`). That covers env files, SQL Server on port 1434, migrations, and the manage app at http://localhost:8090.
 
 ## Development workflow
 
