@@ -5,7 +5,9 @@ import { loadEnvFile } from 'node:process';
 export interface Config extends BaseConfig {
 	appHostname: string;
 	// the URL of the Python function app's consultee-areas endpoint - see apps/function-python
-	pythonFunctionUrl: string;
+	// undefined if not configured; only the consultee-areas-python page needs this, so its absence
+	// shouldn't crash the whole app at boot (see its controller for the fallback behaviour)
+	pythonFunctionUrl: string | undefined;
 	auth: {
 		authority: string;
 		clientId: string;
@@ -76,10 +78,6 @@ export function loadConfig(): Config {
 
 	if (!SESSION_SECRET) {
 		throw new Error('SESSION_SECRET is required');
-	}
-
-	if (!PYTHON_FUNCTION_URL) {
-		throw new Error('PYTHON_FUNCTION_URL is required');
 	}
 
 	let httpPort = 8090;

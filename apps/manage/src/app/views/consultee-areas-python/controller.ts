@@ -17,6 +17,12 @@ export function buildRunConsulteeAreasPython(service: ManageService): AsyncReque
 	return async (req, res) => {
 		const viewModel: ConsulteeAreasPythonViewModel = { pageHeading: PAGE_HEADING };
 
+		if (!service.pythonFunctionUrl) {
+			logger.error('PYTHON_FUNCTION_URL is not configured');
+			viewModel.error = 'Could not reach the Python function.';
+			return res.render(VIEW, viewModel);
+		}
+
 		try {
 			const response = await fetch(service.pythonFunctionUrl);
 			if (!response.ok) {
