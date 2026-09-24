@@ -140,6 +140,14 @@ When the user mentions maps in conversation or tickets, interpret wording as fol
 
 Do not assume “map” alone refers to the static fallback; only treat it as static when they say static or non-interactive (or clearly point at the image/fallback path).
 
+### Shapefile upload and GIS report workflow (external)
+
+For Astun GIS shapefile packaging, upload, attribute population, and prescribed-consultee report generation, read:
+
+- [`docs/gis-shapefile-upload-and-report.md`](./docs/gis-shapefile-upload-and-report.md)
+
+Keep that procedural detail out of this file; link here when an agent needs the operational context.
+
 ### GIS Tool Styling (map overlays — required)
 
 Source: **GIS Tool Styling** (last updated 12/09/2024, Jo Gerulaitis). Agents and contributors **must** use these styles whenever implementing or changing map overlays (interactive layers, legends/keys, and static-map drawings of the same features). Do not invent new colours or fill patterns for these layer types.
