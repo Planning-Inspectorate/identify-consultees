@@ -119,6 +119,24 @@ describe('manage page accessibility smoke', () => {
 		await assertNoSeriousA11yViolations(html);
 	});
 
+	test('home page with no search results has no serious a11y violations', async () => {
+		const html = nunjucks.render('views/home/view.njk', {
+			...pageLocals,
+			pageHeading: 'Identify consultees for an infrastructure project',
+			rulesets: [{ value: 'post-apr-2025-england-wales', text: 'Post Apr 2025 England & Wales' }],
+			selectedRuleset: 'post-apr-2025-england-wales',
+			searchQuery: 'ZZZ-NOMATCH-XXX',
+			pageSize: 25,
+			pageSizeOptions: [25, 50, 100],
+			resultsFrom: 0,
+			resultsTo: 0,
+			resultsTotal: 0,
+			selectedGeometryId: null,
+			geometries: []
+		});
+		await assertNoSeriousA11yViolations(html);
+	});
+
 	test('signed out page has no serious a11y violations', async () => {
 		const html = nunjucks.render('views/signed-out/view.njk', {
 			...pageLocals,
@@ -204,6 +222,36 @@ describe('manage page accessibility smoke', () => {
 					geometryWkt: 'POLYGON((0 0,1 0,1 1,0 1,0 0))'
 				}
 			]
+		});
+		await assertNoSeriousA11yViolations(html);
+	});
+
+	test('consultee areas python page with an error has no serious a11y violations', async () => {
+		const html = nunjucks.render('views/consultee-areas-python/view.njk', {
+			...pageLocals,
+			pageHeading: 'Consultee areas (Python function)',
+			_csrf: 'test-csrf',
+			error: 'PYTHON_FUNCTION_URL is not configured'
+		});
+		await assertNoSeriousA11yViolations(html);
+	});
+
+	test('consultee areas python page with empty rows has no serious a11y violations', async () => {
+		const html = nunjucks.render('views/consultee-areas-python/view.njk', {
+			...pageLocals,
+			pageHeading: 'Consultee areas (Python function)',
+			_csrf: 'test-csrf',
+			rows: []
+		});
+		await assertNoSeriousA11yViolations(html);
+	});
+
+	test('500 error page with development details has no serious a11y violations', async () => {
+		const html = nunjucks.render('views/errors/500.njk', {
+			...pageLocals,
+			pageHeading: 'Sorry, there is a problem with the service',
+			isDevelopment: true,
+			error: { message: 'boom', stack: 'Error: boom\n    at test' }
 		});
 		await assertNoSeriousA11yViolations(html);
 	});

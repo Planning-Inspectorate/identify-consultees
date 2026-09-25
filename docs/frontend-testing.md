@@ -13,7 +13,7 @@ From the repo root:
    - Official GOV.UK Frontend HTML fixtures (`govuk-frontend-components.test.ts`)
    - Client JS unit tests (`public/javascripts/*.test.js`)
 2. **Browser e2e + a11y + cross-browser render** — Playwright projects:
-   - `chromium-e2e` / `chromium-a11y` — journeys and axe checks (auth disabled test server)
+   - `chromium-e2e` / `chromium-a11y` — journeys and axe checks across routes and UI states (auth disabled test server), including skip-link/landmark and keyboard focus smoke
    - `firefox-render` / `webkit-render` — render-completeness checks in Firefox and WebKit (Safari engine)
 
 ## Coverage gate (frontend)
