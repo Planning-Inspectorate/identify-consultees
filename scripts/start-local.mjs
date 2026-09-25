@@ -152,6 +152,9 @@ async function main() {
 	console.log('Running database migrations...');
 	await run('npm', ['run', 'db-migrate-dev']);
 
+	console.log('Seeding sample data...');
+	await run('npm', ['run', 'db-seed']);
+
 	console.log('Starting manage app on http://localhost:8090 ...');
 	await run('npm', ['run', 'dev', '--workspace', 'identify-consultees-manage'], {
 		allowSignalExit: true
