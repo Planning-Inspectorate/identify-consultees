@@ -71,4 +71,15 @@ describe('OWASP / map-aware CSP directives', () => {
 	test('production HSTS matches OWASP long-lived recommendation', () => {
 		assert.equal(STRICT_TRANSPORT_SECURITY_PRODUCTION, 'max-age=63072000; includeSubDomains; preload');
 	});
+
+	test('scriptSrc nonce callback tolerates missing locals and cspNonce', () => {
+		const scriptSrc = buildContentSecurityPolicyDirectives({ isProduction: false }).scriptSrc;
+		const nonceFn = scriptSrc.find(
+			(entry): entry is (req: unknown, res: { locals?: { cspNonce?: string } }) => string => typeof entry === 'function'
+		);
+		assert.ok(nonceFn);
+		assert.equal(nonceFn({}, {}), `'nonce-'`);
+		assert.equal(nonceFn({}, { locals: {} }), `'nonce-'`);
+		assert.equal(nonceFn({}, { locals: { cspNonce: 'abc123' } }), `'nonce-abc123'`);
+	});
 });

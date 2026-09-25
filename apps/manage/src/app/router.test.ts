@@ -26,6 +26,19 @@ describe('manage router wiring', () => {
 		assert.equal(response.status, 200);
 		assert.match(response.text, /You have signed out/);
 		assert.match(response.text, /Sign in again/);
+		assert.match(response.text, /href="\/"/);
+	});
+
+	test('GET /signed-out links to /auth/signin when auth is enabled', async () => {
+		const service = createManageTestService(false);
+		const app = createManageTestApp(service);
+		try {
+			const response = await request(app).get('/signed-out');
+			assert.equal(response.status, 200);
+			assert.match(response.text, /href="\/auth\/signin"/);
+		} finally {
+			await service.db.$disconnect().catch(() => undefined);
+		}
 	});
 
 	test('GET /auth/signout redirects to /signed-out when auth is disabled', async () => {

@@ -91,6 +91,18 @@ describe('static-map helpers', () => {
 		assert.match(svg, /<path /);
 	});
 
+	test('renderStaticMapSvg draws consultee polygons', () => {
+		const svg = renderStaticMapSvg({
+			center: [-1.75, 50.65],
+			zoom: 10,
+			projectGeojson: square,
+			consulteeGeojson: square
+		});
+
+		assert.match(svg, /#55A868/);
+		assert.match(svg, /#C44E52/);
+	});
+
 	test('buildStaticMapSvg delegates to renderStaticMapSvg', () => {
 		const svg = buildStaticMapSvg({
 			center: [-1.75, 50.65],
@@ -271,6 +283,13 @@ describe('static-map helpers', () => {
 		};
 		const tiles = await fetchOsmBasemapTiles({ center: [0, 0], zoom: 2, width: 128, height: 128 }, fetchImpl);
 		assert.equal(tiles.length, 0);
+	});
+
+	test('fetchOsmBasemapTiles uses MAP_VIEWPORT defaults when size is omitted', async () => {
+		const fetchImpl: typeof fetch = async () =>
+			new Response(tinyPng, { status: 200, headers: { 'content-type': 'image/png' } });
+		const tiles = await fetchOsmBasemapTiles({ center: [0, 0], zoom: 2 }, fetchImpl);
+		assert.ok(tiles.length > 0);
 	});
 
 	test('fetchOsmBasemapTiles expires stale cache entries', async () => {

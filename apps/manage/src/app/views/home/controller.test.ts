@@ -135,4 +135,44 @@ describe('home page', () => {
 		await homePage({ query: {} }, mockRes);
 		assert.strictEqual(mockRes.render.mock.calls[0].arguments[1].resultsTotal, 100);
 	});
+
+	it('should show zero results when the search matches nothing', async () => {
+		const mockRes = { render: mock.fn() };
+		const homePage = buildHomePage({ logger: mockLogger(), db: createMockDb() });
+		await homePage({ query: { q: 'ZZZ-NOMATCH-XXX' } }, mockRes);
+		const viewModel = mockRes.render.mock.calls[0].arguments[1];
+		assert.strictEqual(viewModel.geometries.length, 0);
+		assert.strictEqual(viewModel.resultsFrom, 0);
+		assert.strictEqual(viewModel.resultsTo, 0);
+		assert.strictEqual(viewModel.selectedGeometryId, null);
+	});
+
+	it('should honour an explicit ruleset query value', async () => {
+		const mockRes = { render: mock.fn() };
+		const homePage = buildHomePage({ logger: mockLogger(), db: createMockDb() });
+		await homePage({ query: { ruleset: 'scotland' } }, mockRes);
+		assert.strictEqual(mockRes.render.mock.calls[0].arguments[1].selectedRuleset, 'scotland');
+	});
+
+	it('should fall back to an empty ruleset when none are configured', async () => {
+		const geometryModule = await import('../../data/dummy-geometries.ts');
+		const originalRulesets = geometryModule.RULESETS.splice(0, geometryModule.RULESETS.length);
+		try {
+			const mockRes = { render: mock.fn() };
+			const homePage = buildHomePage({ logger: mockLogger(), db: createMockDb() });
+			await homePage({ query: {} }, mockRes);
+			assert.strictEqual(mockRes.render.mock.calls[0].arguments[1].selectedRuleset, '');
+		} finally {
+			geometryModule.RULESETS.push(...originalRulesets);
+		}
+	});
+
+	it('should filter by project reference as well as case name', async () => {
+		const mockRes = { render: mock.fn() };
+		const homePage = buildHomePage({ logger: mockLogger(), db: createMockDb() });
+		await homePage({ query: { q: 'TR010034' } }, mockRes);
+		const viewModel = mockRes.render.mock.calls[0].arguments[1];
+		assert.ok(viewModel.geometries.length > 0);
+		assert.ok(viewModel.geometries.every((geometry) => geometry.reference === 'TR010034'));
+	});
 });
