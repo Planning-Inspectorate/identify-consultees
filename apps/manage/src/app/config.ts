@@ -111,7 +111,7 @@ export function loadConfig(): Config {
 
 	config = {
 		appHostname: APP_HOSTNAME || '',
-		pythonFunctionUrl: PYTHON_FUNCTION_URL,
+		pythonFunctionUrl: PYTHON_FUNCTION_URL || undefined,
 		auth: {
 			authority: `https://login.microsoftonline.com/${AUTH_TENANT_ID}`,
 			clientId: AUTH_CLIENT_ID || '',
