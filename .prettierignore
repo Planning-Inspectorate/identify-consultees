@@ -4,3 +4,6 @@ package-lock.json
 README.md
 *.njk
 .env*
+# GeoJSON data files - pretty-printing minified coordinate data serves no purpose and would
+# massively bloat file size
+*.geojson
