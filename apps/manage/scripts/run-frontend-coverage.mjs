@@ -15,7 +15,7 @@ const args = [
 	'--experimental-test-coverage',
 	'--test-coverage-lines=100',
 	'--test-coverage-functions=100',
-	'--test-coverage-branches=90',
+	'--test-coverage-branches=100',
 	`--test-coverage-include=${path.join(manageRoot, 'src/**')}`,
 	`--test-coverage-exclude=${path.join(manageRoot, '**/*.test.*')}`,
 	`--test-coverage-exclude=${path.join(manageRoot, '**/server.ts')}`,

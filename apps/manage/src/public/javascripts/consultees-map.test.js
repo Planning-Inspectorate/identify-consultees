@@ -45,6 +45,35 @@ describe('consultees-map client helpers', () => {
 		assert.deepEqual(readMapConfig('map-c'), { zoom: 8 });
 	});
 
+	test('readMapConfig prefers the script text property when set', () => {
+		const dom = installDom('<!DOCTYPE html><html><body></body></html>');
+		const script = dom.window.document.createElement('script');
+		script.id = 'map-text-data';
+		script.type = 'application/json';
+		script.text = '{"zoom":9}';
+		dom.window.document.body.appendChild(script);
+		assert.deepEqual(readMapConfig('map-text'), { zoom: 9 });
+	});
+
+	test('readMapConfig falls back to textContent then empty string', () => {
+		const dom = installDom('<!DOCTYPE html><html><body></body></html>');
+		const withTextContent = dom.window.document.createElement('script');
+		withTextContent.id = 'map-tc-data';
+		withTextContent.type = 'application/json';
+		withTextContent.textContent = '{"zoom":7}';
+		Object.defineProperty(withTextContent, 'text', { configurable: true, get: () => '' });
+		dom.window.document.body.appendChild(withTextContent);
+		assert.deepEqual(readMapConfig('map-tc'), { zoom: 7 });
+
+		const empty = dom.window.document.createElement('script');
+		empty.id = 'map-empty-data';
+		empty.type = 'application/json';
+		Object.defineProperty(empty, 'text', { configurable: true, get: () => '' });
+		Object.defineProperty(empty, 'textContent', { configurable: true, get: () => '' });
+		dom.window.document.body.appendChild(empty);
+		assert.equal(readMapConfig('map-empty'), null);
+	});
+
 	test('buildDatasets includes project and consultee layers when present', () => {
 		const datasets = buildDatasets({
 			projectGeojson: { features: [{ type: 'Feature' }] },

@@ -89,4 +89,116 @@ describe('serve-static-map', () => {
 		});
 		assert.equal(fetchCount, firstFetches);
 	});
+
+	it('returns a Google Static Map PNG when a key is configured', async () => {
+		clearOsmTileCacheForTests();
+		const fetchImpl = async (input: RequestInfo | URL) => {
+			const url = String(input);
+			assert.match(url, /maps\.googleapis\.com/);
+			return new Response(tinyPng, { status: 200, headers: { 'content-type': 'image/png' } });
+		};
+
+		const map = {
+			center: [-1.78, 50.62] as const,
+			zoom: 10,
+			projectGeojson: buildProjectSiteGeojson('EN010024', 'Navitus'),
+			consulteeGeojson: buildConsulteeAreaGeojson('Ambulance', [
+				{ name: 'A', code: 'A', offsetLng: 0, offsetLat: 0, size: 0.02 }
+			])
+		};
+
+		const response = await buildConsulteeStaticMapResponse({
+			geometryId: 'geo-1',
+			sectionId: 'ambulance-trusts',
+			map,
+			googleMapsApiKey: 'test-key',
+			fetchImpl
+		});
+
+		assert.equal(response.status, 200);
+		assert.equal(response.contentType, 'image/png');
+		assert.ok(Buffer.isBuffer(response.body));
+	});
+
+	it('returns 304 with image/png when a Google Static Map was preferred', async () => {
+		clearOsmTileCacheForTests();
+		const map = {
+			center: [-1.78, 50.62] as const,
+			zoom: 10,
+			projectGeojson: buildProjectSiteGeojson('EN010024', 'Navitus'),
+			consulteeGeojson: buildConsulteeAreaGeojson('Ambulance', [
+				{ name: 'A', code: 'A', offsetLng: 0, offsetLat: 0, size: 0.02 }
+			]),
+			width: 256,
+			height: 256
+		};
+
+		const first = await buildConsulteeStaticMapResponse({
+			geometryId: 'geo-1',
+			sectionId: 'ambulance-trusts',
+			map,
+			googleMapsApiKey: 'test-key',
+			fetchImpl: async () => new Response(tinyPng, { status: 200, headers: { 'content-type': 'image/png' } })
+		});
+		assert.equal(first.status, 200);
+		assert.equal(first.contentType, 'image/png');
+
+		const second = await buildConsulteeStaticMapResponse({
+			geometryId: 'geo-1',
+			sectionId: 'ambulance-trusts',
+			map,
+			googleMapsApiKey: 'test-key',
+			ifNoneMatch: first.etag,
+			fetchImpl: async () => {
+				throw new Error('should not fetch on 304');
+			}
+		});
+
+		assert.equal(second.status, 304);
+		assert.equal(second.contentType, 'image/png');
+	});
+
+	it('falls back to SVG when the Google Static Map request fails', async () => {
+		clearOsmTileCacheForTests();
+		const map = {
+			center: [-1.78, 50.62] as const,
+			zoom: 10,
+			projectGeojson: buildProjectSiteGeojson('EN010024', 'Navitus'),
+			consulteeGeojson: buildConsulteeAreaGeojson('Ambulance', [
+				{ name: 'A', code: 'A', offsetLng: 0, offsetLat: 0, size: 0.02 }
+			]),
+			width: 256,
+			height: 256
+		};
+
+		const nonOk = await buildConsulteeStaticMapResponse({
+			geometryId: 'geo-1',
+			sectionId: 'ambulance-trusts',
+			map,
+			googleMapsApiKey: 'test-key',
+			fetchImpl: async (input) => {
+				if (String(input).includes('maps.googleapis.com')) {
+					return new Response('nope', { status: 503 });
+				}
+				return new Response(tinyPng, { status: 200, headers: { 'content-type': 'image/png' } });
+			}
+		});
+		assert.equal(nonOk.status, 200);
+		assert.match(nonOk.contentType, /image\/svg\+xml/);
+
+		const thrown = await buildConsulteeStaticMapResponse({
+			geometryId: 'geo-1',
+			sectionId: 'ambulance-trusts',
+			map,
+			googleMapsApiKey: 'test-key',
+			fetchImpl: async (input) => {
+				if (String(input).includes('maps.googleapis.com')) {
+					throw new Error('network down');
+				}
+				return new Response(tinyPng, { status: 200, headers: { 'content-type': 'image/png' } });
+			}
+		});
+		assert.equal(thrown.status, 200);
+		assert.match(thrown.contentType, /image\/svg\+xml/);
+	});
 });

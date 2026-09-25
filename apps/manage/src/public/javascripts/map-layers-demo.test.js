@@ -80,6 +80,35 @@ describe('map-layers-demo client helpers', () => {
 		assert.deepEqual(readMapConfig('demo'), { zoom: 11 });
 	});
 
+	test('readMapConfig prefers the script text property when set', () => {
+		const dom = installDom('<!DOCTYPE html><html><body></body></html>');
+		const script = dom.window.document.createElement('script');
+		script.id = 'demo-text-data';
+		script.type = 'application/json';
+		script.text = '{"zoom":12}';
+		dom.window.document.body.appendChild(script);
+		assert.deepEqual(readMapConfig('demo-text'), { zoom: 12 });
+	});
+
+	test('readMapConfig falls back to textContent then empty string', () => {
+		const dom = installDom('<!DOCTYPE html><html><body></body></html>');
+		const withTextContent = dom.window.document.createElement('script');
+		withTextContent.id = 'demo-tc-data';
+		withTextContent.type = 'application/json';
+		withTextContent.textContent = '{"zoom":10}';
+		Object.defineProperty(withTextContent, 'text', { configurable: true, get: () => '' });
+		dom.window.document.body.appendChild(withTextContent);
+		assert.deepEqual(readMapConfig('demo-tc'), { zoom: 10 });
+
+		const empty = dom.window.document.createElement('script');
+		empty.id = 'demo-empty-data';
+		empty.type = 'application/json';
+		Object.defineProperty(empty, 'text', { configurable: true, get: () => '' });
+		Object.defineProperty(empty, 'textContent', { configurable: true, get: () => '' });
+		dom.window.document.body.appendChild(empty);
+		assert.equal(readMapConfig('demo-empty'), null);
+	});
+
 	test('showMapUnavailable replaces the container contents', () => {
 		const dom = installDom(
 			'<!DOCTYPE html><html><body><div id="demo" class="app-case-map-interactive">x</div></body></html>'

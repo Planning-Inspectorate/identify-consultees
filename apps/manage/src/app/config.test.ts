@@ -1,4 +1,7 @@
 import assert from 'node:assert/strict';
+import { mkdtempSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { afterEach, describe, test } from 'node:test';
 import { loadConfig, loadEnvironmentConfig, resetConfigCache } from './config.ts';
 
@@ -18,6 +21,8 @@ const managedKeys = [
 	'AUTH_GROUP_APPLICATION_ACCESS',
 	'AUTH_TENANT_ID',
 	'ENVIRONMENT',
+	'LOG_LEVEL',
+	'CACHE_CONTROL_MAX_AGE',
 	'NODE_ENV',
 	'PORT',
 	'PYTHON_FUNCTION_URL',
@@ -80,13 +85,17 @@ describe('manage loadConfig', () => {
 		setBaseEnv({
 			AUTH_DISABLED: 'true',
 			NODE_ENV: 'development',
-			AUTH_CLIENT_ID: undefined,
-			AUTH_CLIENT_SECRET: undefined,
-			AUTH_GROUP_APPLICATION_ACCESS: undefined,
-			AUTH_TENANT_ID: undefined
+			// Empty strings (not delete): loadEnvFile must not restore values from a local .env
+			AUTH_CLIENT_ID: '',
+			AUTH_CLIENT_SECRET: '',
+			AUTH_GROUP_APPLICATION_ACCESS: '',
+			AUTH_TENANT_ID: ''
 		});
 		const config = loadConfig();
 		assert.equal(config.auth.disabled, true);
+		assert.equal(config.auth.clientId, '');
+		assert.equal(config.auth.clientSecret, '');
+		assert.equal(config.auth.groups.applicationAccess, '');
 	});
 
 	test('does not allow AUTH_DISABLED in production', () => {
@@ -129,6 +138,59 @@ describe('manage loadConfig', () => {
 		const config = loadConfig();
 		assert.equal(config.httpPort, 9001);
 	});
+
+	test('uses https when APP_HOSTNAME is not localhost', () => {
+		setBaseEnv({ AUTH_DISABLED: 'true', APP_HOSTNAME: 'manage.example.gov.uk' });
+		const config = loadConfig();
+		assert.equal(config.appHostname, 'manage.example.gov.uk');
+		assert.equal(config.auth.redirectUri, 'https://manage.example.gov.uk/auth/redirect');
+	});
+
+	test('defaults hostname and protocol when APP_HOSTNAME is missing', () => {
+		// Empty string (not delete): loadEnvFile must not restore values from a local .env
+		setBaseEnv({ AUTH_DISABLED: 'true', APP_HOSTNAME: '' });
+		const config = loadConfig();
+		assert.equal(config.appHostname, '');
+		assert.equal(config.auth.redirectUri, 'https:///auth/redirect');
+	});
+
+	test('honours LOG_LEVEL and defaults NODE_ENV when unset', () => {
+		setBaseEnv({
+			AUTH_DISABLED: 'true',
+			LOG_LEVEL: 'debug',
+			CACHE_CONTROL_MAX_AGE: '2d',
+			NODE_ENV: undefined
+		});
+		// Empty string would be falsy for NODE_ENV || 'development'; delete so loadEnvFile
+		// cannot restore a local value either — chdir below covers the catch path.
+		const previousCwd = process.cwd();
+		const emptyDir = mkdtempSync(join(tmpdir(), 'manage-config-'));
+		try {
+			process.chdir(emptyDir);
+			resetConfigCache();
+			const config = loadConfig();
+			assert.equal(config.logLevel, 'debug');
+			assert.equal(config.cacheControl.maxAge, '2d');
+			assert.equal(config.NODE_ENV, 'development');
+		} finally {
+			process.chdir(previousCwd);
+		}
+	});
+
+	test('defaults LOG_LEVEL to info when unset', () => {
+		// Empty string (not delete): loadEnvFile must not restore values from a local .env
+		setBaseEnv({ AUTH_DISABLED: 'true', LOG_LEVEL: '' });
+		const config = loadConfig();
+		assert.equal(config.logLevel, 'info');
+	});
+
+	test('maps auth field values when auth is enabled', () => {
+		setBaseEnv({ AUTH_DISABLED: 'false' });
+		const config = loadConfig();
+		assert.equal(config.auth.clientId, 'client-id');
+		assert.equal(config.auth.clientSecret, 'client-secret');
+		assert.equal(config.auth.groups.applicationAccess, 'group-id');
+	});
 });
 
 describe('manage loadEnvironmentConfig', () => {
@@ -146,5 +208,17 @@ describe('manage loadEnvironmentConfig', () => {
 	test('returns a valid ENVIRONMENT value', () => {
 		process.env.ENVIRONMENT = 'dev';
 		assert.equal(loadEnvironmentConfig(), 'dev');
+	});
+
+	test('continues when loadEnvFile throws', () => {
+		process.env.ENVIRONMENT = 'dev';
+		const previousCwd = process.cwd();
+		const emptyDir = mkdtempSync(join(tmpdir(), 'manage-env-'));
+		try {
+			process.chdir(emptyDir);
+			assert.equal(loadEnvironmentConfig(), 'dev');
+		} finally {
+			process.chdir(previousCwd);
+		}
 	});
 });

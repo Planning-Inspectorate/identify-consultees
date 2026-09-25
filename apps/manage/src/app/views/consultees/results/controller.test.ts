@@ -100,4 +100,66 @@ describe('consultees results page', () => {
 		await handler({ params: { geometryId: 'geo-1', sectionId: 'missing' }, headers: {} }, mockRes);
 		assert.strictEqual(mockRes.status.mock.calls[1].arguments[0], 404);
 	});
+
+	it('should 404 when geometry and section params are missing', async () => {
+		const mockRes = {
+			status: mock.fn(() => mockRes),
+			type: mock.fn(() => mockRes),
+			send: mock.fn(),
+			render: mock.fn(),
+			set: mock.fn(() => mockRes),
+			end: mock.fn()
+		};
+		const results = buildConsulteesResultsPage({ logger: mockLogger() });
+		await results({ params: {}, query: {} }, mockRes);
+		assert.strictEqual(mockRes.status.mock.calls[0].arguments[0], 404);
+
+		const staticMap = buildSectionStaticMap({ logger: mockLogger() });
+		await staticMap({ params: {}, headers: {} }, mockRes);
+		assert.strictEqual(mockRes.status.mock.calls[1].arguments[0], 404);
+	});
+
+	it('should end the response when the static map returns 304', async () => {
+		const originalFetch = globalThis.fetch;
+		globalThis.fetch = async () =>
+			new Response(
+				Buffer.from(
+					'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
+					'base64'
+				),
+				{ status: 200, headers: { 'content-type': 'image/png' } }
+			);
+
+		const mockRes = {
+			status: mock.fn(() => mockRes),
+			type: mock.fn(() => mockRes),
+			set: mock.fn(() => mockRes),
+			send: mock.fn(),
+			end: mock.fn()
+		};
+
+		try {
+			const handler = buildSectionStaticMap({ logger: mockLogger() }, true);
+			await handler({ params: { geometryId: 'geo-1', sectionId: 'ambulance-trusts' }, headers: {} }, mockRes);
+			const etag = mockRes.set.mock.calls[0].arguments[0].ETag;
+
+			mockRes.status.mock.resetCalls();
+			mockRes.send.mock.resetCalls();
+			mockRes.end.mock.resetCalls();
+
+			await handler(
+				{
+					params: { geometryId: 'geo-1', sectionId: 'ambulance-trusts' },
+					headers: { 'if-none-match': etag }
+				},
+				mockRes
+			);
+
+			assert.strictEqual(mockRes.status.mock.calls[0].arguments[0], 304);
+			assert.strictEqual(mockRes.end.mock.callCount(), 1);
+			assert.strictEqual(mockRes.send.mock.callCount(), 0);
+		} finally {
+			globalThis.fetch = originalFetch;
+		}
+	});
 });
