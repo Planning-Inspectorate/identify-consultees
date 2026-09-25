@@ -65,7 +65,8 @@ describe('manage loadConfig', () => {
 
 	test('does not throw when PYTHON_FUNCTION_URL is missing', () => {
 		// only the consultee-areas-python page needs this - its absence shouldn't crash the app at boot
-		setBaseEnv({ PYTHON_FUNCTION_URL: undefined });
+		// Empty string (not delete): loadEnvFile must not restore values from a local .env
+		setBaseEnv({ PYTHON_FUNCTION_URL: '' });
 		const config = loadConfig();
 		assert.strictEqual(config.pythonFunctionUrl, undefined);
 	});
