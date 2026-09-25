@@ -9,6 +9,15 @@ const tinyPng = Buffer.from(
 	'base64'
 );
 
+function requestHostname(input: RequestInfo | URL): string {
+	const href = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
+	return new URL(href).hostname;
+}
+
+function isGoogleMapsStaticHost(input: RequestInfo | URL): boolean {
+	return requestHostname(input) === 'maps.googleapis.com';
+}
+
 describe('serve-static-map', () => {
 	it('returns 304 without upstream fetches when If-None-Match matches', async () => {
 		clearOsmTileCacheForTests();
@@ -93,8 +102,7 @@ describe('serve-static-map', () => {
 	it('returns a Google Static Map PNG when a key is configured', async () => {
 		clearOsmTileCacheForTests();
 		const fetchImpl = async (input: RequestInfo | URL) => {
-			const url = String(input);
-			assert.match(url, /maps\.googleapis\.com/);
+			assert.equal(requestHostname(input), 'maps.googleapis.com');
 			return new Response(tinyPng, { status: 200, headers: { 'content-type': 'image/png' } });
 		};
 
@@ -177,7 +185,7 @@ describe('serve-static-map', () => {
 			map,
 			googleMapsApiKey: 'test-key',
 			fetchImpl: async (input) => {
-				if (String(input).includes('maps.googleapis.com')) {
+				if (isGoogleMapsStaticHost(input)) {
 					return new Response('nope', { status: 503 });
 				}
 				return new Response(tinyPng, { status: 200, headers: { 'content-type': 'image/png' } });
@@ -192,7 +200,7 @@ describe('serve-static-map', () => {
 			map,
 			googleMapsApiKey: 'test-key',
 			fetchImpl: async (input) => {
-				if (String(input).includes('maps.googleapis.com')) {
+				if (isGoogleMapsStaticHost(input)) {
 					throw new Error('network down');
 				}
 				return new Response(tinyPng, { status: 200, headers: { 'content-type': 'image/png' } });
