@@ -6,7 +6,10 @@ const baseURL = process.env.E2E_BASE_URL || `http://127.0.0.1:${e2ePort}`;
 /**
  * Frontend browser tests for the manage app.
  *
- * Default projects (`chromium-e2e`, `chromium-a11y`) run under `npm test`.
+ * Default projects run under `npm test` / `npm run test:e2e`:
+ * - Chromium: e2e journeys + browser a11y
+ * - Firefox + WebKit (Safari engine): render-completeness checks
+ *
  * Visual regression (`chromium-visual`) is configured but excluded from the
  * default run until the UI is closer to finished — use `npm run test:visual`.
  */
@@ -42,6 +45,17 @@ export default defineConfig({
 			name: 'chromium-a11y',
 			testMatch: /.*\.a11y\.spec\.ts/,
 			use: { ...devices['Desktop Chrome'] }
+		},
+		{
+			name: 'firefox-render',
+			testMatch: /.*\.render\.spec\.ts/,
+			use: { ...devices['Desktop Firefox'] }
+		},
+		{
+			// Playwright WebKit covers Safari rendering (Safari itself is macOS-only)
+			name: 'webkit-render',
+			testMatch: /.*\.render\.spec\.ts/,
+			use: { ...devices['Desktop Safari'] }
 		},
 		{
 			name: 'chromium-visual',
