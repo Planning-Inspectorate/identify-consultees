@@ -34,7 +34,7 @@ Keep commits focused. Before requesting review, squash noisy WIP or fixup commit
 
 ```bash
 npm run check-toolchain
-npm run playwright:install   # once, for browser tests
+npm run playwright:install   # once — Chromium, Firefox, WebKit (+ OS deps on Linux)
 npm run lint
 npm run format-prettier-check
 npm run check-types
