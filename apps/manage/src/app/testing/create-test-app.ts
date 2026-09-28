@@ -38,7 +38,9 @@ export function buildManageTestConfig(authDisabled = true): Config {
 			maxAge: '1d'
 		},
 		database: {
+			// Prefer CI / local env (dynamic Docker port + password) over the compose default
 			connectionString:
+				process.env.SQL_CONNECTION_STRING ||
 				'sqlserver://localhost:1434;database=identify-consultees;user=sa;password=DockerDatabaseP@22word!;trustServerCertificate=true'
 		},
 		gitSha: undefined,
