@@ -5,6 +5,28 @@ import { loadConfig } from './app/config.ts';
 const config = loadConfig();
 const service = new ManageService(config);
 
+// @planning-inspectorate/core's RedisClient kicks off client.connect() in the background
+// without awaiting it (see its constructor) - accepting traffic before that resolves lets the
+// first request needing a session (e.g. the auth redirect on /, since auth can't be disabled in
+// production) call session.save() while the client is still "offline", which throws in a spot
+// that isn't caught and crashes the whole process. That's been causing a deploy-time restart
+// loop (the container never stays up long enough for /health to succeed). Wait here instead.
+async function waitForRedisReady(): Promise<void> {
+	const client = service.redisClient?.fullClient;
+	if (!client || client.isReady) {
+		return;
+	}
+	const deadline = Date.now() + 15_000;
+	while (!client.isReady && Date.now() < deadline) {
+		await new Promise((resolve) => setTimeout(resolve, 100));
+	}
+	if (!client.isReady) {
+		service.logger.warn('Redis was not ready after 15s waiting at startup - starting anyway');
+	}
+}
+
+await waitForRedisReady();
+
 await prepareStaticAssetServing(service);
 const app = createApp(service);
 
