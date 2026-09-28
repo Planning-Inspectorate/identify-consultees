@@ -19,7 +19,7 @@ $font-family: arial, helvetica, sans-serif;
 	max-width: 960px;
 	height: 516px;
 	overflow: hidden;
-	background: govuk-colour('light-grey');
+	background: index.govuk-colour('black', $variant: 'tint-95');
 }
 
 /* stylelint-disable-next-line selector-class-pattern */
