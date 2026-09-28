@@ -10,16 +10,19 @@ $font-family: arial, helvetica, sans-serif;
 // PINS branding for GOV.UK Frontend macros (header/nav) and PINS footer
 @use 'govuk-overrides';
 
-// Defra Interactive Map viewport (aligned with PINS-data-spike)
+// Defra Interactive Map viewport (aligned with PINS-data-spike) - class names match the
+// map JS/templates' own naming, not BEM, same as .autocomplete__menu below
+/* stylelint-disable-next-line selector-class-pattern */
 .app-case-map {
+	box-sizing: border-box;
 	width: 100%;
 	max-width: 960px;
 	height: 516px;
-	box-sizing: border-box;
 	overflow: hidden;
-	background: #f5f5f0;
+	background: govuk-colour('light-grey');
 }
 
+/* stylelint-disable-next-line selector-class-pattern */
 .app-case-map-static {
 	display: block;
 	width: 100%;
@@ -27,6 +30,7 @@ $font-family: arial, helvetica, sans-serif;
 	height: auto;
 }
 
+/* stylelint-disable-next-line selector-class-pattern */
 .app-case-map-js-hint {
 	margin-top: 15px;
 }
