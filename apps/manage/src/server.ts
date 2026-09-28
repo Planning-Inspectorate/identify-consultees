@@ -8,10 +8,14 @@ const service = new ManageService(config);
 await prepareStaticAssetServing(service);
 const app = createApp(service);
 
-// Trust proxy, because our application is behind Front Door
-// required for secure session cookies
-// see https://expressjs.com/en/resources/middleware/session.html#cookiesecure
-app.set('trust proxy', true);
+// Trust one proxy hop (Azure App Service ARR in front of the Node process).
+// Front Door terminates TLS and forwards to App Service; App Service then
+// presents a single reverse-proxy hop to this origin. Use a hop count — not
+// `true` — so express-rate-limit can trust req.ip (ERR_ERL_PERMISSIVE_TRUST_PROXY).
+// Also required for secure session cookies via X-Forwarded-Proto.
+// see https://expressjs.com/en/guide/behind-proxies.html
+// see https://express-rate-limit.github.io/ERR_ERL_PERMISSIVE_TRUST_PROXY/
+app.set('trust proxy', 1);
 
 // set the HTTP port to use from loaded config
 app.set('http-port', config.httpPort);
