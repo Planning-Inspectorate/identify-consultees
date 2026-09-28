@@ -39,10 +39,6 @@ module "app_web" {
   health_check_eviction_time_in_min = var.health_check_eviction_time_in_min
 
   app_settings = {
-    # this was set directly on the live resource outside Terraform (not in this module's
-    # defaults either) - declaring it here stops a future apply from silently reverting it to
-    # Azure's default (true), which broke /health on a container-based Linux Web App like this one
-    WEBSITES_ENABLE_APP_SERVICE_STORAGE        = "false"
     APPLICATIONINSIGHTS_CONNECTION_STRING      = local.key_vault_refs["app-insights-connection-string"]
     ApplicationInsightsAgent_EXTENSION_VERSION = "~3"
     NODE_ENV                                   = var.apps_config.node_environment
