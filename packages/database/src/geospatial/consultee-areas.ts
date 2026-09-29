@@ -67,36 +67,88 @@ function rowToFeature(row: ConsulteeAreaRow): ConsulteeAreaFeature {
 	};
 }
 
+export interface LoadOptions {
+	/**
+	 * Rows per round trip. Default is tuned for typical consultee area geometries; pass a smaller
+	 * value for unusually large/complex geometries (e.g. detailed national rail/road networks),
+	 * since the whole batch travels as a single JSON parameter.
+	 */
+	batchSize?: number;
+	onProgress?: (loaded: number, total: number) => void;
+}
+
+const DEFAULT_LOAD_BATCH_SIZE = 200;
+
 /**
- * Upsert (by id) every feature in `featureCollection` into consultee_area. Safe to re-run over
- * data that's already there.
+ * Upsert (by id) every feature in `featureCollection` into consultee_area, `batchSize` rows per
+ * round trip via `OPENJSON` rather than one round trip per row - the difference between a load
+ * that takes seconds and one that takes tens of minutes once this holds a real, large dataset.
+ * Safe to re-run over data that's already there.
  */
 export async function loadConsulteeAreas(
 	dbClient: PrismaClient,
-	featureCollection: ConsulteeAreaFeatureCollection
+	featureCollection: ConsulteeAreaFeatureCollection,
+	options: LoadOptions = {}
 ): Promise<number> {
-	for (const feature of featureCollection.features) {
-		const wkt = geometryToWkt(feature.geometry);
-		const properties = feature.properties;
-		const metadata = JSON.stringify(properties.metadata ?? {});
+	const { batchSize = DEFAULT_LOAD_BATCH_SIZE, onProgress } = options;
+	const features = featureCollection.features;
+
+	for (let i = 0; i < features.length; i += batchSize) {
+		const batch = features.slice(i, i + batchSize);
+		const batchJson = JSON.stringify(
+			batch.map((feature) => ({
+				id: feature.id,
+				geometryType: feature.geometry.type,
+				wkt: geometryToWkt(feature.geometry),
+				consulteeCategory: feature.properties.consulteeCategory ?? null,
+				consultee: feature.properties.consultee ?? null,
+				region: feature.properties.region ?? null,
+				caseReference: feature.properties.caseReference ?? null,
+				documentId: feature.properties.documentId ?? null,
+				consulteeId: feature.properties.consulteeId ?? null,
+				organisationId: feature.properties.organisationId ?? null,
+				currentVersion: feature.properties.currentVersion ?? 1,
+				// pre-stringified rather than nested JSON - OPENJSON's WITH clause extracts a
+				// declared NVARCHAR column as a scalar string, not a nested object
+				metadata: JSON.stringify(feature.properties.metadata ?? {})
+			}))
+		);
 
 		await dbClient.$executeRaw`
 			MERGE INTO consultee_area AS target
-			USING (SELECT
-				CAST(${feature.id} AS UNIQUEIDENTIFIER) AS id,
-				CAST(${feature.geometry.type} AS NVARCHAR(50)) AS geometryType,
-				-- .MakeValid() is a no-op for already-valid geometry, and repairs minor
-				-- self-intersections real-world boundary simplification introduces
-				geography::STGeomFromText(${wkt}, 4326).MakeValid() AS geometry,
-				CAST(${properties.consulteeCategory ?? null} AS NVARCHAR(200)) AS consulteeCategory,
-				CAST(${properties.consultee ?? null} AS NVARCHAR(200)) AS consultee,
-				CAST(${properties.region ?? null} AS NVARCHAR(100)) AS region,
-				CAST(${properties.caseReference ?? null} AS NVARCHAR(50)) AS caseReference,
-				CAST(${properties.documentId ?? null} AS UNIQUEIDENTIFIER) AS documentId,
-				CAST(${properties.consulteeId ?? null} AS UNIQUEIDENTIFIER) AS consulteeId,
-				CAST(${properties.organisationId ?? null} AS UNIQUEIDENTIFIER) AS organisationId,
-				CAST(${properties.currentVersion ?? 1} AS INT) AS currentVersion,
-				CAST(${metadata} AS NVARCHAR(MAX)) AS metadata
+			USING (
+				SELECT
+					id,
+					geometryType,
+					-- .MakeValid() is a no-op for already-valid geometry, and repairs minor
+					-- self-intersections real-world boundary simplification introduces
+					geography::STGeomFromText(wkt, 4326).MakeValid() AS geometry,
+					consulteeCategory,
+					consultee,
+					region,
+					caseReference,
+					documentId,
+					consulteeId,
+					organisationId,
+					currentVersion,
+					metadata
+				FROM OPENJSON(${batchJson})
+				WITH (
+					id UNIQUEIDENTIFIER '$.id',
+					geometryType NVARCHAR(50) '$.geometryType',
+					-- NVARCHAR(MAX) here (not JSON_VALUE, which silently returns NULL past 4000
+					-- characters) - real geometry WKT routinely exceeds that
+					wkt NVARCHAR(MAX) '$.wkt',
+					consulteeCategory NVARCHAR(200) '$.consulteeCategory',
+					consultee NVARCHAR(200) '$.consultee',
+					region NVARCHAR(100) '$.region',
+					caseReference NVARCHAR(50) '$.caseReference',
+					documentId UNIQUEIDENTIFIER '$.documentId',
+					consulteeId UNIQUEIDENTIFIER '$.consulteeId',
+					organisationId UNIQUEIDENTIFIER '$.organisationId',
+					currentVersion INT '$.currentVersion',
+					metadata NVARCHAR(MAX) '$.metadata'
+				)
 			) AS source
 			ON target.id = source.id
 			WHEN MATCHED THEN UPDATE SET
@@ -121,8 +173,10 @@ export async function loadConsulteeAreas(
 				source.consulteeId, source.organisationId, source.currentVersion, source.metadata
 			);
 		`;
+
+		onProgress?.(Math.min(i + batchSize, features.length), features.length);
 	}
-	return featureCollection.features.length;
+	return features.length;
 }
 
 // a plain, developer-controlled (never user input) column list - safe to inline as raw SQL via

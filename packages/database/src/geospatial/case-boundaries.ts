@@ -57,33 +57,75 @@ function rowToFeature(row: CaseBoundaryRow): CaseBoundaryFeature {
 	};
 }
 
+export interface LoadOptions {
+	/** Rows per round trip - see the equivalent option on loadConsulteeAreas for why this exists. */
+	batchSize?: number;
+	onProgress?: (loaded: number, total: number) => void;
+}
+
+const DEFAULT_LOAD_BATCH_SIZE = 200;
+
 /**
- * Upsert (by id) every feature in `featureCollection` into case_boundary. Safe to re-run over
+ * Upsert (by id) every feature in `featureCollection` into case_boundary, `batchSize` rows per
+ * round trip via `OPENJSON` rather than one round trip per row - see loadConsulteeAreas for the
+ * same technique and why it matters once this holds a real, large dataset. Safe to re-run over
  * data that's already there.
  */
 export async function loadCaseBoundaries(
 	dbClient: PrismaClient,
-	featureCollection: CaseBoundaryFeatureCollection
+	featureCollection: CaseBoundaryFeatureCollection,
+	options: LoadOptions = {}
 ): Promise<number> {
-	for (const feature of featureCollection.features) {
-		const wkt = geometryToWkt(feature.geometry);
-		const properties = feature.properties;
-		const metadata = JSON.stringify(properties.metadata ?? {});
+	const { batchSize = DEFAULT_LOAD_BATCH_SIZE, onProgress } = options;
+	const features = featureCollection.features;
+
+	for (let i = 0; i < features.length; i += batchSize) {
+		const batch = features.slice(i, i + batchSize);
+		const batchJson = JSON.stringify(
+			batch.map((feature) => ({
+				id: feature.id,
+				geometryType: feature.geometry.type,
+				wkt: geometryToWkt(feature.geometry),
+				caseReference: feature.properties.caseReference,
+				caseName: feature.properties.caseName,
+				fileName: feature.properties.fileName ?? null,
+				receivedDate: feature.properties.receivedDate ? feature.properties.receivedDate.toISOString() : null,
+				acceptance: feature.properties.acceptance ?? null,
+				// pre-stringified rather than nested JSON - OPENJSON's WITH clause extracts a
+				// declared NVARCHAR column as a scalar string, not a nested object
+				metadata: JSON.stringify(feature.properties.metadata ?? {})
+			}))
+		);
 
 		await dbClient.$executeRaw`
 			MERGE INTO case_boundary AS target
-			USING (SELECT
-				CAST(${feature.id} AS UNIQUEIDENTIFIER) AS id,
-				CAST(${feature.geometry.type} AS NVARCHAR(50)) AS geometryType,
-				-- .MakeValid() is a no-op for already-valid geometry, and repairs minor
-				-- self-intersections real-world boundary simplification introduces
-				geography::STGeomFromText(${wkt}, 4326).MakeValid() AS geometry,
-				CAST(${properties.caseReference} AS NVARCHAR(50)) AS caseReference,
-				CAST(${properties.caseName} AS NVARCHAR(500)) AS caseName,
-				CAST(${properties.fileName ?? null} AS NVARCHAR(500)) AS fileName,
-				CAST(${properties.receivedDate ?? null} AS DATETIME2) AS receivedDate,
-				CAST(${properties.acceptance ?? null} AS NVARCHAR(50)) AS acceptance,
-				CAST(${metadata} AS NVARCHAR(MAX)) AS metadata
+			USING (
+				SELECT
+					id,
+					geometryType,
+					-- .MakeValid() is a no-op for already-valid geometry, and repairs minor
+					-- self-intersections real-world boundary simplification introduces
+					geography::STGeomFromText(wkt, 4326).MakeValid() AS geometry,
+					caseReference,
+					caseName,
+					fileName,
+					receivedDate,
+					acceptance,
+					metadata
+				FROM OPENJSON(${batchJson})
+				WITH (
+					id UNIQUEIDENTIFIER '$.id',
+					geometryType NVARCHAR(50) '$.geometryType',
+					-- NVARCHAR(MAX) here (not JSON_VALUE, which silently returns NULL past 4000
+					-- characters) - real geometry WKT routinely exceeds that
+					wkt NVARCHAR(MAX) '$.wkt',
+					caseReference NVARCHAR(50) '$.caseReference',
+					caseName NVARCHAR(500) '$.caseName',
+					fileName NVARCHAR(500) '$.fileName',
+					receivedDate DATETIME2 '$.receivedDate',
+					acceptance NVARCHAR(50) '$.acceptance',
+					metadata NVARCHAR(MAX) '$.metadata'
+				)
 			) AS source
 			ON target.id = source.id
 			WHEN MATCHED THEN UPDATE SET
@@ -105,8 +147,10 @@ export async function loadCaseBoundaries(
 				source.metadata
 			);
 		`;
+
+		onProgress?.(Math.min(i + batchSize, features.length), features.length);
 	}
-	return featureCollection.features.length;
+	return features.length;
 }
 
 // a plain, developer-controlled (never user input) column list - safe to inline as raw SQL via
