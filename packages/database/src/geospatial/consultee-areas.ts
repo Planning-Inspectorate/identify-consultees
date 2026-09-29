@@ -186,6 +186,17 @@ const selectColumns = Prisma.raw(`
 	consulteeId, organisationId, currentVersion, metadata, geometry.STAsText() AS geometryWkt
 `);
 
+/**
+ * Look up a single consultee area by id. Returns `null` rather than throwing when the id is
+ * well-formed but doesn't match any row - a genuine "not found", not an error.
+ */
+export async function getConsulteeAreaById(dbClient: PrismaClient, id: string): Promise<ConsulteeAreaFeature | null> {
+	const rows = await dbClient.$queryRaw<ConsulteeAreaRow[]>`
+		SELECT ${selectColumns} FROM consultee_area WHERE id = CAST(${id} AS UNIQUEIDENTIFIER)
+	`;
+	return rows[0] ? rowToFeature(rows[0]) : null;
+}
+
 export interface ListOptions {
 	limit?: number;
 	offset?: number;
