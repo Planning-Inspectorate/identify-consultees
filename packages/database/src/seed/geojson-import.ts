@@ -77,7 +77,13 @@ export function toConsulteeArea(feature: RawFeature): ConsulteeAreaFeature {
 export function toCaseBoundary(feature: RawFeature): CaseBoundaryFeature {
 	const props = feature.properties;
 	return {
-		id: deterministicId(`case-boundary:${props.caseReference}`),
+		// caseReference alone isn't a unique key for real data - the same project can have several
+		// boundary submissions over time (different fileName/receivedDate for the same reference),
+		// which caseReference-only ids would silently collapse into one, dropping real rows. Note:
+		// this changes ids for anything already seeded under the old caseReference-only scheme
+		// (harmless - it just leaves old rows alongside new ones, as already happens with
+		// consultee_area's sample vs. real data; clear case_boundary first for a clean re-seed).
+		id: deterministicId(`case-boundary:${props.caseReference}:${props.fileName}`),
 		type: 'Feature',
 		geometry: feature.geometry,
 		properties: {

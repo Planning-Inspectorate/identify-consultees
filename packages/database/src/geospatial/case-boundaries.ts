@@ -80,7 +80,11 @@ export async function loadCaseBoundaries(
 	const features = featureCollection.features;
 
 	for (let i = 0; i < features.length; i += batchSize) {
-		const batch = features.slice(i, i + batchSize);
+		// MERGE can't join against a source with duplicate keys within one statement - real source
+		// data can genuinely contain exact-duplicate rows (the same id computed twice); keep the
+		// last occurrence, matching what a sequential per-row load would do (each write overwrites
+		// the last)
+		const batch = [...new Map(features.slice(i, i + batchSize).map((feature) => [feature.id, feature])).values()];
 		const batchJson = JSON.stringify(
 			batch.map((feature) => ({
 				id: feature.id,
