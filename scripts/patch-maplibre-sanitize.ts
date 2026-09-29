@@ -98,8 +98,11 @@ const isMain = process.argv[1] !== undefined && path.resolve(process.argv[1]) ==
 if (isMain) {
 	const target = defraMaplibreFrameworkPath();
 	if (!fs.existsSync(target)) {
-		console.error(`MapLibre sanitize patch: missing ${target} (run npm ci first).`);
-		process.exit(1);
+		// this postinstall hook runs for every npm ci, including workspace-scoped ones
+		// (e.g. `npm ci --workspace=@pins/identify-consultees-database` in the Migrate
+		// deploy job) that never install apps/manage's own dependencies - nothing to patch
+		console.log(`MapLibre sanitize patch: ${target} not installed here, skipping.`);
+		process.exit(0);
 	}
 	patchDefraMaplibreFrameworkFile(target, { log: true });
 }
