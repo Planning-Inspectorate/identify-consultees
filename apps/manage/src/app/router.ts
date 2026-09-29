@@ -6,6 +6,7 @@ import type { IRouter, RequestHandler } from 'express';
 import { Router as createRouter } from 'express';
 import rateLimit from 'express-rate-limit';
 import { createDefraVendorRouter } from './maps/vendor.ts';
+import { createRoutes as createConsulteeAreasDirectRoutes } from './views/consultee-areas-direct/index.ts';
 import { createRoutes as createConsulteeAreasPythonRoutes } from './views/consultee-areas-python/index.ts';
 import { createRoutes as createConsulteeRoutes } from './views/consultees/index.ts';
 import { createRoutes as createHomeRoutes } from './views/home/index.ts';
@@ -49,6 +50,7 @@ export function buildRouter(service: ManageService, options: BuildRouterOptions 
 	const mapLayersDemoRoutes = createMapLayersDemoRoutes();
 	const itemsRoutes = createItemRoutes(service);
 	const consulteeAreasPythonRoutes = createConsulteeAreasPythonRoutes(service);
+	const consulteeAreasDirectRoutes = createConsulteeAreasDirectRoutes(service);
 	const authRateLimiter = options.authRateLimiter ?? buildAuthRateLimiter();
 
 	router.use('/', monitoringRoutes);
@@ -98,6 +100,7 @@ export function buildRouter(service: ManageService, options: BuildRouterOptions 
 	router.use('/map-layers-demo', mapLayersDemoRoutes);
 	router.use('/items', itemsRoutes);
 	router.use('/consultee-areas-python', consulteeAreasPythonRoutes);
+	router.use('/consultee-areas-direct', consulteeAreasDirectRoutes);
 	router.use('/error', createErrorRoutes(service));
 
 	return router;
