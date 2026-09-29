@@ -36,6 +36,20 @@ export function deterministicId(seed: string): string {
 
 export function toConsulteeArea(feature: RawFeature): ConsulteeAreaFeature {
 	const props = feature.properties;
+
+	// two source shapes seen so far: the original small ArcGIS-style sample (consulteeCategory,
+	// camelCase, metadata as a real JSON object) and the real "combined reference data" export
+	// (consultee_category, snake_case, metadata as a Python dict repr string - not valid JSON, so
+	// it's kept as-is under rawMetadata rather than risking corruption from a fragile parser)
+	const consulteeCategory = (props.consulteeCategory ?? props.consultee_category) as string | undefined;
+	const rawMetadata = props.metadata;
+	let metadata: Record<string, unknown> = {};
+	if (rawMetadata && typeof rawMetadata === 'object') {
+		metadata = rawMetadata as Record<string, unknown>;
+	} else if (typeof rawMetadata === 'string') {
+		metadata = { rawMetadata };
+	}
+
 	return {
 		id: deterministicId(`consultee-area:${props.id}`),
 		type: 'Feature',
@@ -43,16 +57,16 @@ export function toConsulteeArea(feature: RawFeature): ConsulteeAreaFeature {
 		properties: {
 			consultee: (props.consultee as string) ?? null,
 			region: (props.region as string) ?? null,
-			consulteeCategory: (props.consulteeCategory as string) ?? null,
+			consulteeCategory: consulteeCategory ?? null,
 			caseReference: (props.caseId as string) ?? null,
 			documentId: (props.documentId as string) ?? null,
 			consulteeId: (props.consulteeId as string) ?? null,
 			organisationId: (props.organisationId as string) ?? null,
 			currentVersion: (props.currentVersion as number) ?? 1,
-			// keep the source data's own id/lastUpdated alongside its ArcGIS export metadata, rather
-			// than dropping them - our schema only has a dedicated column for currentVersion
+			// keep the source data's own id/lastUpdated alongside its metadata, rather than dropping
+			// them - our schema only has a dedicated column for currentVersion
 			metadata: {
-				...(props.metadata as Record<string, unknown>),
+				...metadata,
 				sourceId: props.id,
 				sourceLastUpdated: props.last_updated
 			}
