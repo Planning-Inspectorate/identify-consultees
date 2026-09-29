@@ -98,21 +98,15 @@ describe('manage page accessibility smoke', () => {
 			geometries: [
 				{
 					id: 'geo-1',
-					reference: 'EN0110036',
-					caseName: 'Gwynt Glas Offshore Wind Farm',
-					geometryProjectStage: 'Acceptance',
-					version: '3',
-					received: '03/03/2026',
-					uploadedToCbos: '10/03/2026 00:00:00'
+					reference: 'EN010025',
+					caseName: 'East Anglia ONE Offshore Windfarm',
+					received: '03/03/2026'
 				},
 				{
 					id: 'geo-2',
-					reference: 'EN0110036',
-					caseName: 'Gwynt Glas Offshore Wind Farm',
-					geometryProjectStage: 'Scoping',
-					version: '2',
-					received: '15/01/2026',
-					uploadedToCbos: '20/01/2026 00:00:00'
+					reference: 'EN010013',
+					caseName: 'Clocaenog Forest Wind Farm',
+					received: '15/01/2026'
 				}
 			]
 		});

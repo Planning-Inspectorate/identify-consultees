@@ -92,7 +92,7 @@
 						},
 						items: [{
 							value: geometry.id,
-							text: "Select " + geometry.reference + " version " + geometry.version,
+							text: "Select " + geometry.reference,
 							label: {
 								classes: "govuk-visually-hidden"
 							},
@@ -104,10 +104,7 @@
 					{ html: radioHtml },
 					{ text: geometry.reference },
 					{ text: geometry.caseName },
-					{ text: geometry.geometryProjectStage },
-					{ text: geometry.version },
-					{ text: geometry.received },
-					{ text: geometry.uploadedToCbos }
+					{ text: geometry.received }
 				]), tableRows) %}
 			{% endfor %}
 
@@ -119,10 +116,7 @@
 					{ text: "Select", classes: "govuk-!-width-one-tenth" },
 					{ text: "Reference" },
 					{ text: "Case name" },
-					{ text: "Geometry project stage" },
-					{ text: "Version" },
-					{ text: "Received", attributes: { "aria-sort": "descending" } },
-					{ text: "Uploaded to C-BOS" }
+					{ text: "Received", attributes: { "aria-sort": "descending" } }
 				],
 				rows: tableRows
 			}) }}
