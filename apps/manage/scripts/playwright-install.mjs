@@ -10,8 +10,8 @@ import { spawnSync } from 'node:child_process';
 import { platform } from 'node:os';
 
 const BROWSERS = ['chromium', 'firefox', 'webkit'];
-/** ~1 minute total (12 × 5s) before attempting install anyway. */
-const MAX_LOCK_WAIT_ATTEMPTS = 12;
+/** ~30 seconds total (6 × 5s) before attempting install anyway. */
+const MAX_LOCK_WAIT_ATTEMPTS = 6;
 const LOCK_POLL_SECONDS = 5;
 
 /**
