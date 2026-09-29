@@ -7,7 +7,7 @@ import type { ConsulteeAreaFeatureCollection } from './consultee-areas.ts';
 import {
 	findConsulteeAreasIntersecting,
 	findConsulteeAreasNear,
-	listConsulteeAreas,
+	getConsulteeAreaById,
 	loadConsulteeAreas
 } from './consultee-areas.ts';
 
@@ -74,9 +74,10 @@ describe('consultee areas (requires a local SQL Server - see docker-compose.yml)
 			const loadedCount = await loadConsulteeAreas(dbClient, featureCollection);
 			assert.equal(loadedCount, 1);
 
-			const listed = await listConsulteeAreas(dbClient, { limit: 100 });
-			const stored = listed.features.find((feature) => feature.id === testAreaId);
-			assert.ok(stored, 'expected the loaded area to come back from listConsulteeAreas');
+			// by id, not listConsulteeAreas + a fixed limit - a real (or previously-imported) large
+			// dataset in the same database shouldn't be able to push this test row out of range
+			const stored = await getConsulteeAreaById(dbClient, testAreaId);
+			assert.ok(stored, 'expected the loaded area to come back from getConsulteeAreaById');
 			assert.equal(stored.properties.consulteeCategory, 'Environment Agency');
 			assert.deepEqual(stored.geometry, featureCollection.features[0].geometry);
 			assert.deepEqual(stored.properties.metadata, { source: 'test' });
@@ -122,10 +123,11 @@ describe('consultee areas (requires a local SQL Server - see docker-compose.yml)
 				features: [{ ...baseFeature, properties: { consultee: 'Updated' } }]
 			});
 
-			const listed = await listConsulteeAreas(dbClient);
-			const matches = listed.features.filter((feature) => feature.id === testAreaId);
-			assert.equal(matches.length, 1);
-			assert.equal(matches[0].properties.consultee, 'Updated');
+			// id is the primary key, so a genuine duplicate is structurally impossible - a second
+			// loadConsulteeAreas() call would throw a PK violation instead of silently duplicating.
+			// This just confirms it went through the UPDATE branch, not NOT MATCHED/INSERT again
+			const updated = await getConsulteeAreaById(dbClient, testAreaId);
+			assert.equal(updated?.properties.consultee, 'Updated');
 		} finally {
 			await cleanup();
 		}
