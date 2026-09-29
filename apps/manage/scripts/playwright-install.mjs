@@ -48,27 +48,19 @@ function waitForAptLock() {
 			}
 			return;
 		}
-		console.log(
-			`Waiting for dpkg/apt lock (unattended-upgrades)... (${attempt}/${MAX_LOCK_WAIT_ATTEMPTS})`
-		);
+		console.log(`Waiting for dpkg/apt lock (unattended-upgrades)... (${attempt}/${MAX_LOCK_WAIT_ATTEMPTS})`);
 		spawnSync('sleep', [String(LOCK_POLL_SECONDS)], { stdio: 'ignore' });
 	}
 
-	console.warn(
-		'Timed out waiting for dpkg/apt lock; attempting Playwright install anyway.'
-	);
+	console.warn('Timed out waiting for dpkg/apt lock; attempting Playwright install anyway.');
 }
 
 waitForAptLock();
 
-const result = spawnSync(
-	'npx',
-	['playwright', 'install', '--with-deps', ...BROWSERS],
-	{
-		stdio: 'inherit',
-		env: process.env,
-		shell: false
-	}
-);
+const result = spawnSync('npx', ['playwright', 'install', '--with-deps', ...BROWSERS], {
+	stdio: 'inherit',
+	env: process.env,
+	shell: false
+});
 
 process.exit(result.status ?? 1);
