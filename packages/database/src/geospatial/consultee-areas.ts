@@ -165,11 +165,16 @@ export async function listConsulteeAreas(
  * Find consultee areas within `radiusMetres` of `geometry`, nearest first. `STDistance` returns
  * true great-circle metres for `geography` columns, so a single threshold behaves consistently
  * regardless of latitude - don't compare raw WGS84 degrees as if they were a distance unit.
+ *
+ * `consulteeCategory`, when given, restricts to that category only (e.g. 'railway') - the
+ * per-category distance/inclusion rules a real ruleset would define aren't modelled yet, this is
+ * just enough to run one rule for real.
  */
 export async function findConsulteeAreasNear(
 	dbClient: PrismaClient,
 	geometry: Geometry,
-	radiusMetres: number
+	radiusMetres: number,
+	consulteeCategory?: string
 ): Promise<ConsulteeAreaMatch[]> {
 	const wkt = geometryToWkt(geometry);
 	const rows = await dbClient.$queryRaw<(ConsulteeAreaRow & { distanceMetres: number })[]>`
@@ -177,6 +182,7 @@ export async function findConsulteeAreasNear(
 			geometry.STDistance(geography::STGeomFromText(${wkt}, 4326)) AS distanceMetres
 		FROM consultee_area
 		WHERE geometry.STDistance(geography::STGeomFromText(${wkt}, 4326)) <= ${radiusMetres}
+			AND (${consulteeCategory ?? null} IS NULL OR consulteeCategory = ${consulteeCategory ?? null})
 		ORDER BY distanceMetres
 	`;
 	return rows.map((row) => ({ feature: rowToFeature(row), distanceMetres: row.distanceMetres }));

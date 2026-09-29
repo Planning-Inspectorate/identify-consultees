@@ -7,8 +7,10 @@ import type { CaseBoundaryFeatureCollection } from './case-boundaries.ts';
 import {
 	findCaseBoundariesIntersecting,
 	findCaseBoundariesNear,
+	getCaseBoundaryById,
 	listCaseBoundaries,
-	loadCaseBoundaries
+	loadCaseBoundaries,
+	searchCaseBoundaries
 } from './case-boundaries.ts';
 
 // a fixed id, rather than a wholesale table truncate, so this suite can't wipe out other data in
@@ -118,6 +120,65 @@ describe('case boundaries (requires a local SQL Server - see docker-compose.yml)
 			const matches = listed.features.filter((feature) => feature.id === testBoundaryId);
 			assert.equal(matches.length, 1);
 			assert.equal(matches[0].properties.caseName, 'Updated name');
+		} finally {
+			await cleanup();
+		}
+	});
+
+	test('getCaseBoundaryById finds a stored boundary and returns null otherwise', async (t) => {
+		if (!dbAvailable) return t.skip('SQL Server database not available');
+
+		await cleanup();
+		try {
+			await loadCaseBoundaries(dbClient, {
+				type: 'FeatureCollection',
+				features: [
+					{
+						id: testBoundaryId,
+						type: 'Feature',
+						geometry: { type: 'Point', coordinates: [0, 0] },
+						properties: { caseReference: 'EN010001', caseName: 'Findable by id' }
+					}
+				]
+			});
+
+			const found = await getCaseBoundaryById(dbClient, testBoundaryId);
+			assert.equal(found?.properties.caseName, 'Findable by id');
+
+			const missing = await getCaseBoundaryById(dbClient, '99999999-9999-9999-9999-999999999999');
+			assert.equal(missing, null);
+		} finally {
+			await cleanup();
+		}
+	});
+
+	test('searchCaseBoundaries matches by name or reference and reports a total count', async (t) => {
+		if (!dbAvailable) return t.skip('SQL Server database not available');
+
+		await cleanup();
+		try {
+			await loadCaseBoundaries(dbClient, {
+				type: 'FeatureCollection',
+				features: [
+					{
+						id: testBoundaryId,
+						type: 'Feature',
+						geometry: { type: 'Point', coordinates: [0, 0] },
+						properties: { caseReference: 'ZZ999999', caseName: 'Searchable Wind Farm' }
+					}
+				]
+			});
+
+			const byName = await searchCaseBoundaries(dbClient, { query: 'Searchable Wind' });
+			assert.ok(byName.features.some((feature) => feature.id === testBoundaryId));
+			assert.ok(byName.total >= 1);
+
+			const byReference = await searchCaseBoundaries(dbClient, { query: 'ZZ999999' });
+			assert.ok(byReference.features.some((feature) => feature.id === testBoundaryId));
+
+			const noMatch = await searchCaseBoundaries(dbClient, { query: 'no-such-project-exists-anywhere' });
+			assert.equal(noMatch.features.length, 0);
+			assert.equal(noMatch.total, 0);
 		} finally {
 			await cleanup();
 		}
