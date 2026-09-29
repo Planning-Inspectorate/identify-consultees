@@ -12,7 +12,7 @@ const pages = [
 		path: '/',
 		name: 'home',
 		heading: /Identify consultees for an infrastructure project/i,
-		mustSee: [/Choose a ruleset/i, /Gwynt Glas Offshore Wind Farm/i]
+		mustSee: [/Choose a ruleset/i, /East Anglia ONE Offshore Windfarm/i]
 	},
 	{
 		path: '/consultees/geo-1',

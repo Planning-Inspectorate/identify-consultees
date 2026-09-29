@@ -7,12 +7,17 @@ test.describe('manage journeys', () => {
 			'Identify consultees for an infrastructure project'
 		);
 		await expect(page.getByLabel(/Choose a ruleset/i)).toBeVisible();
-		await expect(page.getByText('Gwynt Glas Offshore Wind Farm').first()).toBeVisible();
+		await expect(page.getByText('East Anglia ONE Offshore Windfarm').first()).toBeVisible();
 	});
 
 	test('home page respects results per page', async ({ page }) => {
 		await page.goto('/?pageSize=50');
-		await expect(page.getByText(/Showing 1 to 50 of/)).toBeVisible();
+		// real seed data has fewer than 50 case boundaries, so "to" is capped at however many
+		// actually matched - just confirm the requested page size took effect
+		await expect(page.getByText(/Showing 1 to \d+ of \d+ results/)).toBeVisible();
+		await expect(
+			page.locator('.govuk-body', { hasText: 'Results per page' }).getByText('50', { exact: true })
+		).toBeVisible();
 	});
 
 	test('consultees results page shows sections and map regions', async ({ page }) => {

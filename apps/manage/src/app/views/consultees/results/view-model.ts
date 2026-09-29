@@ -9,6 +9,20 @@ export interface ConsulteesResultsViewModel {
 	downloadSummaryHref: string;
 	downloadMapsHref: string;
 	sections: ConsulteeMapSection[];
+	// only present for a real project (from case_boundary, not the dummy prototype data) - a
+	// genuine spatial query result, not a demo. See buildConsulteesResultsPage.
+	realScreening?: RealScreeningResult;
+}
+
+export interface RealScreeningRow {
+	consultee: string | null;
+	region: string | null;
+	distanceMetres: number;
+}
+
+export interface RealScreeningResult {
+	heading: string;
+	rows: RealScreeningRow[];
 }
 
 export interface ConsulteeMapSection {

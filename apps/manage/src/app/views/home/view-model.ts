@@ -21,8 +21,7 @@ export interface ProjectGeometry {
 	id: string;
 	reference: string;
 	caseName: string;
-	geometryProjectStage: string;
-	version: string;
+	// formatted from case_boundary.receivedDate - empty string when not set, real seed data
+	// doesn't populate this for every row
 	received: string;
-	uploadedToCbos: string;
 }

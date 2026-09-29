@@ -1,7 +1,8 @@
 import type { ManageService } from '#service';
+import { searchCaseBoundaries } from '@pins/identify-consultees-database/src/geospatial/case-boundaries.ts';
 import type { AsyncRequestHandler } from '@planning-inspectorate/core/util';
-import { DUMMY_GEOMETRIES, RULESETS } from '../../data/dummy-geometries.ts';
-import type { HomeViewModel } from './view-model.ts';
+import { RULESETS } from '../../data/dummy-geometries.ts';
+import type { HomeViewModel, ProjectGeometry } from './view-model.ts';
 
 const PAGE_SIZE_OPTIONS = [25, 50, 100];
 const DEFAULT_PAGE_SIZE = 25;
@@ -18,38 +19,16 @@ function parsePageSize(value: unknown): number {
 	return PAGE_SIZE_OPTIONS.includes(parsed) ? parsed : DEFAULT_PAGE_SIZE;
 }
 
-function filterGeometries(searchQuery: string) {
-	const normalised = searchQuery.trim().toLowerCase();
-	if (!normalised) {
-		return DUMMY_GEOMETRIES;
-	}
-
-	return DUMMY_GEOMETRIES.filter(
-		(geometry) =>
-			geometry.reference.toLowerCase().includes(normalised) || geometry.caseName.toLowerCase().includes(normalised)
-	);
-}
-
-/**
- * Prefer the live case_boundary count. While the UI still uses dummy rows and the
- * table is empty (or unreachable), fall back to the dummy dataset size so the
- * summary stays coherent.
- */
-async function resolveResultsTotal(
-	db: ManageService['db'],
-	searchQuery: string,
-	filteredLength: number
-): Promise<number> {
-	if (searchQuery) {
-		return filteredLength;
-	}
-
-	try {
-		const databaseCount = await db.caseBoundary.count();
-		return databaseCount > 0 ? databaseCount : DUMMY_GEOMETRIES.length;
-	} catch {
-		return DUMMY_GEOMETRIES.length;
-	}
+function toProjectGeometry(feature: {
+	id: string;
+	properties: { caseReference: string; caseName: string; receivedDate?: Date | null };
+}): ProjectGeometry {
+	return {
+		id: feature.id,
+		reference: feature.properties.caseReference,
+		caseName: feature.properties.caseName,
+		received: feature.properties.receivedDate ? feature.properties.receivedDate.toLocaleDateString('en-GB') : ''
+	};
 }
 
 export function buildHomePage(service: ManageService): AsyncRequestHandler {
@@ -61,10 +40,18 @@ export function buildHomePage(service: ManageService): AsyncRequestHandler {
 		const searchQuery = firstQueryValue(req.query.q);
 		const selectedRuleset = firstQueryValue(req.query.ruleset) || RULESETS[0]?.value || '';
 		const pageSize = parsePageSize(req.query.pageSize);
-		const filtered = filterGeometries(searchQuery);
-		const pageGeometries = filtered.slice(0, pageSize);
-		const selectedGeometryId = firstQueryValue(req.query.geometryId) || pageGeometries[0]?.id || null;
-		const resultsTotal = await resolveResultsTotal(db, searchQuery, filtered.length);
+
+		let geometries: ProjectGeometry[] = [];
+		let resultsTotal = 0;
+		try {
+			const { features, total } = await searchCaseBoundaries(db, { query: searchQuery, limit: pageSize });
+			geometries = features.map(toProjectGeometry);
+			resultsTotal = total;
+		} catch (error) {
+			logger.error({ error }, 'Failed to search case boundaries');
+		}
+
+		const selectedGeometryId = firstQueryValue(req.query.geometryId) || geometries[0]?.id || null;
 
 		const viewModel: HomeViewModel = {
 			pageHeading: 'Identify consultees for an infrastructure project',
@@ -73,10 +60,10 @@ export function buildHomePage(service: ManageService): AsyncRequestHandler {
 			searchQuery,
 			pageSize,
 			pageSizeOptions: PAGE_SIZE_OPTIONS,
-			resultsFrom: pageGeometries.length > 0 ? 1 : 0,
-			resultsTo: pageGeometries.length,
+			resultsFrom: geometries.length > 0 ? 1 : 0,
+			resultsTo: geometries.length,
 			resultsTotal,
-			geometries: pageGeometries,
+			geometries,
 			selectedGeometryId
 		};
 

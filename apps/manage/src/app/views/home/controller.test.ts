@@ -4,12 +4,23 @@ import { describe, it, mock } from 'node:test';
 import { configureNunjucks } from '../../nunjucks.ts';
 import { buildHomePage } from './controller.ts';
 
-function createMockDb(caseBoundaryCount = 0) {
+function newRow(overrides: Partial<{ id: string; caseReference: string; caseName: string }> = {}) {
 	return {
-		caseBoundary: {
-			count: mock.fn(async () => caseBoundaryCount)
-		}
+		id: overrides.id ?? '11111111-1111-1111-1111-111111111111',
+		geometryType: 'Point',
+		caseReference: overrides.caseReference ?? 'EN010001',
+		caseName: overrides.caseName ?? 'Test Wind Farm',
+		fileName: null,
+		receivedDate: null,
+		acceptance: null,
+		metadata: '{}',
+		geometryWkt: 'POINT(-1.5 52.5)',
+		totalCount: 1n
 	};
+}
+
+function createMockDb(rows: ReturnType<typeof newRow>[] = [newRow()]) {
+	return { $queryRaw: mock.fn(async () => rows) };
 }
 
 describe('home page', () => {
@@ -28,83 +39,93 @@ describe('home page', () => {
 			mockRes.render.mock.calls[0].arguments[1].pageHeading,
 			'Identify consultees for an infrastructure project'
 		);
-		assert.ok(mockRes.render.mock.calls[0].arguments[1].geometries.length > 0);
+		assert.strictEqual(mockRes.render.mock.calls[0].arguments[1].geometries.length, 1);
 	});
 
-	it('should filter dummy geometries by search query', async () => {
-		const mockRes = {
-			render: mock.fn()
-		};
-		const homePage = buildHomePage({ logger: mockLogger(), db: createMockDb() });
+	it('should map real search results to the view model', async () => {
+		const mockRes = { render: mock.fn() };
+		const rows = [newRow({ id: 'aaaa', caseReference: 'TR010034', caseName: 'A66 Northern Trans-Pennine Project' })];
+		const homePage = buildHomePage({ logger: mockLogger(), db: createMockDb(rows) });
 		await homePage({ query: { q: 'A66' } }, mockRes);
+
 		const viewModel = mockRes.render.mock.calls[0].arguments[1];
-		assert.ok(viewModel.geometries.length > 0);
-		assert.ok(viewModel.geometries.every((geometry) => geometry.reference === 'TR010034'));
-		assert.strictEqual(viewModel.resultsTotal, viewModel.geometries.length);
+		assert.strictEqual(viewModel.geometries.length, 1);
+		assert.strictEqual(viewModel.geometries[0].reference, 'TR010034');
+		assert.strictEqual(viewModel.geometries[0].caseName, 'A66 Northern Trans-Pennine Project');
+		assert.strictEqual(viewModel.resultsTotal, 1);
 	});
 
-	it('should include varied project types in dummy data', async () => {
-		const mockRes = {
-			render: mock.fn()
-		};
-		const homePage = buildHomePage({ logger: mockLogger(), db: createMockDb() });
-		await homePage({ query: { pageSize: '100' } }, mockRes);
-		const viewModel = mockRes.render.mock.calls[0].arguments[1];
-		const references = new Set(viewModel.geometries.map((geometry) => geometry.reference));
-		const stages = new Set(viewModel.geometries.map((geometry) => geometry.geometryProjectStage));
-		const caseNames = new Set(viewModel.geometries.map((geometry) => geometry.caseName));
-
-		assert.ok(references.size >= 20);
-		assert.ok(stages.size >= 5);
-		assert.ok(caseNames.size >= 20);
-		assert.ok([...references].some((reference) => reference.startsWith('EN')));
-		assert.ok([...references].some((reference) => reference.startsWith('TR')));
-		assert.ok([...references].some((reference) => reference.startsWith('WS')));
-	});
-
-	it('should use case_boundary count from the database when available', async () => {
-		const mockRes = {
-			render: mock.fn()
-		};
-		const homePage = buildHomePage({ logger: mockLogger(), db: createMockDb(42) });
+	it('should format a real receivedDate for display', async () => {
+		const mockRes = { render: mock.fn() };
+		const rows = [{ ...newRow(), receivedDate: new Date(Date.UTC(2026, 2, 3)) }];
+		const homePage = buildHomePage({ logger: mockLogger(), db: createMockDb(rows) });
 		await homePage({ query: {} }, mockRes);
+
+		assert.strictEqual(mockRes.render.mock.calls[0].arguments[1].geometries[0].received, '03/03/2026');
+	});
+
+	it('should show an empty received date when not set', async () => {
+		const mockRes = { render: mock.fn() };
+		const homePage = buildHomePage({ logger: mockLogger(), db: createMockDb([newRow()]) });
+		await homePage({ query: {} }, mockRes);
+
+		assert.strictEqual(mockRes.render.mock.calls[0].arguments[1].geometries[0].received, '');
+	});
+
+	it('should report the total match count from the query, not just the page length', async () => {
+		const mockRes = { render: mock.fn() };
+		const rows = [{ ...newRow(), totalCount: 42n }];
+		const homePage = buildHomePage({ logger: mockLogger(), db: createMockDb(rows) });
+		await homePage({ query: {} }, mockRes);
+
 		assert.strictEqual(mockRes.render.mock.calls[0].arguments[1].resultsTotal, 42);
 	});
 
-	it('should fall back to dummy dataset size when case_boundary is empty', async () => {
-		const mockRes = {
-			render: mock.fn()
-		};
-		const homePage = buildHomePage({ logger: mockLogger(), db: createMockDb(0) });
-		await homePage({ query: { pageSize: '100' } }, mockRes);
+	it('should show zero results when the query returns nothing', async () => {
+		const mockRes = { render: mock.fn() };
+		const homePage = buildHomePage({ logger: mockLogger(), db: createMockDb([]) });
+		await homePage({ query: { q: 'ZZZ-NOMATCH-XXX' } }, mockRes);
+
 		const viewModel = mockRes.render.mock.calls[0].arguments[1];
-		assert.strictEqual(viewModel.resultsTotal, 100);
-		assert.strictEqual(viewModel.geometries.length, 100);
+		assert.strictEqual(viewModel.geometries.length, 0);
+		assert.strictEqual(viewModel.resultsFrom, 0);
+		assert.strictEqual(viewModel.resultsTo, 0);
+		assert.strictEqual(viewModel.resultsTotal, 0);
+		assert.strictEqual(viewModel.selectedGeometryId, null);
 	});
 
-	it('should respect results per page', async () => {
-		const mockRes = {
-			render: mock.fn()
+	it('should render an empty result set (not throw) when the query fails', async () => {
+		const mockRes = { render: mock.fn() };
+		const db = {
+			$queryRaw: mock.fn(async () => {
+				throw new Error('db down');
+			})
 		};
-		const homePage = buildHomePage({ logger: mockLogger(), db: createMockDb(0) });
+		const homePage = buildHomePage({ logger: mockLogger(), db });
+		await assert.doesNotReject(() => homePage({ query: {} }, mockRes));
 
+		const viewModel = mockRes.render.mock.calls[0].arguments[1];
+		assert.strictEqual(viewModel.geometries.length, 0);
+		assert.strictEqual(viewModel.resultsTotal, 0);
+	});
+
+	it('should respect the requested page size', async () => {
+		const mockRes = { render: mock.fn() };
+		const homePage = buildHomePage({ logger: mockLogger(), db: createMockDb([newRow()]) });
 		await homePage({ query: { pageSize: '50' } }, mockRes);
-		const pageSize50 = mockRes.render.mock.calls[0].arguments[1];
-		assert.strictEqual(pageSize50.pageSize, 50);
-		assert.strictEqual(pageSize50.geometries.length, 50);
-		assert.strictEqual(pageSize50.resultsTo, 50);
-		assert.strictEqual(pageSize50.resultsTotal, 100);
+		assert.strictEqual(mockRes.render.mock.calls[0].arguments[1].pageSize, 50);
+	});
 
-		await homePage({ query: { pageSize: '100' } }, mockRes);
-		const pageSize100 = mockRes.render.mock.calls[1].arguments[1];
-		assert.strictEqual(pageSize100.pageSize, 100);
-		assert.strictEqual(pageSize100.geometries.length, 100);
-		assert.strictEqual(pageSize100.resultsTo, 100);
+	it('should default to a page size of 25 for an unrecognised value', async () => {
+		const mockRes = { render: mock.fn() };
+		const homePage = buildHomePage({ logger: mockLogger(), db: createMockDb([]) });
+		await homePage({ query: { pageSize: '999' } }, mockRes);
+		assert.strictEqual(mockRes.render.mock.calls[0].arguments[1].pageSize, 25);
 	});
 
 	it('should read the first value from array query params', async () => {
 		const mockRes = { render: mock.fn() };
-		const homePage = buildHomePage({ logger: mockLogger(), db: createMockDb(0) });
+		const homePage = buildHomePage({ logger: mockLogger(), db: createMockDb([]) });
 		await homePage({ query: { q: ['A66', 'ignored'], pageSize: ['50'] } }, mockRes);
 		const viewModel = mockRes.render.mock.calls[0].arguments[1];
 		assert.strictEqual(viewModel.searchQuery, 'A66');
@@ -113,43 +134,16 @@ describe('home page', () => {
 
 	it('should ignore non-string array query values', async () => {
 		const mockRes = { render: mock.fn() };
-		const homePage = buildHomePage({ logger: mockLogger(), db: createMockDb(0) });
+		const homePage = buildHomePage({ logger: mockLogger(), db: createMockDb([]) });
 		await homePage({ query: { q: [1], pageSize: [{}] } }, mockRes);
 		const viewModel = mockRes.render.mock.calls[0].arguments[1];
 		assert.strictEqual(viewModel.searchQuery, '');
 		assert.strictEqual(viewModel.pageSize, 25);
 	});
 
-	it('should fall back to dummy size when case_boundary count throws', async () => {
-		const mockRes = { render: mock.fn() };
-		const homePage = buildHomePage({
-			logger: mockLogger(),
-			db: {
-				caseBoundary: {
-					count: mock.fn(async () => {
-						throw new Error('db down');
-					})
-				}
-			}
-		});
-		await homePage({ query: {} }, mockRes);
-		assert.strictEqual(mockRes.render.mock.calls[0].arguments[1].resultsTotal, 100);
-	});
-
-	it('should show zero results when the search matches nothing', async () => {
-		const mockRes = { render: mock.fn() };
-		const homePage = buildHomePage({ logger: mockLogger(), db: createMockDb() });
-		await homePage({ query: { q: 'ZZZ-NOMATCH-XXX' } }, mockRes);
-		const viewModel = mockRes.render.mock.calls[0].arguments[1];
-		assert.strictEqual(viewModel.geometries.length, 0);
-		assert.strictEqual(viewModel.resultsFrom, 0);
-		assert.strictEqual(viewModel.resultsTo, 0);
-		assert.strictEqual(viewModel.selectedGeometryId, null);
-	});
-
 	it('should honour an explicit ruleset query value', async () => {
 		const mockRes = { render: mock.fn() };
-		const homePage = buildHomePage({ logger: mockLogger(), db: createMockDb() });
+		const homePage = buildHomePage({ logger: mockLogger(), db: createMockDb([]) });
 		await homePage({ query: { ruleset: 'scotland' } }, mockRes);
 		assert.strictEqual(mockRes.render.mock.calls[0].arguments[1].selectedRuleset, 'scotland');
 	});
@@ -159,7 +153,7 @@ describe('home page', () => {
 		const originalRulesets = geometryModule.RULESETS.splice(0, geometryModule.RULESETS.length);
 		try {
 			const mockRes = { render: mock.fn() };
-			const homePage = buildHomePage({ logger: mockLogger(), db: createMockDb() });
+			const homePage = buildHomePage({ logger: mockLogger(), db: createMockDb([]) });
 			await homePage({ query: {} }, mockRes);
 			assert.strictEqual(mockRes.render.mock.calls[0].arguments[1].selectedRuleset, '');
 		} finally {
@@ -167,12 +161,10 @@ describe('home page', () => {
 		}
 	});
 
-	it('should filter by project reference as well as case name', async () => {
+	it('should use the geometryId query param when provided, over the first result', async () => {
 		const mockRes = { render: mock.fn() };
-		const homePage = buildHomePage({ logger: mockLogger(), db: createMockDb() });
-		await homePage({ query: { q: 'TR010034' } }, mockRes);
-		const viewModel = mockRes.render.mock.calls[0].arguments[1];
-		assert.ok(viewModel.geometries.length > 0);
-		assert.ok(viewModel.geometries.every((geometry) => geometry.reference === 'TR010034'));
+		const homePage = buildHomePage({ logger: mockLogger(), db: createMockDb([newRow({ id: 'aaaa' })]) });
+		await homePage({ query: { geometryId: 'explicit-id' } }, mockRes);
+		assert.strictEqual(mockRes.render.mock.calls[0].arguments[1].selectedGeometryId, 'explicit-id');
 	});
 });

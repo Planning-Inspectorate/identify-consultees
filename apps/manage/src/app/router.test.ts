@@ -1,24 +1,45 @@
 import { ManageService } from '#service';
+import { loadCaseBoundaries } from '@pins/identify-consultees-database/src/geospatial/case-boundaries.ts';
 import assert from 'node:assert/strict';
-import { after, describe, test } from 'node:test';
+import { after, before, describe, test } from 'node:test';
 import request from 'supertest';
 import { buildAuthRateLimiter } from './router.ts';
 import { buildManageTestConfig, createManageTestApp, createManageTestService } from './testing/create-test-app.ts';
+
+// a fixed id, rather than depending on whatever sample data may or may not be seeded (CI's
+// database is migrated but never seeded - see .azure/pipelines/pr.yml)
+const homePageTestCaseId = '33333333-3333-3333-3333-333333333333';
 
 describe('manage router wiring', () => {
 	const authDisabledService = createManageTestService(true);
 	const authDisabledApp = createManageTestApp(authDisabledService);
 
+	before(async () => {
+		await authDisabledService.db.$executeRaw`DELETE FROM case_boundary WHERE id = ${homePageTestCaseId}`;
+		await loadCaseBoundaries(authDisabledService.db, {
+			type: 'FeatureCollection',
+			features: [
+				{
+					id: homePageTestCaseId,
+					type: 'Feature',
+					geometry: { type: 'Point', coordinates: [-1.5, 52.5] },
+					properties: { caseReference: 'ZZ000001', caseName: 'Router Test Fixture Wind Farm' }
+				}
+			]
+		});
+	});
+
 	after(async () => {
+		await authDisabledService.db.$executeRaw`DELETE FROM case_boundary WHERE id = ${homePageTestCaseId}`;
 		await authDisabledService.db.$disconnect().catch(() => undefined);
 	});
 
 	test('GET / renders the identify consultees home page', async () => {
-		const response = await request(authDisabledApp).get('/');
+		const response = await request(authDisabledApp).get('/?q=Router+Test+Fixture');
 		assert.equal(response.status, 200);
 		assert.match(response.text, /Identify consultees for an infrastructure project/);
 		assert.match(response.text, /Choose a ruleset/);
-		assert.match(response.text, /Gwynt Glas Offshore Wind Farm/);
+		assert.match(response.text, /Router Test Fixture Wind Farm/);
 	});
 
 	test('GET /signed-out renders the signed out page', async () => {
@@ -47,10 +68,10 @@ describe('manage router wiring', () => {
 		assert.equal(response.headers.location, '/signed-out');
 	});
 
-	test('GET /?pageSize=50 returns fifty geometry rows', async () => {
-		const response = await request(authDisabledApp).get('/?pageSize=50');
+	test('GET /?pageSize=50 honours the requested page size', async () => {
+		const response = await request(authDisabledApp).get('/?q=Router+Test+Fixture&pageSize=50');
 		assert.equal(response.status, 200);
-		assert.match(response.text, /Showing 1 to 50 of 100 results/);
+		assert.match(response.text, /Showing 1 to 1 of 1 results/);
 		assert.match(response.text, />50</);
 	});
 

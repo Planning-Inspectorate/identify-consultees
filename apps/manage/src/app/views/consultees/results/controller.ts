@@ -1,4 +1,7 @@
 import type { ManageService } from '#service';
+import { getCaseBoundaryById } from '@pins/identify-consultees-database/src/geospatial/case-boundaries.ts';
+import { findConsulteeAreasNear } from '@pins/identify-consultees-database/src/geospatial/consultee-areas.ts';
+import type { Geometry } from '@pins/identify-consultees-database/src/geospatial/wkt.ts';
 import type { AsyncRequestHandler } from '@planning-inspectorate/core/util';
 import { findDummyGeometry, findRulesetLabel } from '../../../data/dummy-geometries.ts';
 import {
@@ -8,7 +11,68 @@ import {
 	mapViewForCollections
 } from '../../../maps/sample-geojson.ts';
 import { buildConsulteeStaticMapResponse } from '../../../maps/serve-static-map.ts';
-import type { ConsulteeMapSection, ConsulteesResultsViewModel } from './view-model.ts';
+import type { ConsulteeMapSection, ConsulteesResultsViewModel, RealScreeningResult } from './view-model.ts';
+
+// the one real screening rule implemented so far - see AGENTS.md/PR discussion for why this
+// isn't yet a per-ruleset distance/category table
+const RAILWAY_SCREENING_RADIUS_METRES = 500;
+
+interface ResolvedProject {
+	id: string;
+	reference: string;
+	caseName: string;
+	/** Only set for a real case_boundary row - the dummy prototype data has no real geometry. */
+	geometry?: Geometry;
+}
+
+/**
+ * Resolve a project by id, trying the dummy prototype data first (fast, no DB hit, keeps every
+ * existing dummy-id-based page/test working unchanged), then a real case_boundary lookup.
+ */
+async function resolveProject(db: ManageService['db'], geometryId: string): Promise<ResolvedProject | undefined> {
+	const dummy = findDummyGeometry(geometryId);
+	if (dummy) {
+		return { id: dummy.id, reference: dummy.reference, caseName: dummy.caseName };
+	}
+
+	// case_boundary ids are UNIQUEIDENTIFIERs - anything else can't match, and isn't worth a
+	// round trip (or a raw-SQL CAST error) to find out
+	if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(geometryId)) {
+		return undefined;
+	}
+
+	const real = await getCaseBoundaryById(db, geometryId);
+	if (!real) {
+		return undefined;
+	}
+	return {
+		id: real.id,
+		reference: real.properties.caseReference,
+		caseName: real.properties.caseName,
+		geometry: real.geometry
+	};
+}
+
+async function buildRealScreening(
+	db: ManageService['db'],
+	geometry: Geometry,
+	logger: ManageService['logger']
+): Promise<RealScreeningResult | undefined> {
+	try {
+		const matches = await findConsulteeAreasNear(db, geometry, RAILWAY_SCREENING_RADIUS_METRES, 'railway');
+		return {
+			heading: `Railways within ${RAILWAY_SCREENING_RADIUS_METRES}m of the project site`,
+			rows: matches.map((match) => ({
+				consultee: match.feature.properties.consultee ?? null,
+				region: match.feature.properties.region ?? null,
+				distanceMetres: Math.round(match.distanceMetres)
+			}))
+		};
+	} catch (error) {
+		logger.error({ error }, 'Failed to run real railway screening query');
+		return undefined;
+	}
+}
 
 type SectionDefinition = {
 	id: string;
@@ -122,11 +186,11 @@ function buildSectionMapContext(
 }
 
 export function buildConsulteesResultsPage(service: ManageService): AsyncRequestHandler {
-	const { logger } = service;
+	const { db, logger } = service;
 
 	return async (req, res) => {
 		const geometryId = String(req.params.geometryId ?? '');
-		const geometry = findDummyGeometry(geometryId);
+		const geometry = await resolveProject(db, geometryId);
 
 		if (!geometry) {
 			res.status(404).render('views/errors/404.njk', { pageHeading: 'Page not found' });
@@ -141,8 +205,11 @@ export function buildConsulteesResultsPage(service: ManageService): AsyncRequest
 			(definition) => buildSectionMapContext(definition, geometry.reference, geometry.caseName, geometry.id).section
 		);
 
+		const realScreening = geometry.geometry ? await buildRealScreening(db, geometry.geometry, logger) : undefined;
+
 		const viewModel: ConsulteesResultsViewModel = {
 			pageHeading: `Consultees identified for ${geometry.caseName} (${geometry.reference})`,
+			realScreening,
 			backLinkUrl: '/',
 			backLinkText: 'Back to project geometry search',
 			rulesetLabel,

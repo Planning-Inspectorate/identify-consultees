@@ -66,6 +66,40 @@
 		</section>
 	{% endfor %}
 
+	{% if realScreening %}
+		<section id="real-screening" class="govuk-!-margin-bottom-9">
+			<h2 class="govuk-heading-l">{{ realScreening.heading }}</h2>
+			<p class="govuk-body">
+				A real query against the <code>consultee_area</code> table for this project's actual
+				geometry - not the prototype data above.
+			</p>
+
+			{% if realScreening.rows.length == 0 %}
+				<p class="govuk-body">No railways found within range.</p>
+			{% else %}
+				{% set realTableRows = [] %}
+				{% for row in realScreening.rows %}
+					{% set realTableRows = (realTableRows.push([
+						{ text: row.consultee | default("") },
+						{ text: row.region | default("") },
+						{ text: row.distanceMetres ~ "m" }
+					]), realTableRows) %}
+				{% endfor %}
+				{{ govukTable({
+					caption: realScreening.heading,
+					captionClasses: "govuk-visually-hidden",
+					firstCellIsHeader: false,
+					head: [
+						{ text: "Consultee" },
+						{ text: "Region" },
+						{ text: "Distance" }
+					],
+					rows: realTableRows
+				}) }}
+			{% endif %}
+		</section>
+	{% endif %}
+
 	{{ govukButton({
 		text: "Back to project geometry search",
 		href: backLinkUrl,
