@@ -4,10 +4,29 @@ import logging
 import azure.functions as func
 
 from querying.consultee_areas import fetch_consultee_areas
-from setup_database.db import connection_params_from_env
+from setup_database.db import check_connection, connection_params_from_env
 
 app = func.FunctionApp(http_auth_level=func.AuthLevel.ANONYMOUS)
 logger = logging.getLogger(__name__)
+
+
+@app.route(route="health")
+def health(req: func.HttpRequest) -> func.HttpResponse:
+    """Always returns 200 - the database field reports whether it's actually
+    reachable, matching the Node app's own /health convention (see
+    @planning-inspectorate/core's monitoring controller).
+    """
+    try:
+        check_connection(connection_params_from_env())
+        database_status = "OK"
+    except Exception:
+        logger.exception("Health check: database connection failed")
+        database_status = "ERROR"
+
+    return func.HttpResponse(
+        json.dumps({"status": "OK", "database": database_status}),
+        mimetype="application/json",
+    )
 
 
 @app.route(route="consultee-areas")

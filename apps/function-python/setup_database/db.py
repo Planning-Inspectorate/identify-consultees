@@ -9,6 +9,8 @@ import os
 import re
 from dataclasses import dataclass
 
+import pymssql
+
 _CONNECTION_STRING_PATTERN = re.compile(r"^sqlserver://([^:;]+)(?::(\d+))?;(.+)$")
 
 
@@ -43,3 +45,24 @@ def connection_params_from_env() -> ConnectionParams:
     if not connection_string:
         raise RuntimeError("SQL_CONNECTION_STRING is not set")
     return parse_connection_string(connection_string)
+
+
+def check_connection(params: ConnectionParams) -> None:
+    """Open a connection and run a trivial query, raising if either fails.
+
+    Used by the health check route - proves the function can actually reach
+    the database, not just that a connection string is configured.
+    """
+    connection = pymssql.connect(
+        server=params.server,
+        port=params.port,
+        database=params.database,
+        user=params.user,
+        password=params.password,
+    )
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT 1")
+            cursor.fetchone()
+    finally:
+        connection.close()
