@@ -146,6 +146,54 @@ export async function listCaseBoundaries(
 }
 
 /**
+ * Look up a single case boundary by id. Returns `null` rather than throwing when the id is
+ * well-formed but doesn't match any row - a genuine "not found", not an error.
+ */
+export async function getCaseBoundaryById(dbClient: PrismaClient, id: string): Promise<CaseBoundaryFeature | null> {
+	const rows = await dbClient.$queryRaw<CaseBoundaryRow[]>`
+		SELECT ${selectColumns} FROM case_boundary WHERE id = CAST(${id} AS UNIQUEIDENTIFIER)
+	`;
+	return rows[0] ? rowToFeature(rows[0]) : null;
+}
+
+export interface SearchOptions {
+	query?: string;
+	limit?: number;
+	offset?: number;
+}
+
+export interface SearchResult {
+	features: CaseBoundaryFeature[];
+	total: number;
+}
+
+/**
+ * Search case boundaries by name/reference (case-insensitive substring match), paginated.
+ * Fetches the matching page and the total match count in a single round trip via
+ * `COUNT(*) OVER()`, rather than a separate COUNT(*) query.
+ *
+ * A leading-wildcard LIKE can't use a plain index - fine while the table is small, but consider
+ * a full-text index (or a proper search service) once it holds a large, real dataset.
+ */
+export async function searchCaseBoundaries(dbClient: PrismaClient, options: SearchOptions = {}): Promise<SearchResult> {
+	const { query, limit = 25, offset = 0 } = options;
+	const likePattern = query?.trim() ? `%${query.trim()}%` : '%';
+
+	const rows = await dbClient.$queryRaw<(CaseBoundaryRow & { totalCount: bigint })[]>`
+		SELECT ${selectColumns}, COUNT(*) OVER() AS totalCount
+		FROM case_boundary
+		WHERE caseName LIKE ${likePattern} OR caseReference LIKE ${likePattern}
+		ORDER BY caseName
+		OFFSET ${offset} ROWS FETCH NEXT ${limit} ROWS ONLY
+	`;
+
+	return {
+		features: rows.map(rowToFeature),
+		total: rows[0] ? Number(rows[0].totalCount) : 0
+	};
+}
+
+/**
  * Find case boundaries within `radiusMetres` of `geometry`, nearest first. `STDistance` returns
  * true great-circle metres for `geography` columns, so a single threshold behaves consistently
  * regardless of latitude - don't compare raw WGS84 degrees as if they were a distance unit.
