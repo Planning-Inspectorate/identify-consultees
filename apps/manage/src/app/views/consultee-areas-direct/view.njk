@@ -12,13 +12,13 @@
     <h1 class="govuk-heading-l">{{ pageHeading }}</h1>
 
     <p class="govuk-body">
-        Calls the Python Azure Function in <code>apps/function-python</code>, which runs a SQL
-        query against the <code>consultee_area</code> table and returns the results below.
-        Compare with <a class="govuk-link" href="/consultee-areas-direct">the direct database
-        query version</a>, which queries the same table without going through the function.
+        Queries the <code>consultee_area</code> table directly via Prisma
+        (<code>packages/database/src/geospatial/consultee-areas.ts</code>) - no Azure Function
+        involved. Compare with <a class="govuk-link" href="/consultee-areas-python">the Python
+        function version</a>, which queries the same table.
     </p>
 
-    <form method="post" action="/consultee-areas-python/run" novalidate>
+    <form method="post" action="/consultee-areas-direct/run" novalidate>
         <input type="hidden" name="_csrf" value="{{ _csrf }}">
         {{ govukButton({ text: "Run query" }) }}
     </form>
@@ -34,11 +34,10 @@
             {% set tableRows = [] %}
             {% for row in rows %}
                 {% set tableRows = (tableRows.push([
-                    { text: row.consultee | default("") },
-                    { text: row.consulteeCategory | default("") },
-                    { text: row.region | default("") },
-                    { text: row.geometryType },
-                    { text: row.lastUpdated | default("") }
+                    { text: row.properties.consultee | default("") },
+                    { text: row.properties.consulteeCategory | default("") },
+                    { text: row.properties.region | default("") },
+                    { text: row.geometry.type }
                 ]), tableRows) %}
             {% endfor %}
 
@@ -47,8 +46,7 @@
                     { text: "Consultee" },
                     { text: "Category" },
                     { text: "Region" },
-                    { text: "Geometry type" },
-                    { text: "Last updated" }
+                    { text: "Geometry type" }
                 ],
                 rows: tableRows
             }) }}
