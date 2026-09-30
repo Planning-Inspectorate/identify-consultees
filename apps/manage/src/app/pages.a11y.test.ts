@@ -92,6 +92,7 @@ describe('manage page accessibility smoke', () => {
 			resultsFrom: 1,
 			resultsTo: 3,
 			resultsTotal: 100,
+			exampleCase: { reference: 'EN010025', caseName: 'East Anglia ONE Offshore Windfarm' },
 			geometries: [
 				{
 					id: '11111111-1111-1111-1111-111111111111',
@@ -120,6 +121,7 @@ describe('manage page accessibility smoke', () => {
 			resultsFrom: 0,
 			resultsTo: 0,
 			resultsTotal: 0,
+			exampleCase: null,
 			geometries: []
 		});
 		await assertNoSeriousA11yViolations(html);

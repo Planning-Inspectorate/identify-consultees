@@ -138,4 +138,41 @@ describe('home page', () => {
 		assert.strictEqual(viewModel.searchQuery, '');
 		assert.strictEqual(viewModel.pageSize, 25);
 	});
+
+	it('should include a real example case for the search hint', async () => {
+		const mockRes = { render: mock.fn() };
+		const rows = [newRow({ caseReference: 'EN010025', caseName: 'East Anglia ONE Offshore Windfarm' })];
+		const homePage = buildHomePage({ logger: mockLogger(), db: createMockDb(rows) });
+		await homePage({ query: {} }, mockRes);
+
+		assert.deepStrictEqual(mockRes.render.mock.calls[0].arguments[1].exampleCase, {
+			reference: 'EN010025',
+			caseName: 'East Anglia ONE Offshore Windfarm'
+		});
+	});
+
+	it('should show no example case when none exist yet', async () => {
+		const mockRes = { render: mock.fn() };
+		const homePage = buildHomePage({ logger: mockLogger(), db: createMockDb([]) });
+		await homePage({ query: {} }, mockRes);
+		assert.strictEqual(mockRes.render.mock.calls[0].arguments[1].exampleCase, null);
+	});
+
+	it('should render with no example case (not throw) when that query fails', async () => {
+		const mockRes = { render: mock.fn() };
+		let call = 0;
+		const db = {
+			$queryRaw: mock.fn(async () => {
+				call += 1;
+				if (call === 1) return [newRow()];
+				throw new Error('random pick failed');
+			})
+		};
+		const homePage = buildHomePage({ logger: mockLogger(), db });
+		await assert.doesNotReject(() => homePage({ query: {} }, mockRes));
+
+		const viewModel = mockRes.render.mock.calls[0].arguments[1];
+		assert.strictEqual(viewModel.exampleCase, null);
+		assert.strictEqual(viewModel.geometries.length, 1);
+	});
 });
