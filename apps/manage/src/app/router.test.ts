@@ -38,8 +38,8 @@ describe('manage router wiring', () => {
 		const response = await request(authDisabledApp).get('/?q=Router+Test+Fixture');
 		assert.equal(response.status, 200);
 		assert.match(response.text, /Identify consultees for an infrastructure project/);
-		assert.match(response.text, /Choose a ruleset/);
 		assert.match(response.text, /Router Test Fixture Wind Farm/);
+		assert.match(response.text, new RegExp(`/consultees/${homePageTestCaseId}`));
 	});
 
 	test('GET /signed-out renders the signed out page', async () => {
@@ -75,26 +75,33 @@ describe('manage router wiring', () => {
 		assert.match(response.text, />50</);
 	});
 
-	test('GET /consultees/:id renders consultees results page', async () => {
-		const response = await request(authDisabledApp).get('/consultees/geo-1');
+	test('GET /consultees/:id renders the ruleset picker page', async () => {
+		const response = await request(authDisabledApp).get(`/consultees/${homePageTestCaseId}`);
+		assert.equal(response.status, 200);
+		assert.match(response.text, /Choose a ruleset/);
+		assert.match(response.text, /Router Test Fixture Wind Farm/);
+		assert.match(response.text, /Railways within 500m/);
+	});
+
+	test('GET /consultees/:id/results runs the ruleset and renders the results page', async () => {
+		const response = await request(authDisabledApp).get(
+			`/consultees/${homePageTestCaseId}/results?ruleset=railways-500m`
+		);
 		assert.equal(response.status, 200);
 		assert.match(response.text, /Consultees identified for/);
-		assert.match(response.text, /Ambulance Trusts/);
-		assert.match(response.text, /Police Force Areas/);
+		assert.match(response.text, /Ruleset used: Railways within 500m/);
 	});
 
-	test('GET /consultees redirects to results when geometryId is provided', async () => {
+	test('GET /consultees/:id/results 404s for an unknown ruleset', async () => {
 		const response = await request(authDisabledApp).get(
-			'/consultees?geometryId=geo-1&ruleset=post-30-apr-2024-england-wales'
+			`/consultees/${homePageTestCaseId}/results?ruleset=not-a-real-ruleset`
 		);
-		assert.equal(response.status, 302);
-		assert.equal(response.headers.location, '/consultees/geo-1?ruleset=post-30-apr-2024-england-wales');
+		assert.equal(response.status, 404);
 	});
 
-	test('GET /consultees redirects to results without ruleset when only geometryId is set', async () => {
-		const response = await request(authDisabledApp).get('/consultees?geometryId=geo-1');
-		assert.equal(response.status, 302);
-		assert.equal(response.headers.location, '/consultees/geo-1');
+	test('GET /consultees/:id 404s for an unknown case', async () => {
+		const response = await request(authDisabledApp).get('/consultees/99999999-9999-9999-9999-999999999999');
+		assert.equal(response.status, 404);
 	});
 
 	test('GET /auth/signout forwards session destroy errors', async () => {
@@ -136,7 +143,7 @@ describe('manage router wiring', () => {
 		assert.match(response.text, /data-map-layers-demo/);
 	});
 
-	test('GET /consultees/:id/sections/:sectionId/static-map returns a cached image', async () => {
+	test('GET /consultees/:id/results/static-map returns a cached image', async () => {
 		const originalFetch = globalThis.fetch;
 		globalThis.fetch = async () =>
 			new Response(
@@ -151,14 +158,16 @@ describe('manage router wiring', () => {
 			);
 
 		try {
-			const response = await request(authDisabledApp).get('/consultees/geo-1/sections/ambulance-trusts/static-map');
+			const response = await request(authDisabledApp).get(
+				`/consultees/${homePageTestCaseId}/results/static-map?ruleset=railways-500m`
+			);
 			assert.equal(response.status, 200);
 			assert.match(response.headers['content-type'] || '', /image\/(svg\+xml|png)/);
 			assert.match(response.headers['cache-control'] || '', /max-age=/);
 			assert.ok(response.headers.etag);
 
 			const cached = await request(authDisabledApp)
-				.get('/consultees/geo-1/sections/ambulance-trusts/static-map')
+				.get(`/consultees/${homePageTestCaseId}/results/static-map?ruleset=railways-500m`)
 				.set('If-None-Match', response.headers.etag);
 			assert.equal(cached.status, 304);
 		} finally {
@@ -166,7 +175,7 @@ describe('manage router wiring', () => {
 		}
 	});
 
-	test('GET /consultees/:id/sections/:sectionId/static-map.svg returns svg', async () => {
+	test('GET /consultees/:id/results/static-map.svg returns svg', async () => {
 		const originalFetch = globalThis.fetch;
 		globalThis.fetch = async () =>
 			new Response(
@@ -181,7 +190,9 @@ describe('manage router wiring', () => {
 			);
 
 		try {
-			const response = await request(authDisabledApp).get('/consultees/geo-1/sections/ambulance-trusts/static-map.svg');
+			const response = await request(authDisabledApp).get(
+				`/consultees/${homePageTestCaseId}/results/static-map.svg?ruleset=railways-500m`
+			);
 			assert.equal(response.status, 200);
 			assert.match(response.headers['content-type'] || '', /image\/svg\+xml/);
 			assert.match(response.body.toString(), /<svg/);

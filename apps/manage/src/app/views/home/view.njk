@@ -3,8 +3,6 @@
 {% from "govuk/components/button/macro.njk" import govukButton %}
 {% from "govuk/components/input/macro.njk" import govukInput %}
 {% from "govuk/components/inset-text/macro.njk" import govukInsetText %}
-{% from "govuk/components/radios/macro.njk" import govukRadios %}
-{% from "govuk/components/select/macro.njk" import govukSelect %}
 {% from "govuk/components/table/macro.njk" import govukTable %}
 
 {% block pageTitle %}
@@ -17,29 +15,17 @@
 	}) }}
 
 	<form method="get" action="/">
-		{{ govukSelect({
-			id: "ruleset",
-			name: "ruleset",
-			label: {
-				text: "Choose a ruleset",
-				classes: "govuk-label--m"
-			},
-			items: rulesets,
-			value: selectedRuleset,
-			classes: "govuk-!-width-one-half"
-		}) }}
-
 		<div class="pins-inline-search">
 			{{ govukInput({
 				id: "q",
 				name: "q",
 				value: searchQuery,
 				label: {
-					text: "Choose a project geometry",
+					text: "Search for a project",
 					classes: "govuk-label--m"
 				},
 				hint: {
-					text: "To find a specific project, search by case reference or project name"
+					text: "Search by case reference or project name"
 				},
 				classes: "pins-inline-search__input",
 				formGroup: {
@@ -66,7 +52,7 @@
 					{% if size == pageSize %}
 						<span class="govuk-!-font-weight-bold">{{ size }}</span>
 					{% else %}
-						<a class="govuk-link" href="/?q={{ searchQuery | urlencode }}&amp;ruleset={{ selectedRuleset | urlencode }}&amp;pageSize={{ size }}">{{ size }}</a>
+						<a class="govuk-link" href="/?q={{ searchQuery | urlencode }}&amp;pageSize={{ size }}">{{ size }}</a>
 					{% endif %}
 					{% if not loop.last %}
 						<span class="govuk-!-margin-left-1 govuk-!-margin-right-1" aria-hidden="true">|</span>
@@ -75,57 +61,27 @@
 			</p>
 		</div>
 
-		<form method="get" action="/consultees">
-			<input type="hidden" name="ruleset" value="{{ selectedRuleset }}">
-			<input type="hidden" name="pageSize" value="{{ pageSize }}">
-			<input type="hidden" name="q" value="{{ searchQuery }}">
+		{% set tableRows = [] %}
+		{% for geometry in geometries %}
+			{% set referenceLink %}<a class="govuk-link" href="/consultees/{{ geometry.id | urlencode }}">{{ geometry.reference }}</a>{% endset %}
+			{% set tableRows = (tableRows.push([
+				{ html: referenceLink },
+				{ text: geometry.caseName },
+				{ text: geometry.received }
+			]), tableRows) %}
+		{% endfor %}
 
-			{% set tableRows = [] %}
-			{% for geometry in geometries %}
-				{% set radioHtml %}
-					{{ govukRadios({
-						name: "geometryId",
-						idPrefix: "geometry-" + geometry.id,
-						classes: "govuk-radios--small",
-						formGroup: {
-							classes: "govuk-!-margin-bottom-0"
-						},
-						items: [{
-							value: geometry.id,
-							text: "Select " + geometry.reference,
-							label: {
-								classes: "govuk-visually-hidden"
-							},
-							checked: geometry.id == selectedGeometryId
-						}]
-					}) }}
-				{% endset %}
-				{% set tableRows = (tableRows.push([
-					{ html: radioHtml },
-					{ text: geometry.reference },
-					{ text: geometry.caseName },
-					{ text: geometry.received }
-				]), tableRows) %}
-			{% endfor %}
-
-			{{ govukTable({
-				caption: "Project geometries",
-				captionClasses: "govuk-visually-hidden",
-				firstCellIsHeader: false,
-				head: [
-					{ text: "Select", classes: "govuk-!-width-one-tenth" },
-					{ text: "Reference" },
-					{ text: "Case name" },
-					{ text: "Received", attributes: { "aria-sort": "descending" } }
-				],
-				rows: tableRows
-			}) }}
-
-			{{ govukButton({
-				text: "Identify consultees",
-				classes: "govuk-!-margin-top-2"
-			}) }}
-		</form>
+		{{ govukTable({
+			caption: "Project geometries",
+			captionClasses: "govuk-visually-hidden",
+			firstCellIsHeader: false,
+			head: [
+				{ text: "Reference" },
+				{ text: "Case name" },
+				{ text: "Received", attributes: { "aria-sort": "descending" } }
+			],
+			rows: tableRows
+		}) }}
 	{% else %}
 		<p class="govuk-body govuk-!-margin-top-6">No project geometries match your search.</p>
 	{% endif %}

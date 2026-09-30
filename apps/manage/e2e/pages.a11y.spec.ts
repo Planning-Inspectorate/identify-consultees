@@ -1,6 +1,7 @@
 import { AxeBuilder } from '@axe-core/playwright';
 import { expect, test } from '@playwright/test';
 import type { Result } from 'axe-core';
+import { SAMPLE_CASE_ID, SAMPLE_RULESET_ID } from './fixtures.ts';
 
 /**
  * Browser accessibility checks (Chromium).
@@ -13,11 +14,10 @@ const pages = [
 	{ path: '/', name: 'home' },
 	{ path: '/?q=ZZZ-NOMATCH-XXX', name: 'home with no search results' },
 	{ path: '/?pageSize=50', name: 'home with 50 results per page' },
-	{ path: '/?ruleset=scotland', name: 'home with Scotland ruleset' },
-	{ path: '/consultees/geo-1', name: 'consultees results' },
+	{ path: `/consultees/${SAMPLE_CASE_ID}`, name: 'ruleset picker' },
 	{
-		path: '/consultees/geo-1?ruleset=post-30-apr-2024-england-wales',
-		name: 'consultees results with ruleset'
+		path: `/consultees/${SAMPLE_CASE_ID}/results?ruleset=${SAMPLE_RULESET_ID}`,
+		name: 'consultees results'
 	},
 	{ path: '/map-layers-demo', name: 'map layers demo' },
 	{ path: '/signed-out', name: 'signed out' },
@@ -69,10 +69,9 @@ test.describe('browser accessibility landmarks and skip link', () => {
 		await expect(page.getByRole('contentinfo').first()).toBeVisible();
 	});
 
-	test('consultees results page keeps section nav and map regions labelled', async ({ page }) => {
-		await page.goto('/consultees/geo-1');
+	test('consultees results page keeps its map region labelled', async ({ page }) => {
+		await page.goto(`/consultees/${SAMPLE_CASE_ID}/results?ruleset=${SAMPLE_RULESET_ID}`);
 
-		await expect(page.getByRole('navigation', { name: 'Consultee map sections' })).toBeVisible();
 		await expect(page.locator('[data-consultee-map][role="region"]').first()).toBeAttached();
 		await expect(page.locator('[data-consultee-map]').first()).toHaveAttribute('aria-label', /.+/);
 
@@ -91,25 +90,30 @@ test.describe('browser accessibility landmarks and skip link', () => {
 });
 
 test.describe('browser accessibility keyboard focus', () => {
-	test('home search controls are reachable in tab order', async ({ page }) => {
+	async function tabUntil(page: Parameters<typeof AxeBuilder>[0]['page'], targetId: string, maxPresses = 20) {
+		for (let i = 0; i < maxPresses; i += 1) {
+			await page.keyboard.press('Tab');
+			const id = await page.locator(':focus').getAttribute('id');
+			if (id === targetId) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	test('home search control is reachable in tab order', async ({ page }) => {
 		await page.goto('/');
 
-		await page.keyboard.press('Tab');
-		// First Tab often focuses the skip link; continue until the ruleset select
-		let focusedRuleset = false;
-		for (let i = 0; i < 20; i += 1) {
-			const focused = page.locator(':focus');
-			const id = await focused.getAttribute('id');
-			if (id === 'ruleset') {
-				focusedRuleset = true;
-				break;
-			}
-			await page.keyboard.press('Tab');
-		}
-		expect(focusedRuleset).toBe(true);
+		// First Tab often focuses the skip link; continue until the search input
+		expect(await tabUntil(page, 'q')).toBe(true);
 
-		await page.keyboard.press('Tab');
-		await expect(page.locator(':focus')).toHaveAttribute('id', 'q');
+		await expectNoSeriousAxeViolations(page);
+	});
+
+	test('ruleset picker select is reachable in tab order', async ({ page }) => {
+		await page.goto(`/consultees/${SAMPLE_CASE_ID}`);
+
+		expect(await tabUntil(page, 'ruleset')).toBe(true);
 
 		await expectNoSeriousAxeViolations(page);
 	});

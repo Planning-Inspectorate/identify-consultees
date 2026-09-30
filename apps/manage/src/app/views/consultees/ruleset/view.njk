@@ -1,0 +1,38 @@
+{% extends "views/layouts/main.njk" %}
+
+{% from "govuk/components/back-link/macro.njk" import govukBackLink %}
+{% from "govuk/components/button/macro.njk" import govukButton %}
+{% from "govuk/components/select/macro.njk" import govukSelect %}
+
+{% block pageTitle %}
+	{{ pageHeading }} - {{ config.headerTitle }}
+{% endblock %}
+
+{% block beforeContent %}
+	{{ govukBackLink({
+		text: "Back to project search",
+		href: backLinkUrl
+	}) }}
+{% endblock %}
+
+{% block pageContent %}
+	<form method="get" action="/consultees/{{ caseId }}/results">
+		{{ govukSelect({
+			id: "ruleset",
+			name: "ruleset",
+			label: {
+				text: "Ruleset",
+				classes: "govuk-label--m"
+			},
+			hint: {
+				text: "Applies rules to this project to find the consultees it needs to notify. More rulesets will be added over time."
+			},
+			items: rulesets,
+			classes: "govuk-!-width-one-half"
+		}) }}
+
+		{{ govukButton({
+			text: "Run ruleset"
+		}) }}
+	</form>
+{% endblock %}

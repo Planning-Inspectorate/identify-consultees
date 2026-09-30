@@ -1,4 +1,4 @@
-import { computeMapView } from './geometry-bounds.ts';
+import type { Geometry, Position } from '@pins/identify-consultees-database/src/geospatial/wkt.ts';
 
 export const MAP_VIEWPORT = {
 	width: 960,
@@ -14,13 +14,10 @@ export type GeoJsonFeature = {
 	type: 'Feature';
 	id?: string | number;
 	properties: Record<string, string>;
-	geometry: {
-		type: 'Polygon';
-		coordinates: number[][][];
-	};
+	geometry: Geometry;
 };
 
-function squareAround(lng: number, lat: number, halfSizeDegrees: number): number[][][] {
+function squareAround(lng: number, lat: number, halfSizeDegrees: number): Position[][] {
 	return [
 		[
 			[lng - halfSizeDegrees, lat - halfSizeDegrees],
@@ -75,10 +72,4 @@ export function buildConsulteeAreaGeojson(
 			}
 		}))
 	};
-}
-
-export function mapViewForCollections(...collections: GeoJsonFeatureCollection[]) {
-	return computeMapView({
-		features: collections.flatMap((collection) => collection.features)
-	});
 }

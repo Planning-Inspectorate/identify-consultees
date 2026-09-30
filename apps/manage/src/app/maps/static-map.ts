@@ -8,6 +8,7 @@
  * Tile and static-image upstreams must be used sparingly — see AGENTS.md.
  */
 
+import type { Geometry, Position } from '@pins/identify-consultees-database/src/geospatial/wkt.ts';
 import type { GeoJsonFeature, GeoJsonFeatureCollection } from './sample-geojson.ts';
 import { MAP_VIEWPORT } from './sample-geojson.ts';
 
@@ -219,6 +220,49 @@ function encodeSigned(value: number): string {
 	return output;
 }
 
+/** A point's tiny square footprint, in degrees - just enough to give a bare Point something to draw. */
+const POINT_MARKER_RADIUS_DEGREES = 0.0005;
+
+function pointToRing([lng, lat]: Position): Position[] {
+	const r = POINT_MARKER_RADIUS_DEGREES;
+	return [
+		[lng - r, lat - r],
+		[lng + r, lat - r],
+		[lng + r, lat + r],
+		[lng - r, lat + r],
+		[lng - r, lat - r]
+	];
+}
+
+/** Areal geometry types are drawn filled; everything else (lines, points) is drawn as an outline only. */
+function isArealGeometryType(type: Geometry['type']): boolean {
+	return type === 'Polygon' || type === 'MultiPolygon' || type === 'Point' || type === 'MultiPoint';
+}
+
+/**
+ * Flatten any GeoJSON geometry into the individual lines/rings a renderer draws - one entry per
+ * SVG subpath or Google Static Maps `path=` parameter. Real consultee/project geometries include
+ * lines (e.g. railways) as well as polygons, so this can't assume every feature is a closed ring.
+ */
+function collectLines(geometry: Geometry): Position[][] {
+	switch (geometry.type) {
+		case 'Point':
+			return [pointToRing(geometry.coordinates)];
+		case 'MultiPoint':
+			return geometry.coordinates.map(pointToRing);
+		case 'LineString':
+			return [geometry.coordinates];
+		case 'MultiLineString':
+			return geometry.coordinates;
+		case 'Polygon':
+			return geometry.coordinates;
+		case 'MultiPolygon':
+			return geometry.coordinates.flat();
+		case 'GeometryCollection':
+			return geometry.geometries.flatMap(collectLines);
+	}
+}
+
 export function buildGoogleStaticMapUrl(options: StaticMapBuildOptions): string | undefined {
 	const key = options.googleMapsApiKey?.trim();
 	if (!key) {
@@ -255,12 +299,15 @@ function appendGooglePath(
 	feature: GeoJsonFeature,
 	colours: { googleFill: string; googleStroke: string }
 ): void {
-	const ring = feature.geometry.coordinates[0];
-	if (!ring || ring.length < 3) {
-		return;
+	const filled = isArealGeometryType(feature.geometry.type);
+	for (const line of collectLines(feature.geometry)) {
+		if (line.length < 2) {
+			continue;
+		}
+		const encoded = encodeGooglePolyline(line);
+		const fillPart = filled ? `fillcolor:${colours.googleFill}|` : '';
+		params.append('path', `${fillPart}color:${colours.googleStroke}|weight:2|enc:${encoded}`);
 	}
-	const encoded = encodeGooglePolyline(ring);
-	params.append('path', `fillcolor:${colours.googleFill}|color:${colours.googleStroke}|weight:2|enc:${encoded}`);
 }
 
 export function escapeXml(value: string): string {
@@ -272,26 +319,33 @@ export function escapeXml(value: string): string {
 		.replaceAll("'", '&apos;');
 }
 
-function pathForFeature(
-	feature: GeoJsonFeature,
-	project: (lng: number, lat: number) => [number, number],
-	colours: { fill: string; stroke: string }
-): string {
-	const ring = feature.geometry.coordinates[0];
-	if (!ring || ring.length < 3) {
-		return '';
-	}
+function svgPathCommandsForLine(line: Position[], project: (lng: number, lat: number) => [number, number]): string {
 	const commands: string[] = [];
-	for (let i = 0; i < ring.length; i += 1) {
-		const point = ring[i];
+	for (let i = 0; i < line.length; i += 1) {
+		const point = line[i];
 		if (point?.[0] === undefined || point?.[1] === undefined) {
 			continue;
 		}
 		const [x, y] = project(point[0], point[1]);
 		commands.push(`${i === 0 ? 'M' : 'L'}${x.toFixed(1)} ${y.toFixed(1)}`);
 	}
-	commands.push('Z');
-	return `<path d="${commands.join(' ')}" fill="${colours.fill}" stroke="${colours.stroke}" stroke-width="2" fill-opacity="0.45"/>`;
+	return commands.join(' ');
+}
+
+function pathForFeature(
+	feature: GeoJsonFeature,
+	project: (lng: number, lat: number) => [number, number],
+	colours: { fill: string; stroke: string }
+): string {
+	const filled = isArealGeometryType(feature.geometry.type);
+	const subpaths = collectLines(feature.geometry)
+		.filter((line) => line.length >= 2)
+		.map((line) => `${svgPathCommandsForLine(line, project)}${filled ? ' Z' : ''}`);
+	if (subpaths.length === 0) {
+		return '';
+	}
+	const fillAttributes = filled ? `fill="${colours.fill}" fill-opacity="0.45"` : 'fill="none"';
+	return `<path d="${subpaths.join(' ')}" ${fillAttributes} stroke="${colours.stroke}" stroke-width="2"/>`;
 }
 
 /**

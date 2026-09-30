@@ -2,40 +2,22 @@ import type { ManageService } from '#service';
 import { asyncHandler } from '@planning-inspectorate/core/util';
 import type { IRouter } from 'express';
 import { Router as createRouter } from 'express';
-import { buildConsulteesResultsPage, buildSectionStaticMap } from './results/controller.ts';
-
-function firstQueryValue(value: unknown): string {
-	if (Array.isArray(value)) {
-		return typeof value[0] === 'string' ? value[0] : '';
-	}
-	return typeof value === 'string' ? value : '';
-}
+import { buildConsulteesResultsPage, buildResultsStaticMap } from './results/controller.ts';
+import { buildRulesetPickerPage } from './ruleset/controller.ts';
 
 export function createRoutes(service: ManageService): IRouter {
 	const router = createRouter({ mergeParams: true });
+	const rulesetPickerPage = buildRulesetPickerPage(service);
 	const resultsPage = buildConsulteesResultsPage(service);
-	const staticMap = buildSectionStaticMap(service);
-	const staticMapSvg = buildSectionStaticMap(service, true);
+	const resultsStaticMap = buildResultsStaticMap(service);
+	const resultsStaticMapSvg = buildResultsStaticMap(service, true);
 
-	router.get('/', (req, res) => {
-		const geometryId = firstQueryValue(req.query.geometryId);
-		if (!geometryId) {
-			res.redirect('/');
-			return;
-		}
-
-		const ruleset = firstQueryValue(req.query.ruleset);
-		const query = new URLSearchParams();
-		if (ruleset) {
-			query.set('ruleset', ruleset);
-		}
-		const suffix = query.toString() ? `?${query.toString()}` : '';
-		res.redirect(`/consultees/${encodeURIComponent(geometryId)}${suffix}`);
-	});
-
-	router.get('/:geometryId/sections/:sectionId/static-map.svg', asyncHandler(staticMapSvg));
-	router.get('/:geometryId/sections/:sectionId/static-map', asyncHandler(staticMap));
-	router.get('/:geometryId', asyncHandler(resultsPage));
+	// step 2: pick a ruleset for the project chosen on the home page
+	router.get('/:caseId', asyncHandler(rulesetPickerPage));
+	// step 3: run it and show the matching consultees
+	router.get('/:caseId/results/static-map.svg', asyncHandler(resultsStaticMapSvg));
+	router.get('/:caseId/results/static-map', asyncHandler(resultsStaticMap));
+	router.get('/:caseId/results', asyncHandler(resultsPage));
 
 	return router;
 }

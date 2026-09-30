@@ -1,13 +1,13 @@
 import { expect, test } from '@playwright/test';
+import { SAMPLE_CASE_ID, SAMPLE_CASE_NAME, SAMPLE_CASE_REFERENCE, SAMPLE_RULESET_NAME } from './fixtures.ts';
 
 test.describe('manage journeys', () => {
 	test('home page shows identify consultees search', async ({ page }) => {
-		await page.goto('/');
+		await page.goto(`/?q=${SAMPLE_CASE_REFERENCE}`);
 		await expect(page.getByRole('heading', { level: 1 })).toContainText(
 			'Identify consultees for an infrastructure project'
 		);
-		await expect(page.getByLabel(/Choose a ruleset/i)).toBeVisible();
-		await expect(page.getByText('East Anglia ONE Offshore Windfarm').first()).toBeVisible();
+		await expect(page.getByText(SAMPLE_CASE_NAME).first()).toBeVisible();
 	});
 
 	test('home page respects results per page', async ({ page }) => {
@@ -20,11 +20,25 @@ test.describe('manage journeys', () => {
 		).toBeVisible();
 	});
 
-	test('consultees results page shows sections and map regions', async ({ page }) => {
-		await page.goto('/consultees/geo-1');
+	test('choosing a project then a ruleset runs it and shows the results', async ({ page }) => {
+		await page.goto(`/?q=${SAMPLE_CASE_REFERENCE}`);
+		// a caseReference isn't guaranteed unique (a project can have several boundary submissions),
+		// so follow the link by its href (a specific case id) rather than by its visible text
+		await page.locator(`a[href="/consultees/${SAMPLE_CASE_ID}"]`).click();
+
+		await expect(page.getByRole('heading', { level: 1 })).toContainText('Choose a ruleset');
+		await page.getByLabel('Ruleset').selectOption({ label: SAMPLE_RULESET_NAME });
+		await page.getByRole('button', { name: 'Run ruleset' }).click();
+
 		await expect(page.getByRole('heading', { level: 1 })).toContainText('Consultees identified for');
-		await expect(page.getByRole('heading', { level: 2, name: /Ambulance Trusts/i })).toBeVisible();
-		await expect(page.getByRole('heading', { level: 2, name: /Police Force Areas/i })).toBeVisible();
+		await expect(page.getByText(`Ruleset used: ${SAMPLE_RULESET_NAME}`)).toBeVisible();
+		await expect(page.getByRole('heading', { level: 2, name: 'Consultees identified' })).toBeVisible();
+	});
+
+	test('a direct link to the ruleset picker page works', async ({ page }) => {
+		await page.goto(`/consultees/${SAMPLE_CASE_ID}`);
+		await expect(page.getByRole('heading', { level: 1 })).toContainText('Choose a ruleset');
+		await expect(page.getByText(SAMPLE_CASE_NAME)).toBeVisible();
 	});
 
 	test('map layers demo page renders layer summaries', async ({ page }) => {

@@ -1,7 +1,5 @@
 export interface HomeViewModel {
 	pageHeading: string;
-	rulesets: RulesetOption[];
-	selectedRuleset: string;
 	searchQuery: string;
 	pageSize: number;
 	pageSizeOptions: number[];
@@ -9,12 +7,6 @@ export interface HomeViewModel {
 	resultsTo: number;
 	resultsTotal: number;
 	geometries: ProjectGeometry[];
-	selectedGeometryId: string | null;
-}
-
-export interface RulesetOption {
-	value: string;
-	text: string;
 }
 
 export interface ProjectGeometry {
