@@ -10,6 +10,6 @@ export const SAMPLE_CASE_ID = '9aba1d63-8575-ce89-847f-0a978e848bca';
 export const SAMPLE_CASE_REFERENCE = 'EN010025';
 export const SAMPLE_CASE_NAME = 'East Anglia ONE Offshore Windfarm';
 
-// from apps/function-python/setup_database/sample_data/example_ruleset.csv
+// from packages/database/src/geospatial/example_ruleset.csv
 export const SAMPLE_RULESET_ID = 'railway';
 export const SAMPLE_RULESET_NAME = 'Railways';

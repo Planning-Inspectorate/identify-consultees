@@ -204,9 +204,44 @@ export async function getCaseBoundaryById(dbClient: PrismaClient, id: string): P
 	return rows[0] ? rowToFeature(rows[0]) : null;
 }
 
-export interface CaseSummary {
+/**
+ * A case boundary without its geometry - for the (common) pages that only ever show a
+ * reference/name/date and would otherwise pay for fetching and WKT-parsing a geometry that's
+ * never used. Some real boundaries are large (complex multi-part polygons), so this isn't just a
+ * theoretical saving on the app's highest-traffic pages (home page search, the ruleset picker).
+ */
+export interface CaseBoundarySummary {
+	id: string;
 	reference: string;
 	caseName: string;
+	receivedDate: Date | null;
+}
+
+const summaryColumns = Prisma.raw('id, caseReference, caseName, receivedDate');
+
+function rowToSummary(row: {
+	id: string;
+	caseReference: string;
+	caseName: string;
+	receivedDate: Date | null;
+}): CaseBoundarySummary {
+	return { id: row.id, reference: row.caseReference, caseName: row.caseName, receivedDate: row.receivedDate };
+}
+
+/**
+ * Look up a single case boundary by id, without its geometry - see {@link CaseBoundarySummary}.
+ * Returns `null` rather than throwing when the id is well-formed but doesn't match any row.
+ */
+export async function getCaseBoundarySummaryById(
+	dbClient: PrismaClient,
+	id: string
+): Promise<CaseBoundarySummary | null> {
+	const rows = await dbClient.$queryRaw<
+		{ id: string; caseReference: string; caseName: string; receivedDate: Date | null }[]
+	>`
+		SELECT ${summaryColumns} FROM case_boundary WHERE id = CAST(${id} AS UNIQUEIDENTIFIER)
+	`;
+	return rows[0] ? rowToSummary(rows[0]) : null;
 }
 
 /**
@@ -214,11 +249,13 @@ export interface CaseSummary {
  * home page. `ORDER BY NEWID()` forces a full scan/sort, which is fine at this table's size
  * (hundreds of rows) but wouldn't be a sensible way to sample from a genuinely large table.
  */
-export async function getRandomCaseSummary(dbClient: PrismaClient): Promise<CaseSummary | null> {
-	const rows = await dbClient.$queryRaw<{ caseReference: string; caseName: string }[]>`
-		SELECT TOP 1 caseReference, caseName FROM case_boundary ORDER BY NEWID()
+export async function getRandomCaseSummary(dbClient: PrismaClient): Promise<CaseBoundarySummary | null> {
+	const rows = await dbClient.$queryRaw<
+		{ id: string; caseReference: string; caseName: string; receivedDate: Date | null }[]
+	>`
+		SELECT TOP 1 ${summaryColumns} FROM case_boundary ORDER BY NEWID()
 	`;
-	return rows[0] ? { reference: rows[0].caseReference, caseName: rows[0].caseName } : null;
+	return rows[0] ? rowToSummary(rows[0]) : null;
 }
 
 export interface SearchOptions {
@@ -228,14 +265,16 @@ export interface SearchOptions {
 }
 
 export interface SearchResult {
-	features: CaseBoundaryFeature[];
+	features: CaseBoundarySummary[];
 	total: number;
 }
 
 /**
  * Search case boundaries by name/reference (case-insensitive substring match), paginated.
  * Fetches the matching page and the total match count in a single round trip via
- * `COUNT(*) OVER()`, rather than a separate COUNT(*) query.
+ * `COUNT(*) OVER()`, rather than a separate COUNT(*) query. Returns summaries, not full features
+ * with geometry - see {@link CaseBoundarySummary} - since every current caller is a results list
+ * that never renders a boundary's shape.
  *
  * A leading-wildcard LIKE can't use a plain index - fine while the table is small, but consider
  * a full-text index (or a proper search service) once it holds a large, real dataset.
@@ -244,8 +283,10 @@ export async function searchCaseBoundaries(dbClient: PrismaClient, options: Sear
 	const { query, limit = 25, offset = 0 } = options;
 	const likePattern = query?.trim() ? `%${query.trim()}%` : '%';
 
-	const rows = await dbClient.$queryRaw<(CaseBoundaryRow & { totalCount: bigint })[]>`
-		SELECT ${selectColumns}, COUNT(*) OVER() AS totalCount
+	const rows = await dbClient.$queryRaw<
+		{ id: string; caseReference: string; caseName: string; receivedDate: Date | null; totalCount: bigint }[]
+	>`
+		SELECT ${summaryColumns}, COUNT(*) OVER() AS totalCount
 		FROM case_boundary
 		WHERE caseName LIKE ${likePattern} OR caseReference LIKE ${likePattern}
 		ORDER BY caseName
@@ -253,7 +294,7 @@ export async function searchCaseBoundaries(dbClient: PrismaClient, options: Sear
 	`;
 
 	return {
-		features: rows.map(rowToFeature),
+		features: rows.map(rowToSummary),
 		total: rows[0] ? Number(rows[0].totalCount) : 0
 	};
 }
