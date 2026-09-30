@@ -38,39 +38,41 @@ export interface RulesetDefinition {
 // areas, coal mining reporting areas, Cheshire brine area, Joint Transport Authorities Wales)
 // have no current mapping because that reference data hasn't been loaded yet - left as-is below,
 // which just means that ruleset matches nothing until it is, rather than guessing wrong.
-const CATEGORY_ALIASES: Record<string, string[]> = {
-	parish: ['Parish Council'],
-	distr_council: ['Lower Tier Authority'],
-	unitary_auth: ['Unitary Authority'],
-	unit_auth: ['Unitary Authority'],
-	nat_park: ['National Park'],
-	county_council: ['Upper Tier Authority'],
-	greater_london_authority: ['Greater London Authority'],
-	rail_epsg27700: ['Railway'],
-	ambulance_services_epsg27700: ['Ambulance Trust'],
-	fire_and_rescue_service: ['Fire and Rescue Authority'],
-	passenger_transport_exec_integrated_transport_auth: [
-		'Passenger Transport Executive',
-		'Integrated Transport Authority'
+// a Map, not an object literal - these keys are snake_case source identifiers, not JS property
+// names, and an object literal's keys get flagged (rightly) by the camelcase lint rule
+const CATEGORY_ALIASES = new Map<string, string[]>([
+	['parish', ['Parish Council']],
+	['distr_council', ['Lower Tier Authority']],
+	['unitary_auth', ['Unitary Authority']],
+	['unit_auth', ['Unitary Authority']],
+	['nat_park', ['National Park']],
+	['county_council', ['Upper Tier Authority']],
+	['greater_london_authority', ['Greater London Authority']],
+	['rail_epsg27700', ['Railway']],
+	['ambulance_services_epsg27700', ['Ambulance Trust']],
+	['fire_and_rescue_service', ['Fire and Rescue Authority']],
+	[
+		'passenger_transport_exec_integrated_transport_auth',
+		['Passenger Transport Executive', 'Integrated Transport Authority']
 	],
-	police_crime_commissioner: ['Police'],
-	hospital: ['Hospital'],
-	integrated_care_board: ['ICB'],
-	idd_w_epsg27700: ['Internal Drainage District'],
-	internal_drainage_board_england: ['Internal Drainage Board'],
-	local_resilience_forum: ['Local Resilience Forum'],
-	local_health_board: ['Local Health Board'],
-	national_landscape_aonb_england: ['National Landscape'],
-	national_landscape_aonb_wales: ['National Landscape'],
-	ports_harbours_epsg27700: ['Dock or Harbour'],
-	offshore_areas_wind_site: ['Offshore Wind Site'],
-	offshore_areas_export_cable: ['Offshore Wind Export Cable'],
-	office_for_nuclear_regulation_site: ['ONR Site']
-};
+	['police_crime_commissioner', ['Police']],
+	['hospital', ['Hospital']],
+	['integrated_care_board', ['ICB']],
+	['idd_w_epsg27700', ['Internal Drainage District']],
+	['internal_drainage_board_england', ['Internal Drainage Board']],
+	['local_resilience_forum', ['Local Resilience Forum']],
+	['local_health_board', ['Local Health Board']],
+	['national_landscape_aonb_england', ['National Landscape']],
+	['national_landscape_aonb_wales', ['National Landscape']],
+	['ports_harbours_epsg27700', ['Dock or Harbour']],
+	['offshore_areas_wind_site', ['Offshore Wind Site']],
+	['offshore_areas_export_cable', ['Offshore Wind Export Cable']],
+	['office_for_nuclear_regulation_site', ['ONR Site']]
+]);
 
 function resolveCategories(token: string): string[] {
 	const trimmed = token.trim();
-	return CATEGORY_ALIASES[trimmed] ?? [trimmed];
+	return CATEGORY_ALIASES.get(trimmed) ?? [trimmed];
 }
 
 /** A row's matching categories: referenceData if set, else matchingConsulteeType (`;`-separated), else consulteeName. */
