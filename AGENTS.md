@@ -320,4 +320,25 @@ OpenStreetMap tile servers and commercial static-map APIs rate-limit and block a
 4. **Only load static `<img>` when needed** — put the image in `<noscript>` and/or inject from `data-static-map-src` after interactive-map failure; never eager-load static images for JS-capable users who will use the interactive map.
 5. **Do not invent uncached polling or prefetch** of static maps or tiles (e.g. pre-warming every section on every page view without cache).
 
+## Database operations without redeploying the app
+
+Schema migrations and data changes for a real environment (Dev/Test/Training/Prod) don't require
+shipping app code - two pipelines already handle this independently of `Build`/`Deploy`'s web-app
+job:
+
+- **Schema-only migration**: run the `Deploy` pipeline (`.azure/pipelines/deploy.yml`) with
+  `deployWeb=false` and `schemaMigration=true` (the default). Its `Migrate` and `Deploy Web` jobs
+  are siblings, not dependent on each other, so this applies `npm run migrate-prod` to the target
+  environment's real database without touching the running app or its slots at all.
+- **Data operations**: `.azure/pipelines/db-seed.yml` (`trigger: none`, manually run via
+  `az pipelines run` or the Azure DevOps UI, parameterised by `environment`) is a fully separate
+  pipeline for loading data - currently only the small built-in sample dataset
+  (`npm run seed`/`seed-prod`). Extending it to run `npm run db-import` (see
+  `packages/database/src/seed/import-cli.ts`) against a real, large GeoJSON file is the natural
+  next step once that file is reachable by the pipeline (e.g. from blob storage - see
+  `infrastructure/storage.tf`, provisioned but not yet wired to anything).
+- **One-off local imports**: `npm run db-import -- --type=<consultee-areas|case-boundaries> --file=<path>`
+  works against any `SQL_CONNECTION_STRING` you can reach directly (e.g. from a machine with a
+  route to a real environment's database), independently of any pipeline.
+
 When changing static-map code, preserve ETag fingerprinting of framing + geometry so validators continue to avoid unnecessary upstream work.

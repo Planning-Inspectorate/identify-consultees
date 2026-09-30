@@ -145,10 +145,11 @@ export function parseRulesetCsv(contents: string): RulesetDefinition[] {
 	});
 }
 
-const RULESET_CSV_PATH = path.resolve(
-	path.dirname(fileURLToPath(import.meta.url)),
-	'../../../../apps/function-python/setup_database/sample_data/example_ruleset.csv'
-);
+// co-located with this module (not under apps/function-python/setup_database/sample_data, where
+// it originally lived) so it's guaranteed to exist wherever packages/database is deployed - a
+// cross-app relative path here previously crashed the manage app's Docker image at startup, since
+// that image only ever copies packages/ and apps/manage/, never apps/function-python
+const RULESET_CSV_PATH = path.join(path.dirname(fileURLToPath(import.meta.url)), 'example_ruleset.csv');
 
 export const RULESETS: RulesetDefinition[] = parseRulesetCsv(readFileSync(RULESET_CSV_PATH, 'utf8'));
 

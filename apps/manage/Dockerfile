@@ -12,8 +12,6 @@ COPY package-lock.json .
 
 COPY packages ./packages
 COPY apps/manage ./apps/manage
-# packages/database/src/geospatial/rulesets.ts reads the ruleset CSV from here at import time
-COPY apps/function-python/setup_database/sample_data ./apps/function-python/setup_database/sample_data
 
 RUN npm ci --loglevel notice --workspace=identify-consultees-manage --ignore-scripts
 

@@ -1,4 +1,5 @@
 import type { ManageService } from '#service';
+import type { CaseBoundarySummary } from '@pins/identify-consultees-database/src/geospatial/case-boundaries.ts';
 import {
 	getRandomCaseSummary,
 	searchCaseBoundaries
@@ -21,15 +22,12 @@ function parsePageSize(value: unknown): number {
 	return PAGE_SIZE_OPTIONS.includes(parsed) ? parsed : DEFAULT_PAGE_SIZE;
 }
 
-function toProjectGeometry(feature: {
-	id: string;
-	properties: { caseReference: string; caseName: string; receivedDate?: Date | null };
-}): ProjectGeometry {
+function toProjectGeometry(summary: CaseBoundarySummary): ProjectGeometry {
 	return {
-		id: feature.id,
-		reference: feature.properties.caseReference,
-		caseName: feature.properties.caseName,
-		received: feature.properties.receivedDate ? feature.properties.receivedDate.toLocaleDateString('en-GB') : ''
+		id: summary.id,
+		reference: summary.reference,
+		caseName: summary.caseName,
+		received: summary.receivedDate ? summary.receivedDate.toLocaleDateString('en-GB') : ''
 	};
 }
 
@@ -58,7 +56,8 @@ export function buildHomePage(service: ManageService): AsyncRequestHandler {
 
 		let exampleCase: ExampleCase | null = null;
 		try {
-			exampleCase = await getRandomCaseSummary(db);
+			const summary = await getRandomCaseSummary(db);
+			exampleCase = summary ? { reference: summary.reference, caseName: summary.caseName } : null;
 		} catch (error) {
 			logger.error({ error }, 'Failed to fetch an example case for the home page');
 		}

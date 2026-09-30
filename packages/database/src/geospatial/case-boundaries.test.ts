@@ -8,6 +8,7 @@ import {
 	findCaseBoundariesIntersecting,
 	findCaseBoundariesNear,
 	getCaseBoundaryById,
+	getCaseBoundarySummaryById,
 	getRandomCaseSummary,
 	listCaseBoundaries,
 	loadCaseBoundaries,
@@ -147,6 +148,43 @@ describe('case boundaries (requires a local SQL Server - see docker-compose.yml)
 			assert.equal(found?.properties.caseName, 'Findable by id');
 
 			const missing = await getCaseBoundaryById(dbClient, '99999999-9999-9999-9999-999999999999');
+			assert.equal(missing, null);
+		} finally {
+			await cleanup();
+		}
+	});
+
+	test('getCaseBoundarySummaryById finds a stored boundary without its geometry, and returns null otherwise', async (t) => {
+		if (!dbAvailable) return t.skip('SQL Server database not available');
+
+		await cleanup();
+		try {
+			await loadCaseBoundaries(dbClient, {
+				type: 'FeatureCollection',
+				features: [
+					{
+						id: testBoundaryId,
+						type: 'Feature',
+						geometry: { type: 'Point', coordinates: [0, 0] },
+						properties: {
+							caseReference: 'EN010001',
+							caseName: 'Findable by id',
+							receivedDate: new Date(Date.UTC(2026, 2, 3))
+						}
+					}
+				]
+			});
+
+			const found = await getCaseBoundarySummaryById(dbClient, testBoundaryId);
+			assert.deepEqual(found, {
+				id: testBoundaryId,
+				reference: 'EN010001',
+				caseName: 'Findable by id',
+				receivedDate: new Date(Date.UTC(2026, 2, 3))
+			});
+			assert.ok(!('geometry' in (found as object)), 'summary should not carry geometry');
+
+			const missing = await getCaseBoundarySummaryById(dbClient, '99999999-9999-9999-9999-999999999999');
 			assert.equal(missing, null);
 		} finally {
 			await cleanup();
