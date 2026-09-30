@@ -134,8 +134,8 @@ describe('manage page accessibility smoke', () => {
 			reference: 'EN01',
 			caseName: 'Example Project',
 			rulesets: [
-				{ value: 'railways-500m', text: 'Railways within 500m' },
-				{ value: 'local-councils-5km', text: 'Local councils within 5km' }
+				{ value: 'railway', text: 'Railways' },
+				{ value: 'hospital', text: 'Hospitals' }
 			]
 		});
 		await assertNoSeriousA11yViolations(html);
@@ -174,14 +174,14 @@ describe('manage page accessibility smoke', () => {
 			...pageLocals,
 			pageHeading: 'Consultees identified for Example Project (EN01)',
 			backLinkUrl: '/consultees/11111111-1111-1111-1111-111111111111',
-			rulesetName: 'Railways within 500m',
+			rulesetName: 'Railways',
 			reference: 'EN01',
 			caseName: 'Example Project',
 			caseId: '11111111-1111-1111-1111-111111111111',
 			mapId: 'case-map',
-			mapRegionLabel: 'Map showing Railways within 500m for Example Project',
-			staticMapSrc: '/consultees/11111111-1111-1111-1111-111111111111/results/static-map?ruleset=railways-500m',
-			staticMapAlt: 'Static map showing Railways within 500m for Example Project',
+			mapRegionLabel: 'Map showing Railways for Example Project',
+			staticMapSrc: '/consultees/11111111-1111-1111-1111-111111111111/results/static-map?ruleset=railway',
+			staticMapAlt: 'Static map showing Railways for Example Project',
 			mapWidth: 960,
 			mapHeight: 516,
 			mapConfigJson: '{"center":[-1.78,50.62],"zoom":11}',

@@ -262,6 +262,57 @@ export async function findConsulteeAreasNear(
 }
 
 /**
+ * Find consultee areas of `matchingCategories` that share a border with a `hostCategory` area
+ * intersecting `geometry` - e.g. "neighbouring parishes of the parish the site sits in". This is
+ * a different shape of query to `findConsulteeAreasNear`: it isn't about distance from the site
+ * at all, so `distanceMetres` on the result is always 0 (there's no meaningful value to compute).
+ *
+ * SQL Server's `geography` type has no `STTouches` ("Could not find method 'STTouches' for type
+ * ... SqlGeography" - it's geometry-only), so this uses `STIntersects` plus an explicit id
+ * exclusion instead: for real, non-overlapping administrative boundary data, two *different*
+ * areas that intersect only do so where they meet, which is exactly what "borders" means here.
+ *
+ * Two round trips, not one: a single query joining `candidate.geometry.STIntersects(host.geometry)`
+ * column-to-column can't use the spatial index (it needs a constant on one side), so it degrades
+ * to a near full-table scan - confirmed by a real 15s+ timeout on this project's own reference
+ * data. Fetching the (typically one) host area first, then querying with its geometry as a
+ * parameter, keeps both queries on the indexed `STIntersects(column, constant)` path.
+ */
+export async function findConsulteeAreasBordering(
+	dbClient: PrismaClient,
+	geometry: Geometry,
+	hostCategory: string,
+	matchingCategories: string[]
+): Promise<ConsulteeAreaMatch[]> {
+	if (matchingCategories.length === 0) {
+		return [];
+	}
+	const wkt = geometryToWkt(geometry);
+	const hosts = await dbClient.$queryRaw<{ id: string; hostWkt: string }[]>`
+		SELECT id, geometry.STAsText() AS hostWkt
+		FROM consultee_area
+		WHERE consulteeCategory = ${hostCategory}
+			AND geometry.STIntersects(geography::STGeomFromText(${wkt}, 4326)) = 1
+	`;
+
+	const matchesById = new Map<string, ConsulteeAreaRow>();
+	for (const host of hosts) {
+		const rows = await dbClient.$queryRaw<ConsulteeAreaRow[]>`
+			SELECT ${selectColumns}
+			FROM consultee_area
+			WHERE consulteeCategory IN (${Prisma.join(matchingCategories)})
+				AND id <> CAST(${host.id} AS UNIQUEIDENTIFIER)
+				AND geometry.STIntersects(geography::STGeomFromText(${host.hostWkt}, 4326)) = 1
+		`;
+		for (const row of rows) {
+			matchesById.set(row.id, row);
+		}
+	}
+
+	return [...matchesById.values()].map((row) => ({ feature: rowToFeature(row), distanceMetres: 0 }));
+}
+
+/**
  * Find consultee areas that intersect `geometry`.
  */
 export async function findConsulteeAreasIntersecting(

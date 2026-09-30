@@ -10,5 +10,6 @@ export const SAMPLE_CASE_ID = '9aba1d63-8575-ce89-847f-0a978e848bca';
 export const SAMPLE_CASE_REFERENCE = 'EN010025';
 export const SAMPLE_CASE_NAME = 'East Anglia ONE Offshore Windfarm';
 
-export const SAMPLE_RULESET_ID = 'railways-500m';
-export const SAMPLE_RULESET_NAME = 'Railways within 500m';
+// from apps/function-python/setup_database/sample_data/example_ruleset.csv
+export const SAMPLE_RULESET_ID = 'railway';
+export const SAMPLE_RULESET_NAME = 'Railways';
