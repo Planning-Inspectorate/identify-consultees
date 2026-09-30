@@ -11,8 +11,12 @@
  * unusually large/complex geometries, up for small simple ones).
  */
 import { loadConfig } from '../configuration/config.ts';
-import { newDatabaseClient } from '../index.ts';
+import { newDatabaseClient, withExtendedTimeout } from '../index.ts';
 import { importCaseBoundaries, importConsulteeAreas } from './geojson-import.ts';
+
+// see withExtendedTimeout - a large/complex real geometry can exceed the driver's default ~15s
+// request timeout regardless of batch size
+const IMPORT_REQUEST_TIMEOUT_MS = 120_000;
 
 interface ParsedArgs {
 	type: 'consultee-areas' | 'case-boundaries';
@@ -58,7 +62,7 @@ function logProgress(startedAt: number) {
 async function run() {
 	const args = parseArgs(process.argv.slice(2));
 	const config = loadConfig();
-	const dbClient = newDatabaseClient(config.db);
+	const dbClient = newDatabaseClient(withExtendedTimeout(config.db, IMPORT_REQUEST_TIMEOUT_MS));
 
 	console.log(`Importing ${args.type} from ${args.file}...`);
 	const startedAt = Date.now();
