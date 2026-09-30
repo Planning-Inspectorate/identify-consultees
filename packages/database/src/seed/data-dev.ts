@@ -11,13 +11,29 @@ const sampleDataDir = path.resolve(
 	'../../../../apps/function-python/setup_database/sample_data'
 );
 
+// A smaller batch than loadConsulteeAreas/loadCaseBoundaries' own default (200). reference_data.geojson
+// is only 80 features but ~10.5MB (some genuinely large/complex geometries, e.g. national rail
+// networks) - a single MERGE statement covering all of them comfortably exceeds Prisma's 15s
+// request timeout against a real, network-distant SQL Server (confirmed: it reliably timed out
+// seeding the real Dev database, even though the same file loads in seconds against a local
+// Docker instance). Seeding isn't performance-sensitive, so trading round trips for headroom here
+// is the right call.
+const SEED_BATCH_SIZE = 5;
+
 export async function seedDev(dbClient: PrismaClient) {
-	const consulteeAreaCount = await importConsulteeAreas(dbClient, path.join(sampleDataDir, 'reference_data.geojson'));
+	const options = { batchSize: SEED_BATCH_SIZE };
+
+	const consulteeAreaCount = await importConsulteeAreas(
+		dbClient,
+		path.join(sampleDataDir, 'reference_data.geojson'),
+		options
+	);
 	console.log(`Loaded ${consulteeAreaCount} consultee areas`);
 
 	const caseBoundaryCount = await importCaseBoundaries(
 		dbClient,
-		path.join(sampleDataDir, 'sample_application_boundaries.geojson')
+		path.join(sampleDataDir, 'sample_application_boundaries.geojson'),
+		options
 	);
 	console.log(`Loaded ${caseBoundaryCount} case boundaries`);
 
