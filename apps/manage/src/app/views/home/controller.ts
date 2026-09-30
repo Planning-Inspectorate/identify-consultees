@@ -1,7 +1,10 @@
 import type { ManageService } from '#service';
-import { searchCaseBoundaries } from '@pins/identify-consultees-database/src/geospatial/case-boundaries.ts';
+import {
+	getRandomCaseSummary,
+	searchCaseBoundaries
+} from '@pins/identify-consultees-database/src/geospatial/case-boundaries.ts';
 import type { AsyncRequestHandler } from '@planning-inspectorate/core/util';
-import type { HomeViewModel, ProjectGeometry } from './view-model.ts';
+import type { ExampleCase, HomeViewModel, ProjectGeometry } from './view-model.ts';
 
 const PAGE_SIZE_OPTIONS = [25, 50, 100];
 const DEFAULT_PAGE_SIZE = 25;
@@ -53,6 +56,13 @@ export function buildHomePage(service: ManageService): AsyncRequestHandler {
 			logger.error({ error }, 'Failed to search case boundaries');
 		}
 
+		let exampleCase: ExampleCase | null = null;
+		try {
+			exampleCase = await getRandomCaseSummary(db);
+		} catch (error) {
+			logger.error({ error }, 'Failed to fetch an example case for the home page');
+		}
+
 		const viewModel: HomeViewModel = {
 			pageHeading: 'Identify consultees for an infrastructure project',
 			searchQuery,
@@ -61,7 +71,8 @@ export function buildHomePage(service: ManageService): AsyncRequestHandler {
 			resultsFrom: geometries.length > 0 ? 1 : 0,
 			resultsTo: geometries.length,
 			resultsTotal,
-			geometries
+			geometries,
+			exampleCase
 		};
 
 		return res.render('views/home/view.njk', viewModel);

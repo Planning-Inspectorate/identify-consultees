@@ -10,9 +10,12 @@
 {% endblock %}
 
 {% block pageContent %}
-	{{ govukInsetText({
-		html: 'Prototype: try <a class="govuk-link" href="/map-layers-demo">map layer toggles</a> (railways, roads, and other overlays).'
-	}) }}
+	{% if exampleCase %}
+		{% set exampleHint %}For example, try searching for <strong>{{ exampleCase.reference }}</strong> ({{ exampleCase.caseName }}).{% endset %}
+		{{ govukInsetText({
+			html: exampleHint
+		}) }}
+	{% endif %}
 
 	<form method="get" action="/">
 		<div class="pins-inline-search">

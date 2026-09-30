@@ -8,6 +8,7 @@ import {
 	findCaseBoundariesIntersecting,
 	findCaseBoundariesNear,
 	getCaseBoundaryById,
+	getRandomCaseSummary,
 	listCaseBoundaries,
 	loadCaseBoundaries,
 	searchCaseBoundaries
@@ -147,6 +148,32 @@ describe('case boundaries (requires a local SQL Server - see docker-compose.yml)
 
 			const missing = await getCaseBoundaryById(dbClient, '99999999-9999-9999-9999-999999999999');
 			assert.equal(missing, null);
+		} finally {
+			await cleanup();
+		}
+	});
+
+	test('getRandomCaseSummary returns a real reference and case name', async (t) => {
+		if (!dbAvailable) return t.skip('SQL Server database not available');
+
+		await cleanup();
+		try {
+			await loadCaseBoundaries(dbClient, {
+				type: 'FeatureCollection',
+				features: [
+					{
+						id: testBoundaryId,
+						type: 'Feature',
+						geometry: { type: 'Point', coordinates: [0, 0] },
+						properties: { caseReference: 'EN010001', caseName: 'Findable by id' }
+					}
+				]
+			});
+
+			const summary = await getRandomCaseSummary(dbClient);
+			assert.ok(summary);
+			assert.ok(summary.reference);
+			assert.ok(summary.caseName);
 		} finally {
 			await cleanup();
 		}

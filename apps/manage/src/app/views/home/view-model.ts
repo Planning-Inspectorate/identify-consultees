@@ -7,6 +7,13 @@ export interface HomeViewModel {
 	resultsTo: number;
 	resultsTotal: number;
 	geometries: ProjectGeometry[];
+	/** A real case reference/name to show as a "try searching for..." example. Null if none exist yet. */
+	exampleCase: ExampleCase | null;
+}
+
+export interface ExampleCase {
+	reference: string;
+	caseName: string;
 }
 
 export interface ProjectGeometry {
