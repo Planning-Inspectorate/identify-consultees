@@ -292,6 +292,190 @@ describe('static-map helpers', () => {
 		assert.ok(tiles.length > 0);
 	});
 
+	test('renderStaticMapSvg draws non-areal geometry types unfilled', () => {
+		const nonAreal: GeoJsonFeatureCollection = {
+			type: 'FeatureCollection',
+			features: [
+				{
+					type: 'Feature',
+					properties: {},
+					geometry: {
+						type: 'LineString',
+						coordinates: [
+							[-1.8, 50.6],
+							[-1.7, 50.6],
+							[-1.6, 50.65]
+						]
+					}
+				},
+				{
+					type: 'Feature',
+					properties: {},
+					geometry: {
+						type: 'MultiLineString',
+						coordinates: [
+							[
+								[-1.8, 50.6],
+								[-1.7, 50.6]
+							],
+							[
+								[-1.6, 50.6],
+								[-1.5, 50.65]
+							]
+						]
+					}
+				},
+				{
+					type: 'Feature',
+					properties: {},
+					geometry: {
+						type: 'MultiPoint',
+						coordinates: [
+							[-1.8, 50.6],
+							[-1.7, 50.6]
+						]
+					}
+				},
+				{
+					type: 'Feature',
+					properties: {},
+					geometry: {
+						type: 'GeometryCollection',
+						geometries: [
+							{
+								type: 'Polygon',
+								coordinates: [
+									[
+										[-1.8, 50.6],
+										[-1.7, 50.6],
+										[-1.7, 50.7],
+										[-1.8, 50.7],
+										[-1.8, 50.6]
+									]
+								]
+							},
+							{
+								type: 'LineString',
+								coordinates: [
+									[-1.6, 50.6],
+									[-1.5, 50.65]
+								]
+							}
+						]
+					}
+				}
+			]
+		};
+
+		const svg = renderStaticMapSvg({
+			center: [-1.75, 50.65],
+			zoom: 10,
+			projectGeojson: nonAreal,
+			consulteeGeojson: emptyCollection
+		});
+		assert.match(svg, /fill="none"/);
+	});
+
+	test('renderStaticMapSvg draws MultiPolygon features filled', () => {
+		const multiPolygon: GeoJsonFeatureCollection = {
+			type: 'FeatureCollection',
+			features: [
+				{
+					type: 'Feature',
+					properties: {},
+					geometry: {
+						type: 'MultiPolygon',
+						coordinates: [
+							[
+								[
+									[-1.8, 50.6],
+									[-1.7, 50.6],
+									[-1.7, 50.7],
+									[-1.8, 50.7],
+									[-1.8, 50.6]
+								]
+							],
+							[
+								[
+									[-1.6, 50.6],
+									[-1.5, 50.6],
+									[-1.5, 50.7],
+									[-1.6, 50.7],
+									[-1.6, 50.6]
+								]
+							]
+						]
+					}
+				}
+			]
+		};
+
+		const svg = renderStaticMapSvg({
+			center: [-1.75, 50.65],
+			zoom: 10,
+			projectGeojson: multiPolygon,
+			consulteeGeojson: emptyCollection
+		});
+		assert.match(svg, / Z M/);
+	});
+
+	test('renderStaticMapSvg omits a feature whose only line is too short to draw', () => {
+		const tooShort: GeoJsonFeatureCollection = {
+			type: 'FeatureCollection',
+			features: [
+				{
+					type: 'Feature',
+					properties: {},
+					geometry: { type: 'LineString', coordinates: [[-1.8, 50.6]] }
+				}
+			]
+		};
+
+		const svg = renderStaticMapSvg({
+			center: [-1.75, 50.65],
+			zoom: 10,
+			projectGeojson: tooShort,
+			consulteeGeojson: emptyCollection
+		});
+		assert.doesNotMatch(svg, /<path /);
+	});
+
+	test('buildGoogleStaticMapUrl skips lines shorter than two points and omits fillcolor for lines', () => {
+		const mixed: GeoJsonFeatureCollection = {
+			type: 'FeatureCollection',
+			features: [
+				{
+					type: 'Feature',
+					properties: {},
+					geometry: { type: 'LineString', coordinates: [[-1.8, 50.6]] }
+				},
+				{
+					type: 'Feature',
+					properties: {},
+					geometry: {
+						type: 'LineString',
+						coordinates: [
+							[-1.8, 50.6],
+							[-1.7, 50.6]
+						]
+					}
+				}
+			]
+		};
+
+		const url = buildGoogleStaticMapUrl({
+			center: [-1.75, 50.65],
+			zoom: 10,
+			projectGeojson: mixed,
+			consulteeGeojson: emptyCollection,
+			googleMapsApiKey: 'test-key'
+		});
+		assert.ok(url);
+		const paths = new URL(url).searchParams.getAll('path');
+		assert.equal(paths.length, 1);
+		assert.doesNotMatch(paths[0], /fillcolor/);
+	});
+
 	test('fetchOsmBasemapTiles expires stale cache entries', async () => {
 		let calls = 0;
 		const fetchImpl: typeof fetch = async () => {

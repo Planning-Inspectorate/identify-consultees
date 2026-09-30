@@ -1,4 +1,11 @@
 import { expect, test } from '@playwright/test';
+import {
+	SAMPLE_CASE_ID,
+	SAMPLE_CASE_NAME,
+	SAMPLE_CASE_REFERENCE,
+	SAMPLE_RULESET_ID,
+	SAMPLE_RULESET_NAME
+} from './fixtures.ts';
 
 /**
  * Cross-browser render completeness checks (Firefox + WebKit/Safari).
@@ -9,16 +16,24 @@ import { expect, test } from '@playwright/test';
  */
 const pages = [
 	{
-		path: '/',
+		path: `/?q=${SAMPLE_CASE_REFERENCE}`,
 		name: 'home',
 		heading: /Identify consultees for an infrastructure project/i,
-		mustSee: [/Choose a ruleset/i, /East Anglia ONE Offshore Windfarm/i]
+		mustSee: [new RegExp(SAMPLE_CASE_NAME, 'i')]
 	},
 	{
-		path: '/consultees/geo-1',
+		path: `/consultees/${SAMPLE_CASE_ID}`,
+		name: 'ruleset picker',
+		heading: /Choose a ruleset/i,
+		// the ruleset options themselves live inside a <select> - not "visible" text in the
+		// getByText sense - so check the visible label instead
+		mustSee: [/Ruleset/i]
+	},
+	{
+		path: `/consultees/${SAMPLE_CASE_ID}/results?ruleset=${SAMPLE_RULESET_ID}`,
 		name: 'consultees results',
 		heading: /Consultees identified for/i,
-		mustSee: [/Ambulance Trusts/i, /Police Force Areas/i]
+		mustSee: [new RegExp(`Ruleset used: ${SAMPLE_RULESET_NAME}`, 'i')]
 	},
 	{
 		path: '/map-layers-demo',
@@ -90,17 +105,17 @@ test.describe('cross-browser render completeness', () => {
 		});
 	}
 
-	test('consultees results exposes map section regions', async ({ page }) => {
-		await page.goto('/consultees/geo-1');
-		await expect(page.getByRole('heading', { level: 2, name: /Ambulance Trusts/i })).toBeVisible();
+	test('consultees results exposes a map region', async ({ page }) => {
+		await page.goto(`/consultees/${SAMPLE_CASE_ID}/results?ruleset=${SAMPLE_RULESET_ID}`);
+		await expect(page.getByRole('heading', { level: 2, name: /Consultees identified/i })).toBeVisible();
 
 		const mapRegion = page.locator('[data-consultee-map].app-case-map').first();
 		await expect(mapRegion).toBeAttached();
 		await expect(mapRegion).toHaveAttribute('role', 'region');
 		await expect(mapRegion).toHaveAttribute('data-map-width', '960');
 		await expect(mapRegion).toHaveAttribute('data-map-height', '516');
-		await expect(mapRegion).toHaveAttribute('data-static-map-src', /\/static-map$/);
-		await expect(mapRegion).toHaveAttribute('aria-label', /Ambulance Trust/i);
+		await expect(mapRegion).toHaveAttribute('data-static-map-src', /\/static-map/);
+		await expect(mapRegion).toHaveAttribute('aria-label', new RegExp(SAMPLE_RULESET_NAME, 'i'));
 	});
 
 	test('map layers demo host is present for progressive enhancement', async ({ page }) => {

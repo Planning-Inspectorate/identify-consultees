@@ -1,7 +1,8 @@
 import { ManageService } from '#service';
+import { loadCaseBoundaries } from '@pins/identify-consultees-database/src/geospatial/case-boundaries.ts';
 import { mockLogger } from '@planning-inspectorate/core/testing';
 import assert from 'node:assert/strict';
-import { after, describe, test } from 'node:test';
+import { after, before, describe, test } from 'node:test';
 import request from 'supertest';
 import { createApp } from '../app.ts';
 import type { Config } from '../config.ts';
@@ -103,7 +104,24 @@ describe('HTML security response headers', () => {
 	const developmentApp = createApp(developmentService);
 	const productionApp = createApp(productionService);
 
+	const mapPageTestCaseId = '66666666-6666-6666-6666-666666666666';
+
+	before(async () => {
+		await loadCaseBoundaries(developmentService.db, {
+			type: 'FeatureCollection',
+			features: [
+				{
+					id: mapPageTestCaseId,
+					type: 'Feature',
+					geometry: { type: 'Point', coordinates: [-1.5, 52.5] },
+					properties: { caseReference: 'ZZ000002', caseName: 'Security Header Test Fixture' }
+				}
+			]
+		});
+	});
+
 	after(async () => {
+		await developmentService.db.$executeRaw`DELETE FROM case_boundary WHERE id = ${mapPageTestCaseId}`;
 		await Promise.all([
 			developmentService.db.$disconnect().catch(() => undefined),
 			productionService.db.$disconnect().catch(() => undefined)
@@ -145,7 +163,9 @@ describe('HTML security response headers', () => {
 	});
 
 	test('consultees results page keeps map-aware CSP', async () => {
-		const response = await request(developmentApp).get('/consultees/geo-1');
+		const response = await request(developmentApp).get(
+			`/consultees/${mapPageTestCaseId}/results?ruleset=railways-500m`
+		);
 		assert.equal(response.status, 200);
 		const csp = response.headers['content-security-policy'];
 		assert.ok(typeof csp === 'string');

@@ -1,131 +1,14 @@
 import type { ManageService } from '#service';
-import { getCaseBoundaryById } from '@pins/identify-consultees-database/src/geospatial/case-boundaries.ts';
-import { findConsulteeAreasNear } from '@pins/identify-consultees-database/src/geospatial/consultee-areas.ts';
-import type { Geometry } from '@pins/identify-consultees-database/src/geospatial/wkt.ts';
+import type { CaseBoundaryFeature } from '@pins/identify-consultees-database/src/geospatial/case-boundaries.ts';
+import type { ConsulteeAreaMatch } from '@pins/identify-consultees-database/src/geospatial/consultee-areas.ts';
+import type { RulesetDefinition } from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
+import { getRuleset, runRuleset } from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
 import type { AsyncRequestHandler } from '@planning-inspectorate/core/util';
-import { findDummyGeometry, findRulesetLabel } from '../../../data/dummy-geometries.ts';
-import {
-	buildConsulteeAreaGeojson,
-	buildProjectSiteGeojson,
-	MAP_VIEWPORT,
-	mapViewForCollections
-} from '../../../maps/sample-geojson.ts';
+import { buildCaseMapConfig } from '../../../maps/case-geojson.ts';
+import { MAP_VIEWPORT } from '../../../maps/sample-geojson.ts';
 import { buildConsulteeStaticMapResponse } from '../../../maps/serve-static-map.ts';
-import type { ConsulteeMapSection, ConsulteesResultsViewModel, RealScreeningResult } from './view-model.ts';
-
-// the one real screening rule implemented so far - see AGENTS.md/PR discussion for why this
-// isn't yet a per-ruleset distance/category table
-const RAILWAY_SCREENING_RADIUS_METRES = 500;
-
-interface ResolvedProject {
-	id: string;
-	reference: string;
-	caseName: string;
-	/** Only set for a real case_boundary row - the dummy prototype data has no real geometry. */
-	geometry?: Geometry;
-}
-
-/**
- * Resolve a project by id, trying the dummy prototype data first (fast, no DB hit, keeps every
- * existing dummy-id-based page/test working unchanged), then a real case_boundary lookup.
- */
-async function resolveProject(db: ManageService['db'], geometryId: string): Promise<ResolvedProject | undefined> {
-	const dummy = findDummyGeometry(geometryId);
-	if (dummy) {
-		return { id: dummy.id, reference: dummy.reference, caseName: dummy.caseName };
-	}
-
-	// case_boundary ids are UNIQUEIDENTIFIERs - anything else can't match, and isn't worth a
-	// round trip (or a raw-SQL CAST error) to find out
-	if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(geometryId)) {
-		return undefined;
-	}
-
-	const real = await getCaseBoundaryById(db, geometryId);
-	if (!real) {
-		return undefined;
-	}
-	return {
-		id: real.id,
-		reference: real.properties.caseReference,
-		caseName: real.properties.caseName,
-		geometry: real.geometry
-	};
-}
-
-async function buildRealScreening(
-	db: ManageService['db'],
-	geometry: Geometry,
-	logger: ManageService['logger']
-): Promise<RealScreeningResult | undefined> {
-	try {
-		const matches = await findConsulteeAreasNear(db, geometry, RAILWAY_SCREENING_RADIUS_METRES, 'railway');
-		return {
-			heading: `Railways within ${RAILWAY_SCREENING_RADIUS_METRES}m of the project site`,
-			rows: matches.map((match) => ({
-				consultee: match.feature.properties.consultee ?? null,
-				region: match.feature.properties.region ?? null,
-				distanceMetres: Math.round(match.distanceMetres)
-			}))
-		};
-	} catch (error) {
-		logger.error({ error }, 'Failed to run real railway screening query');
-		return undefined;
-	}
-}
-
-type SectionDefinition = {
-	id: string;
-	heading: string;
-	distanceLabel: string;
-	consultees: string[];
-	areas: { name: string; code: string; offsetLng: number; offsetLat: number; size: number }[];
-};
-
-const SECTION_DEFINITIONS: SectionDefinition[] = [
-	{
-		id: 'ambulance-trusts',
-		heading: 'Ambulance Trusts (within 1km of the site)',
-		distanceLabel: 'Ambulance Trust within 1km of the project site',
-		consultees: ['South Central Ambulance Service', 'South Western Ambulance Service'],
-		areas: [
-			{ name: 'South Central Ambulance Service', code: 'SCAS', offsetLng: -0.08, offsetLat: 0.05, size: 0.06 },
-			{ name: 'South Western Ambulance Service', code: 'SWAS', offsetLng: 0.07, offsetLat: -0.04, size: 0.055 }
-		]
-	},
-	{
-		id: 'police-force-areas',
-		heading: 'Police Force Areas (within 10km of the site)',
-		distanceLabel: 'Police Force Area within 10km of the project site',
-		consultees: ['Dorset Police', 'Hampshire and Isle of Wight Constabulary'],
-		areas: [
-			{ name: 'Dorset Police', code: 'DOR', offsetLng: -0.12, offsetLat: 0.02, size: 0.09 },
-			{ name: 'Hampshire and Isle of Wight Constabulary', code: 'HIOW', offsetLng: 0.1, offsetLat: 0.06, size: 0.08 }
-		]
-	},
-	{
-		id: 'fire-rescue',
-		heading: 'Fire and Rescue Authorities (within 10km of the site)',
-		distanceLabel: 'Fire and Rescue Authority within 10km of the project site',
-		consultees: ['Dorset and Wiltshire Fire and Rescue Service', 'Hampshire and Isle of Wight Fire and Rescue Service'],
-		areas: [
-			{
-				name: 'Dorset and Wiltshire Fire and Rescue Service',
-				code: 'DWFRS',
-				offsetLng: -0.05,
-				offsetLat: 0.08,
-				size: 0.07
-			},
-			{
-				name: 'Hampshire and Isle of Wight Fire and Rescue Service',
-				code: 'HIOWFRS',
-				offsetLng: 0.09,
-				offsetLat: -0.06,
-				size: 0.07
-			}
-		]
-	}
-];
+import { resolveCase } from '../resolve-case.ts';
+import type { ConsulteeMatchRow, ConsulteesResultsViewModel } from './view-model.ts';
 
 function firstQueryValue(value: unknown): string {
 	if (Array.isArray(value)) {
@@ -134,117 +17,99 @@ function firstQueryValue(value: unknown): string {
 	return typeof value === 'string' ? value : '';
 }
 
-function buildSectionMapContext(
-	definition: SectionDefinition,
-	reference: string,
-	caseName: string,
-	geometryId: string
-) {
-	const projectGeojson = buildProjectSiteGeojson(reference, caseName);
-	const consulteeGeojson = buildConsulteeAreaGeojson(definition.distanceLabel, definition.areas);
-	const view = mapViewForCollections(projectGeojson, consulteeGeojson);
-	const mapLabel = `${definition.distanceLabel} for ${caseName} (${reference})`;
+async function runRulesetSafely(
+	db: ManageService['db'],
+	project: CaseBoundaryFeature,
+	ruleset: RulesetDefinition,
+	logger: ManageService['logger']
+): Promise<ConsulteeAreaMatch[]> {
+	try {
+		return await runRuleset(db, project.geometry, ruleset);
+	} catch (error) {
+		logger.error({ error, caseId: project.id, rulesetId: ruleset.id }, 'Failed to run ruleset');
+		return [];
+	}
+}
 
-	const mapConfig = {
-		center: view.center,
-		zoom: view.zoom,
-		width: MAP_VIEWPORT.width,
-		height: MAP_VIEWPORT.height,
-		mapLabel,
-		projectLayerLabel: `Project site (${reference})`,
-		consulteeLayerLabel: definition.distanceLabel,
-		projectGeojson,
-		consulteeGeojson
-	};
-
-	const section: ConsulteeMapSection = {
-		id: definition.id,
-		heading: definition.heading,
-		mapTitle: mapLabel,
-		mapRegionLabel: mapLabel,
-		consultees: definition.consultees,
-		staticMapSrc: `/consultees/${encodeURIComponent(geometryId)}/sections/${definition.id}/static-map`,
-		staticMapAlt: `Static map showing ${mapLabel}`,
-		mapWidth: MAP_VIEWPORT.width,
-		mapHeight: MAP_VIEWPORT.height,
-		mapConfigJson: JSON.stringify(mapConfig)
-	};
-
+function toMatchRow(match: ConsulteeAreaMatch): ConsulteeMatchRow {
 	return {
-		section,
-		map: {
-			center: view.center,
-			zoom: view.zoom,
-			projectGeojson,
-			consulteeGeojson,
-			width: MAP_VIEWPORT.width,
-			height: MAP_VIEWPORT.height,
-			title: `Static map of ${mapLabel}`,
-			description: `Static map showing ${mapLabel}`
-		}
+		consultee: match.feature.properties.consultee ?? null,
+		consulteeCategory: match.feature.properties.consulteeCategory ?? null,
+		region: match.feature.properties.region ?? null,
+		distanceMetres: Math.round(match.distanceMetres)
 	};
 }
 
+/**
+ * Step 3 of the identify-consultees flow: run the chosen ruleset against the chosen project and
+ * show the matching consultees, on a map and in a table.
+ */
 export function buildConsulteesResultsPage(service: ManageService): AsyncRequestHandler {
 	const { db, logger } = service;
 
 	return async (req, res) => {
-		const geometryId = String(req.params.geometryId ?? '');
-		const geometry = await resolveProject(db, geometryId);
-
-		if (!geometry) {
+		const caseId = String(req.params.caseId ?? '');
+		const project = await resolveCase(db, caseId);
+		if (!project) {
 			res.status(404).render('views/errors/404.njk', { pageHeading: 'Page not found' });
 			return;
 		}
 
-		const ruleset = firstQueryValue(req.query.ruleset) || 'post-30-apr-2024-england-wales';
-		const rulesetLabel = findRulesetLabel(ruleset);
-		logger.info({ geometryId, reference: geometry.reference }, 'consultees results page');
+		const ruleset = getRuleset(firstQueryValue(req.query.ruleset));
+		if (!ruleset) {
+			res.status(404).render('views/errors/404.njk', { pageHeading: 'Page not found' });
+			return;
+		}
 
-		const sections = SECTION_DEFINITIONS.map(
-			(definition) => buildSectionMapContext(definition, geometry.reference, geometry.caseName, geometry.id).section
+		logger.info(
+			{ caseId, reference: project.properties.caseReference, rulesetId: ruleset.id },
+			'consultees results page'
 		);
 
-		const realScreening = geometry.geometry ? await buildRealScreening(db, geometry.geometry, logger) : undefined;
+		const matches = await runRulesetSafely(db, project, ruleset, logger);
+		const map = buildCaseMapConfig(project, matches, ruleset.name);
 
 		const viewModel: ConsulteesResultsViewModel = {
-			pageHeading: `Consultees identified for ${geometry.caseName} (${geometry.reference})`,
-			realScreening,
-			backLinkUrl: '/',
-			backLinkText: 'Back to project geometry search',
-			rulesetLabel,
-			reference: geometry.reference,
-			caseName: geometry.caseName,
-			geometryId: geometry.id,
-			downloadSummaryHref: '#',
-			downloadMapsHref: '#',
-			sections
+			pageHeading: `Consultees identified for ${project.properties.caseName} (${project.properties.caseReference})`,
+			backLinkUrl: `/consultees/${project.id}`,
+			rulesetName: ruleset.name,
+			reference: project.properties.caseReference,
+			caseName: project.properties.caseName,
+			caseId: project.id,
+			mapId: 'case-map',
+			mapRegionLabel: `Map showing ${ruleset.name} for ${project.properties.caseName}`,
+			staticMapSrc: `/consultees/${encodeURIComponent(project.id)}/results/static-map?ruleset=${encodeURIComponent(ruleset.id)}`,
+			staticMapAlt: `Static map showing ${ruleset.name} for ${project.properties.caseName}`,
+			mapWidth: MAP_VIEWPORT.width,
+			mapHeight: MAP_VIEWPORT.height,
+			mapConfigJson: JSON.stringify(map),
+			matches: matches.map(toMatchRow)
 		};
 
 		return res.render('views/consultees/results/view.njk', viewModel);
 	};
 }
 
-export function buildSectionStaticMap(service: ManageService, forceSvg = false): AsyncRequestHandler {
-	const { logger } = service;
+export function buildResultsStaticMap(service: ManageService, forceSvg = false): AsyncRequestHandler {
+	const { db, logger } = service;
 
 	return async (req, res) => {
-		const geometryId = String(req.params.geometryId ?? '');
-		const sectionId = String(req.params.sectionId ?? '');
-		const geometry = findDummyGeometry(geometryId);
-		const definition = SECTION_DEFINITIONS.find((section) => section.id === sectionId);
+		const caseId = String(req.params.caseId ?? '');
+		const project = await resolveCase(db, caseId);
+		const ruleset = getRuleset(firstQueryValue(req.query.ruleset));
 
-		if (!geometry || !definition) {
+		if (!project || !ruleset) {
 			res.status(404).type('text/plain').send('Not found');
 			return;
 		}
 
-		logger.debug({ geometryId, sectionId, forceSvg }, 'serving static consultee map');
-		const { map } = buildSectionMapContext(definition, geometry.reference, geometry.caseName, geometry.id);
+		const matches = await runRulesetSafely(db, project, ruleset, logger);
+		const map = buildCaseMapConfig(project, matches, ruleset.name);
 		const ifNoneMatch = typeof req.headers['if-none-match'] === 'string' ? req.headers['if-none-match'] : undefined;
+
 		const image = await buildConsulteeStaticMapResponse({
-			geometryId,
-			sectionId,
+			geometryId: project.id,
+			sectionId: ruleset.id,
 			map,
 			forceSvg,
 			ifNoneMatch

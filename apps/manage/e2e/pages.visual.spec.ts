@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { SAMPLE_CASE_ID, SAMPLE_RULESET_ID } from './fixtures.ts';
 
 /**
  * Visual regression baselines for key manage pages.
@@ -16,7 +17,7 @@ test.describe('visual regression @visual', () => {
 	});
 
 	test('consultees results page', async ({ page }) => {
-		await page.goto('/consultees/geo-1');
+		await page.goto(`/consultees/${SAMPLE_CASE_ID}/results?ruleset=${SAMPLE_RULESET_ID}`);
 		await expect(page).toHaveScreenshot('consultees-results.png', { fullPage: true });
 	});
 

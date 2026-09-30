@@ -86,24 +86,21 @@ describe('manage page accessibility smoke', () => {
 		const html = nunjucks.render('views/home/view.njk', {
 			...pageLocals,
 			pageHeading: 'Identify consultees for an infrastructure project',
-			rulesets: [{ value: 'post-apr-2025-england-wales', text: 'Post Apr 2025 England & Wales' }],
-			selectedRuleset: 'post-apr-2025-england-wales',
 			searchQuery: 'EN01',
 			pageSize: 25,
 			pageSizeOptions: [25, 50, 100],
 			resultsFrom: 1,
 			resultsTo: 3,
 			resultsTotal: 100,
-			selectedGeometryId: 'geo-1',
 			geometries: [
 				{
-					id: 'geo-1',
+					id: '11111111-1111-1111-1111-111111111111',
 					reference: 'EN010025',
 					caseName: 'East Anglia ONE Offshore Windfarm',
 					received: '03/03/2026'
 				},
 				{
-					id: 'geo-2',
+					id: '22222222-2222-2222-2222-222222222222',
 					reference: 'EN010013',
 					caseName: 'Clocaenog Forest Wind Farm',
 					received: '15/01/2026'
@@ -117,16 +114,29 @@ describe('manage page accessibility smoke', () => {
 		const html = nunjucks.render('views/home/view.njk', {
 			...pageLocals,
 			pageHeading: 'Identify consultees for an infrastructure project',
-			rulesets: [{ value: 'post-apr-2025-england-wales', text: 'Post Apr 2025 England & Wales' }],
-			selectedRuleset: 'post-apr-2025-england-wales',
 			searchQuery: 'ZZZ-NOMATCH-XXX',
 			pageSize: 25,
 			pageSizeOptions: [25, 50, 100],
 			resultsFrom: 0,
 			resultsTo: 0,
 			resultsTotal: 0,
-			selectedGeometryId: null,
 			geometries: []
+		});
+		await assertNoSeriousA11yViolations(html);
+	});
+
+	test('ruleset picker page has no serious a11y violations', async () => {
+		const html = nunjucks.render('views/consultees/ruleset/view.njk', {
+			...pageLocals,
+			pageHeading: 'Choose a ruleset for Example Project (EN01)',
+			backLinkUrl: '/',
+			caseId: '11111111-1111-1111-1111-111111111111',
+			reference: 'EN01',
+			caseName: 'Example Project',
+			rulesets: [
+				{ value: 'railways-500m', text: 'Railways within 500m' },
+				{ value: 'local-councils-5km', text: 'Local councils within 5km' }
+			]
 		});
 		await assertNoSeriousA11yViolations(html);
 	});
@@ -163,28 +173,19 @@ describe('manage page accessibility smoke', () => {
 		const html = nunjucks.render('views/consultees/results/view.njk', {
 			...pageLocals,
 			pageHeading: 'Consultees identified for Example Project (EN01)',
-			backLinkUrl: '/',
-			backLinkText: 'Back to project geometry search',
-			rulesetLabel: 'Post 30 Apr 2024 England & Wales',
+			backLinkUrl: '/consultees/11111111-1111-1111-1111-111111111111',
+			rulesetName: 'Railways within 500m',
 			reference: 'EN01',
 			caseName: 'Example Project',
-			geometryId: 'geo-1',
-			downloadSummaryHref: '#',
-			downloadMapsHref: '#',
-			sections: [
-				{
-					id: 'ambulance-trusts',
-					heading: 'Ambulance Trusts (within 1km of the site)',
-					mapTitle: 'Ambulance Trust within 1km of the project site',
-					mapRegionLabel: 'Ambulance Trust within 1km of the project site',
-					consultees: ['South Central Ambulance Service'],
-					staticMapSrc: '/consultees/geo-1/sections/ambulance-trusts/static-map',
-					staticMapAlt: 'Static map showing ambulance trusts',
-					mapWidth: 960,
-					mapHeight: 516,
-					mapConfigJson: '{"center":[-1.78,50.62],"zoom":11}'
-				}
-			]
+			caseId: '11111111-1111-1111-1111-111111111111',
+			mapId: 'case-map',
+			mapRegionLabel: 'Map showing Railways within 500m for Example Project',
+			staticMapSrc: '/consultees/11111111-1111-1111-1111-111111111111/results/static-map?ruleset=railways-500m',
+			staticMapAlt: 'Static map showing Railways within 500m for Example Project',
+			mapWidth: 960,
+			mapHeight: 516,
+			mapConfigJson: '{"center":[-1.78,50.62],"zoom":11}',
+			matches: [{ consultee: 'Network Rail', consulteeCategory: 'Railway', region: 'South West', distanceMetres: 123 }]
 		});
 		await assertNoSeriousA11yViolations(html);
 	});

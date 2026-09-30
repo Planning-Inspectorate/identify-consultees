@@ -235,23 +235,27 @@ export async function listConsulteeAreas(
  * true great-circle metres for `geography` columns, so a single threshold behaves consistently
  * regardless of latitude - don't compare raw WGS84 degrees as if they were a distance unit.
  *
- * `consulteeCategory`, when given, restricts to that category only (e.g. 'railway') - the
- * per-category distance/inclusion rules a real ruleset would define aren't modelled yet, this is
- * just enough to run one rule for real.
+ * `consulteeCategories`, when given, restricts to those categories only (e.g. `['Railway']`) -
+ * this is the query a ruleset runs (see geospatial/rulesets.ts): each ruleset is just a
+ * categories + radius pair, so one generic, index-backed query covers all of them.
  */
 export async function findConsulteeAreasNear(
 	dbClient: PrismaClient,
 	geometry: Geometry,
 	radiusMetres: number,
-	consulteeCategory?: string
+	consulteeCategories?: string[]
 ): Promise<ConsulteeAreaMatch[]> {
 	const wkt = geometryToWkt(geometry);
+	const categoryFilter =
+		consulteeCategories && consulteeCategories.length > 0
+			? Prisma.sql`AND consulteeCategory IN (${Prisma.join(consulteeCategories)})`
+			: Prisma.empty;
 	const rows = await dbClient.$queryRaw<(ConsulteeAreaRow & { distanceMetres: number })[]>`
 		SELECT ${selectColumns},
 			geometry.STDistance(geography::STGeomFromText(${wkt}, 4326)) AS distanceMetres
 		FROM consultee_area
 		WHERE geometry.STDistance(geography::STGeomFromText(${wkt}, 4326)) <= ${radiusMetres}
-			AND (${consulteeCategory ?? null} IS NULL OR consulteeCategory = ${consulteeCategory ?? null})
+			${categoryFilter}
 		ORDER BY distanceMetres
 	`;
 	return rows.map((row) => ({ feature: rowToFeature(row), distanceMetres: row.distanceMetres }));

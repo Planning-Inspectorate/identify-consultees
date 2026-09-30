@@ -1,6 +1,6 @@
 {% extends "views/layouts/main.njk" %}
 
-{% from "govuk/components/button/macro.njk" import govukButton %}
+{% from "govuk/components/back-link/macro.njk" import govukBackLink %}
 {% from "govuk/components/table/macro.njk" import govukTable %}
 
 {% block pageTitle %}
@@ -14,97 +14,53 @@
 	<link rel="stylesheet" href="/vendor/map-key-plugin/css/index.css">
 {% endblock %}
 
+{% block beforeContent %}
+	{{ govukBackLink({
+		text: "Back to ruleset selection",
+		href: backLinkUrl
+	}) }}
+{% endblock %}
+
 {% block pageContent %}
 	<p class="govuk-body">
-		Rule set used: {{ rulesetLabel }}
+		Ruleset used: {{ rulesetName }}
 	</p>
 
-	<p class="govuk-body">
-		<a class="govuk-link" href="{{ downloadSummaryHref }}">Download consultee list summary report</a>
-	</p>
-	<p class="govuk-body">
-		<a class="govuk-link" href="{{ downloadMapsHref }}">Download all maps as image files</a>
-	</p>
+	{% set mapRegionLabel = mapRegionLabel %}
+	{% set staticMapSrc = staticMapSrc %}
+	{% set staticMapAlt = staticMapAlt %}
+	{% set mapWidth = mapWidth %}
+	{% set mapHeight = mapHeight %}
+	{% set mapConfigJson = mapConfigJson %}
+	{% include "views/partials/consultee-map-region.njk" %}
 
-	<nav class="govuk-!-margin-top-6 govuk-!-margin-bottom-6" aria-label="Consultee map sections">
-		<h2 class="govuk-heading-m">Consultee maps on this page</h2>
-		<ul class="govuk-list govuk-list--bullet">
-			{% for section in sections %}
-				<li>
-					<a class="govuk-link" href="#{{ section.id }}">{{ section.heading }}</a>
-				</li>
-			{% endfor %}
-		</ul>
-	</nav>
+	<h2 class="govuk-heading-m govuk-!-margin-top-6">Consultees identified</h2>
 
-	{% for section in sections %}
-		<section id="{{ section.id }}" class="govuk-!-margin-bottom-9">
-			<h2 class="govuk-heading-l">{{ section.heading }}</h2>
-			<h3 class="govuk-heading-m">{{ section.mapTitle }}</h3>
-
-			{% set mapId = "map-" + section.id %}
-			{% set mapRegionLabel = section.mapRegionLabel %}
-			{% set staticMapSrc = section.staticMapSrc %}
-			{% set staticMapAlt = section.staticMapAlt %}
-			{% set mapWidth = section.mapWidth %}
-			{% set mapHeight = section.mapHeight %}
-			{% set mapConfigJson = section.mapConfigJson %}
-			{% include "views/partials/consultee-map-region.njk" %}
-
-			<h3 class="govuk-heading-s govuk-!-margin-top-6">{{ section.heading }}</h3>
-			{% set tableRows = [] %}
-			{% for consultee in section.consultees %}
-				{% set tableRows = (tableRows.push([{ text: consultee }]), tableRows) %}
-			{% endfor %}
-			{{ govukTable({
-				caption: section.heading + " consultees",
-				captionClasses: "govuk-visually-hidden",
-				firstCellIsHeader: false,
-				head: [{ text: "Organisation" }],
-				rows: tableRows
-			}) }}
-		</section>
-	{% endfor %}
-
-	{% if realScreening %}
-		<section id="real-screening" class="govuk-!-margin-bottom-9">
-			<h2 class="govuk-heading-l">{{ realScreening.heading }}</h2>
-			<p class="govuk-body">
-				A real query against the <code>consultee_area</code> table for this project's actual
-				geometry - not the prototype data above.
-			</p>
-
-			{% if realScreening.rows.length == 0 %}
-				<p class="govuk-body">No railways found within range.</p>
-			{% else %}
-				{% set realTableRows = [] %}
-				{% for row in realScreening.rows %}
-					{% set realTableRows = (realTableRows.push([
-						{ text: row.consultee | default("") },
-						{ text: row.region | default("") },
-						{ text: row.distanceMetres ~ "m" }
-					]), realTableRows) %}
-				{% endfor %}
-				{{ govukTable({
-					caption: realScreening.heading,
-					captionClasses: "govuk-visually-hidden",
-					firstCellIsHeader: false,
-					head: [
-						{ text: "Consultee" },
-						{ text: "Region" },
-						{ text: "Distance" }
-					],
-					rows: realTableRows
-				}) }}
-			{% endif %}
-		</section>
+	{% if matches.length == 0 %}
+		<p class="govuk-body">No consultees matched this ruleset.</p>
+	{% else %}
+		{% set tableRows = [] %}
+		{% for match in matches %}
+			{% set tableRows = (tableRows.push([
+				{ text: match.consultee | default("") },
+				{ text: match.consulteeCategory | default("") },
+				{ text: match.region | default("") },
+				{ text: match.distanceMetres ~ "m" }
+			]), tableRows) %}
+		{% endfor %}
+		{{ govukTable({
+			caption: "Consultees identified",
+			captionClasses: "govuk-visually-hidden",
+			firstCellIsHeader: false,
+			head: [
+				{ text: "Consultee" },
+				{ text: "Category" },
+				{ text: "Region" },
+				{ text: "Distance" }
+			],
+			rows: tableRows
+		}) }}
 	{% endif %}
-
-	{{ govukButton({
-		text: "Back to project geometry search",
-		href: backLinkUrl,
-		classes: "govuk-button--secondary"
-	}) }}
 {% endblock %}
 
 {% block bodyEnd %}

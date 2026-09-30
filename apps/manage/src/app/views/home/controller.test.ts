@@ -30,9 +30,7 @@ describe('home page', () => {
 			render: mock.fn((view, data) => nunjucks.render(view, data))
 		};
 		const homePage = buildHomePage({ logger: mockLogger(), db: createMockDb() });
-		await assert.doesNotReject(() =>
-			homePage({ query: { q: 'EN01', ruleset: 'post-apr-2025-england-wales' } }, mockRes)
-		);
+		await assert.doesNotReject(() => homePage({ query: { q: 'EN01' } }, mockRes));
 		assert.strictEqual(mockRes.render.mock.callCount(), 1);
 		assert.strictEqual(mockRes.render.mock.calls[0].arguments[0], 'views/home/view.njk');
 		assert.strictEqual(
@@ -50,6 +48,7 @@ describe('home page', () => {
 
 		const viewModel = mockRes.render.mock.calls[0].arguments[1];
 		assert.strictEqual(viewModel.geometries.length, 1);
+		assert.strictEqual(viewModel.geometries[0].id, 'aaaa');
 		assert.strictEqual(viewModel.geometries[0].reference, 'TR010034');
 		assert.strictEqual(viewModel.geometries[0].caseName, 'A66 Northern Trans-Pennine Project');
 		assert.strictEqual(viewModel.resultsTotal, 1);
@@ -91,7 +90,6 @@ describe('home page', () => {
 		assert.strictEqual(viewModel.resultsFrom, 0);
 		assert.strictEqual(viewModel.resultsTo, 0);
 		assert.strictEqual(viewModel.resultsTotal, 0);
-		assert.strictEqual(viewModel.selectedGeometryId, null);
 	});
 
 	it('should render an empty result set (not throw) when the query fails', async () => {
@@ -139,32 +137,5 @@ describe('home page', () => {
 		const viewModel = mockRes.render.mock.calls[0].arguments[1];
 		assert.strictEqual(viewModel.searchQuery, '');
 		assert.strictEqual(viewModel.pageSize, 25);
-	});
-
-	it('should honour an explicit ruleset query value', async () => {
-		const mockRes = { render: mock.fn() };
-		const homePage = buildHomePage({ logger: mockLogger(), db: createMockDb([]) });
-		await homePage({ query: { ruleset: 'scotland' } }, mockRes);
-		assert.strictEqual(mockRes.render.mock.calls[0].arguments[1].selectedRuleset, 'scotland');
-	});
-
-	it('should fall back to an empty ruleset when none are configured', async () => {
-		const geometryModule = await import('../../data/dummy-geometries.ts');
-		const originalRulesets = geometryModule.RULESETS.splice(0, geometryModule.RULESETS.length);
-		try {
-			const mockRes = { render: mock.fn() };
-			const homePage = buildHomePage({ logger: mockLogger(), db: createMockDb([]) });
-			await homePage({ query: {} }, mockRes);
-			assert.strictEqual(mockRes.render.mock.calls[0].arguments[1].selectedRuleset, '');
-		} finally {
-			geometryModule.RULESETS.push(...originalRulesets);
-		}
-	});
-
-	it('should use the geometryId query param when provided, over the first result', async () => {
-		const mockRes = { render: mock.fn() };
-		const homePage = buildHomePage({ logger: mockLogger(), db: createMockDb([newRow({ id: 'aaaa' })]) });
-		await homePage({ query: { geometryId: 'explicit-id' } }, mockRes);
-		assert.strictEqual(mockRes.render.mock.calls[0].arguments[1].selectedGeometryId, 'explicit-id');
 	});
 });

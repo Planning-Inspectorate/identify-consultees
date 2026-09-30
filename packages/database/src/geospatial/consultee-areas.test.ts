@@ -95,11 +95,11 @@ describe('consultee areas (requires a local SQL Server - see docker-compose.yml)
 			const farMatches = await findConsulteeAreasNear(dbClient, farPoint, 1000);
 			assert.ok(!farMatches.some((match) => match.feature.id === testAreaId));
 
-			// consulteeCategory filters to that category only
-			const rightCategory = await findConsulteeAreasNear(dbClient, insidePoint, 5000, 'Environment Agency');
+			// consulteeCategories filters to those categories only
+			const rightCategory = await findConsulteeAreasNear(dbClient, insidePoint, 5000, ['Environment Agency']);
 			assert.ok(rightCategory.some((match) => match.feature.id === testAreaId));
 
-			const wrongCategory = await findConsulteeAreasNear(dbClient, insidePoint, 5000, 'railway');
+			const wrongCategory = await findConsulteeAreasNear(dbClient, insidePoint, 5000, ['railway']);
 			assert.ok(!wrongCategory.some((match) => match.feature.id === testAreaId));
 		} finally {
 			await cleanup();
