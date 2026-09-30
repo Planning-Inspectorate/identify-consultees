@@ -36,7 +36,7 @@ describe('ruleset picker page', () => {
 		assert.match(viewModel.pageHeading, /Real Test Project/);
 		assert.strictEqual(viewModel.caseId, realProjectId);
 		assert.ok(viewModel.rulesets.length >= 2);
-		assert.ok(viewModel.rulesets.some((ruleset) => ruleset.value === 'railways-500m'));
+		assert.ok(viewModel.rulesets.some((ruleset) => ruleset.value === 'railway'));
 	});
 
 	it('should 404 when caseId is missing', async () => {
