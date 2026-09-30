@@ -38,7 +38,11 @@ function buildTestConfig(nodeEnv: Config['NODE_ENV']): Config {
 			maxAge: '1d'
 		},
 		database: {
+			// CI runs a SQL Server container on a dynamically assigned port (see
+			// .azure/pipelines/pr.yml's "Start SQL Server for tests" step) - fall back to the
+			// docker-compose port for local `node --test`
 			connectionString:
+				process.env.SQL_CONNECTION_STRING ??
 				'sqlserver://localhost:1434;database=identify-consultees;user=sa;password=DockerDatabaseP@22word!;trustServerCertificate=true'
 		},
 		gitSha: undefined,
