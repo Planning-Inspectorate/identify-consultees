@@ -1,7 +1,10 @@
 import type { PrismaClient } from '../client/client.ts';
 import { Prisma } from '../client/client.ts';
+import { withDeadlockRetry } from './db-retry.ts';
 import type { Geometry } from './wkt.ts';
 import { geometryToWkt, wktToGeometry } from './wkt.ts';
+
+export { isDeadlockError, withDeadlockRetry } from './db-retry.ts';
 
 export interface ConsulteeAreaProperties {
 	consulteeCategory?: string | null;
@@ -195,9 +198,11 @@ const selectColumns = Prisma.raw(`
  * well-formed but doesn't match any row - a genuine "not found", not an error.
  */
 export async function getConsulteeAreaById(dbClient: PrismaClient, id: string): Promise<ConsulteeAreaFeature | null> {
-	const rows = await dbClient.$queryRaw<ConsulteeAreaRow[]>`
-		SELECT ${selectColumns} FROM consultee_area WHERE id = CAST(${id} AS UNIQUEIDENTIFIER)
-	`;
+	const rows = await withDeadlockRetry(
+		() => dbClient.$queryRaw<ConsulteeAreaRow[]>`
+			SELECT ${selectColumns} FROM consultee_area WHERE id = CAST(${id} AS UNIQUEIDENTIFIER)
+		`
+	);
 	return rows[0] ? rowToFeature(rows[0]) : null;
 }
 
@@ -217,15 +222,16 @@ export async function listConsulteeAreas(
 ): Promise<ConsulteeAreaFeatureCollection> {
 	const { limit, offset = 0 } = options;
 
-	const rows =
+	const rows = await withDeadlockRetry(() =>
 		limit === undefined
-			? await dbClient.$queryRaw<ConsulteeAreaRow[]>`SELECT ${selectColumns} FROM consultee_area`
-			: await dbClient.$queryRaw<ConsulteeAreaRow[]>`
+			? dbClient.$queryRaw<ConsulteeAreaRow[]>`SELECT ${selectColumns} FROM consultee_area`
+			: dbClient.$queryRaw<ConsulteeAreaRow[]>`
 					SELECT ${selectColumns} FROM consultee_area
 					-- SQL Server requires ORDER BY for OFFSET/FETCH; the primary key gives a stable
 					-- order without needing a table-specific column
 					ORDER BY id OFFSET ${offset} ROWS FETCH NEXT ${limit} ROWS ONLY
-				`;
+				`
+	);
 
 	return { type: 'FeatureCollection', features: rows.map(rowToFeature) };
 }
@@ -250,14 +256,17 @@ export async function findConsulteeAreasNear(
 		consulteeCategories && consulteeCategories.length > 0
 			? Prisma.sql`AND consulteeCategory IN (${Prisma.join(consulteeCategories)})`
 			: Prisma.empty;
-	const rows = await dbClient.$queryRaw<(ConsulteeAreaRow & { distanceMetres: number })[]>`
-		SELECT ${selectColumns},
-			geometry.STDistance(geography::STGeomFromText(${wkt}, 4326)) AS distanceMetres
-		FROM consultee_area
-		WHERE geometry.STDistance(geography::STGeomFromText(${wkt}, 4326)) <= ${radiusMetres}
-			${categoryFilter}
-		ORDER BY distanceMetres
-	`;
+	const rows = await withDeadlockRetry(
+		() =>
+			dbClient.$queryRaw<(ConsulteeAreaRow & { distanceMetres: number })[]>`
+			SELECT ${selectColumns},
+				geometry.STDistance(geography::STGeomFromText(${wkt}, 4326)) AS distanceMetres
+			FROM consultee_area
+			WHERE geometry.STDistance(geography::STGeomFromText(${wkt}, 4326)) <= ${radiusMetres}
+				${categoryFilter}
+			ORDER BY distanceMetres
+		`
+	);
 	return rows.map((row) => ({ feature: rowToFeature(row), distanceMetres: row.distanceMetres }));
 }
 
@@ -288,28 +297,31 @@ export async function findConsulteeAreasBordering(
 		return [];
 	}
 	const wkt = geometryToWkt(geometry);
-	const hosts = await dbClient.$queryRaw<{ id: string; hostWkt: string }[]>`
-		SELECT id, geometry.STAsText() AS hostWkt
-		FROM consultee_area
-		WHERE consulteeCategory = ${hostCategory}
-			AND geometry.STIntersects(geography::STGeomFromText(${wkt}, 4326)) = 1
-	`;
 
-	const matchesById = new Map<string, ConsulteeAreaRow>();
-	for (const host of hosts) {
-		const rows = await dbClient.$queryRaw<ConsulteeAreaRow[]>`
-			SELECT ${selectColumns}
+	return withDeadlockRetry(async () => {
+		const hosts = await dbClient.$queryRaw<{ id: string; hostWkt: string }[]>`
+			SELECT id, geometry.STAsText() AS hostWkt
 			FROM consultee_area
-			WHERE consulteeCategory IN (${Prisma.join(matchingCategories)})
-				AND id <> CAST(${host.id} AS UNIQUEIDENTIFIER)
-				AND geometry.STIntersects(geography::STGeomFromText(${host.hostWkt}, 4326)) = 1
+			WHERE consulteeCategory = ${hostCategory}
+				AND geometry.STIntersects(geography::STGeomFromText(${wkt}, 4326)) = 1
 		`;
-		for (const row of rows) {
-			matchesById.set(row.id, row);
-		}
-	}
 
-	return [...matchesById.values()].map((row) => ({ feature: rowToFeature(row), distanceMetres: 0 }));
+		const matchesById = new Map<string, ConsulteeAreaRow>();
+		for (const host of hosts) {
+			const rows = await dbClient.$queryRaw<ConsulteeAreaRow[]>`
+				SELECT ${selectColumns}
+				FROM consultee_area
+				WHERE consulteeCategory IN (${Prisma.join(matchingCategories)})
+					AND id <> CAST(${host.id} AS UNIQUEIDENTIFIER)
+					AND geometry.STIntersects(geography::STGeomFromText(${host.hostWkt}, 4326)) = 1
+			`;
+			for (const row of rows) {
+				matchesById.set(row.id, row);
+			}
+		}
+
+		return [...matchesById.values()].map((row) => ({ feature: rowToFeature(row), distanceMetres: 0 }));
+	});
 }
 
 /**
@@ -320,10 +332,12 @@ export async function findConsulteeAreasIntersecting(
 	geometry: Geometry
 ): Promise<ConsulteeAreaFeatureCollection> {
 	const wkt = geometryToWkt(geometry);
-	const rows = await dbClient.$queryRaw<ConsulteeAreaRow[]>`
-		SELECT ${selectColumns}
-		FROM consultee_area
-		WHERE geometry.STIntersects(geography::STGeomFromText(${wkt}, 4326)) = 1
-	`;
+	const rows = await withDeadlockRetry(
+		() => dbClient.$queryRaw<ConsulteeAreaRow[]>`
+			SELECT ${selectColumns}
+			FROM consultee_area
+			WHERE geometry.STIntersects(geography::STGeomFromText(${wkt}, 4326)) = 1
+		`
+	);
 	return { type: 'FeatureCollection', features: rows.map(rowToFeature) };
 }
