@@ -1,2 +1,5 @@
-azure-functions
-pymssql
+# Pinned for reproducible builds and supply-chain safety - the deployment package
+# installs whatever this file resolves to (see .azure/pipelines/build.yml), so
+# unpinned deps would pull whatever happened to be latest at deploy time.
+azure-functions==2.3.0
+pymssql==2.4.2
