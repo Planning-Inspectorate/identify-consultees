@@ -7,10 +7,14 @@ import { findConsulteeAreasBordering, findConsulteeAreasNear } from './consultee
 import type { Geometry } from './wkt.ts';
 
 /**
- * A ruleset that can be run against a project's geometry to find the consultees it needs to
- * notify. Loaded from the real ruleset export (see RULESET_CSV_PATH below) - each row is one of
- * two shapes:
+ * One condition within a ruleset (one row of the ruleset export - see RULESET_CSV_PATH below).
+ * A ruleset is made up of many of these; running the ruleset means running every one of its
+ * conditions and combining the results (see runRuleset) - a single condition on its own (e.g.
+ * "district council hosting the site") routinely matches nothing for a *specific* project (e.g.
+ * one that sits in a unitary-authority area, which has no district council at all) without that
+ * being a bug - it's only the combined result across every condition that means anything.
  *
+ * Each condition is one of two shapes:
  * - `intersection`: match consultee areas of `categories` within `bufferMetres` of the site
  *   (0 = must actually intersect, not just be nearby).
  * - `bordering`: find the `hostCategory` area that intersects the site (e.g. the parish the site
@@ -18,13 +22,13 @@ import type { Geometry } from './wkt.ts';
  *   (e.g. neighbouring parishes) - a different query shape to `intersection`, not just a distance
  *   check, so it isn't expressible as a radius.
  */
-export type RulesetLogicType = 'intersection' | 'bordering';
+export type RuleLogicType = 'intersection' | 'bordering';
 
-export interface RulesetDefinition {
+export interface RuleCondition {
 	id: string;
 	name: string;
-	logicType: RulesetLogicType;
-	/** consultee_area.consulteeCategory values this ruleset matches (OR'd together). */
+	logicType: RuleLogicType;
+	/** consultee_area.consulteeCategory values this condition matches (OR'd together). */
 	categories: string[];
 	/** intersection only: buffer radius in metres (0 = must actually intersect). */
 	bufferMetres?: number;
@@ -32,12 +36,24 @@ export interface RulesetDefinition {
 	hostCategory?: string;
 }
 
+/**
+ * A named ruleset: the full set of conditions to run against a project to find every consultee it
+ * needs to notify. Only one exists so far (loaded whole from the example export below) - the real
+ * set (around 8, each presumably its own export in the same shape) will replace/extend this list
+ * later; nothing about running a ruleset needs to change when they arrive.
+ */
+export interface Ruleset {
+	id: string;
+	name: string;
+	rules: RuleCondition[];
+}
+
 // The ruleset export uses short internal identifiers (e.g. "parish", "rail_epsg27700") where the
 // loaded reference data uses human-readable category names (e.g. "Parish Council", "Railway") -
 // this bridges the two. A handful of export identifiers (canals, MoD safeguarding/low-flying
 // areas, coal mining reporting areas, Cheshire brine area, Joint Transport Authorities Wales)
 // have no current mapping because that reference data hasn't been loaded yet - left as-is below,
-// which just means that ruleset matches nothing until it is, rather than guessing wrong.
+// which just means that condition matches nothing until it is, rather than guessing wrong.
 // a Map, not an object literal - these keys are snake_case source identifiers, not JS property
 // names, and an object literal's keys get flagged (rightly) by the camelcase lint rule
 const CATEGORY_ALIASES = new Map<string, string[]>([
@@ -102,10 +118,11 @@ const RULESET_CSV_COLUMNS = [
 ] as const;
 
 /**
- * Parse the tab-separated ruleset export into RulesetDefinitions. Not a general CSV parser -
- * fields here are never quoted/escaped, so a plain split on tabs and newlines is enough.
+ * Parse the tab-separated ruleset export into RuleConditions (one ruleset's worth of rows - see
+ * buildRulesetFromCsv). Not a general CSV parser - fields here are never quoted/escaped, so a
+ * plain split on tabs and newlines is enough.
  */
-export function parseRulesetCsv(contents: string): RulesetDefinition[] {
+export function parseRulesetCsv(contents: string): RuleCondition[] {
 	const lines = contents.split('\n').filter((line) => line.trim() !== '');
 	const [header, ...dataLines] = lines;
 	const columns = header.split('\t').map((column) => column.trim());
@@ -122,7 +139,7 @@ export function parseRulesetCsv(contents: string): RulesetDefinition[] {
 			string
 		>;
 
-		const logicType: RulesetLogicType = row.logicType === 'bordering' ? 'bordering' : 'intersection';
+		const logicType: RuleLogicType = row.logicType === 'bordering' ? 'bordering' : 'intersection';
 		const categories = matchingCategoriesFor(row);
 
 		if (logicType === 'bordering') {
@@ -145,31 +162,95 @@ export function parseRulesetCsv(contents: string): RulesetDefinition[] {
 	});
 }
 
+/** Build one named Ruleset from a whole CSV export - every row becomes one of its conditions. */
+export function buildRulesetFromCsv(id: string, name: string, contents: string): Ruleset {
+	return { id, name, rules: parseRulesetCsv(contents) };
+}
+
 // co-located with this module (not under apps/function-python/setup_database/sample_data, where
 // it originally lived) so it's guaranteed to exist wherever packages/database is deployed - a
 // cross-app relative path here previously crashed the manage app's Docker image at startup, since
 // that image only ever copies packages/ and apps/manage/, never apps/function-python
 const RULESET_CSV_PATH = path.join(path.dirname(fileURLToPath(import.meta.url)), 'example_ruleset.csv');
 
-export const RULESETS: RulesetDefinition[] = parseRulesetCsv(readFileSync(RULESET_CSV_PATH, 'utf8'));
+// Only one ruleset exists yet, built from the one real export provided so far. The real set
+// (around 8) will replace this list later - each presumably its own named CSV export loaded the
+// same way, not a change to how a ruleset is run.
+export const RULESETS: Ruleset[] = [
+	buildRulesetFromCsv('example-ruleset', 'Example ruleset', readFileSync(RULESET_CSV_PATH, 'utf8'))
+];
 
-export function getRuleset(id: string): RulesetDefinition | undefined {
+export function getRuleset(id: string): Ruleset | undefined {
 	return RULESETS.find((ruleset) => ruleset.id === id);
 }
 
+// re-exported for callers/tests that reason about ruleset condition execution - the retry itself
+// now lives in consultee-areas.ts, since any read against consultee_area can be a deadlock victim
+// under concurrent load, not just one made from within a ruleset run (see there for why)
+export { isDeadlockError, withDeadlockRetry } from './consultee-areas.ts';
+
+async function runCondition(
+	dbClient: PrismaClient,
+	geometry: Geometry,
+	rule: RuleCondition
+): Promise<ConsulteeAreaMatch[]> {
+	if (rule.logicType === 'bordering') {
+		if (!rule.hostCategory) {
+			return [];
+		}
+		return findConsulteeAreasBordering(dbClient, geometry, rule.hostCategory, rule.categories);
+	}
+	return findConsulteeAreasNear(dbClient, geometry, rule.bufferMetres ?? 0, rule.categories);
+}
+
+// Conditions run concurrently in batches of this size, not all ~34 at once. Running every
+// condition fully in parallel maximises throughput for a single ruleset run in isolation, but
+// multiplies how many simultaneous connections/locks it holds against the same table - confirmed
+// to matter for real, not just in theory: running everything fully parallel produced real
+// deadlocks and lock-wait timeouts once other work was hitting the same table concurrently. A
+// bounded batch size keeps most of the speed-up over a fully sequential run while giving the
+// database far less simultaneous load to contend with.
+const CONDITION_CONCURRENCY = 6;
+
 /**
- * Run a ruleset against a project's geometry, nearest match first.
+ * Run every condition in a ruleset against a project's geometry and combine the results - a
+ * ruleset finding "all relevant consultees" means the union of what each of its conditions finds
+ * (e.g. the site's hosting council *and* nearby railways *and* nearby hospitals...), not any one
+ * condition in isolation. Conditions run in bounded-concurrency batches (see
+ * CONDITION_CONCURRENCY) - each condition's own query already retries on deadlock (see
+ * findConsulteeAreasNear/findConsulteeAreasBordering in consultee-areas.ts) - and duplicates (the
+ * same consultee area matching more than one condition) are removed, nearest first.
  */
 export async function runRuleset(
 	dbClient: PrismaClient,
 	geometry: Geometry,
-	ruleset: RulesetDefinition
+	ruleset: Ruleset
 ): Promise<ConsulteeAreaMatch[]> {
-	if (ruleset.logicType === 'bordering') {
-		if (!ruleset.hostCategory) {
-			return [];
-		}
-		return findConsulteeAreasBordering(dbClient, geometry, ruleset.hostCategory, ruleset.categories);
+	const resultsByRule: ConsulteeAreaMatch[][] = [];
+	for (let i = 0; i < ruleset.rules.length; i += CONDITION_CONCURRENCY) {
+		const batch = ruleset.rules.slice(i, i + CONDITION_CONCURRENCY);
+		const batchResults = await Promise.all(batch.map((rule) => runCondition(dbClient, geometry, rule)));
+		resultsByRule.push(...batchResults);
 	}
-	return findConsulteeAreasNear(dbClient, geometry, ruleset.bufferMetres ?? 0, ruleset.categories);
+
+	const matchesById = new Map<string, ConsulteeAreaMatch>();
+	for (const matches of resultsByRule) {
+		for (const match of matches) {
+			const existing = matchesById.get(match.feature.id);
+			if (!existing || match.distanceMetres < existing.distanceMetres) {
+				matchesById.set(match.feature.id, match);
+			}
+		}
+	}
+
+	// tie-break on id: SQL Server's `ORDER BY distanceMetres` (in findConsulteeAreasNear) has no
+	// secondary key, so rows tied at the same distance (very common here - most conditions require
+	// an outright intersection, i.e. distance 0) aren't returned in a guaranteed-stable order
+	// between separate executions of the same query. Without this, the map/static-map's result
+	// order - and so its cache fingerprint - could differ between two requests for the exact same
+	// underlying matches, breaking ETag caching (confirmed: this caused a real, intermittent test
+	// failure).
+	return [...matchesById.values()].sort(
+		(a, b) => a.distanceMetres - b.distanceMetres || a.feature.id.localeCompare(b.feature.id)
+	);
 }

@@ -80,14 +80,16 @@ describe('manage router wiring', () => {
 		assert.equal(response.status, 200);
 		assert.match(response.text, /Choose a ruleset/);
 		assert.match(response.text, /Router Test Fixture Wind Farm/);
-		assert.match(response.text, /Railways/);
+		assert.match(response.text, /Example ruleset/);
 	});
 
 	test('GET /consultees/:id/results runs the ruleset and renders the results page', async () => {
-		const response = await request(authDisabledApp).get(`/consultees/${homePageTestCaseId}/results?ruleset=railway`);
+		const response = await request(authDisabledApp).get(
+			`/consultees/${homePageTestCaseId}/results?ruleset=example-ruleset`
+		);
 		assert.equal(response.status, 200);
 		assert.match(response.text, /Consultees identified for/);
-		assert.match(response.text, /Ruleset used: Railways/);
+		assert.match(response.text, /Ruleset used: Example ruleset/);
 	});
 
 	test('GET /consultees/:id/results 404s for an unknown ruleset', async () => {
@@ -157,7 +159,7 @@ describe('manage router wiring', () => {
 
 		try {
 			const response = await request(authDisabledApp).get(
-				`/consultees/${homePageTestCaseId}/results/static-map?ruleset=railway`
+				`/consultees/${homePageTestCaseId}/results/static-map?ruleset=example-ruleset`
 			);
 			assert.equal(response.status, 200);
 			assert.match(response.headers['content-type'] || '', /image\/(svg\+xml|png)/);
@@ -165,7 +167,7 @@ describe('manage router wiring', () => {
 			assert.ok(response.headers.etag);
 
 			const cached = await request(authDisabledApp)
-				.get(`/consultees/${homePageTestCaseId}/results/static-map?ruleset=railway`)
+				.get(`/consultees/${homePageTestCaseId}/results/static-map?ruleset=example-ruleset`)
 				.set('If-None-Match', response.headers.etag);
 			assert.equal(cached.status, 304);
 		} finally {
@@ -189,7 +191,7 @@ describe('manage router wiring', () => {
 
 		try {
 			const response = await request(authDisabledApp).get(
-				`/consultees/${homePageTestCaseId}/results/static-map.svg?ruleset=railway`
+				`/consultees/${homePageTestCaseId}/results/static-map.svg?ruleset=example-ruleset`
 			);
 			assert.equal(response.status, 200);
 			assert.match(response.headers['content-type'] || '', /image\/svg\+xml/);

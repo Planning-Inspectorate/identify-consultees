@@ -4,9 +4,19 @@ import type { PrismaClient } from '../client/client.ts';
 import { loadConfig } from '../configuration/config.ts';
 import { newDatabaseClient } from '../index.ts';
 import { loadConsulteeAreas } from './consultee-areas.ts';
-import { getRuleset, parseRulesetCsv, RULESETS, runRuleset } from './rulesets.ts';
+import type { Ruleset } from './rulesets.ts';
+import {
+	buildRulesetFromCsv,
+	getRuleset,
+	isDeadlockError,
+	parseRulesetCsv,
+	RULESETS,
+	runRuleset,
+	withDeadlockRetry
+} from './rulesets.ts';
 
 const testAreaId = '22222222-2222-2222-2222-222222222222';
+const secondAreaId = '55555555-5555-5555-5555-555555555555';
 const hostAreaId = '33333333-3333-3333-3333-333333333333';
 const neighbourAreaId = '44444444-4444-4444-4444-444444444444';
 
@@ -29,7 +39,7 @@ after(async () => {
 });
 
 async function cleanup() {
-	await dbClient.$executeRaw`DELETE FROM consultee_area WHERE id IN (${testAreaId}, ${hostAreaId}, ${neighbourAreaId})`;
+	await dbClient.$executeRaw`DELETE FROM consultee_area WHERE id IN (${testAreaId}, ${secondAreaId}, ${hostAreaId}, ${neighbourAreaId})`;
 }
 
 describe('parseRulesetCsv', () => {
@@ -37,8 +47,8 @@ describe('parseRulesetCsv', () => {
 		'consulteeName\treferenceData\tconsulteeDescription\tmatchingConsulteeType\thostType\tlogicDescription\tlogicType\tintersectionBufferKm';
 
 	test('resolves the matching category from referenceData when set', () => {
-		const [ruleset] = parseRulesetCsv(`${header}\nrailway\trail_epsg27700\tRailways\t\t\tIntersects\tintersection\t10`);
-		assert.deepEqual(ruleset, {
+		const [rule] = parseRulesetCsv(`${header}\nrailway\trail_epsg27700\tRailways\t\t\tIntersects\tintersection\t10`);
+		assert.deepEqual(rule, {
 			id: 'railway',
 			name: 'Railways',
 			logicType: 'intersection',
@@ -58,20 +68,20 @@ describe('parseRulesetCsv', () => {
 	});
 
 	test('parses a bordering rule with a host category', () => {
-		const [ruleset] = parseRulesetCsv(
+		const [rule] = parseRulesetCsv(
 			`${header}\na_bordering_b\t\tBordering\tparish\tparish\tBordering host authority\tbordering\t0`
 		);
-		assert.equal(ruleset.logicType, 'bordering');
-		assert.deepEqual(ruleset.categories, ['Parish Council']);
-		assert.equal(ruleset.hostCategory, 'Parish Council');
-		assert.equal(ruleset.bufferMetres, undefined);
+		assert.equal(rule.logicType, 'bordering');
+		assert.deepEqual(rule.categories, ['Parish Council']);
+		assert.equal(rule.hostCategory, 'Parish Council');
+		assert.equal(rule.bufferMetres, undefined);
 	});
 
 	test('passes through an unmapped identifier unchanged rather than dropping it', () => {
-		const [ruleset] = parseRulesetCsv(`${header}\ncanal\tcanals_epsg27700\tCanals\t\t\tIntersects\tintersection\t10`);
-		// no reference data has this category loaded yet - the ruleset still exists, it just
+		const [rule] = parseRulesetCsv(`${header}\ncanal\tcanals_epsg27700\tCanals\t\t\tIntersects\tintersection\t10`);
+		// no reference data has this category loaded yet - the condition still exists, it just
 		// won't match anything until it does
-		assert.deepEqual(ruleset.categories, ['canals_epsg27700']);
+		assert.deepEqual(rule.categories, ['canals_epsg27700']);
 	});
 
 	test('throws on a CSV missing an expected column', () => {
@@ -79,21 +89,106 @@ describe('parseRulesetCsv', () => {
 	});
 });
 
+describe('buildRulesetFromCsv', () => {
+	const header =
+		'consulteeName\treferenceData\tconsulteeDescription\tmatchingConsulteeType\thostType\tlogicDescription\tlogicType\tintersectionBufferKm';
+
+	test('wraps every row of a CSV export as one ruleset', () => {
+		const ruleset = buildRulesetFromCsv(
+			'test-ruleset',
+			'Test ruleset',
+			`${header}\nrailway\trail_epsg27700\tRailways\t\t\tIntersects\tintersection\t10\nhospital\t\tHospitals\t\t\tIntersects\tintersection\t10`
+		);
+		assert.equal(ruleset.id, 'test-ruleset');
+		assert.equal(ruleset.name, 'Test ruleset');
+		assert.equal(ruleset.rules.length, 2);
+		assert.deepEqual(
+			ruleset.rules.map((rule) => rule.id),
+			['railway', 'hospital']
+		);
+	});
+});
+
+describe('isDeadlockError', () => {
+	test('recognises a SQL Server deadlock message', () => {
+		assert.ok(isDeadlockError(new Error('Transaction was deadlocked on lock resources...')));
+		assert.ok(isDeadlockError(new Error('DEADLOCK detected')));
+	});
+
+	test('does not misclassify other errors', () => {
+		assert.ok(!isDeadlockError(new Error('Timeout: Request failed to complete in 15000ms')));
+		assert.ok(!isDeadlockError('not an Error instance'));
+		assert.ok(!isDeadlockError(undefined));
+	});
+});
+
+describe('withDeadlockRetry', () => {
+	test('returns the result on the first success without retrying', async () => {
+		const fn = async () => 'ok';
+		assert.equal(await withDeadlockRetry(fn), 'ok');
+	});
+
+	test('retries on a deadlock and returns the eventual success', async () => {
+		let attempts = 0;
+		const fn = async () => {
+			attempts += 1;
+			if (attempts < 3) {
+				throw new Error('deadlocked on lock resources');
+			}
+			return 'ok';
+		};
+		assert.equal(await withDeadlockRetry(fn), 'ok');
+		assert.equal(attempts, 3);
+	});
+
+	test('gives up after the retry limit and rethrows the deadlock error', async () => {
+		const fn = async () => {
+			throw new Error('deadlocked on lock resources');
+		};
+		await assert.rejects(() => withDeadlockRetry(fn, 2), /deadlocked/);
+	});
+
+	test('retries on a lock-wait timeout (not a detected deadlock, but the same underlying cause)', async () => {
+		let attempts = 0;
+		const fn = async () => {
+			attempts += 1;
+			if (attempts < 2) {
+				throw new Error('Timeout: Request failed to complete in 15000ms');
+			}
+			return 'ok';
+		};
+		assert.equal(await withDeadlockRetry(fn), 'ok');
+		assert.equal(attempts, 2);
+	});
+
+	test('rethrows a non-deadlock error immediately, without retrying', async () => {
+		let attempts = 0;
+		const fn = async () => {
+			attempts += 1;
+			throw new Error('some other error');
+		};
+		await assert.rejects(() => withDeadlockRetry(fn), /some other error/);
+		assert.equal(attempts, 1);
+	});
+});
+
 describe('rulesets registry', () => {
-	test('loads real rulesets from the sample data export', () => {
-		assert.ok(RULESETS.length > 0);
-		assert.ok(RULESETS.every((ruleset) => ruleset.id && ruleset.name));
+	test('loads exactly the one real ruleset from the sample data export, with its conditions', () => {
+		assert.equal(RULESETS.length, 1);
+		const [ruleset] = RULESETS;
+		assert.ok(ruleset.id && ruleset.name);
+		assert.ok(ruleset.rules.length > 1, 'expected the real export to contain more than one condition');
 	});
 
 	test('getRuleset finds a known ruleset by id and returns undefined for an unknown one', () => {
-		const ruleset = getRuleset('railway');
-		assert.equal(ruleset?.name, 'Railways');
+		const ruleset = getRuleset('example-ruleset');
+		assert.ok(ruleset);
 		assert.equal(getRuleset('not-a-real-ruleset'), undefined);
 	});
 });
 
 describe('runRuleset', () => {
-	test("only matches consultee areas in the ruleset's categories, within its buffer (intersection)", async (t) => {
+	test("only matches consultee areas in a condition's categories, within its buffer (intersection)", async (t) => {
 		if (!dbAvailable) return t.skip('SQL Server database not available');
 
 		await cleanup();
@@ -110,22 +205,141 @@ describe('runRuleset', () => {
 				]
 			});
 
-			const railway = getRuleset('railway');
-			assert.ok(railway);
+			const railwayRuleset: Ruleset = {
+				id: 'railway-only',
+				name: 'Railway only',
+				rules: [
+					{ id: 'railway', name: 'Railways', logicType: 'intersection', categories: ['Railway'], bufferMetres: 10_000 }
+				]
+			};
 
 			// well within the 10km buffer
-			const nearMatches = await runRuleset(dbClient, { type: 'Point', coordinates: [0.001, 0.001] }, railway);
+			const nearMatches = await runRuleset(dbClient, { type: 'Point', coordinates: [0.001, 0.001] }, railwayRuleset);
 			assert.ok(nearMatches.some((match) => match.feature.id === testAreaId));
 
-			// a different ruleset's categories shouldn't match a Railway area
-			const hospital = getRuleset('hospital');
-			assert.ok(hospital);
-			const wrongCategory = await runRuleset(dbClient, { type: 'Point', coordinates: [0.001, 0.001] }, hospital);
+			// a ruleset whose only condition targets a different category shouldn't match a Railway area
+			const hospitalRuleset: Ruleset = {
+				id: 'hospital-only',
+				name: 'Hospital only',
+				rules: [
+					{
+						id: 'hospital',
+						name: 'Hospitals',
+						logicType: 'intersection',
+						categories: ['Hospital'],
+						bufferMetres: 10_000
+					}
+				]
+			};
+			const wrongCategory = await runRuleset(dbClient, { type: 'Point', coordinates: [0.001, 0.001] }, hospitalRuleset);
 			assert.ok(!wrongCategory.some((match) => match.feature.id === testAreaId));
 
 			// well outside the 10km buffer
-			const farMatches = await runRuleset(dbClient, { type: 'Point', coordinates: [10, 10] }, railway);
+			const farMatches = await runRuleset(dbClient, { type: 'Point', coordinates: [10, 10] }, railwayRuleset);
 			assert.ok(!farMatches.some((match) => match.feature.id === testAreaId));
+		} finally {
+			await cleanup();
+		}
+	});
+
+	test('combines matches from every condition in the ruleset, deduplicated', async (t) => {
+		if (!dbAvailable) return t.skip('SQL Server database not available');
+
+		await cleanup();
+		try {
+			await loadConsulteeAreas(dbClient, {
+				type: 'FeatureCollection',
+				features: [
+					{
+						id: testAreaId,
+						type: 'Feature',
+						geometry: { type: 'Point', coordinates: [0, 0] },
+						properties: { consulteeCategory: 'Railway', consultee: 'Test Railway' }
+					},
+					{
+						id: secondAreaId,
+						type: 'Feature',
+						geometry: { type: 'Point', coordinates: [0, 0] },
+						properties: { consulteeCategory: 'Hospital', consultee: 'Test Hospital' }
+					}
+				]
+			});
+
+			// a ruleset with two conditions, each targeting a different category, plus a third
+			// condition targeting the *same* category as the first (to prove overlapping matches are
+			// deduplicated rather than returned twice)
+			const ruleset: Ruleset = {
+				id: 'multi-condition',
+				name: 'Multi-condition',
+				rules: [
+					{ id: 'railway', name: 'Railways', logicType: 'intersection', categories: ['Railway'], bufferMetres: 10_000 },
+					{
+						id: 'hospital',
+						name: 'Hospitals',
+						logicType: 'intersection',
+						categories: ['Hospital'],
+						bufferMetres: 10_000
+					},
+					{
+						id: 'railway-again',
+						name: 'Railways (again)',
+						logicType: 'intersection',
+						categories: ['Railway'],
+						bufferMetres: 20_000
+					}
+				]
+			};
+
+			const matches = await runRuleset(dbClient, { type: 'Point', coordinates: [0.001, 0.001] }, ruleset);
+			const ids = matches.map((match) => match.feature.id).sort();
+			assert.deepEqual(ids, [testAreaId, secondAreaId].sort());
+		} finally {
+			await cleanup();
+		}
+	});
+
+	test('orders matches tied at the same distance deterministically, by id', async (t) => {
+		if (!dbAvailable) return t.skip('SQL Server database not available');
+
+		await cleanup();
+		try {
+			// both areas intersect the same point (distance 0) - with no tiebreaker, their relative
+			// order isn't guaranteed to be stable across repeated runs of the same query
+			await loadConsulteeAreas(dbClient, {
+				type: 'FeatureCollection',
+				features: [
+					{
+						id: testAreaId,
+						type: 'Feature',
+						geometry: { type: 'Point', coordinates: [0, 0] },
+						properties: { consulteeCategory: 'Railway', consultee: 'Test Railway' }
+					},
+					{
+						id: secondAreaId,
+						type: 'Feature',
+						geometry: { type: 'Point', coordinates: [0, 0] },
+						properties: { consulteeCategory: 'Railway', consultee: 'Test Railway 2' }
+					}
+				]
+			});
+
+			const ruleset: Ruleset = {
+				id: 'tie-break',
+				name: 'Tie break',
+				rules: [
+					{ id: 'railway', name: 'Railways', logicType: 'intersection', categories: ['Railway'], bufferMetres: 0 }
+				]
+			};
+
+			const runs = await Promise.all(
+				Array.from({ length: 5 }, () => runRuleset(dbClient, { type: 'Point', coordinates: [0, 0] }, ruleset))
+			);
+			const orderings = runs.map((matches) => matches.map((match) => match.feature.id).join(','));
+			assert.ok(
+				orderings.every((ordering) => ordering === orderings[0]),
+				`expected every run to return matches in the same order, got: ${orderings.join(' | ')}`
+			);
+			assert.deepEqual(orderings[0].split(','), [testAreaId, secondAreaId].sort());
 		} finally {
 			await cleanup();
 		}
@@ -177,12 +391,22 @@ describe('runRuleset', () => {
 				]
 			});
 
-			const ruleset = getRuleset('a_bordering_b_host_parish_comm_council');
-			assert.ok(ruleset);
-			assert.equal(ruleset.logicType, 'bordering');
+			const borderingRuleset: Ruleset = {
+				id: 'bordering-only',
+				name: 'Bordering only',
+				rules: [
+					{
+						id: 'a_bordering_b_host_parish_comm_council',
+						name: 'Bordering parishes',
+						logicType: 'bordering',
+						categories: ['Parish Council'],
+						hostCategory: 'Parish Council'
+					}
+				]
+			};
 
 			// a point inside the host parish
-			const matches = await runRuleset(dbClient, { type: 'Point', coordinates: [0.5, 0.5] }, ruleset);
+			const matches = await runRuleset(dbClient, { type: 'Point', coordinates: [0.5, 0.5] }, borderingRuleset);
 			assert.ok(matches.some((match) => match.feature.id === neighbourAreaId));
 			assert.ok(!matches.some((match) => match.feature.id === hostAreaId));
 		} finally {
@@ -190,12 +414,13 @@ describe('runRuleset', () => {
 		}
 	});
 
-	test('returns no matches for a bordering ruleset with no resolvable host category', async (t) => {
+	test('returns no matches for a bordering condition with no resolvable host category', async (t) => {
 		if (!dbAvailable) return t.skip('SQL Server database not available');
-		const [ruleset] = parseRulesetCsv(
-			'consulteeName\treferenceData\tconsulteeDescription\tmatchingConsulteeType\thostType\tlogicDescription\tlogicType\tintersectionBufferKm\nno_host\t\tNo host\tparish\t\tBordering\tbordering\t0'
-		);
-		assert.equal(ruleset.hostCategory, undefined);
+		const ruleset: Ruleset = {
+			id: 'no-host',
+			name: 'No host',
+			rules: [{ id: 'no_host', name: 'No host', logicType: 'bordering', categories: ['Parish Council'] }]
+		};
 		const matches = await runRuleset(dbClient, { type: 'Point', coordinates: [0, 0] }, ruleset);
 		assert.deepEqual(matches, []);
 	});

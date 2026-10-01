@@ -35,8 +35,8 @@ describe('ruleset picker page', () => {
 		const viewModel = mockRes.render.mock.calls[0].arguments[1];
 		assert.match(viewModel.pageHeading, /Real Test Project/);
 		assert.strictEqual(viewModel.caseId, realProjectId);
-		assert.ok(viewModel.rulesets.length >= 2);
-		assert.ok(viewModel.rulesets.some((ruleset) => ruleset.value === 'railway'));
+		assert.ok(viewModel.rulesets.length >= 1);
+		assert.ok(viewModel.rulesets.some((ruleset) => ruleset.value === 'example-ruleset'));
 	});
 
 	it('should 404 when caseId is missing', async () => {

@@ -54,16 +54,19 @@ describe('consultees results page', () => {
 		};
 		const db = dbReturning([[realProjectRow()], [railwayMatchRow()]]);
 		const handler = buildConsulteesResultsPage({ db, logger: mockLogger() });
-		await handler({ params: { caseId: realProjectId }, query: { ruleset: 'railway' } }, mockRes);
+		await handler({ params: { caseId: realProjectId }, query: { ruleset: 'example-ruleset' } }, mockRes);
 
 		assert.strictEqual(mockRes.render.mock.callCount(), 1);
 		assert.strictEqual(mockRes.render.mock.calls[0].arguments[0], 'views/consultees/results/view.njk');
 		const viewModel = mockRes.render.mock.calls[0].arguments[1];
 		assert.match(viewModel.pageHeading, /Real Test Project/);
-		assert.strictEqual(viewModel.rulesetName, 'Railways');
+		assert.strictEqual(viewModel.rulesetName, 'Example ruleset');
+		// this mock returns the same single row for every one of the ruleset's ~34 conditions
+		// (unlike real data, where a row's category only ever matches a subset of them), so which
+		// exact distance survives deduplication isn't meaningful here - just that the row shows up
+		// exactly once, not once per condition that happened to "match" it
 		assert.strictEqual(viewModel.matches.length, 1);
 		assert.strictEqual(viewModel.matches[0].consultee, 'Network Rail');
-		assert.strictEqual(viewModel.matches[0].distanceMetres, 123);
 		assert.ok(viewModel.mapConfigJson.includes('FeatureCollection'));
 	});
 
@@ -74,7 +77,7 @@ describe('consultees results page', () => {
 			[railwayMatchRow({ consultee: null, region: null, consulteeCategory: null })]
 		]);
 		const handler = buildConsulteesResultsPage({ db, logger: mockLogger() });
-		await handler({ params: { caseId: realProjectId }, query: { ruleset: 'railway' } }, mockRes);
+		await handler({ params: { caseId: realProjectId }, query: { ruleset: 'example-ruleset' } }, mockRes);
 
 		const viewModel = mockRes.render.mock.calls[0].arguments[1];
 		assert.strictEqual(viewModel.matches[0].consultee, null);
@@ -85,7 +88,7 @@ describe('consultees results page', () => {
 	it('should 404 when caseId is missing', async () => {
 		const mockRes = { status: mock.fn(() => mockRes), render: mock.fn() };
 		const handler = buildConsulteesResultsPage({ db: { $queryRaw: mock.fn() }, logger: mockLogger() });
-		await handler({ params: {}, query: { ruleset: 'railway' } }, mockRes);
+		await handler({ params: {}, query: { ruleset: 'example-ruleset' } }, mockRes);
 		assert.strictEqual(mockRes.status.mock.calls[0].arguments[0], 404);
 	});
 
@@ -112,7 +115,7 @@ describe('consultees results page', () => {
 			})
 		};
 		const handler = buildConsulteesResultsPage({ db, logger: mockLogger() });
-		await handler({ params: { caseId: realProjectId }, query: { ruleset: 'railway' } }, mockRes);
+		await handler({ params: { caseId: realProjectId }, query: { ruleset: 'example-ruleset' } }, mockRes);
 
 		const viewModel = mockRes.render.mock.calls[0].arguments[1];
 		assert.match(viewModel.pageHeading, /Real Test Project/);
@@ -123,14 +126,14 @@ describe('consultees results page', () => {
 		const mockRes = { status: mock.fn(() => mockRes), render: mock.fn() };
 		const db = dbReturning([[]]);
 		const handler = buildConsulteesResultsPage({ db, logger: mockLogger() });
-		await handler({ params: { caseId: realProjectId }, query: { ruleset: 'railway' } }, mockRes);
+		await handler({ params: { caseId: realProjectId }, query: { ruleset: 'example-ruleset' } }, mockRes);
 		assert.strictEqual(mockRes.status.mock.calls[0].arguments[0], 404);
 	});
 
 	it('should 404 for an id that is not a well-formed UUID', async () => {
 		const mockRes = { status: mock.fn(() => mockRes), render: mock.fn() };
 		const handler = buildConsulteesResultsPage({ db: { $queryRaw: mock.fn() }, logger: mockLogger() });
-		await handler({ params: { caseId: 'not-a-uuid' }, query: { ruleset: 'railway' } }, mockRes);
+		await handler({ params: { caseId: 'not-a-uuid' }, query: { ruleset: 'example-ruleset' } }, mockRes);
 		assert.strictEqual(mockRes.status.mock.calls[0].arguments[0], 404);
 	});
 
@@ -150,12 +153,20 @@ describe('consultees results page', () => {
 		assert.strictEqual(mockRes.status.mock.calls[0].arguments[0], 404);
 	});
 
+	it('should 404 for a condition id, since only whole rulesets are selectable, not one condition', async () => {
+		const mockRes = { status: mock.fn(() => mockRes), render: mock.fn() };
+		const db = dbReturning([[realProjectRow()]]);
+		const handler = buildConsulteesResultsPage({ db, logger: mockLogger() });
+		await handler({ params: { caseId: realProjectId }, query: { ruleset: 'railway' } }, mockRes);
+		assert.strictEqual(mockRes.status.mock.calls[0].arguments[0], 404);
+	});
+
 	it('should accept array ruleset query values', async () => {
 		const mockRes = { status: mock.fn(() => mockRes), render: mock.fn() };
 		const db = dbReturning([[realProjectRow()], []]);
 		const handler = buildConsulteesResultsPage({ db, logger: mockLogger() });
-		await handler({ params: { caseId: realProjectId }, query: { ruleset: ['railway'] } }, mockRes);
-		assert.strictEqual(mockRes.render.mock.calls[0].arguments[1].rulesetName, 'Railways');
+		await handler({ params: { caseId: realProjectId }, query: { ruleset: ['example-ruleset'] } }, mockRes);
+		assert.strictEqual(mockRes.render.mock.calls[0].arguments[1].rulesetName, 'Example ruleset');
 	});
 });
 
@@ -182,7 +193,7 @@ describe('consultees results static map', () => {
 		try {
 			const db = dbReturning([[realProjectRow()], []]);
 			const handler = buildResultsStaticMap({ db, logger: mockLogger() }, true);
-			await handler({ params: { caseId: realProjectId }, query: { ruleset: 'railway' }, headers: {} }, mockRes);
+			await handler({ params: { caseId: realProjectId }, query: { ruleset: 'example-ruleset' }, headers: {} }, mockRes);
 			assert.strictEqual(mockRes.status.mock.calls[0].arguments[0], 200);
 			assert.match(String(mockRes.type.mock.calls[0].arguments[0]), /image\/svg\+xml/);
 			assert.match(String(mockRes.set.mock.calls[0].arguments[0]['Cache-Control']), /max-age=/);
@@ -200,7 +211,7 @@ describe('consultees results static map', () => {
 			send: mock.fn()
 		};
 		const handler = buildResultsStaticMap({ db: { $queryRaw: mock.fn() }, logger: mockLogger() });
-		await handler({ params: {}, query: { ruleset: 'railway' }, headers: {} }, mockRes);
+		await handler({ params: {}, query: { ruleset: 'example-ruleset' }, headers: {} }, mockRes);
 		assert.strictEqual(mockRes.status.mock.calls[0].arguments[0], 404);
 	});
 
@@ -213,7 +224,7 @@ describe('consultees results static map', () => {
 		};
 		const db = dbReturning([[realProjectRow()], []]);
 		const handler = buildResultsStaticMap({ db, logger: mockLogger() }, true);
-		await handler({ params: { caseId: realProjectId }, query: { ruleset: ['railway'] }, headers: {} }, mockRes);
+		await handler({ params: { caseId: realProjectId }, query: { ruleset: ['example-ruleset'] }, headers: {} }, mockRes);
 		assert.strictEqual(mockRes.status.mock.calls[0].arguments[0], 200);
 	});
 
@@ -224,7 +235,7 @@ describe('consultees results static map', () => {
 			send: mock.fn()
 		};
 		const handler = buildResultsStaticMap({ db: dbReturning([[]]), logger: mockLogger() });
-		await handler({ params: { caseId: realProjectId }, query: { ruleset: 'railway' }, headers: {} }, mockRes);
+		await handler({ params: { caseId: realProjectId }, query: { ruleset: 'example-ruleset' }, headers: {} }, mockRes);
 		assert.strictEqual(mockRes.status.mock.calls[0].arguments[0], 404);
 
 		const handlerBadRuleset = buildResultsStaticMap({ db: dbReturning([[realProjectRow()]]), logger: mockLogger() });
@@ -257,7 +268,7 @@ describe('consultees results static map', () => {
 		try {
 			const db = dbReturning([[realProjectRow()], []]);
 			const handler = buildResultsStaticMap({ db, logger: mockLogger() }, true);
-			await handler({ params: { caseId: realProjectId }, query: { ruleset: 'railway' }, headers: {} }, mockRes);
+			await handler({ params: { caseId: realProjectId }, query: { ruleset: 'example-ruleset' }, headers: {} }, mockRes);
 			const etag = mockRes.set.mock.calls[0].arguments[0].ETag;
 
 			mockRes.status.mock.resetCalls();
@@ -269,7 +280,7 @@ describe('consultees results static map', () => {
 			await handler2(
 				{
 					params: { caseId: realProjectId },
-					query: { ruleset: 'railway' },
+					query: { ruleset: 'example-ruleset' },
 					headers: { 'if-none-match': etag }
 				},
 				mockRes
