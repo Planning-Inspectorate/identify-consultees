@@ -1,10 +1,10 @@
 import type { ManageService } from '#service';
 import type { CaseBoundaryFeature } from '@pins/identify-consultees-database/src/geospatial/case-boundaries.ts';
 import type { ConsulteeAreaMatch } from '@pins/identify-consultees-database/src/geospatial/consultee-areas.ts';
-import type { RulesetDefinition } from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
+import type { Ruleset } from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
 import { getRuleset, runRuleset } from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
 import type { AsyncRequestHandler } from '@planning-inspectorate/core/util';
-import { buildCaseMapConfig } from '../../../maps/case-geojson.ts';
+import { buildCaseMapConfig, MAX_SAMPLED_MAP_MATCHES } from '../../../maps/case-geojson.ts';
 import { MAP_VIEWPORT } from '../../../maps/sample-geojson.ts';
 import { buildConsulteeStaticMapResponse } from '../../../maps/serve-static-map.ts';
 import { resolveCase } from '../resolve-case.ts';
@@ -20,7 +20,7 @@ function firstQueryValue(value: unknown): string {
 async function runRulesetSafely(
 	db: ManageService['db'],
 	project: CaseBoundaryFeature,
-	ruleset: RulesetDefinition,
+	ruleset: Ruleset,
 	logger: ManageService['logger']
 ): Promise<ConsulteeAreaMatch[]> {
 	try {
@@ -83,7 +83,10 @@ export function buildConsulteesResultsPage(service: ManageService): AsyncRequest
 			mapWidth: MAP_VIEWPORT.width,
 			mapHeight: MAP_VIEWPORT.height,
 			mapConfigJson: JSON.stringify(map),
-			matches: matches.map(toMatchRow)
+			matches: matches.map(toMatchRow),
+			matchCount: map.matchCount,
+			mapIsSampled: map.isSampled,
+			mapSampleSize: MAX_SAMPLED_MAP_MATCHES
 		};
 
 		return res.render('views/consultees/results/view.njk', viewModel);
