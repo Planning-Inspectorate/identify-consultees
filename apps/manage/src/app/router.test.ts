@@ -104,29 +104,30 @@ describe('manage router wiring', () => {
 		assert.equal(response.status, 404);
 	});
 
-	test('GET /auth/signout forwards session destroy errors', async () => {
+	test('GET /auth/signout renders a sanitised 500 when session destroy fails', async () => {
 		const express = (await import('express')).default;
 		const service = createManageTestService(true);
 		service.logger = (await import('@planning-inspectorate/core/testing')).mockLogger();
 		const { buildRouter } = await import('./router.ts');
+		const { configureNunjucks } = await import('./nunjucks.ts');
 		const app = express();
+		configureNunjucks().express(app);
+		app.set('view engine', 'njk');
 		app.use((req, _res, next) => {
 			req.session = {
 				destroy(callback) {
-					callback(new Error('destroy failed'));
+					callback(new Error('destroy failed: internal detail that must not leak'));
 				}
 			};
 			next();
 		});
 		app.use(buildRouter(service));
-		app.use((error, _req, res, _next) => {
-			res.status(500).send(String(error.message || error));
-		});
 
 		try {
 			const response = await request(app).get('/auth/signout');
 			assert.equal(response.status, 500);
-			assert.match(response.text, /destroy failed/);
+			assert.match(response.text, /Sorry, there is a problem with the service/);
+			assert.doesNotMatch(response.text, /internal detail that must not leak/);
 		} finally {
 			await service.db.$disconnect().catch(() => undefined);
 		}

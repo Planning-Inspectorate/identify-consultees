@@ -5,6 +5,7 @@ import { cacheNoCacheMiddleware } from '@planning-inspectorate/core/middleware';
 import type { IRouter, RequestHandler } from 'express';
 import { Router as createRouter } from 'express';
 import rateLimit from 'express-rate-limit';
+import { buildSanitisingErrorHandler } from './error-handler.ts';
 import { createDefraVendorRouter } from './maps/vendor.ts';
 import { createRoutes as createConsulteeAreasDirectRoutes } from './views/consultee-areas-direct/index.ts';
 import { createRoutes as createConsulteeAreasPythonRoutes } from './views/consultee-areas-python/index.ts';
@@ -102,6 +103,10 @@ export function buildRouter(service: ManageService, options: BuildRouterOptions 
 	router.use('/consultee-areas-python', consulteeAreasPythonRoutes);
 	router.use('/consultee-areas-direct', consulteeAreasDirectRoutes);
 	router.use('/error', createErrorRoutes(service));
+
+	// last: route errors render generic copy (full detail goes to the logs only) rather
+	// than reaching the core default handler, which renders error.message to the page
+	router.use(buildSanitisingErrorHandler(service));
 
 	return router;
 }
