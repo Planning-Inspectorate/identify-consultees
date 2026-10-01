@@ -1,4 +1,5 @@
 import type { ManageService } from '#service';
+import { stringifyForInlineScript } from '#util/inline-json.ts';
 import type { CaseBoundaryFeature } from '@pins/identify-consultees-database/src/geospatial/case-boundaries.ts';
 import type { ConsulteeAreaMatch } from '@pins/identify-consultees-database/src/geospatial/consultee-areas.ts';
 import type { Ruleset } from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
@@ -82,7 +83,7 @@ export function buildConsulteesResultsPage(service: ManageService): AsyncRequest
 			staticMapAlt: `Static map showing ${ruleset.name} for ${project.properties.caseName}`,
 			mapWidth: MAP_VIEWPORT.width,
 			mapHeight: MAP_VIEWPORT.height,
-			mapConfigJson: JSON.stringify(map),
+			mapConfigJson: stringifyForInlineScript(map),
 			matches: matches.map(toMatchRow),
 			matchCount: map.matchCount,
 			mapIsSampled: map.isSampled,

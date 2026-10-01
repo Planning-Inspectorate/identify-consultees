@@ -1,3 +1,4 @@
+import { stringifyForInlineScript } from '#util/inline-json.ts';
 import type { AsyncRequestHandler } from '@planning-inspectorate/core/util';
 import { buildMapLayersDemoCollections } from '../../maps/map-layers-demo-geojson.ts';
 import { MAP_VIEWPORT } from '../../maps/sample-geojson.ts';
@@ -35,7 +36,7 @@ export function buildMapLayersDemoPage(): AsyncRequestHandler {
 			mapRegionLabel: 'Interactive map with toggleable overlay layers',
 			mapWidth: MAP_VIEWPORT.width,
 			mapHeight: MAP_VIEWPORT.height,
-			mapConfigJson: JSON.stringify(mapConfig).replace(/</g, '\\u003c'),
+			mapConfigJson: stringifyForInlineScript(mapConfig),
 			layerSummaries: [
 				{
 					label: 'Project site',
