@@ -13,12 +13,14 @@ resource "azurerm_resource_group" "secondary" {
 }
 
 resource "azurerm_key_vault" "main" {
-  name                          = "${local.org}-kv-${local.short_resource_suffix}"
-  location                      = module.primary_region.location
-  resource_group_name           = azurerm_resource_group.primary.name
-  enabled_for_disk_encryption   = true
-  tenant_id                     = data.azurerm_client_config.current.tenant_id
-  soft_delete_retention_days    = 7
+  name                        = "${local.org}-kv-${local.short_resource_suffix}"
+  location                    = module.primary_region.location
+  resource_group_name         = azurerm_resource_group.primary.name
+  enabled_for_disk_encryption = true
+  tenant_id                   = data.azurerm_client_config.current.tenant_id
+  # 90 days (the maximum) gives a long recovery window for accidentally deleted
+  # secrets/keys - purge protection is already on below
+  soft_delete_retention_days    = 90
   purge_protection_enabled      = true
   rbac_authorization_enabled    = true
   public_network_access_enabled = false
