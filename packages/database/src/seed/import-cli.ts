@@ -10,6 +10,8 @@
  * Optional: --batch-size=<n> to override the default rows-per-round-trip (tune down for
  * unusually large/complex geometries, up for small simple ones).
  */
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { loadConfig } from '../configuration/config.ts';
 import { newDatabaseClient, withExtendedTimeout } from '../index.ts';
 import { importCaseBoundaries, importConsulteeAreas } from './geojson-import.ts';
@@ -18,13 +20,13 @@ import { importCaseBoundaries, importConsulteeAreas } from './geojson-import.ts'
 // request timeout regardless of batch size
 const IMPORT_REQUEST_TIMEOUT_MS = 120_000;
 
-interface ParsedArgs {
+export interface ParsedArgs {
 	type: 'consultee-areas' | 'case-boundaries';
 	file: string;
 	batchSize?: number;
 }
 
-function parseArgs(argv: string[]): ParsedArgs {
+export function parseArgs(argv: string[]): ParsedArgs {
 	const values: Record<string, string> = {};
 	for (const arg of argv) {
 		const match = /^--([^=]+)=(.*)$/.exec(arg);
@@ -84,4 +86,8 @@ async function run() {
 	}
 }
 
-run();
+const isMain = process.argv[1] !== undefined && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+
+if (isMain) {
+	await run();
+}
