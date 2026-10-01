@@ -85,6 +85,25 @@ describe('consultees results page', () => {
 		assert.strictEqual(viewModel.matches[0].consulteeCategory, null);
 	});
 
+	it('should escape stored data in mapConfigJson so it cannot break out of the script block', async () => {
+		// mapConfigJson is rendered with |safe inside <script type="application/json"> - a stored
+		// case/consultee name containing </script> must not be able to terminate that element and
+		// inject markup into the page (see util/inline-json.ts)
+		const mockRes = { status: mock.fn(() => mockRes), render: mock.fn() };
+		const hostileRow = { ...realProjectRow(), caseName: '</script><img src=x onerror=alert(1)>' };
+		const hostileMatch = railwayMatchRow({ consultee: '</script><script>alert(1)</script>' });
+		const db = dbReturning([[hostileRow], [hostileMatch]]);
+		const handler = buildConsulteesResultsPage({ db, logger: mockLogger() });
+		await handler({ params: { caseId: realProjectId }, query: { ruleset: 'example-ruleset' } }, mockRes);
+
+		const viewModel = mockRes.render.mock.calls[0].arguments[1];
+		assert.equal(viewModel.mapConfigJson.includes('</'), false);
+		// the escapes are valid JSON \uXXXX sequences - the client still parses the real data
+		const parsed = JSON.parse(viewModel.mapConfigJson);
+		assert.equal(parsed.projectGeojson.features[0].properties.name, '</script><img src=x onerror=alert(1)>');
+		assert.equal(parsed.consulteeGeojson.features[0].properties.name, '</script><script>alert(1)</script>');
+	});
+
 	it('should 404 when caseId is missing', async () => {
 		const mockRes = { status: mock.fn(() => mockRes), render: mock.fn() };
 		const handler = buildConsulteesResultsPage({ db: { $queryRaw: mock.fn() }, logger: mockLogger() });
