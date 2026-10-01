@@ -1,5 +1,6 @@
 import type { PrismaClient } from '../client/client.ts';
 import { Prisma } from '../client/client.ts';
+import { withDeadlockRetry } from './db-retry.ts';
 import type { Geometry } from './wkt.ts';
 import { geometryToWkt, wktToGeometry } from './wkt.ts';
 
@@ -180,15 +181,16 @@ export async function listCaseBoundaries(
 ): Promise<CaseBoundaryFeatureCollection> {
 	const { limit, offset = 0 } = options;
 
-	const rows =
+	const rows = await withDeadlockRetry(() =>
 		limit === undefined
-			? await dbClient.$queryRaw<CaseBoundaryRow[]>`SELECT ${selectColumns} FROM case_boundary`
-			: await dbClient.$queryRaw<CaseBoundaryRow[]>`
+			? dbClient.$queryRaw<CaseBoundaryRow[]>`SELECT ${selectColumns} FROM case_boundary`
+			: dbClient.$queryRaw<CaseBoundaryRow[]>`
 					SELECT ${selectColumns} FROM case_boundary
 					-- SQL Server requires ORDER BY for OFFSET/FETCH; the primary key gives a stable
 					-- order without needing a table-specific column
 					ORDER BY id OFFSET ${offset} ROWS FETCH NEXT ${limit} ROWS ONLY
-				`;
+				`
+	);
 
 	return { type: 'FeatureCollection', features: rows.map(rowToFeature) };
 }
@@ -198,9 +200,11 @@ export async function listCaseBoundaries(
  * well-formed but doesn't match any row - a genuine "not found", not an error.
  */
 export async function getCaseBoundaryById(dbClient: PrismaClient, id: string): Promise<CaseBoundaryFeature | null> {
-	const rows = await dbClient.$queryRaw<CaseBoundaryRow[]>`
-		SELECT ${selectColumns} FROM case_boundary WHERE id = CAST(${id} AS UNIQUEIDENTIFIER)
-	`;
+	const rows = await withDeadlockRetry(
+		() => dbClient.$queryRaw<CaseBoundaryRow[]>`
+			SELECT ${selectColumns} FROM case_boundary WHERE id = CAST(${id} AS UNIQUEIDENTIFIER)
+		`
+	);
 	return rows[0] ? rowToFeature(rows[0]) : null;
 }
 
@@ -236,11 +240,11 @@ export async function getCaseBoundarySummaryById(
 	dbClient: PrismaClient,
 	id: string
 ): Promise<CaseBoundarySummary | null> {
-	const rows = await dbClient.$queryRaw<
-		{ id: string; caseReference: string; caseName: string; receivedDate: Date | null }[]
-	>`
-		SELECT ${summaryColumns} FROM case_boundary WHERE id = CAST(${id} AS UNIQUEIDENTIFIER)
-	`;
+	const rows = await withDeadlockRetry(
+		() => dbClient.$queryRaw<{ id: string; caseReference: string; caseName: string; receivedDate: Date | null }[]>`
+			SELECT ${summaryColumns} FROM case_boundary WHERE id = CAST(${id} AS UNIQUEIDENTIFIER)
+		`
+	);
 	return rows[0] ? rowToSummary(rows[0]) : null;
 }
 
@@ -250,11 +254,11 @@ export async function getCaseBoundarySummaryById(
  * (hundreds of rows) but wouldn't be a sensible way to sample from a genuinely large table.
  */
 export async function getRandomCaseSummary(dbClient: PrismaClient): Promise<CaseBoundarySummary | null> {
-	const rows = await dbClient.$queryRaw<
-		{ id: string; caseReference: string; caseName: string; receivedDate: Date | null }[]
-	>`
-		SELECT TOP 1 ${summaryColumns} FROM case_boundary ORDER BY NEWID()
-	`;
+	const rows = await withDeadlockRetry(
+		() => dbClient.$queryRaw<{ id: string; caseReference: string; caseName: string; receivedDate: Date | null }[]>`
+			SELECT TOP 1 ${summaryColumns} FROM case_boundary ORDER BY NEWID()
+		`
+	);
 	return rows[0] ? rowToSummary(rows[0]) : null;
 }
 
@@ -283,15 +287,17 @@ export async function searchCaseBoundaries(dbClient: PrismaClient, options: Sear
 	const { query, limit = 25, offset = 0 } = options;
 	const likePattern = query?.trim() ? `%${query.trim()}%` : '%';
 
-	const rows = await dbClient.$queryRaw<
-		{ id: string; caseReference: string; caseName: string; receivedDate: Date | null; totalCount: bigint }[]
-	>`
-		SELECT ${summaryColumns}, COUNT(*) OVER() AS totalCount
-		FROM case_boundary
-		WHERE caseName LIKE ${likePattern} OR caseReference LIKE ${likePattern}
-		ORDER BY caseName
-		OFFSET ${offset} ROWS FETCH NEXT ${limit} ROWS ONLY
-	`;
+	const rows = await withDeadlockRetry(
+		() => dbClient.$queryRaw<
+			{ id: string; caseReference: string; caseName: string; receivedDate: Date | null; totalCount: bigint }[]
+		>`
+			SELECT ${summaryColumns}, COUNT(*) OVER() AS totalCount
+			FROM case_boundary
+			WHERE caseName LIKE ${likePattern} OR caseReference LIKE ${likePattern}
+			ORDER BY caseName
+			OFFSET ${offset} ROWS FETCH NEXT ${limit} ROWS ONLY
+		`
+	);
 
 	return {
 		features: rows.map(rowToSummary),
@@ -310,13 +316,15 @@ export async function findCaseBoundariesNear(
 	radiusMetres: number
 ): Promise<CaseBoundaryMatch[]> {
 	const wkt = geometryToWkt(geometry);
-	const rows = await dbClient.$queryRaw<(CaseBoundaryRow & { distanceMetres: number })[]>`
-		SELECT ${selectColumns},
-			geometry.STDistance(geography::STGeomFromText(${wkt}, 4326)) AS distanceMetres
-		FROM case_boundary
-		WHERE geometry.STDistance(geography::STGeomFromText(${wkt}, 4326)) <= ${radiusMetres}
-		ORDER BY distanceMetres
-	`;
+	const rows = await withDeadlockRetry(
+		() => dbClient.$queryRaw<(CaseBoundaryRow & { distanceMetres: number })[]>`
+			SELECT ${selectColumns},
+				geometry.STDistance(geography::STGeomFromText(${wkt}, 4326)) AS distanceMetres
+			FROM case_boundary
+			WHERE geometry.STDistance(geography::STGeomFromText(${wkt}, 4326)) <= ${radiusMetres}
+			ORDER BY distanceMetres
+		`
+	);
 	return rows.map((row) => ({ feature: rowToFeature(row), distanceMetres: row.distanceMetres }));
 }
 
@@ -328,10 +336,12 @@ export async function findCaseBoundariesIntersecting(
 	geometry: Geometry
 ): Promise<CaseBoundaryFeatureCollection> {
 	const wkt = geometryToWkt(geometry);
-	const rows = await dbClient.$queryRaw<CaseBoundaryRow[]>`
-		SELECT ${selectColumns}
-		FROM case_boundary
-		WHERE geometry.STIntersects(geography::STGeomFromText(${wkt}, 4326)) = 1
-	`;
+	const rows = await withDeadlockRetry(
+		() => dbClient.$queryRaw<CaseBoundaryRow[]>`
+			SELECT ${selectColumns}
+			FROM case_boundary
+			WHERE geometry.STIntersects(geography::STGeomFromText(${wkt}, 4326)) = 1
+		`
+	);
 	return { type: 'FeatureCollection', features: rows.map(rowToFeature) };
 }
