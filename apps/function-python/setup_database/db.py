@@ -26,7 +26,9 @@ class ConnectionParams:
 def parse_connection_string(connection_string: str) -> ConnectionParams:
     match = _CONNECTION_STRING_PATTERN.match(connection_string)
     if not match:
-        raise ValueError(f"Unrecognised SQL_CONNECTION_STRING format: {connection_string!r}")
+        # the connection string carries the database password - never echo it into an
+        # exception message, it would end up in logs (function_app.py logs exceptions)
+        raise ValueError("Unrecognised SQL_CONNECTION_STRING format")
 
     host, port, rest = match.groups()
     params = dict(pair.split("=", 1) for pair in rest.split(";") if "=" in pair)

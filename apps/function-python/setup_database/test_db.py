@@ -28,6 +28,16 @@ def test_raises_on_an_unrecognised_format():
         parse_connection_string("not-a-connection-string")
 
 
+def test_error_messages_never_echo_the_connection_string():
+    # the connection string carries the database password - function_app.py logs
+    # exceptions, so the raw input must never end up in the error message
+    secret = "Sup3r$ecret!"
+    with pytest.raises(ValueError) as excinfo:
+        parse_connection_string(f"sqlserver://;password={secret}")
+    assert secret not in str(excinfo.value)
+    assert "sqlserver://" not in str(excinfo.value)
+
+
 def test_raises_when_a_required_field_is_missing():
     with pytest.raises(ValueError, match="must include database, user and password"):
         parse_connection_string("sqlserver://localhost;database=db;user=sa")

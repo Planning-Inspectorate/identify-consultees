@@ -1,5 +1,7 @@
 import json
 
+import pytest
+
 from querying.consultee_areas import fetch_consultee_areas
 
 # connection_params fixture (skips if no DB reachable) lives in conftest.py, shared with
@@ -23,3 +25,12 @@ def test_fetch_consultee_areas_rows_are_json_serialisable(connection_params):
 def test_fetch_consultee_areas_respects_limit(connection_params):
     rows = fetch_consultee_areas(connection_params, limit=1)
     assert len(rows) <= 1
+
+
+# limit is interpolated into the TOP clause (it can't be parameterised), so anything
+# that isn't a plain int in range must be rejected before it reaches the SQL - these
+# tests don't need a database because they fail before connecting
+@pytest.mark.parametrize("limit", [0, -1, 501, True, "50", "1; DROP TABLE consultee_area", None, 1.5])
+def test_fetch_consultee_areas_rejects_invalid_limits(limit):
+    with pytest.raises(ValueError):
+        fetch_consultee_areas(None, limit=limit)
