@@ -26,6 +26,13 @@
 		Ruleset used: {{ rulesetName }}
 	</p>
 
+	{% if mapIsSampled %}
+		{% from "govuk/components/inset-text/macro.njk" import govukInsetText %}
+		{{ govukInsetText({
+			text: "This ruleset matched " ~ matchCount ~ " consultees - showing a sample of " ~ mapSampleSize ~ " on the map below. The table further down lists all " ~ matchCount ~ "."
+		}) }}
+	{% endif %}
+
 	{% set mapRegionLabel = mapRegionLabel %}
 	{% set staticMapSrc = staticMapSrc %}
 	{% set staticMapAlt = staticMapAlt %}
@@ -34,7 +41,7 @@
 	{% set mapConfigJson = mapConfigJson %}
 	{% include "views/partials/consultee-map-region.njk" %}
 
-	<h2 class="govuk-heading-m govuk-!-margin-top-6">Consultees identified</h2>
+	<h2 class="govuk-heading-m govuk-!-margin-top-6">Consultees identified ({{ matchCount }})</h2>
 
 	{% if matches.length == 0 %}
 		<p class="govuk-body">No consultees matched this ruleset.</p>
