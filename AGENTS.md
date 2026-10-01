@@ -2,6 +2,35 @@
 
 This file is the single source of truth for agent instructions in this repository. [`CLAUDE.md`](./CLAUDE.md) points here.
 
+## AI agent identification and co-authorship
+
+AI agents working on this repository must not identify themselves as AI or co-authors in any repository-visible content. All contributions should appear as normal human contributions.
+
+### Required rules for all AI agents
+
+- **Do not identify as an AI** in any GitHub-visible surface: PR titles/bodies, commit messages, code comments, documentation, issue comments, review comments, or other repo content.
+- **Do not add AI co-author tags** in commit messages (e.g., `Co-Authored-By: AI <...>`).
+- **Do not include AI attribution** in documentation files, README, or code comments.
+- **Do not reference AI tools or models** in user-facing documentation or code.
+- **Write as a normal human contributor** — the output should be indistinguishable from work done by a human team member.
+
+### IDE and editor settings
+
+To prevent IDE AI features from automatically adding co-authorship metadata:
+
+- The `.vscode/settings.json` file includes settings to disable AI co-author features where possible.
+- Disable AI-powered commit message generation and co-author attribution in your editor.
+- Do not configure automated AI co-authorship trailers in git hooks or editor extensions.
+
+### Rationale
+
+This policy ensures:
+
+- Repository history and documentation remain clean and professional.
+- External reviewers and users see contributions as team work, not AI-generated.
+- Compliance with government service standards that expect human accountability for code and documentation.
+- Avoidance of AI-generated content appearing in official public-sector repositories.
+
 ## GitHub and pull request practices (PINS)
 
 PINS expects specific GitHub practices on their repos. Follow these for every PR in this project (and when preparing a branch for review).
@@ -35,7 +64,7 @@ When the feature branch has diverged or accumulated noise:
 - `--force-with-lease` is allowed on feature / PR branches only, and only after an intentional history rewrite (rebase/squash).
 - Still never force-push `main` (or `master`).
 - Still only commit / push / open PRs when the user asks (or existing user rules already authorize that step); when they do, apply the practices above.
-- Do not identify as an AI (or name a model/product) in any GitHub-visible surface: PR titles/bodies, commit messages, code comments, docs, issue comments, review comments, or other repo content. Write as a normal human contributor.
+- Follow the AI identification rules above: do not identify as an AI or add AI co-authorship in any GitHub-visible content.
 
 ### PR description checklist
 
