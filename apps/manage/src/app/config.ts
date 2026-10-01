@@ -8,6 +8,10 @@ export interface Config extends BaseConfig {
 	// undefined if not configured; only the consultee-areas-python page needs this, so its absence
 	// shouldn't crash the whole app at boot (see its controller for the fallback behaviour)
 	pythonFunctionUrl: string | undefined;
+	// shared secret the Python function requires on its data route (sent as x-api-key) - see
+	// apps/function-python/function_app.py; Key Vault-wired in infrastructure. Optional so local
+	// setups without the function running keep working.
+	pythonFunctionApiKey: string | undefined;
 	auth: {
 		authority: string;
 		clientId: string;
@@ -70,6 +74,7 @@ export function loadConfig(): Config {
 		MANAGED_REDIS_URL,
 		NODE_ENV,
 		PYTHON_FUNCTION_URL,
+		PYTHON_FUNCTION_API_KEY,
 		SESSION_SECRET,
 		SQL_CONNECTION_STRING
 	} = process.env;
@@ -112,6 +117,7 @@ export function loadConfig(): Config {
 	config = {
 		appHostname: APP_HOSTNAME || '',
 		pythonFunctionUrl: PYTHON_FUNCTION_URL || undefined,
+		pythonFunctionApiKey: PYTHON_FUNCTION_API_KEY || undefined,
 		auth: {
 			authority: `https://login.microsoftonline.com/${AUTH_TENANT_ID}`,
 			clientId: AUTH_CLIENT_ID || '',

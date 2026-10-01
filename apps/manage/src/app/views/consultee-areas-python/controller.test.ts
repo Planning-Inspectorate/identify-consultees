@@ -9,7 +9,8 @@ describe('consultee areas python', () => {
 	const newRes = () => ({ render: mock.fn((view, data) => nunjucks.render(view, data)) });
 	const newService = () => ({
 		logger: mockLogger(),
-		pythonFunctionUrl: 'http://localhost:7071/api/consultee-areas'
+		pythonFunctionUrl: 'http://localhost:7071/api/consultee-areas',
+		pythonFunctionApiKey: 'test-function-api-key'
 	});
 
 	it('renders the page with no rows', async () => {
@@ -34,6 +35,20 @@ describe('consultee areas python', () => {
 
 		assert.deepStrictEqual(res.render.mock.calls[0].arguments[1].rows, rows);
 		assert.strictEqual(res.render.mock.calls[0].arguments[1].error, undefined);
+	});
+
+	it('sends the configured API key as an x-api-key header', async (t) => {
+		const fetchMock = t.mock.method(globalThis, 'fetch', async () => ({
+			ok: true,
+			json: async () => ({ rows: [] })
+		}));
+
+		const res = newRes();
+		const run = buildRunConsulteeAreasPython(newService());
+		await run({}, res);
+
+		assert.strictEqual(fetchMock.mock.callCount(), 1);
+		assert.strictEqual(fetchMock.mock.calls[0].arguments[1].headers['x-api-key'], 'test-function-api-key');
 	});
 
 	it('renders an error when the function is unreachable', async (t) => {

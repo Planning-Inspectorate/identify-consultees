@@ -22,6 +22,7 @@ locals {
       "app-insights-connection-string" = "@Microsoft.KeyVault(SecretUri=${azurerm_key_vault_secret.app_insights_connection_string.versionless_id})",
       "session-secret-web"             = "@Microsoft.KeyVault(SecretUri=${azurerm_key_vault_secret.web_session_secret.versionless_id})"
       "sql-app-connection-string"      = "@Microsoft.KeyVault(SecretUri=${azurerm_key_vault_secret.sql_app_connection_string.versionless_id})"
+      "function-api-key"               = "@Microsoft.KeyVault(SecretUri=${azurerm_key_vault_secret.function_api_key.versionless_id})"
     }
   )
 
