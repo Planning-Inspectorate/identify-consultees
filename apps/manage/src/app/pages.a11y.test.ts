@@ -135,10 +135,7 @@ describe('manage page accessibility smoke', () => {
 			caseId: '11111111-1111-1111-1111-111111111111',
 			reference: 'EN01',
 			caseName: 'Example Project',
-			rulesets: [
-				{ value: 'railway', text: 'Railways' },
-				{ value: 'hospital', text: 'Hospitals' }
-			]
+			rulesets: [{ value: 'example-ruleset', text: 'Example ruleset' }]
 		});
 		await assertNoSeriousA11yViolations(html);
 	});
@@ -176,18 +173,45 @@ describe('manage page accessibility smoke', () => {
 			...pageLocals,
 			pageHeading: 'Consultees identified for Example Project (EN01)',
 			backLinkUrl: '/consultees/11111111-1111-1111-1111-111111111111',
-			rulesetName: 'Railways',
+			rulesetName: 'Example ruleset',
 			reference: 'EN01',
 			caseName: 'Example Project',
 			caseId: '11111111-1111-1111-1111-111111111111',
 			mapId: 'case-map',
-			mapRegionLabel: 'Map showing Railways for Example Project',
-			staticMapSrc: '/consultees/11111111-1111-1111-1111-111111111111/results/static-map?ruleset=railway',
-			staticMapAlt: 'Static map showing Railways for Example Project',
+			mapRegionLabel: 'Map showing Example ruleset for Example Project',
+			staticMapSrc: '/consultees/11111111-1111-1111-1111-111111111111/results/static-map?ruleset=example-ruleset',
+			staticMapAlt: 'Static map showing Example ruleset for Example Project',
 			mapWidth: 960,
 			mapHeight: 516,
 			mapConfigJson: '{"center":[-1.78,50.62],"zoom":11}',
-			matches: [{ consultee: 'Network Rail', consulteeCategory: 'Railway', region: 'South West', distanceMetres: 123 }]
+			matches: [{ consultee: 'Network Rail', consulteeCategory: 'Railway', region: 'South West', distanceMetres: 123 }],
+			matchCount: 1,
+			mapIsSampled: false,
+			mapSampleSize: 30
+		});
+		await assertNoSeriousA11yViolations(html);
+	});
+
+	test('consultees results page with a sampled map has no serious a11y violations', async () => {
+		const html = nunjucks.render('views/consultees/results/view.njk', {
+			...pageLocals,
+			pageHeading: 'Consultees identified for Example Project (EN01)',
+			backLinkUrl: '/consultees/11111111-1111-1111-1111-111111111111',
+			rulesetName: 'Example ruleset',
+			reference: 'EN01',
+			caseName: 'Example Project',
+			caseId: '11111111-1111-1111-1111-111111111111',
+			mapId: 'case-map',
+			mapRegionLabel: 'Map showing Example ruleset for Example Project',
+			staticMapSrc: '/consultees/11111111-1111-1111-1111-111111111111/results/static-map?ruleset=example-ruleset',
+			staticMapAlt: 'Static map showing Example ruleset for Example Project',
+			mapWidth: 960,
+			mapHeight: 516,
+			mapConfigJson: '{"center":[-1.78,50.62],"zoom":11}',
+			matches: [{ consultee: 'Network Rail', consulteeCategory: 'Railway', region: 'South West', distanceMetres: 123 }],
+			matchCount: 120,
+			mapIsSampled: true,
+			mapSampleSize: 30
 		});
 		await assertNoSeriousA11yViolations(html);
 	});

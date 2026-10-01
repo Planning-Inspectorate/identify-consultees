@@ -13,6 +13,11 @@ export interface ConsulteesResultsViewModel {
 	mapHeight: number;
 	mapConfigJson: string;
 	matches: ConsulteeMatchRow[];
+	/** Total matches the ruleset found - the same as matches.length, kept explicit for the map note below. */
+	matchCount: number;
+	/** True when the map shows only a sample of matches, not all of them - see maps/case-geojson.ts. */
+	mapIsSampled: boolean;
+	mapSampleSize: number;
 }
 
 export interface ConsulteeMatchRow {

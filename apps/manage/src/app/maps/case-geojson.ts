@@ -28,10 +28,20 @@ export function buildProjectGeojson(project: CaseBoundaryFeature): GeoJsonFeatur
 	};
 }
 
+// A ruleset is now the union of every condition it's made of (see geospatial/rulesets.ts), so a
+// single run can realistically return thousands of matches (e.g. most parish councils near a
+// large site). Rendering that many complex polygons - in the client-side interactive map, and
+// especially in the server-side static-map SVG/PNG fallback - is slow enough to be a real
+// reliability risk, not just a cosmetic one. Above MAP_SAMPLING_THRESHOLD matches, the map shows
+// only a sample; the results table (built from the full, unsampled list) is unaffected.
+export const MAP_SAMPLING_THRESHOLD = 50;
+export const MAX_SAMPLED_MAP_MATCHES = 30;
+
 export function buildConsulteeMatchesGeojson(matches: ConsulteeAreaMatch[]): GeoJsonFeatureCollection {
+	const sample = matches.length > MAP_SAMPLING_THRESHOLD ? matches.slice(0, MAX_SAMPLED_MAP_MATCHES) : matches;
 	return {
 		type: 'FeatureCollection',
-		features: matches.map((match) => ({
+		features: sample.map((match) => ({
 			type: 'Feature',
 			id: match.feature.id,
 			properties: {
@@ -55,6 +65,10 @@ export interface CaseMapConfig {
 	consulteeLayerLabel: string;
 	projectGeojson: GeoJsonFeatureCollection;
 	consulteeGeojson: GeoJsonFeatureCollection;
+	/** Total matches the ruleset found - may be larger than consulteeGeojson.features.length. */
+	matchCount: number;
+	/** True when the map shows a sample rather than every match - see MAP_SAMPLING_THRESHOLD. */
+	isSampled: boolean;
 }
 
 export function buildCaseMapConfig(
@@ -76,6 +90,8 @@ export function buildCaseMapConfig(
 		projectLayerLabel: `Project site (${project.properties.caseReference})`,
 		consulteeLayerLabel: rulesetName,
 		projectGeojson,
-		consulteeGeojson
+		consulteeGeojson,
+		matchCount: matches.length,
+		isSampled: matches.length > MAP_SAMPLING_THRESHOLD
 	};
 }
