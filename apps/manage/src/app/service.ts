@@ -30,6 +30,10 @@ export class ManageService extends BaseService<PrismaClient> {
 		return this.#config.pythonFunctionUrl;
 	}
 
+	get pythonFunctionApiKey(): string | undefined {
+		return this.#config.pythonFunctionApiKey;
+	}
+
 	/**
 	 * Built asset root (fingerprinted + Brotli sidecars). Used by our static middleware.
 	 */

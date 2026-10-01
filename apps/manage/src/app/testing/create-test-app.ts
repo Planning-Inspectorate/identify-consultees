@@ -23,6 +23,7 @@ export function buildManageTestConfig(authDisabled = true): Config {
 	return {
 		appHostname: 'localhost',
 		pythonFunctionUrl: 'http://localhost:7071/api/consultee-areas',
+		pythonFunctionApiKey: 'test-function-api-key',
 		auth: {
 			authority: 'https://login.microsoftonline.com/tenant-id',
 			clientId: 'client-id',

@@ -69,8 +69,10 @@ module "app_web" {
     BLOB_STORE_HOST      = azurerm_storage_account.data.primary_blob_endpoint
     BLOB_STORE_CONTAINER = azurerm_storage_container.data.name
 
-    # Python function (see infrastructure/app-function.tf)
-    PYTHON_FUNCTION_URL = "https://${azurerm_linux_function_app.function_orchestrator.default_hostname}/api/consultee-areas"
+    # Python function (see infrastructure/app-function.tf) - the data route requires this
+    # shared secret as an x-api-key header (see apps/function-python/function_app.py)
+    PYTHON_FUNCTION_URL     = "https://${azurerm_linux_function_app.function_orchestrator.default_hostname}/api/consultee-areas"
+    PYTHON_FUNCTION_API_KEY = local.key_vault_refs["function-api-key"]
   }
 
   providers = {

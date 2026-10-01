@@ -92,6 +92,10 @@ resource "azurerm_linux_function_app" "function_orchestrator" {
     SCM_DO_BUILD_DURING_DEPLOYMENT = false
     WEBSITE_RUN_FROM_PACKAGE       = 1
     SQL_CONNECTION_STRING          = local.key_vault_refs["sql-app-connection-string"]
+    # shared secret the consultee-areas data route requires (x-api-key header) - see
+    # apps/function-python/function_app.py; the same secret is given to the web app as
+    # PYTHON_FUNCTION_API_KEY (infrastructure/app-web.tf)
+    CONSULTEE_AREAS_API_KEY = local.key_vault_refs["function-api-key"]
   }
 
   identity {
@@ -147,4 +151,22 @@ resource "azurerm_role_assignment" "function_orchestrator_secrets_user" {
   scope                = azurerm_key_vault.main.id
   role_definition_name = "Key Vault Secrets User"
   principal_id         = azurerm_linux_function_app.function_orchestrator.identity[0].principal_id
+}
+
+# Shared secret for the function app's data route - the route reads database rows and
+# returns them, so it must not be anonymously callable even though the Function App is
+# only reachable via its private endpoint. See apps/function-python/function_app.py.
+resource "random_password" "function_api_key" {
+  length  = 32
+  special = false
+}
+
+resource "azurerm_key_vault_secret" "function_api_key" {
+  #checkov:skip=CKV_AZURE_41: TODO: Secret rotation
+  key_vault_id = azurerm_key_vault.main.id
+  name         = "${local.service_name}-function-api-key"
+  value        = random_password.function_api_key.result
+  content_type = "api-key"
+
+  tags = local.tags
 }
