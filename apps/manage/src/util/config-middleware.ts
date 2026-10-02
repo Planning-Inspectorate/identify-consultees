@@ -7,7 +7,7 @@ import type { Handler } from 'express';
 export function addLocalsConfiguration(): Handler {
 	return (req, res, next) => {
 		res.locals.config = {
-			styleFile: 'style-635ae645.css',
+			styleFile: 'style-983f2e7f.css',
 			govukFrontendJs: 'assets/js/govuk-frontend.min-38b6270a.js',
 			consulteesMapJs: 'javascripts/consultees-map-edecec94.js',
 			mapLayersDemoJs: 'javascripts/map-layers-demo-5c32a650.js',
@@ -16,6 +16,8 @@ export function addLocalsConfiguration(): Handler {
 			headerTitle: 'Identify consultees',
 			footerLinks: []
 		};
+		// the "Components" nav item (component showcase) is only shown when ?components=true is in the URL
+		res.locals.showComponentsNav = req.query.components === 'true';
 		next();
 	};
 }

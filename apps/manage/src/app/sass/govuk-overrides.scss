@@ -1,5 +1,7 @@
 // PINS branding overrides for GOV.UK Frontend components used off GOV.UK.
 // Prefer these over hand-rolled component HTML where a GOV.UK macro exists.
+// Keep this file @use'd AFTER the govuk index in style.scss: later source order
+// means equal-specificity rules here win without needing !important.
 @use 'node_modules/@planning-inspectorate/core/dist/ui/brand/pins-colors' as brand;
 @use 'node_modules/@planning-inspectorate/core/dist/ui/footer/pins-footer';
 @use 'node_modules/govuk-frontend/dist/govuk/index' as govuk;

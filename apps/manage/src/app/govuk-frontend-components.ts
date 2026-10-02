@@ -82,6 +82,27 @@ export function loadGovukFixtures(): GovukFixturesFile[] {
 		.sort((a, b) => a.component.localeCompare(b.component));
 }
 
+let componentCatalogue: GovukFixturesFile[] | undefined;
+
+/**
+ * Memoised component catalogue for the showcase pages - avoids re-reading
+ * every fixtures.json from node_modules on each request.
+ */
+export function loadComponentCatalogue(): GovukFixturesFile[] {
+	if (!componentCatalogue) {
+		componentCatalogue = loadGovukFixtures();
+	}
+	return componentCatalogue;
+}
+
+/**
+ * Fixtures GOV.UK Frontend marks `hidden` are internal to its own review app,
+ * not documented examples - the showcase only lists visible ones.
+ */
+export function getVisibleFixtures(fixturesFile: GovukFixturesFile): GovukFixture[] {
+	return fixturesFile.fixtures.filter((fixture) => !fixture.hidden);
+}
+
 /**
  * Render a GOV.UK Frontend component macro using fixture options.
  */
@@ -126,4 +147,34 @@ export function formatGovukHtmlMismatch(expected: string, actual: string): strin
 	}
 
 	return 'Rendered HTML length differs after normalisation.';
+}
+
+// attributes whose values are space-separated lists of ids (or a single id, like `for`)
+const ID_REFERENCE_ATTRIBUTES = ['for', 'aria-describedby', 'aria-labelledby', 'aria-controls'];
+
+/**
+ * Prefix every `id` in a rendered fixture (and the attributes referencing it)
+ * so several fixtures can be shown on one page without duplicate-id conflicts.
+ * Display-layer only: fixture parity tests compare the raw macro output.
+ */
+export function scopeFixtureIds(html: string, prefix: string): string {
+	const ids = new Set(Array.from(html.matchAll(/\sid="([^"]+)"/g), (match) => match[1]));
+
+	if (ids.size === 0) {
+		return html;
+	}
+
+	let scoped = html.replace(/\sid="([^"]+)"/g, (_match, id: string) => ` id="${prefix}-${id}"`);
+
+	for (const attribute of ID_REFERENCE_ATTRIBUTES) {
+		scoped = scoped.replace(new RegExp(`\\s${attribute}="([^"]+)"`, 'g'), (_match, value: string) => {
+			const rewritten = value
+				.split(/\s+/)
+				.map((token) => (ids.has(token) ? `${prefix}-${token}` : token))
+				.join(' ');
+			return ` ${attribute}="${rewritten}"`;
+		});
+	}
+
+	return scoped.replace(/\bhref="#([^"]+)"/g, (match, id: string) => (ids.has(id) ? `href="#${prefix}-${id}"` : match));
 }

@@ -51,6 +51,13 @@ $font-family: arial, helvetica, sans-serif;
 	white-space: pre-wrap;
 }
 
+// Component showcase (/components): box around each rendered fixture example
+.pins-component-example {
+	padding: index.govuk-spacing(4);
+	margin-bottom: index.govuk-spacing(6);
+	border: 1px solid index.govuk-colour('black', $variant: 'tint-80');
+}
+
 // Align a GOV.UK input and button on one row (search pattern)
 .pins-inline-search {
 	display: flex;

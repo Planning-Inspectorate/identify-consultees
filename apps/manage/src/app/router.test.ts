@@ -144,6 +144,40 @@ describe('manage router wiring', () => {
 		assert.match(response.text, /data-map-layers-demo/);
 	});
 
+	test('GET /components lists every GOV.UK Frontend component', async () => {
+		const response = await request(authDisabledApp).get('/components');
+		assert.equal(response.status, 200);
+		assert.match(response.text, /GOV.UK Frontend components/);
+		assert.match(response.text, /href="\/components\/button"/);
+		assert.match(response.text, /href="\/components\/warning-text"/);
+	});
+
+	test('GET /components/:component renders the fixture examples', async () => {
+		const response = await request(authDisabledApp).get('/components/tag');
+		assert.equal(response.status, 200);
+		assert.match(response.text, /<h1 class="govuk-heading-xl">\s*Tag/);
+		assert.match(response.text, /govuk-tag/);
+		assert.match(response.text, /pins-component-example/);
+	});
+
+	test('GET /components/:component 404s for an unknown component', async () => {
+		const response = await request(authDisabledApp).get('/components/not-a-component');
+		assert.equal(response.status, 404);
+	});
+
+	test('the Components nav link only renders with ?components=true', async () => {
+		const withoutFlag = await request(authDisabledApp).get('/components');
+		assert.doesNotMatch(withoutFlag.text, />\s*Components\s*<\/a>/);
+		assert.doesNotMatch(withoutFlag.text, /href="\/components\/button\?components=true"/);
+
+		const withFlag = await request(authDisabledApp).get('/components?components=true');
+		assert.match(
+			withFlag.text,
+			/govuk-service-navigation__link" href="\/components\?components=true">\s*Components\s*<\/a>/
+		);
+		assert.match(withFlag.text, /href="\/components\/button\?components=true"/);
+	});
+
 	test('GET /consultees/:id/results/static-map returns a cached image', async () => {
 		const originalFetch = globalThis.fetch;
 		globalThis.fetch = async () =>
