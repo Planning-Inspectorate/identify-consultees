@@ -51,6 +51,20 @@ describe('consultee areas python', () => {
 		assert.strictEqual(fetchMock.mock.calls[0].arguments[1].headers['x-api-key'], 'test-function-api-key');
 	});
 
+	it('calls the function without an x-api-key header when no API key is configured', async (t) => {
+		const fetchMock = t.mock.method(globalThis, 'fetch', async () => ({
+			ok: true,
+			json: async () => ({ rows: [] })
+		}));
+
+		const res = newRes();
+		const run = buildRunConsulteeAreasPython({ ...newService(), pythonFunctionApiKey: undefined });
+		await run({}, res);
+
+		assert.strictEqual(fetchMock.mock.callCount(), 1);
+		assert.strictEqual(fetchMock.mock.calls[0].arguments[1].headers, undefined);
+	});
+
 	it('renders an error when the function is unreachable', async (t) => {
 		t.mock.method(globalThis, 'fetch', async () => {
 			throw new Error('network error');
