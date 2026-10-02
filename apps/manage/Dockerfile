@@ -54,6 +54,14 @@ FROM base
 
 ARG GIT_SHA
 
+WORKDIR /usr/src/app
+
+# strip the devDependencies (sass, nodemon, @types/*) out of the shipped
+# filesystem - they only exist for the build steps above and aren't needed at
+# runtime. (A separate fresh stage + npm ci --omit=dev was tried and cost more
+# CI time in a second install than the ~9 packages it removed.)
+RUN npm prune --omit=dev --ignore-scripts
+
 WORKDIR /usr/src/app/apps/manage
 
 ENV NODE_ENV=production
@@ -64,8 +72,6 @@ ENV GIT_SHA=$GIT_SHA
 # src/util/fingerprint-assets.ts ensureEmptyStaticMountDir). Everything is
 # already node-owned from the builder stage.
 USER node
-
-# TODO: Perhaps use `RUN npm ci --production` to shrink the size of the container
 
 EXPOSE 8080
 
