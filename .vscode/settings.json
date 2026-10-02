@@ -19,10 +19,5 @@
 		"editor.defaultFormatter": "esbenp.prettier-vscode"
 	},
 	"eslint.validate": ["javascript", "typescript"],
-	"files.eol": "\n",
-	"github.copilot.enable": {
-		"*": false
-	},
-	"github.copilot.inlineSuggest.enable": false,
-	"github.copilot.editor.enableAutoCompletions": false
+	"files.eol": "\n"
 }
