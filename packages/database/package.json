@@ -11,10 +11,13 @@
     "generate": "npx prisma generate",
     "seed": "npx prisma db seed",
     "seed-prod": "npm run generate && node src/seed/seed-prod.ts",
-    "import": "npm run generate && node src/seed/import-cli.ts"
+    "import": "npm run generate && node src/seed/import-cli.ts",
+    "import-from-blob": "npm run generate && node src/seed/import-from-blob.ts"
   },
   "license": "MIT",
   "dependencies": {
+    "@azure/identity": "*",
+    "@azure/storage-blob": "*",
     "@prisma/adapter-mssql": "*",
     "@prisma/client": "*"
   },
