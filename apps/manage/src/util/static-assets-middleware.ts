@@ -1,4 +1,4 @@
-import type { Handler, RequestHandler, Response } from 'express';
+import type { Handler, Request, RequestHandler, Response } from 'express';
 import { Router as createRouter } from 'express';
 import rateLimit from 'express-rate-limit';
 import { createReadStream, existsSync, readdirSync, statSync } from 'node:fs';
@@ -29,6 +29,12 @@ type IndexedAsset = {
 	absolutePath: string;
 	/** Optional Brotli sidecar discovered at startup. */
 	brotliAbsolutePath?: string;
+	/** Weak ETag derived from file size + mtime at startup. */
+	etag: string;
+	/** HTTP-date string for the Last-Modified header (second precision). */
+	lastModified: string;
+	/** mtime floored to seconds, for If-Modified-Since comparison. */
+	lastModifiedMs: number;
 };
 
 export type StaticAssetsRateLimiterOptions = {
@@ -50,6 +56,35 @@ function acceptsBrotli(acceptEncodingHeader: string | undefined): boolean {
 		return false;
 	}
 	return acceptEncodingHeader.split(',').some((part) => part.trim().toLowerCase().startsWith('br'));
+}
+
+/**
+ * Weak ETag comparison for If-None-Match: a list of entity-tags or `*`,
+ * where the `W/` prefix is ignored (weak comparison per RFC 9110).
+ */
+function ifNoneMatchMatches(headerValue: string, etag: string): boolean {
+	if (headerValue.trim() === '*') {
+		return true;
+	}
+	const bareEtag = etag.replace(/^W\//, '');
+	return headerValue.split(',').some((candidate) => candidate.trim().replace(/^W\//, '') === bareEtag);
+}
+
+/**
+ * Whether the client's cached copy is still fresh: If-None-Match takes
+ * precedence over If-Modified-Since (per RFC 9110 evaluation order).
+ */
+function isFreshRequest(req: Request, entry: IndexedAsset): boolean {
+	const ifNoneMatch = req.get('if-none-match');
+	if (ifNoneMatch) {
+		return ifNoneMatchMatches(ifNoneMatch, entry.etag);
+	}
+	const ifModifiedSince = req.get('if-modified-since');
+	if (ifModifiedSince) {
+		const since = Date.parse(ifModifiedSince);
+		return !Number.isNaN(since) && since >= entry.lastModifiedMs;
+	}
+	return false;
 }
 
 function setCacheControl(res: Response, absolutePath: string): void {
@@ -95,7 +130,14 @@ export function buildStaticAssetIndex(staticDir: string): ReadonlyMap<string, In
 
 			const relativePosix = path.relative(resolvedStaticDir, absolutePath).split(path.sep).join('/');
 			const brotliAbsolutePath = `${absolutePath}.br`;
-			const entry: IndexedAsset = { absolutePath };
+			// floor to seconds: HTTP dates can't express sub-second precision
+			const lastModifiedMs = Math.floor(stats.mtimeMs / 1000) * 1000;
+			const entry: IndexedAsset = {
+				absolutePath,
+				etag: `W/"${stats.size}-${lastModifiedMs}"`,
+				lastModified: new Date(lastModifiedMs).toUTCString(),
+				lastModifiedMs
+			};
 			if (existsSync(brotliAbsolutePath)) {
 				entry.brotliAbsolutePath = brotliAbsolutePath;
 			}
@@ -147,6 +189,8 @@ export function staticAssetRequestKey(requestPath: string): string | null {
  * - Brotli precompressed sidecars when the client accepts `br`
  * - Rate limiting
  * - `Cache-Control: public, max-age=31536000, immutable` only for fingerprinted assets
+ * - `ETag`/`Last-Modified` validators so stale-but-unchanged assets can be
+ *   revalidated cheaply with a 304 (mainly the un-fingerprinted 1-day assets)
  */
 export function createStaticAssetsMiddleware(
 	staticDir: string,
@@ -182,9 +226,21 @@ export function createStaticAssetsMiddleware(
 		res.status(200);
 		res.setHeader('Content-Type', contentTypeFor(entry.absolutePath));
 		setCacheControl(res, entry.absolutePath);
+		res.setHeader('ETag', entry.etag);
+		res.setHeader('Last-Modified', entry.lastModified);
+		if (brotliPath !== undefined) {
+			// the response varies on Accept-Encoding whenever a br variant exists,
+			// even when this particular response is not the encoded one
+			res.setHeader('Vary', 'Accept-Encoding');
+		}
 		if (useBrotli) {
 			res.setHeader('Content-Encoding', 'br');
-			res.setHeader('Vary', 'Accept-Encoding');
+		}
+
+		if (isFreshRequest(req, entry)) {
+			res.status(304);
+			res.end();
+			return;
 		}
 
 		if (req.method === 'HEAD') {

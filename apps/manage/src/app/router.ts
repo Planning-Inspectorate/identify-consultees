@@ -57,7 +57,7 @@ export function buildRouter(service: ManageService, options: BuildRouterOptions 
 	const authRateLimiter = options.authRateLimiter ?? buildAuthRateLimiter();
 
 	router.use('/', monitoringRoutes);
-	router.use(createDefraVendorRouter());
+	router.use(createDefraVendorRouter({ maxAge: service.cacheControl.maxAge }));
 
 	// don't cache responses, note no-cache allows some caching, but with revalidation
 	// see https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Cache-Control#no-cache
