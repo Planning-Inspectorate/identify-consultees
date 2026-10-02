@@ -11,6 +11,7 @@ describe('ManageService', () => {
 			assert.equal(service.authDisabled, true);
 			assert.equal(service.authConfig.clientId, 'client-id');
 			assert.equal(service.pythonFunctionUrl, config.pythonFunctionUrl);
+			assert.equal(service.pythonFunctionApiKey, config.pythonFunctionApiKey);
 			assert.equal(service.assetsStaticDir, config.staticDir);
 			assert.match(service.staticDir, /\.core-static-noop$/);
 		} finally {
