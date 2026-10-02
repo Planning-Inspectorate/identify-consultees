@@ -36,11 +36,11 @@
     "prepare": "node .husky/install.mjs",
     "postinstall": "npm run deps:patch-maplibre && npm run check-toolchain",
     "start": "node scripts/start-local.mjs",
-    "test": "node --test && npm run test:frontend-coverage && npm run test:e2e --workspace identify-consultees-manage",
+    "test": "node --test \"apps/function/**/*.test.*\" \"packages/**/*.test.*\" \"scripts/**/*.test.*\" && npm run test:frontend-coverage && npm run test:e2e --workspace identify-consultees-manage",
     "test:e2e": "npm run test:e2e --workspace identify-consultees-manage",
     "test:visual": "npm run test:visual --workspace identify-consultees-manage",
     "test:frontend-coverage": "npm run test:coverage --workspace identify-consultees-manage",
-    "test-coverage": "node --test --experimental-test-coverage && npm run test:e2e --workspace identify-consultees-manage && npm run test:frontend-coverage",
+    "test-coverage": "node --test --experimental-test-coverage \"apps/function/**/*.test.*\" \"packages/**/*.test.*\" \"scripts/**/*.test.*\" && npm run test:e2e --workspace identify-consultees-manage && npm run test:frontend-coverage",
     "playwright:install": "npm run playwright:install --workspace identify-consultees-manage"
   },
   "dependencies": {
