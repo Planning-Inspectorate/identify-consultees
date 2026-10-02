@@ -97,6 +97,18 @@ Azure jobs use PINS `node_script.yml` with `nodeVersion: 22.23.2` (see `.azure/p
 - Keep the root `overrides.preact` on `^10.29.8` so that conflict resolves to Defra’s preact 10 line in the lockfile.
 - Emergency bypass only: `SKIP_TOOLCHAIN_CHECK=1` (do not use for normal PR work).
 
+### Why React and Preact appear in `package.json`
+
+No application code imports React or Preact — the manage UI is GOV.UK Frontend Nunjucks macros plus vanilla JS only. These entries are transitive peer-dependency plumbing that `npm ci` needs:
+
+| Entry                                                      | Why it exists                                                                                                                                                                                                                                                                                                                                |
+| ---------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `optionalDependencies` → `react`, `react-dom`, `scheduler` | Required (non-optional) peer deps of `@prisma/studio-core` — pulled in by the `prisma` CLI for `prisma studio` — and of the `@visx/*` / `@radix-ui/*` packages it brings. Pinning them keeps `node_modules/react` (etc.) in the lockfile so Azure `npm ci` does not fail with “Missing: react@… from lock file” (PR #53 / commit `2e4f99d`). |
+| `overrides.preact` → `^10.29.8`                            | `@defra/interactive-map` ships Preact-compiled code (`preact` is a real dependency of the map). `accessible-autocomplete` declares an optional `preact@^8` peer; the override keeps resolution on the Defra v10 line.                                                                                                                        |
+| `node_modules/preact` in the lockfile                      | Satisfies `@defra/interactive-map` at runtime — the interactive map component genuinely runs on Preact.                                                                                                                                                                                                                                      |
+
+Do not remove these entries as a “cleanup” — they are enforced by `scripts/check-toolchain.mjs` and removing them breaks Azure `npm ci`. They can only go if the underlying dependencies (`prisma` CLI, `@defra/interactive-map`, `accessible-autocomplete`) are removed, which is an architecture decision, not a tidy-up.
+
 ### Switching locally
 
 ```bash

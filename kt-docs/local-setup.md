@@ -17,6 +17,15 @@
 
 Do **not** regenerate `package-lock.json` with Node 24 / npm 11. See root `AGENTS.md` toolchain section.
 
+## Why React and Preact appear in `package.json`
+
+The manage UI is **GOV.UK Frontend + Nunjucks + vanilla JavaScript only** — no app code imports React or Preact. Those entries exist so `npm ci` can satisfy transitive peer dependencies:
+
+- `optionalDependencies` → `react`, `react-dom`, `scheduler`: required peers of `@prisma/studio-core` (a `prisma` CLI dependency, used for `prisma studio`) and the `@visx` / `@radix-ui` packages it brings. Keeping them pinned prevents “Missing: react@… from lock file” failures in Azure `npm ci`.
+- `overrides.preact` → `^10.29.8`: `@defra/interactive-map` ships Preact-compiled code, while `accessible-autocomplete` asks for `preact@^8`. The override resolves both to the v10 line.
+
+They can only be removed alongside the underlying dependencies — see the `AGENTS.md` toolchain section and [Troubleshooting](./troubleshooting.md).
+
 ## Install and start (happy path)
 
 From a clean clone:

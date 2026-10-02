@@ -19,6 +19,8 @@
 
 Reassess only with an explicit product/architecture decision — not for convenience on a single page.
 
+> **Note:** `react`, `react-dom`, `scheduler`, and `preact` in `package.json` are **not** a UI stack — they are transitive peer-dependency entries required by the Prisma CLI and the Defra interactive map so `npm ci` succeeds. See [Local setup](./local-setup.md#why-react-and-preact-appear-in-packagejson).
+
 ## Page layout
 
 `views/layouts/main.njk` extends `govuk/template.njk` and provides:
