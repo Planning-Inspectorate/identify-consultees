@@ -12,6 +12,15 @@ export interface Config extends BaseConfig {
 	// apps/function-python/function_app.py; Key Vault-wired in infrastructure. Optional so local
 	// setups without the function running keep working.
 	pythonFunctionApiKey: string | undefined;
+	// the app's own blob storage container (infrastructure/storage.tf) - Entra/managed-identity
+	// auth only, no connection string/key (shared_access_key_enabled = false on the storage
+	// account). Optional so local setups without a configured storage account keep working.
+	blobStore:
+		| {
+				host: string;
+				container: string;
+		  }
+		| undefined;
 	auth: {
 		authority: string;
 		clientId: string;
@@ -67,6 +76,8 @@ export function loadConfig(): Config {
 		AUTH_DISABLED,
 		AUTH_GROUP_APPLICATION_ACCESS,
 		AUTH_TENANT_ID,
+		BLOB_STORE_HOST,
+		BLOB_STORE_CONTAINER,
 		CACHE_CONTROL_MAX_AGE,
 		GIT_SHA,
 		LOG_LEVEL,
@@ -118,6 +129,8 @@ export function loadConfig(): Config {
 		appHostname: APP_HOSTNAME || '',
 		pythonFunctionUrl: PYTHON_FUNCTION_URL || undefined,
 		pythonFunctionApiKey: PYTHON_FUNCTION_API_KEY || undefined,
+		blobStore:
+			BLOB_STORE_HOST && BLOB_STORE_CONTAINER ? { host: BLOB_STORE_HOST, container: BLOB_STORE_CONTAINER } : undefined,
 		auth: {
 			authority: `https://login.microsoftonline.com/${AUTH_TENANT_ID}`,
 			clientId: AUTH_CLIENT_ID || '',

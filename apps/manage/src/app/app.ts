@@ -26,6 +26,9 @@ export function createApp(service: ManageService): Express {
 			buildOwaspSecurityHeadersMiddleware({ isProduction }),
 			addLocalsConfiguration()
 		],
-		cspDirectives: buildContentSecurityPolicyDirectives({ isProduction })
+		cspDirectives: buildContentSecurityPolicyDirectives({ isProduction }),
+		// multer needs the raw multipart body before lusca CSRF can read a token from it - see
+		// node_modules/@planning-inspectorate/core/dist/app/csrf.js
+		multiPartFormRoutes: ['/admin/upload-to-blob/run']
 	});
 }

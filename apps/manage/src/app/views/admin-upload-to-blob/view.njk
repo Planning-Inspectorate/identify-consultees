@@ -1,0 +1,45 @@
+{% extends "views/layouts/main.njk" %}
+
+{% from "govuk/components/button/macro.njk" import govukButton %}
+{% from "govuk/components/error-message/macro.njk" import govukErrorMessage %}
+{% from "govuk/components/file-upload/macro.njk" import govukFileUpload %}
+{% from "govuk/components/notification-banner/macro.njk" import govukNotificationBanner %}
+
+{% block pageTitle %}
+    {{ pageHeading }} - {{ config.headerTitle }}
+{% endblock %}
+
+{% block pageContent %}
+    <h1 class="govuk-heading-l">{{ pageHeading }}</h1>
+
+    <p class="govuk-body">
+        Internal tool - uploads a file directly to the application's own blob storage container
+        (<code>infrastructure/storage.tf</code>), using the app's managed identity. Useful for
+        getting a large file (e.g. the full real reference dataset - see
+        <code>packages/database/src/seed/import-from-blob.ts</code>) into storage without needing
+        VPN/Bastion access to the storage account's private endpoint.
+    </p>
+
+    {% if uploadedBlobName %}
+        {{ govukNotificationBanner({
+            type: "success",
+            titleText: "Success",
+            text: "Uploaded \"" + uploadedBlobName + "\" to blob storage."
+        }) }}
+    {% endif %}
+
+    <form method="post" action="/admin/upload-to-blob/run" enctype="multipart/form-data" novalidate>
+        {% if error %}
+            {{ govukErrorMessage({ text: error }) }}
+        {% endif %}
+
+        {{ govukFileUpload({
+            id: "file",
+            name: "file",
+            label: { text: "Upload a file" },
+            hint: { text: "Up to 250MB." }
+        }) }}
+
+        {{ govukButton({ text: "Upload" }) }}
+    </form>
+{% endblock %}

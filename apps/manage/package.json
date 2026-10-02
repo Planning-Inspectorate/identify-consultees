@@ -18,7 +18,9 @@
   },
   "license": "MIT",
   "dependencies": {
+    "@azure/identity": "*",
     "@azure/msal-node": "*",
+    "@azure/storage-blob": "*",
     "@defra/interactive-map": "*",
     "@microsoft/microsoft-graph-client": "*",
     "@pins/identify-consultees-database": "^0.0.0",
@@ -33,12 +35,14 @@
     "express-validator": "*",
     "govuk-frontend": "*",
     "helmet": "*",
+    "multer": "*",
     "nunjucks": "*",
     "pino": "*",
     "pino-pretty": "*",
     "redis": "*"
   },
   "devDependencies": {
+    "@types/multer": "*",
     "nodemon": "*",
     "sass": "*"
   },
