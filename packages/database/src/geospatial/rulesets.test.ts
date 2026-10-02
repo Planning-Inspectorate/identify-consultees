@@ -1,8 +1,12 @@
 import assert from 'node:assert/strict';
+import path from 'node:path';
 import { after, before, describe, test } from 'node:test';
+import { fileURLToPath } from 'node:url';
 import type { PrismaClient } from '../client/client.ts';
 import { loadConfig } from '../configuration/config.ts';
 import { newDatabaseClient } from '../index.ts';
+import { readFeatures, toCaseBoundary } from '../seed/geojson-import.ts';
+import { loadCaseBoundaries } from './case-boundaries.ts';
 import { loadConsulteeAreas } from './consultee-areas.ts';
 import type { Ruleset } from './rulesets.ts';
 import {
@@ -19,6 +23,20 @@ const testAreaId = '22222222-2222-2222-2222-222222222222';
 const secondAreaId = '55555555-5555-5555-5555-555555555555';
 const hostAreaId = '33333333-3333-3333-3333-333333333333';
 const neighbourAreaId = '44444444-4444-4444-4444-444444444444';
+const realCouncilAreaId = '66666666-6666-6666-6666-666666666666';
+const realDistrictAreaId = '77777777-7777-7777-7777-777777777777';
+const realPoliceAreaId = '88888888-8888-8888-8888-888888888888';
+const realHospitalAreaId = '99999999-9999-9999-9999-999999999999';
+const realRailwayAreaId = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
+
+// apps/function-python/setup_database/sample_data/sample_application_boundaries.geojson includes a
+// real project (EN0110019 - EcoPower Suffolk Solar) - using its real, complex geometry (rather than
+// a synthetic Point/Polygon) is what proves the full real ruleset finds multiple relevant
+// consultees for an actual project, not just for conveniently-shaped test fixtures.
+const sampleDataDir = path.resolve(
+	path.dirname(fileURLToPath(import.meta.url)),
+	'../../../../apps/function-python/setup_database/sample_data'
+);
 
 let dbClient: PrismaClient;
 let dbAvailable = false;
@@ -39,7 +57,12 @@ after(async () => {
 });
 
 async function cleanup() {
-	await dbClient.$executeRaw`DELETE FROM consultee_area WHERE id IN (${testAreaId}, ${secondAreaId}, ${hostAreaId}, ${neighbourAreaId})`;
+	await dbClient.$executeRaw`
+		DELETE FROM consultee_area WHERE id IN (
+			${testAreaId}, ${secondAreaId}, ${hostAreaId}, ${neighbourAreaId},
+			${realCouncilAreaId}, ${realDistrictAreaId}, ${realPoliceAreaId}, ${realHospitalAreaId}, ${realRailwayAreaId}
+		)
+	`;
 }
 
 describe('parseRulesetCsv', () => {
@@ -423,5 +446,88 @@ describe('runRuleset', () => {
 		};
 		const matches = await runRuleset(dbClient, { type: 'Point', coordinates: [0, 0] }, ruleset);
 		assert.deepEqual(matches, []);
+	});
+});
+
+describe('runRuleset against a real project (EN0110019 - EcoPower Suffolk Solar)', () => {
+	test('finds multiple relevant consultees across multiple categories for a real project', async (t) => {
+		if (!dbAvailable) return t.skip('SQL Server database not available');
+
+		// the real project's own geometry (181-vertex polygon) - loaded from the same checked-in
+		// file the app itself seeds from, not hand-written, so this test exercises the real shape
+		const rawFeatures = await readFeatures(path.join(sampleDataDir, 'sample_application_boundaries.geojson'));
+		const realFeature = rawFeatures.find((feature) => feature.properties.caseReference === 'EN0110019');
+		assert.ok(realFeature, 'expected EN0110019 to still be present in the sample application boundaries export');
+		const project = toCaseBoundary(realFeature);
+
+		await cleanup();
+		await dbClient.$executeRaw`DELETE FROM case_boundary WHERE id = ${project.id}`;
+		try {
+			await loadCaseBoundaries(dbClient, { type: 'FeatureCollection', features: [project] });
+
+			// realistic categories/distances for this real project, derived from actually running
+			// the full real reference dataset (18k+ real UK consultee areas) against it locally -
+			// not arbitrary: a county and district council whose boundary contains the site, a
+			// police force area doing the same, and a hospital/railway within their real 10km
+			// intersection buffer (see example_ruleset.csv) - this is the real-world shape a correct
+			// ruleset run should find, not just a single category.
+			await loadConsulteeAreas(dbClient, {
+				type: 'FeatureCollection',
+				features: [
+					{
+						id: realCouncilAreaId,
+						type: 'Feature',
+						geometry: project.geometry,
+						properties: { consulteeCategory: 'Upper Tier Authority', consultee: 'Suffolk County Council' }
+					},
+					{
+						id: realDistrictAreaId,
+						type: 'Feature',
+						geometry: project.geometry,
+						properties: { consulteeCategory: 'Lower Tier Authority', consultee: 'Mid Suffolk District Council' }
+					},
+					{
+						id: realPoliceAreaId,
+						type: 'Feature',
+						geometry: project.geometry,
+						properties: { consulteeCategory: 'Police', consultee: 'Suffolk Constabulary' }
+					},
+					{
+						id: realHospitalAreaId,
+						type: 'Feature',
+						// ~6.5km from the site - within the Hospital condition's real 10km buffer
+						geometry: { type: 'Point', coordinates: [1.1828714294908717, 52.38917544689788] },
+						properties: { consulteeCategory: 'Hospital', consultee: 'Hartismere Hospital' }
+					},
+					{
+						id: realRailwayAreaId,
+						type: 'Feature',
+						// ~5.6km from the site - within the Railway condition's real 10km buffer
+						geometry: { type: 'Point', coordinates: [1.2028714294908717, 52.33917544689788] },
+						properties: { consulteeCategory: 'Railway', consultee: 'Test Main Line' }
+					}
+				]
+			});
+
+			const matches = await runRuleset(dbClient, project.geometry, RULESETS[0]);
+
+			const categories = new Set(matches.map((match) => match.feature.properties.consulteeCategory));
+			assert.ok(
+				matches.length >= 5,
+				`expected a real project to find multiple consultees, got ${matches.length}: ${JSON.stringify(matches.map((m) => m.feature.properties.consultee))}`
+			);
+			for (const expectedCategory of [
+				'Upper Tier Authority',
+				'Lower Tier Authority',
+				'Police',
+				'Hospital',
+				'Railway'
+			]) {
+				assert.ok(categories.has(expectedCategory), `expected a match in category "${expectedCategory}"`);
+			}
+		} finally {
+			await cleanup();
+			await dbClient.$executeRaw`DELETE FROM case_boundary WHERE id = ${project.id}`;
+		}
 	});
 });
