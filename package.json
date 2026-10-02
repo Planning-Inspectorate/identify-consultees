@@ -129,6 +129,9 @@
     "qs": "^6.16.0",
     "@humanfs/node": "^0.16.8",
     "maplibre-gl": "6.6.0",
-    "preact": "^10.29.8"
+    "preact": "^10.29.8",
+    "polygon-splitter": {
+      "glob": "^13.0.6"
+    }
   }
 }
