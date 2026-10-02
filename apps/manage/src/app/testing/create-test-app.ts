@@ -24,6 +24,7 @@ export function buildManageTestConfig(authDisabled = true): Config {
 		appHostname: 'localhost',
 		pythonFunctionUrl: 'http://localhost:7071/api/consultee-areas',
 		pythonFunctionApiKey: 'test-function-api-key',
+		blobStore: undefined,
 		auth: {
 			authority: 'https://login.microsoftonline.com/tenant-id',
 			clientId: 'client-id',
@@ -67,7 +68,8 @@ export function createManageTestApp(service: ManageService, options: CreateManag
 		service,
 		configureNunjucks,
 		router: buildRouter(service, { authRateLimiter }),
-		middlewares: [createStaticAssetsMiddleware(service.assetsStaticDir), addLocalsConfiguration()]
+		middlewares: [createStaticAssetsMiddleware(service.assetsStaticDir), addLocalsConfiguration()],
+		multiPartFormRoutes: ['/admin/upload-to-blob/run']
 	});
 }
 

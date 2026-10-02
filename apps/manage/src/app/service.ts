@@ -34,6 +34,10 @@ export class ManageService extends BaseService<PrismaClient> {
 		return this.#config.pythonFunctionApiKey;
 	}
 
+	get blobStoreConfig(): Config['blobStore'] {
+		return this.#config.blobStore;
+	}
+
 	/**
 	 * Built asset root (fingerprinted + Brotli sidecars). Used by our static middleware.
 	 */

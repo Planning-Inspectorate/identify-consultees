@@ -144,6 +144,24 @@ describe('manage router wiring', () => {
 		assert.match(response.text, /data-map-layers-demo/);
 	});
 
+	test('GET /admin/upload-to-blob renders the upload form', async () => {
+		const response = await request(authDisabledApp).get('/admin/upload-to-blob');
+		assert.equal(response.status, 200);
+		assert.match(response.text, /Upload a file to blob storage/);
+	});
+
+	test('POST /admin/upload-to-blob/run accepts a multipart file and reports blob storage is not configured', async () => {
+		// proves multer (applied in views/admin-upload-to-blob/index.ts) actually parses a real
+		// multipart body end-to-end; the test service has no blobStore configured (see
+		// buildManageTestConfig), so this also exercises that guard rather than a real Azure call -
+		// the successful-upload path is covered by controller.test.ts with an injected uploader
+		const response = await request(authDisabledApp)
+			.post('/admin/upload-to-blob/run')
+			.attach('file', Buffer.from('{}'), 'test.geojson');
+		assert.equal(response.status, 200);
+		assert.match(response.text, /not configured/);
+	});
+
 	test('GET /components lists every GOV.UK Frontend component', async () => {
 		const response = await request(authDisabledApp).get('/components');
 		assert.equal(response.status, 200);

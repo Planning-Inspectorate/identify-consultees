@@ -20,6 +20,8 @@ const managedKeys = [
 	'AUTH_DISABLED',
 	'AUTH_GROUP_APPLICATION_ACCESS',
 	'AUTH_TENANT_ID',
+	'BLOB_STORE_CONTAINER',
+	'BLOB_STORE_HOST',
 	'ENVIRONMENT',
 	'LOG_LEVEL',
 	'CACHE_CONTROL_MAX_AGE',
@@ -74,6 +76,21 @@ describe('manage loadConfig', () => {
 		setBaseEnv({ PYTHON_FUNCTION_URL: '' });
 		const config = loadConfig();
 		assert.strictEqual(config.pythonFunctionUrl, undefined);
+	});
+
+	test('leaves blobStore undefined when BLOB_STORE_HOST/CONTAINER are missing', () => {
+		setBaseEnv({ BLOB_STORE_HOST: '', BLOB_STORE_CONTAINER: '' });
+		const config = loadConfig();
+		assert.strictEqual(config.blobStore, undefined);
+	});
+
+	test('populates blobStore when both BLOB_STORE_HOST and BLOB_STORE_CONTAINER are set', () => {
+		setBaseEnv({ BLOB_STORE_HOST: 'https://example.blob.core.windows.net/', BLOB_STORE_CONTAINER: 'consultees-data' });
+		const config = loadConfig();
+		assert.deepEqual(config.blobStore, {
+			host: 'https://example.blob.core.windows.net/',
+			container: 'consultees-data'
+		});
 	});
 
 	test('throws when PORT is not an integer', () => {
