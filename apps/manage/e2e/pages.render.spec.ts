@@ -82,7 +82,10 @@ const pages = [
 test.describe('cross-browser render completeness', () => {
 	for (const pageCase of pages) {
 		test(`${pageCase.name} renders primary content`, async ({ page }, testInfo) => {
-			const response = await page.goto(pageCase.path);
+			// 'load' is deliberately avoided: Firefox intermittently never reports it to
+			// Playwright under parallel load even when the page (and all subresources)
+			// have finished - the assertions below only need the DOM anyway.
+			const response = await page.goto(pageCase.path, { waitUntil: 'domcontentloaded' });
 			expect(response, 'navigation should return a response').not.toBeNull();
 			expect(response!.ok() || response!.status() === 404).toBeTruthy();
 
@@ -118,7 +121,9 @@ test.describe('cross-browser render completeness', () => {
 	}
 
 	test('consultees results exposes a map region', async ({ page }) => {
-		await page.goto(`/consultees/${SAMPLE_CASE_ID}/results?ruleset=${SAMPLE_RULESET_ID}`);
+		await page.goto(`/consultees/${SAMPLE_CASE_ID}/results?ruleset=${SAMPLE_RULESET_ID}`, {
+			waitUntil: 'domcontentloaded'
+		});
 		await expect(page.getByRole('heading', { level: 2, name: /Consultees identified/i })).toBeVisible();
 
 		const mapRegion = page.locator('[data-consultee-map].app-case-map').first();
@@ -131,7 +136,7 @@ test.describe('cross-browser render completeness', () => {
 	});
 
 	test('map layers demo host is present for progressive enhancement', async ({ page }) => {
-		await page.goto('/map-layers-demo');
+		await page.goto('/map-layers-demo', { waitUntil: 'domcontentloaded' });
 		const host = page.locator('[data-map-layers-demo].app-case-map');
 		await expect(host).toBeAttached();
 		await expect(host).toHaveAttribute('role', 'region');
