@@ -21,7 +21,7 @@ def fetch_consultee_areas(params: ConnectionParams, limit: int = 50) -> list[dic
     # limit is interpolated into the TOP clause (pymssql can't parameterise it), so it
     # must be a real int in a sane range - bool is a subclass of int, exclude it too
     if isinstance(limit, bool) or not isinstance(limit, int):
-        raise ValueError("limit must be an integer")
+        raise TypeError("limit must be an integer")
     if not 1 <= limit <= 500:
         raise ValueError("limit must be between 1 and 500")
     top = limit
