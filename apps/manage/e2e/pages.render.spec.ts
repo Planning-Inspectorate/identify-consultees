@@ -42,6 +42,18 @@ const pages = [
 		mustSee: [/Railway lines/i, /Road network/i]
 	},
 	{
+		path: '/components?components=true',
+		name: 'components index',
+		heading: /GOV.UK Frontend components/i,
+		mustSee: [/Accordion/i, /Warning text/i, /Components/i]
+	},
+	{
+		path: '/components/tag?components=true',
+		name: 'component detail',
+		heading: /Tag/i,
+		mustSee: [/default/i]
+	},
+	{
 		path: '/signed-out',
 		name: 'signed out',
 		heading: /You have signed out/i,

@@ -1,0 +1,19 @@
+{% extends "views/layouts/main.njk" %}
+
+{% block pageTitle %}
+	{{ pageHeading }} - GOV.UK Frontend components - {{ config.headerTitle }}
+{% endblock %}
+
+{% block pageContent %}
+	<p class="govuk-body">
+		Rendered examples for the <code>{{ componentName }}</code> component,
+		from the fixtures shipped with GOV.UK Frontend.
+	</p>
+
+	{% for example in examples %}
+		<h2 class="govuk-heading-m">{{ example.name }}</h2>
+		<div class="pins-component-example">
+			{{ example.html | safe }}
+		</div>
+	{% endfor %}
+{% endblock %}

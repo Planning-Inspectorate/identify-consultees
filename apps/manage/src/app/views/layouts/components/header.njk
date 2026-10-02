@@ -25,7 +25,7 @@
 	}) }}
 {% endmacro %}
 
-{% macro pinsServiceNavigation(serviceName, hideSignOut = false) %}
+{% macro pinsServiceNavigation(serviceName, hideSignOut = false, showComponents = false) %}
 	{% set navigationItems = [
 		{
 			href: "/",
@@ -33,6 +33,13 @@
 			active: not hideSignOut
 		}
 	] %}
+
+	{% if showComponents %}
+		{% set navigationItems = (navigationItems.push({
+			href: "/components?components=true",
+			text: "Components"
+		}), navigationItems) %}
+	{% endif %}
 
 	{% if not hideSignOut %}
 		{% set navigationItems = (navigationItems.push({

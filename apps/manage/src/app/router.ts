@@ -6,6 +6,7 @@ import type { IRouter, RequestHandler } from 'express';
 import { Router as createRouter } from 'express';
 import rateLimit from 'express-rate-limit';
 import { createDefraVendorRouter } from './maps/vendor.ts';
+import { createRoutes as createComponentRoutes } from './views/components/index.ts';
 import { createRoutes as createConsulteeAreasDirectRoutes } from './views/consultee-areas-direct/index.ts';
 import { createRoutes as createConsulteeAreasPythonRoutes } from './views/consultee-areas-python/index.ts';
 import { createRoutes as createConsulteeRoutes } from './views/consultees/index.ts';
@@ -48,6 +49,7 @@ export function buildRouter(service: ManageService, options: BuildRouterOptions 
 	const homeRoutes = createHomeRoutes(service);
 	const consulteeRoutes = createConsulteeRoutes(service);
 	const mapLayersDemoRoutes = createMapLayersDemoRoutes();
+	const componentRoutes = createComponentRoutes();
 	const itemsRoutes = createItemRoutes(service);
 	const consulteeAreasPythonRoutes = createConsulteeAreasPythonRoutes(service);
 	const consulteeAreasDirectRoutes = createConsulteeAreasDirectRoutes(service);
@@ -98,6 +100,7 @@ export function buildRouter(service: ManageService, options: BuildRouterOptions 
 	router.use('/', homeRoutes);
 	router.use('/consultees', consulteeRoutes);
 	router.use('/map-layers-demo', mapLayersDemoRoutes);
+	router.use('/components', componentRoutes);
 	router.use('/items', itemsRoutes);
 	router.use('/consultee-areas-python', consulteeAreasPythonRoutes);
 	router.use('/consultee-areas-direct', consulteeAreasDirectRoutes);

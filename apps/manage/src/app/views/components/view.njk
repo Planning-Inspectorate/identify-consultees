@@ -1,0 +1,22 @@
+{% extends "views/layouts/main.njk" %}
+
+{% block pageTitle %}
+	{{ pageHeading }} - {{ config.headerTitle }}
+{% endblock %}
+
+{% block pageContent %}
+	<p class="govuk-body">
+		Every component shipped with the installed version of GOV.UK Frontend,
+		rendered from the fixture data it publishes for testing. Select a
+		component to see all of its documented examples.
+	</p>
+
+	<ul class="govuk-list govuk-list--bullet">
+		{% for component in components %}
+			<li>
+				<a class="govuk-link" href="{{ component.href }}">{{ component.title }}</a>
+				({{ component.exampleCount }} example{{ 's' if component.exampleCount != 1 }})
+			</li>
+		{% endfor %}
+	</ul>
+{% endblock %}

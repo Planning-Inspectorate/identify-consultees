@@ -2,6 +2,13 @@ import axe from 'axe-core';
 import { JSDOM } from 'jsdom';
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
+import {
+	createGovukNunjucksEnvironment,
+	getVisibleFixtures,
+	loadComponentCatalogue,
+	renderGovukComponent,
+	scopeFixtureIds
+} from './govuk-frontend-components.ts';
 import { configureNunjucks } from './nunjucks.ts';
 
 const pageLocals = {
@@ -145,6 +152,38 @@ describe('manage page accessibility smoke', () => {
 			...pageLocals,
 			hideSignOut: true,
 			signInHref: '/'
+		});
+		await assertNoSeriousA11yViolations(html);
+	});
+
+	test('components index page has no serious a11y violations', async () => {
+		const html = nunjucks.render('views/components/view.njk', {
+			...pageLocals,
+			pageHeading: 'GOV.UK Frontend components',
+			components: [
+				{ name: 'button', title: 'Button', href: '/components/button', exampleCount: 22 },
+				{ name: 'tag', title: 'Tag', href: '/components/tag', exampleCount: 9 }
+			]
+		});
+		await assertNoSeriousA11yViolations(html);
+	});
+
+	test('component detail page has no serious a11y violations', async () => {
+		const env = createGovukNunjucksEnvironment();
+		const entry = loadComponentCatalogue().find((item) => item.component === 'checkboxes');
+		assert.ok(entry);
+		const examples = getVisibleFixtures(entry).map((fixture, index) => ({
+			name: fixture.name,
+			html: scopeFixtureIds(renderGovukComponent(env, 'checkboxes', fixture.options), `checkboxes-${index}`)
+		}));
+
+		const html = nunjucks.render('views/components/component.njk', {
+			...pageLocals,
+			pageHeading: 'Checkboxes',
+			componentName: 'checkboxes',
+			backLinkUrl: '/components',
+			backLinkText: 'Back to components',
+			examples
 		});
 		await assertNoSeriousA11yViolations(html);
 	});

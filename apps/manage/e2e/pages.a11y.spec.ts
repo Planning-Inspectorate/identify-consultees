@@ -20,6 +20,8 @@ const pages = [
 		name: 'consultees results'
 	},
 	{ path: '/map-layers-demo', name: 'map layers demo' },
+	{ path: '/components?components=true', name: 'components index' },
+	{ path: '/components/checkboxes?components=true', name: 'component detail' },
 	{ path: '/signed-out', name: 'signed out' },
 	{ path: '/items', name: 'items list' },
 	{ path: '/consultee-areas-python', name: 'consultee areas python' },
