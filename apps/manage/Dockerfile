@@ -1,5 +1,11 @@
 # Stage 1/2 - Builder
-FROM node:22-alpine AS base
+# Pinned to the repo toolchain (package.json engines / .nvmrc): node:22-alpine
+# floats to newer patch releases whose npm no longer satisfies engine-strict.
+FROM node:22.23.2-alpine AS base
+
+# npm nags about newer npm releases on every command; the image ships the pinned
+# toolchain so the notice is never actionable here.
+ENV npm_config_update_notifier=false
 
 #RUN apk update
 
@@ -9,6 +15,9 @@ WORKDIR /usr/src/app
 
 COPY package.json .
 COPY package-lock.json .
+# repo npm config (engine-strict, fund/audit off, legacy-peer-deps off) so the
+# install behaves exactly like CI and stays quiet
+COPY .npmrc .
 
 # scripts/ is needed for deps:patch-maplibre below (it lives in the root package.json)
 COPY scripts ./scripts
