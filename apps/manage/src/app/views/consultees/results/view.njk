@@ -9,9 +9,9 @@
 
 {% block head %}
 	{{ super() }}
-	<link rel="stylesheet" href="/vendor/interactive-map/css/index.css">
-	<link rel="stylesheet" href="/vendor/datasets-plugin/css/index.css">
-	<link rel="stylesheet" href="/vendor/map-key-plugin/css/index.css">
+	<link rel="stylesheet" href="/{{ config.vendorInteractiveMapCss }}">
+	<link rel="stylesheet" href="/{{ config.vendorDatasetsPluginCss }}">
+	<link rel="stylesheet" href="/{{ config.vendorMapKeyPluginCss }}">
 {% endblock %}
 
 {% block beforeContent %}
@@ -71,9 +71,9 @@
 {% endblock %}
 
 {% block bodyEnd %}
-	<script defer src="/vendor/interactive-map/js/index.js"></script>
-	<script defer src="/vendor/maplibre-provider/js/index.js"></script>
-	<script defer src="/vendor/datasets-plugin/js/index.js"></script>
-	<script defer src="/vendor/map-key-plugin/js/index.js"></script>
+	<script defer src="/{{ config.vendorInteractiveMapJs }}"></script>
+	<script defer src="/{{ config.vendorMaplibreProviderJs }}"></script>
+	<script defer src="/{{ config.vendorDatasetsPluginJs }}"></script>
+	<script defer src="/{{ config.vendorMapKeyPluginJs }}"></script>
 	<script type="module" src="/{{ config.consulteesMapJs }}"></script>
 {% endblock %}

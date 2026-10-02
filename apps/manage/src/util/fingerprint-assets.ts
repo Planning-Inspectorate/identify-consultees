@@ -12,7 +12,14 @@ export const ASSET_HASH_PATTERN = /-[0-9a-f]{8}(?=\.[^.]+$)/i;
 const BROTLI_EXTENSIONS = new Set(['.css', '.js', '.mjs', '.svg', '.json', '.map', '.txt', '.xml', '.html']);
 
 /** Files we fingerprint at build time (relative to staticDir, posix-style). */
-const FINGERPRINT_GLOBS = [/^assets\/js\/.+\.js$/i, /^assets\/css\/.+\.css$/i, /^javascripts\/.+\.js$/i];
+const FINGERPRINT_GLOBS = [
+	/^assets\/js\/.+\.js$/i,
+	/^assets\/css\/.+\.css$/i,
+	/^javascripts\/.+\.js$/i,
+	// Defra vendor bundle entry points copied in at build time; webpack lazy
+	// chunks under vendor/ are referenced by literal filename and must stay put
+	/^vendor\/[\w-]+\/(js|css)\/index\.(js|css)$/i
+];
 
 export type AssetManifest = {
 	/** Logical path → fingerprinted public path (no leading slash). */
@@ -161,7 +168,14 @@ export async function applyAssetManifestToLocalsFile(localsFile: string, manifes
 		{ logical: 'javascripts/consultees-map.js', property: 'consulteesMapJs' },
 		{ logical: 'javascripts/map-layers-demo.js', property: 'mapLayersDemoJs' },
 		{ logical: 'assets/js/accessible-autocomplete.min.js', property: 'accessibleAutocompleteJs' },
-		{ logical: 'assets/css/accessible-autocomplete.min.css', property: 'accessibleAutocompleteCss' }
+		{ logical: 'assets/css/accessible-autocomplete.min.css', property: 'accessibleAutocompleteCss' },
+		{ logical: 'vendor/interactive-map/js/index.js', property: 'vendorInteractiveMapJs' },
+		{ logical: 'vendor/interactive-map/css/index.css', property: 'vendorInteractiveMapCss' },
+		{ logical: 'vendor/maplibre-provider/js/index.js', property: 'vendorMaplibreProviderJs' },
+		{ logical: 'vendor/datasets-plugin/js/index.js', property: 'vendorDatasetsPluginJs' },
+		{ logical: 'vendor/datasets-plugin/css/index.css', property: 'vendorDatasetsPluginCss' },
+		{ logical: 'vendor/map-key-plugin/js/index.js', property: 'vendorMapKeyPluginJs' },
+		{ logical: 'vendor/map-key-plugin/css/index.css', property: 'vendorMapKeyPluginCss' }
 	];
 
 	for (const { logical, property } of replacements) {

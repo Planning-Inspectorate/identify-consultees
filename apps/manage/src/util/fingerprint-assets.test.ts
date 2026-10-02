@@ -35,6 +35,12 @@ describe('fingerprint-assets', () => {
 		assert.equal(shouldFingerprintRelativePath('javascripts/app.test.js'), false);
 		assert.equal(shouldFingerprintRelativePath('javascripts/app-aabbccdd.js'), false);
 		assert.equal(shouldFingerprintRelativePath('javascripts/app.js'), true);
+		// vendor bundle entry points are fingerprinted, but webpack lazy chunks
+		// keep stable names (they are referenced by literal filename at runtime)
+		assert.equal(shouldFingerprintRelativePath('vendor/datasets-plugin/js/index.js'), true);
+		assert.equal(shouldFingerprintRelativePath('vendor/datasets-plugin/css/index.css'), true);
+		assert.equal(shouldFingerprintRelativePath('vendor/datasets-plugin/js/6924.js'), false);
+		assert.equal(shouldFingerprintRelativePath('vendor/datasets-plugin/js/index-01234567.js'), false);
 		assert.equal(shouldBrotliRelativePath('style.css.br'), false);
 		assert.equal(shouldBrotliRelativePath('style.css'), true);
 		assert.equal(shouldBrotliRelativePath('image.png'), false);
@@ -50,6 +56,9 @@ describe('fingerprint-assets', () => {
 		await writeFile(path.join(tempDir, 'javascripts', 'map-layers-demo.js'), 'export const demo = true;\n');
 		await writeFile(path.join(tempDir, 'style-aabbccdd.css'), 'body{color:red}');
 		await writeFile(path.join(tempDir, 'assets', 'images', 'keep.png'), Buffer.from([1, 2, 3]));
+		await mkdir(path.join(tempDir, 'vendor', 'map-key-plugin', 'js'), { recursive: true });
+		await writeFile(path.join(tempDir, 'vendor', 'map-key-plugin', 'js', 'index.js'), 'globalThis.mkp = {};\n');
+		await writeFile(path.join(tempDir, 'vendor', 'map-key-plugin', 'js', '6924.js'), 'globalThis.chunk = {};\n');
 
 		const manifest = await fingerprintAndCompressStaticAssets(tempDir);
 
@@ -57,6 +66,8 @@ describe('fingerprint-assets', () => {
 		assert.match(manifest.assets['javascripts/consultees-map.js'], /consultees-map-[0-9a-f]{8}\.js/);
 		assert.match(manifest.assets['javascripts/map-layers-demo.js'], /map-layers-demo-[0-9a-f]{8}\.js/);
 		assert.equal(manifest.assets['style.css'], 'style-aabbccdd.css');
+		assert.match(manifest.assets['vendor/map-key-plugin/js/index.js'], /index-[0-9a-f]{8}\.js/);
+		assert.equal(manifest.assets['vendor/map-key-plugin/js/6924.js'], undefined);
 
 		const hashedGovuk = path.join(tempDir, ...manifest.assets['assets/js/govuk-frontend.min.js'].split('/'));
 		const brBody = await readFile(`${hashedGovuk}.br`);
@@ -78,6 +89,7 @@ describe('fingerprint-assets', () => {
 			govukFrontendJs: 'assets/js/govuk-frontend.min.js',
 			consulteesMapJs: 'javascripts/consultees-map.js',
 			mapLayersDemoJs: 'javascripts/map-layers-demo.js',
+			vendorMapKeyPluginJs: 'vendor/map-key-plugin/js/index.js',
 			headerTitle: 'Identify consultees',
 			footerLinks: []
 		};
@@ -92,7 +104,8 @@ describe('fingerprint-assets', () => {
 				'style.css': 'style-deadbeef.css',
 				'assets/js/govuk-frontend.min.js': 'assets/js/govuk-frontend.min-cafebabe.js',
 				'javascripts/consultees-map.js': 'javascripts/consultees-map-01234567.js',
-				'javascripts/map-layers-demo.js': 'javascripts/map-layers-demo-89abcdef.js'
+				'javascripts/map-layers-demo.js': 'javascripts/map-layers-demo-89abcdef.js',
+				'vendor/map-key-plugin/js/index.js': 'vendor/map-key-plugin/js/index-13579bdf.js'
 			}
 		});
 
@@ -101,6 +114,7 @@ describe('fingerprint-assets', () => {
 		assert.match(updated, /govukFrontendJs: 'assets\/js\/govuk-frontend\.min-cafebabe\.js'/);
 		assert.match(updated, /consulteesMapJs: 'javascripts\/consultees-map-01234567\.js'/);
 		assert.match(updated, /mapLayersDemoJs: 'javascripts\/map-layers-demo-89abcdef\.js'/);
+		assert.match(updated, /vendorMapKeyPluginJs: 'vendor\/map-key-plugin\/js\/index-13579bdf\.js'/);
 	});
 
 	test('fingerprintAndCompressStaticAssets skips test files, sidecars, and already-hashed assets', async () => {

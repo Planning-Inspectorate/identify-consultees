@@ -4,6 +4,7 @@ import { createRequire } from 'node:module';
 import path from 'node:path';
 import { loadBuildConfig } from '../app/config.ts';
 import { applyAssetManifestToLocalsFile, fingerprintAndCompressStaticAssets } from './fingerprint-assets.ts';
+import { copyDefraVendorEntryAssets } from './vendor-assets.ts';
 
 /**
  * Do all steps to run the build
@@ -33,6 +34,11 @@ async function run(): Promise<void> {
 		recursive: true,
 		filter: (source) => !source.endsWith('.test.js')
 	});
+
+	// Defra vendor entry points (index.js / index.css) are copied in so the
+	// fingerprint pipeline renames them; webpack lazy chunks keep stable names
+	// and stay on the /vendor express.static mounts
+	await copyDefraVendorEntryAssets(config.staticDir);
 
 	const manifest = await fingerprintAndCompressStaticAssets(config.staticDir);
 	await applyAssetManifestToLocalsFile(localsFile, manifest);

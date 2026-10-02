@@ -75,6 +75,7 @@ Notable features:
 | `app/maps/geometry-bounds.ts`                    | Fit bounds helper (prepared for upload-style maps) |
 | `util/static-assets-middleware.ts`               | Fingerprinted static serving + rate limit          |
 | `util/fingerprint-assets.ts`                     | Build-time asset hashing / Brotli                  |
+| `util/vendor-assets.ts`                          | Defra vendor roots + build-time entry copying      |
 
 ## Request pipeline (mental model)
 

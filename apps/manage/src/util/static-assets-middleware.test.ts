@@ -92,6 +92,49 @@ describe('static-assets-middleware', () => {
 		assert.equal(br.headers['content-encoding'], 'br');
 		assert.equal(br.headers['cache-control'], staticAssetCacheControl.fingerprinted);
 		assert.equal(br.headers['vary'], 'Accept-Encoding');
+
+		// the unencoded variant must also carry Vary so shared caches (e.g. Front
+		// Door) key the object on Accept-Encoding and don't mix the two up
+		assert.equal(plain.headers['vary'], 'Accept-Encoding');
+	});
+
+	test('revalidates unchanged assets with 304 via ETag and Last-Modified', async () => {
+		tempDir = await mkdtemp(path.join(tmpdir(), 'static-assets-mw-etag-'));
+		const relative = 'assets/images/icon.png';
+		const absolute = path.join(tempDir, ...relative.split('/'));
+		await mkdir(path.dirname(absolute), { recursive: true });
+		await writeFile(absolute, Buffer.from([137, 80, 78, 71]));
+
+		const app = express();
+		app.use(
+			createStaticAssetsMiddleware(tempDir, {
+				rateLimiter: buildStaticAssetsRateLimiter({ limit: 100, windowMs: 60_000 })
+			})
+		);
+		app.use((_req, res) => res.status(404).end());
+
+		const first = await request(app).get(`/${relative}`);
+		assert.equal(first.status, 200);
+		assert.ok(first.headers.etag);
+		assert.ok(first.headers['last-modified']);
+
+		const byEtag = await request(app).get(`/${relative}`).set('If-None-Match', first.headers.etag);
+		assert.equal(byEtag.status, 304);
+
+		// strong-tag syntax still matches our weak tag (weak comparison)
+		const weakCompare = await request(app)
+			.get(`/${relative}`)
+			.set('If-None-Match', first.headers.etag.replace(/^W\//, ''));
+		assert.equal(weakCompare.status, 304);
+
+		const wildcard = await request(app).get(`/${relative}`).set('If-None-Match', '*');
+		assert.equal(wildcard.status, 304);
+
+		const byDate = await request(app).get(`/${relative}`).set('If-Modified-Since', first.headers['last-modified']);
+		assert.equal(byDate.status, 304);
+
+		const staleEtag = await request(app).get(`/${relative}`).set('If-None-Match', '"0000-0"');
+		assert.equal(staleEtag.status, 200);
 	});
 
 	test('serves unfingerprinted assets without immutable', async () => {
