@@ -1,5 +1,7 @@
 # Pinned for reproducible builds and supply-chain safety - the deployment package
 # installs whatever this file resolves to (see .azure/pipelines/build.yml), so
 # unpinned deps would pull whatever happened to be latest at deploy time.
-azure-functions==2.3.0
+# azure-functions 2.x requires Python >=3.13; the Function App runtime is 3.12 and CI
+# lint/test uses the agent's system Python 3.10, so we stay on the latest 1.x release.
+azure-functions==1.25.0
 pymssql==2.4.2
