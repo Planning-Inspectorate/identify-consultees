@@ -1,5 +1,10 @@
 node_modules
 **/node_modules
+# generated artifacts - the Docker build produces its own; local ones must
+# never leak into the context and mask a stale generated client
+**/.static
+packages/database/src/client
+**/test-results
 .git
 .github
 .azure

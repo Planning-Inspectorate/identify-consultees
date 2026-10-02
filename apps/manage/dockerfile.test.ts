@@ -21,7 +21,7 @@ describe('manage Dockerfile hardening', () => {
 		);
 		assert.match(
 			dockerfile,
-			/^COPY scripts \.\/scripts/m,
+			/^COPY( --chown=\S+)? scripts \.\/scripts/m,
 			'Dockerfile must COPY scripts/ - the patch script lives there and is otherwise absent from the image'
 		);
 	});
