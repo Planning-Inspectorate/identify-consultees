@@ -1,0 +1,76 @@
+{% extends "views/layouts/main.njk" %}
+
+{% from "govuk/components/inset-text/macro.njk" import govukInsetText %}
+{% from "govuk/components/table/macro.njk" import govukTable %}
+
+{% block pageTitle %}
+	{{ pageHeading }} - Interactive map - {{ config.headerTitle }}
+{% endblock %}
+
+{% block head %}
+	{{ super() }}
+	<link rel="stylesheet" href="/{{ config.vendorInteractiveMapCss }}">
+	{% for stylesheet in pluginStylesheets %}
+		<link rel="stylesheet" href="/{{ stylesheet }}">
+	{% endfor %}
+{% endblock %}
+
+{% block pageContent %}
+	<p class="govuk-body">{{ summary }}</p>
+
+	{{ govukInsetText({ text: interaction }) }}
+
+	<div
+		id="{{ mapId }}"
+		class="app-case-map"
+		role="region"
+		aria-label="{{ mapRegionLabel }}"
+		data-interactive-map-example
+		data-static-map-src="{{ staticMapSrc }}"
+		data-static-map-alt="{{ staticMapAlt }}"
+		data-map-width="{{ mapWidth }}"
+		data-map-height="{{ mapHeight }}"
+	>
+		<noscript>
+			<img
+				class="app-case-map-static"
+				src="{{ staticMapSrc }}"
+				width="{{ mapWidth }}"
+				height="{{ mapHeight }}"
+				alt="{{ staticMapAlt }}"
+			>
+		</noscript>
+	</div>
+	<noscript>
+		<p class="govuk-body app-case-map-js-hint">
+			This static image shows the same map content without JavaScript.
+			The interactive version also supports the plugins listed below.
+		</p>
+	</noscript>
+	<script type="application/json" id="{{ mapId }}-data">{{ mapConfigJson | safe }}</script>
+
+	<h2 class="govuk-heading-m govuk-!-margin-top-6">About this example</h2>
+	{{ govukTable({
+		caption: "About this example",
+		captionClasses: "govuk-visually-hidden",
+		firstCellIsHeader: true,
+		head: [
+			{ text: "Property" },
+			{ text: "Value" }
+		],
+		rows: [
+			[{ text: "Behaviour" }, { text: behaviourLabel }],
+			[{ text: "Plugins" }, { text: pluginsLabel }],
+			[{ text: "Static fallback" }, { text: "AVIF, WebP or PNG (negotiated); SVG on request" }]
+		]
+	}) }}
+{% endblock %}
+
+{% block bodyEnd %}
+	<script defer src="/{{ config.vendorInteractiveMapJs }}"></script>
+	<script defer src="/{{ config.vendorMaplibreProviderJs }}"></script>
+	{% for script in pluginScripts %}
+		<script defer src="/{{ script }}"></script>
+	{% endfor %}
+	<script type="module" src="/{{ config.interactiveMapExamplesJs }}"></script>
+{% endblock %}

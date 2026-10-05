@@ -22,6 +22,14 @@ const pages = [
 	{ path: '/map-layers-demo', name: 'map layers demo' },
 	{ path: '/components?components=true', name: 'components index' },
 	{ path: '/components/checkboxes?components=true', name: 'component detail' },
+	{
+		path: '/components/interactive-map?components=true',
+		name: 'interactive map examples index'
+	},
+	{
+		path: '/components/interactive-map/polygons?components=true',
+		name: 'interactive map example'
+	},
 	{ path: '/signed-out', name: 'signed out' },
 	{ path: '/items', name: 'items list' },
 	{ path: '/consultee-areas-python', name: 'consultee areas python' },
@@ -76,6 +84,16 @@ test.describe('browser accessibility landmarks and skip link', () => {
 
 		await expect(page.locator('[data-consultee-map][role="region"]').first()).toBeAttached();
 		await expect(page.locator('[data-consultee-map]').first()).toHaveAttribute('aria-label', /.+/);
+
+		await expectNoSeriousAxeViolations(page);
+	});
+
+	test('interactive map example host remains an accessible region', async ({ page }) => {
+		await page.goto('/components/interactive-map/basic?components=true');
+
+		const host = page.locator('[data-interactive-map-example][role="region"]');
+		await expect(host).toBeAttached();
+		await expect(host).toHaveAttribute('aria-label', /.+/);
 
 		await expectNoSeriousAxeViolations(page);
 	});

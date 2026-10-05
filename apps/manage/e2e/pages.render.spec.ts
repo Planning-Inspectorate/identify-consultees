@@ -54,6 +54,18 @@ const pages = [
 		mustSee: [/default/i]
 	},
 	{
+		path: '/components/interactive-map?components=true',
+		name: 'interactive map examples index',
+		heading: /Interactive map/i,
+		mustSee: [/Basic map/i, /Style switcher/i]
+	},
+	{
+		path: '/components/interactive-map/polygons?components=true',
+		name: 'interactive map example',
+		heading: /Polygon overlay/i,
+		mustSee: [/About this example/i]
+	},
+	{
 		path: '/signed-out',
 		name: 'signed out',
 		heading: /You have signed out/i,
@@ -133,6 +145,18 @@ test.describe('cross-browser render completeness', () => {
 		await expect(mapRegion).toHaveAttribute('data-map-height', '516');
 		await expect(mapRegion).toHaveAttribute('data-static-map-src', /\/static-map/);
 		await expect(mapRegion).toHaveAttribute('aria-label', new RegExp(SAMPLE_RULESET_NAME, 'i'));
+	});
+
+	test('interactive map example host is present for progressive enhancement', async ({ page }) => {
+		await page.goto('/components/interactive-map/basic?components=true', { waitUntil: 'domcontentloaded' });
+		const host = page.locator('[data-interactive-map-example].app-case-map');
+		await expect(host).toBeAttached();
+		await expect(host).toHaveAttribute('role', 'region');
+		await expect(host).toHaveAttribute('data-map-width', '960');
+		await expect(host).toHaveAttribute('data-map-height', '516');
+		await expect(host).toHaveAttribute('data-static-map-src', '/components/interactive-map/basic/static-map');
+		await expect(host).toHaveAttribute('aria-label', /.+/);
+		await expect(page.locator('#interactive-map-example-basic-data')).toBeAttached();
 	});
 
 	test('map layers demo host is present for progressive enhancement', async ({ page }) => {

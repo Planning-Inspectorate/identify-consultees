@@ -183,6 +183,62 @@ describe('manage router wiring', () => {
 		assert.equal(response.status, 404);
 	});
 
+	test('GET /components/interactive-map lists the Defra map examples', async () => {
+		const response = await request(authDisabledApp).get('/components/interactive-map');
+		assert.equal(response.status, 200);
+		assert.match(response.text, /Interactive map/);
+		assert.match(response.text, /href="\/components\/interactive-map\/basic"/);
+		assert.match(response.text, /href="\/components\/interactive-map\/style-switcher"/);
+	});
+
+	test('GET /components/interactive-map/:example renders a map region with a noscript fallback', async () => {
+		const response = await request(authDisabledApp).get('/components/interactive-map/polygons');
+		assert.equal(response.status, 200);
+		assert.match(response.text, /Polygon overlay/);
+		assert.match(response.text, /role="region"/);
+		assert.match(response.text, /data-interactive-map-example/);
+		assert.match(response.text, /<noscript>[\s\S]*src="\/components\/interactive-map\/polygons\/static-map"/);
+		// only the plugins this example uses are loaded
+		assert.match(response.text, /datasets-plugin\/js\/index(?:-[0-9a-f]{8})?\.js/);
+		assert.doesNotMatch(response.text, /draw-plugin\/js\/index/);
+	});
+
+	test('GET /components/interactive-map/:example 404s for an unknown example', async () => {
+		const response = await request(authDisabledApp).get('/components/interactive-map/not-an-example');
+		assert.equal(response.status, 404);
+	});
+
+	test('GET /components/interactive-map/:example/static-map negotiates and caches the image', async () => {
+		const originalFetch = globalThis.fetch;
+		globalThis.fetch = async () =>
+			new Response(
+				Buffer.from(
+					'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
+					'base64'
+				),
+				{ status: 200, headers: { 'content-type': 'image/png' } }
+			);
+
+		try {
+			const webp = await request(authDisabledApp)
+				.get('/components/interactive-map/basic/static-map')
+				.set('Accept', 'image/webp');
+			assert.equal(webp.status, 200);
+			assert.match(webp.headers['content-type'] || '', /image\/webp/);
+			assert.equal(webp.headers.vary, 'Accept');
+			assert.match(webp.headers['cache-control'] || '', /max-age=/);
+			assert.ok(webp.headers.etag);
+
+			const cached = await request(authDisabledApp)
+				.get('/components/interactive-map/basic/static-map')
+				.set('Accept', 'image/webp')
+				.set('If-None-Match', webp.headers.etag);
+			assert.equal(cached.status, 304);
+		} finally {
+			globalThis.fetch = originalFetch;
+		}
+	});
+
 	test('the Components nav link only renders with ?components=true', async () => {
 		const withoutFlag = await request(authDisabledApp).get('/components');
 		assert.doesNotMatch(withoutFlag.text, />\s*Components\s*<\/a>/);
