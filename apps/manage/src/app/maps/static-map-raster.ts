@@ -61,6 +61,8 @@ export async function renderStaticMapRaster(
 	const width = options.width ?? MAP_VIEWPORT.width;
 	const height = options.height ?? MAP_VIEWPORT.height;
 
+	// one composite() call — sharp replaces (not appends) the input list on
+	// successive calls, which would silently drop the basemap tiles
 	const base = basemapPng
 		? sharp(basemapPng).resize(width, height, { fit: 'fill' })
 		: sharp({
@@ -70,17 +72,18 @@ export async function renderStaticMapRaster(
 					channels: 3,
 					background: BASEMAP_BACKGROUND
 				}
-			}).composite(
-				basemapTiles.map((tile) => ({
-					input: tile.png,
-					left: Math.round(tile.x),
-					top: Math.round(tile.y)
-				}))
-			);
+			});
 
 	const overlay = Buffer.from(renderStaticMapOverlaySvg({ ...options, width, height }));
 
-	const composite = base.composite([{ input: overlay, left: 0, top: 0 }]);
+	const composite = base.composite([
+		...basemapTiles.map((tile) => ({
+			input: tile.png,
+			left: Math.round(tile.x),
+			top: Math.round(tile.y)
+		})),
+		{ input: overlay, left: 0, top: 0 }
+	]);
 
 	switch (format) {
 		case 'avif':

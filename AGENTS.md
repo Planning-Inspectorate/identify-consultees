@@ -369,6 +369,8 @@ OpenStreetMap tile servers and commercial static-map APIs rate-limit and block a
 
 When changing static-map code, preserve ETag fingerprinting of framing + geometry so validators continue to avoid unnecessary upstream work.
 
+`sharp` gotcha in `static-map-raster.ts`: **`.composite()` replaces the input list, it does not append.** Tiles and the overlay must go into a single `.composite()` call — a second call silently drops the basemap, producing a background-only image (this exact bug shipped once because tile fetches also fail silently to an empty array, making the two failure modes indistinguishable). Tests should assert on output pixel stats, not just format signatures.
+
 ### Interactive map component showcase
 
 `/components/interactive-map` (reachable via the `?components=true` showcase) renders one page per worked Defra Interactive Map example from `src/app/maps/interactive-map-examples.ts`. Each page loads only the plugin bundles that example needs, and reuses the shared static-map pipeline for its `<noscript>` / init-failure fallback. Vendor bundles under `/vendor/*` are served with lazy in-process Brotli (`src/app/maps/vendor.ts`); entry points are fingerprinted at build time, lazy chunks keep stable names.
