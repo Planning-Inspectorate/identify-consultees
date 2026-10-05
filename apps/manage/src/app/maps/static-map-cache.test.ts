@@ -19,11 +19,15 @@ describe('static-map-cache', () => {
 			width: 960,
 			height: 516,
 			forceSvg: false,
-			preferGoogle: false
+			preferGoogle: false,
+			format: 'png'
 		};
 
 		assert.equal(buildStaticMapFingerprint(input), buildStaticMapFingerprint(input));
 		assert.notEqual(buildStaticMapFingerprint(input), buildStaticMapFingerprint({ ...input, forceSvg: true }));
+		// each negotiated variant needs its own ETag — a shared one would let a
+		// webp cache entry validate an avif request body
+		assert.notEqual(buildStaticMapFingerprint(input), buildStaticMapFingerprint({ ...input, format: 'avif' }));
 	});
 
 	it('matches If-None-Match lists against the response ETag', () => {

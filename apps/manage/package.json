@@ -39,7 +39,8 @@
     "nunjucks": "*",
     "pino": "*",
     "pino-pretty": "*",
-    "redis": "*"
+    "redis": "*",
+    "sharp": "*"
   },
   "devDependencies": {
     "@types/multer": "*",

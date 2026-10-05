@@ -11,6 +11,7 @@ import {
 	listOsmTilesForViewport,
 	lngLatToWorldPixel,
 	osmTileCacheSizeForTests,
+	renderStaticMapOverlaySvg,
 	renderStaticMapSvg,
 	staticMapViewportOrigin
 } from './static-map.ts';
@@ -101,6 +102,22 @@ describe('static-map helpers', () => {
 
 		assert.match(svg, /#55A868/);
 		assert.match(svg, /#C44E52/);
+	});
+
+	test('renderStaticMapOverlaySvg draws vectors on a transparent background', () => {
+		const svg = renderStaticMapOverlaySvg({
+			center: [-1.75, 50.65],
+			zoom: 10,
+			projectGeojson: square,
+			consulteeGeojson: square
+		});
+
+		assert.match(svg, /<svg/);
+		assert.match(svg, /#55A868/);
+		assert.match(svg, /#C44E52/);
+		// no opaque background or embedded tiles — composites over a raster basemap
+		assert.doesNotMatch(svg, /#f5f5f0/);
+		assert.doesNotMatch(svg, /data:image/);
 	});
 
 	test('buildStaticMapSvg delegates to renderStaticMapSvg', () => {
