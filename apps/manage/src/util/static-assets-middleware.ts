@@ -46,12 +46,12 @@ export type CreateStaticAssetsMiddlewareOptions = {
 	rateLimiter?: RequestHandler;
 };
 
-function contentTypeFor(filePath: string): string {
+export function contentTypeFor(filePath: string): string {
 	const ext = path.extname(filePath).toLowerCase();
 	return CONTENT_TYPES[ext] ?? 'application/octet-stream';
 }
 
-function acceptsBrotli(acceptEncodingHeader: string | undefined): boolean {
+export function acceptsBrotli(acceptEncodingHeader: string | undefined): boolean {
 	if (!acceptEncodingHeader) {
 		return false;
 	}

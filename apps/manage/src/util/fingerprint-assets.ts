@@ -8,8 +8,8 @@ import { createBrotliCompress, constants as zlibConstants } from 'node:zlib';
 /** Content-hash segment used in fingerprinted filenames (8 hex chars). */
 export const ASSET_HASH_PATTERN = /-[0-9a-f]{8}(?=\.[^.]+$)/i;
 
-/** Compressible text-ish assets suitable for Brotli sidecars. */
-const BROTLI_EXTENSIONS = new Set(['.css', '.js', '.mjs', '.svg', '.json', '.map', '.txt', '.xml', '.html']);
+/** Compressible text-ish assets suitable for Brotli (sidecars or runtime compression). */
+export const BROTLI_EXTENSIONS = new Set(['.css', '.js', '.mjs', '.svg', '.json', '.map', '.txt', '.xml', '.html']);
 
 /** Files we fingerprint at build time (relative to staticDir, posix-style). */
 const FINGERPRINT_GLOBS = [
@@ -175,7 +175,12 @@ export async function applyAssetManifestToLocalsFile(localsFile: string, manifes
 		{ logical: 'vendor/datasets-plugin/js/index.js', property: 'vendorDatasetsPluginJs' },
 		{ logical: 'vendor/datasets-plugin/css/index.css', property: 'vendorDatasetsPluginCss' },
 		{ logical: 'vendor/map-key-plugin/js/index.js', property: 'vendorMapKeyPluginJs' },
-		{ logical: 'vendor/map-key-plugin/css/index.css', property: 'vendorMapKeyPluginCss' }
+		{ logical: 'vendor/map-key-plugin/css/index.css', property: 'vendorMapKeyPluginCss' },
+		{ logical: 'vendor/interact-plugin/js/index.js', property: 'vendorInteractPluginJs' },
+		{ logical: 'vendor/draw-plugin/js/index.js', property: 'vendorDrawPluginJs' },
+		{ logical: 'vendor/map-styles-plugin/js/index.js', property: 'vendorMapStylesPluginJs' },
+		{ logical: 'vendor/map-styles-plugin/css/index.css', property: 'vendorMapStylesPluginCss' },
+		{ logical: 'javascripts/interactive-map-examples.js', property: 'interactiveMapExamplesJs' }
 	];
 
 	for (const { logical, property } of replacements) {
