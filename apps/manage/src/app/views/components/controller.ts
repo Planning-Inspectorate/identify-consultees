@@ -39,6 +39,7 @@ export function buildComponentsIndexPage(): AsyncRequestHandler {
 
 		const model: ComponentsIndexViewModel = {
 			pageHeading: 'GOV.UK Frontend components',
+			interactiveMapHref: `/components/interactive-map${suffix}`,
 			components: catalogue.map((entry) => ({
 				name: entry.component,
 				title: componentTitle(entry.component),

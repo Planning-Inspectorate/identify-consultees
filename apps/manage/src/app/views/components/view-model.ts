@@ -8,6 +8,8 @@ export interface ComponentSummary {
 export interface ComponentsIndexViewModel {
 	pageHeading: string;
 	components: ComponentSummary[];
+	/** Link to the Defra Interactive Map examples section (preserves ?components=true). */
+	interactiveMapHref: string;
 }
 
 export interface ComponentExample {

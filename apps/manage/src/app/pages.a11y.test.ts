@@ -19,6 +19,10 @@ const pageLocals = {
 		mapLayersDemoJs: 'javascripts/map-layers-demo.js',
 		accessibleAutocompleteJs: 'assets/js/accessible-autocomplete.min.js',
 		accessibleAutocompleteCss: 'assets/css/accessible-autocomplete.min.css',
+		vendorInteractiveMapJs: 'vendor/interactive-map/js/index.js',
+		vendorInteractiveMapCss: 'vendor/interactive-map/css/index.css',
+		vendorMaplibreProviderJs: 'vendor/maplibre-provider/js/index.js',
+		interactiveMapExamplesJs: 'javascripts/interactive-map-examples.js',
 		headerTitle: 'Identify consultees',
 		footerLinks: []
 	},
@@ -160,6 +164,7 @@ describe('manage page accessibility smoke', () => {
 		const html = nunjucks.render('views/components/view.njk', {
 			...pageLocals,
 			pageHeading: 'GOV.UK Frontend components',
+			interactiveMapHref: '/components/interactive-map',
 			components: [
 				{ name: 'button', title: 'Button', href: '/components/button', exampleCount: 22 },
 				{ name: 'tag', title: 'Tag', href: '/components/tag', exampleCount: 9 }
@@ -186,6 +191,51 @@ describe('manage page accessibility smoke', () => {
 			examples
 		});
 		await assertNoSeriousA11yViolations(html);
+	});
+
+	test('interactive map examples index page has no serious a11y violations', async () => {
+		const html = nunjucks.render('views/interactive-map-examples/view.njk', {
+			...pageLocals,
+			pageHeading: 'Interactive map',
+			backLinkUrl: '/components?components=true',
+			backLinkText: 'Back to components',
+			examples: [
+				{
+					id: 'basic',
+					title: 'Basic map',
+					summary: 'A minimal inline map.',
+					href: '/components/interactive-map/basic?components=true',
+					behaviourLabel: 'Inline',
+					pluginsLabel: 'None'
+				}
+			]
+		});
+		await assertNoSeriousA11yViolations(html);
+	});
+
+	test('interactive map example page has no serious a11y violations', async () => {
+		const html = nunjucks.render('views/interactive-map-examples/example.njk', {
+			...pageLocals,
+			pageHeading: 'Basic map',
+			backLinkUrl: '/components/interactive-map?components=true',
+			backLinkText: 'Back to interactive map examples',
+			summary: 'A minimal inline map on the default OpenFreeMap basemap.',
+			interaction: 'Pan with the mouse or arrow keys.',
+			mapId: 'interactive-map-example-basic',
+			mapRegionLabel: 'Map of the Dorset coast around the demo project site',
+			staticMapSrc: '/components/interactive-map/basic/static-map',
+			staticMapAlt: 'Static map of the Dorset coast centred on the demo project site.',
+			mapWidth: 960,
+			mapHeight: 516,
+			mapConfigJson: '{"kind":"basic","center":[-1.78,50.62],"zoom":11}',
+			pluginStylesheets: [],
+			pluginScripts: [],
+			behaviourLabel: 'Inline',
+			pluginsLabel: 'None'
+		});
+		await assertNoSeriousA11yViolations(html);
+		assert.match(html, /role="region"/);
+		assert.match(html, /<noscript>[\s\S]*<img/);
 	});
 
 	test('map layers demo page has no serious a11y violations', async () => {

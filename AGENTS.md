@@ -346,10 +346,14 @@ The manage app follows the PINS-data-spike pattern: **Defra Interactive Map** wh
 
 Non-JS / fallback maps are **not always SVG**. Depending on configuration they may be:
 
-| Format                | Typical source                                                                     |
-| --------------------- | ---------------------------------------------------------------------------------- |
-| `image/png` (or JPEG) | Google Maps Static API, or other hosted static-image endpoints                     |
-| `image/svg+xml`       | Local SVG that embeds OpenStreetMap (or similar) **raster tiles** as PNG data URIs |
+| Format                | Typical source                                                                                             |
+| --------------------- | ---------------------------------------------------------------------------------------------------------- |
+| `image/avif`          | Default OSM-tile path composited with `sharp` and encoded as AVIF when the client accepts it               |
+| `image/webp`          | Same composited raster, encoded as WebP when AVIF is not accepted                                          |
+| `image/png` (or JPEG) | Composited raster fallback for older clients, or Google Maps Static API when configured                    |
+| `image/svg+xml`       | Local SVG that embeds OpenStreetMap (or similar) **raster tiles** as PNG data URIs (explicit `.svg` route) |
+
+The default `/…/static-map` route negotiates AVIF → WebP → PNG from the request `Accept` header, so it must send `Vary: Accept`, and the negotiated format is part of the ETag fingerprint (`buildStaticMapFingerprint`). The `/…/static-map.svg` route always returns SVG.
 
 Treat static maps as **binary or markup images served by our app**, never as a reason for browsers to hit third-party tile hosts directly.
 
@@ -385,3 +389,7 @@ job:
   route to a real environment's database), independently of any pipeline.
 
 When changing static-map code, preserve ETag fingerprinting of framing + geometry so validators continue to avoid unnecessary upstream work.
+
+### Interactive map component showcase
+
+`/components/interactive-map` (reachable via the `?components=true` showcase) renders one page per worked Defra Interactive Map example from `src/app/maps/interactive-map-examples.ts`. Each page loads only the plugin bundles that example needs, and reuses the shared static-map pipeline for its `<noscript>` / init-failure fallback. Vendor bundles under `/vendor/*` are served with lazy in-process Brotli (`src/app/maps/vendor.ts`); entry points are fingerprinted at build time, lazy chunks keep stable names.
