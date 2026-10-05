@@ -27,7 +27,7 @@ const realCouncilAreaId = '66666666-6666-6666-6666-666666666666';
 const realDistrictAreaId = '77777777-7777-7777-7777-777777777777';
 const realPoliceAreaId = '88888888-8888-8888-8888-888888888888';
 const realHospitalAreaId = '99999999-9999-9999-9999-999999999999';
-const realRailwayAreaId = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
+const realAmbulanceAreaId = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
 
 // apps/function-python/setup_database/sample_data/sample_application_boundaries.geojson includes a
 // real project (EN0110019 - EcoPower Suffolk Solar) - using its real, complex geometry (rather than
@@ -60,7 +60,7 @@ async function cleanup() {
 	await dbClient.$executeRaw`
 		DELETE FROM consultee_area WHERE id IN (
 			${testAreaId}, ${secondAreaId}, ${hostAreaId}, ${neighbourAreaId},
-			${realCouncilAreaId}, ${realDistrictAreaId}, ${realPoliceAreaId}, ${realHospitalAreaId}, ${realRailwayAreaId}
+			${realCouncilAreaId}, ${realDistrictAreaId}, ${realPoliceAreaId}, ${realHospitalAreaId}, ${realAmbulanceAreaId}
 		)
 	`;
 }
@@ -500,11 +500,11 @@ describe('runRuleset against a real project (EN0110019 - EcoPower Suffolk Solar)
 						properties: { consulteeCategory: 'Hospital', consultee: 'Hartismere Hospital' }
 					},
 					{
-						id: realRailwayAreaId,
+						id: realAmbulanceAreaId,
 						type: 'Feature',
-						// ~5.6km from the site - within the Railway condition's real 10km buffer
+						// ~5.6km from the site - within the Ambulance Trust condition's real 10km buffer
 						geometry: { type: 'Point', coordinates: [1.2028714294908717, 52.33917544689788] },
-						properties: { consulteeCategory: 'Railway', consultee: 'Test Main Line' }
+						properties: { consulteeCategory: 'Ambulance Trust', consultee: 'Test Ambulance Trust' }
 					}
 				]
 			});
@@ -521,7 +521,7 @@ describe('runRuleset against a real project (EN0110019 - EcoPower Suffolk Solar)
 				'Lower Tier Authority',
 				'Police',
 				'Hospital',
-				'Railway'
+				'Ambulance Trust'
 			]) {
 				assert.ok(categories.has(expectedCategory), `expected a match in category "${expectedCategory}"`);
 			}
