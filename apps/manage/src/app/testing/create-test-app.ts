@@ -25,6 +25,7 @@ export function buildManageTestConfig(authDisabled = true): Config {
 		pythonFunctionUrl: 'http://localhost:7071/api/consultee-areas',
 		pythonFunctionApiKey: 'test-function-api-key',
 		blobStore: undefined,
+		nearbyConsulteeRadiusMetres: 20_000,
 		auth: {
 			authority: 'https://login.microsoftonline.com/tenant-id',
 			clientId: 'client-id',

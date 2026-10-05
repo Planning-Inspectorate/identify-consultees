@@ -38,6 +38,10 @@ export class ManageService extends BaseService<PrismaClient> {
 		return this.#config.blobStore;
 	}
 
+	get nearbyConsulteeRadiusMetres(): number {
+		return this.#config.nearbyConsulteeRadiusMetres;
+	}
+
 	/**
 	 * Built asset root (fingerprinted + Brotli sidecars). Used by our static middleware.
 	 */

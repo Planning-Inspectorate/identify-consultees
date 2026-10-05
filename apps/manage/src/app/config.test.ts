@@ -25,6 +25,7 @@ const managedKeys = [
 	'ENVIRONMENT',
 	'LOG_LEVEL',
 	'CACHE_CONTROL_MAX_AGE',
+	'NEARBY_CONSULTEE_RADIUS_KM',
 	'NODE_ENV',
 	'PORT',
 	'PYTHON_FUNCTION_URL',
@@ -96,6 +97,27 @@ describe('manage loadConfig', () => {
 	test('throws when PORT is not an integer', () => {
 		setBaseEnv({ PORT: 'not-a-number' });
 		assert.throws(() => loadConfig(), /PORT must be an integer/);
+	});
+
+	test('defaults nearbyConsulteeRadiusMetres to 20km when NEARBY_CONSULTEE_RADIUS_KM is unset', () => {
+		setBaseEnv({ NEARBY_CONSULTEE_RADIUS_KM: '' });
+		const config = loadConfig();
+		assert.strictEqual(config.nearbyConsulteeRadiusMetres, 20_000);
+	});
+
+	test('reads nearbyConsulteeRadiusMetres from NEARBY_CONSULTEE_RADIUS_KM when set', () => {
+		setBaseEnv({ NEARBY_CONSULTEE_RADIUS_KM: '50' });
+		const config = loadConfig();
+		assert.strictEqual(config.nearbyConsulteeRadiusMetres, 50_000);
+	});
+
+	test('throws when NEARBY_CONSULTEE_RADIUS_KM is not a positive number', () => {
+		setBaseEnv({ NEARBY_CONSULTEE_RADIUS_KM: '0' });
+		assert.throws(() => loadConfig(), /NEARBY_CONSULTEE_RADIUS_KM must be a positive number/);
+
+		resetConfigCache();
+		setBaseEnv({ NEARBY_CONSULTEE_RADIUS_KM: 'not-a-number' });
+		assert.throws(() => loadConfig(), /NEARBY_CONSULTEE_RADIUS_KM must be a positive number/);
 	});
 
 	test('allows AUTH_DISABLED outside production', () => {

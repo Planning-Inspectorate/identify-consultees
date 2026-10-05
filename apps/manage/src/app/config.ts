@@ -1,3 +1,4 @@
+import { DEFAULT_NEARBY_RADIUS_METRES } from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
 import type { BaseConfig } from '@planning-inspectorate/core/app';
 import path from 'node:path';
 import { loadEnvFile } from 'node:process';
@@ -21,6 +22,11 @@ export interface Config extends BaseConfig {
 				container: string;
 		  }
 		| undefined;
+	// radius (metres) consultees are shown within by default on the results page, and the radius
+	// most ruleset conditions are filtered from a single shared query rather than their own - see
+	// packages/database/src/geospatial/rulesets.ts. Tunable via NEARBY_CONSULTEE_RADIUS_KM so this
+	// can change without a code deploy; defaults to the package's own default if unset.
+	nearbyConsulteeRadiusMetres: number;
 	auth: {
 		authority: string;
 		clientId: string;
@@ -81,6 +87,7 @@ export function loadConfig(): Config {
 		CACHE_CONTROL_MAX_AGE,
 		GIT_SHA,
 		LOG_LEVEL,
+		NEARBY_CONSULTEE_RADIUS_KM,
 		PORT,
 		MANAGED_REDIS_URL,
 		NODE_ENV,
@@ -104,6 +111,15 @@ export function loadConfig(): Config {
 			throw new Error('PORT must be an integer');
 		}
 		httpPort = port;
+	}
+
+	let nearbyConsulteeRadiusMetres = DEFAULT_NEARBY_RADIUS_METRES;
+	if (NEARBY_CONSULTEE_RADIUS_KM) {
+		const radiusKm = Number.parseFloat(NEARBY_CONSULTEE_RADIUS_KM);
+		if (!Number.isFinite(radiusKm) || radiusKm <= 0) {
+			throw new Error('NEARBY_CONSULTEE_RADIUS_KM must be a positive number');
+		}
+		nearbyConsulteeRadiusMetres = radiusKm * 1000;
 	}
 
 	const isProduction = NODE_ENV === 'production';
@@ -131,6 +147,7 @@ export function loadConfig(): Config {
 		pythonFunctionApiKey: PYTHON_FUNCTION_API_KEY || undefined,
 		blobStore:
 			BLOB_STORE_HOST && BLOB_STORE_CONTAINER ? { host: BLOB_STORE_HOST, container: BLOB_STORE_CONTAINER } : undefined,
+		nearbyConsulteeRadiusMetres,
 		auth: {
 			authority: `https://login.microsoftonline.com/${AUTH_TENANT_ID}`,
 			clientId: AUTH_CLIENT_ID || '',

@@ -2,7 +2,7 @@ import type { ManageService } from '#service';
 import { stringifyForInlineScript } from '#util/inline-json.ts';
 import type { CaseBoundaryFeature } from '@pins/identify-consultees-database/src/geospatial/case-boundaries.ts';
 import type { ConsulteeAreaMatch } from '@pins/identify-consultees-database/src/geospatial/consultee-areas.ts';
-import type { Ruleset } from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
+import type { Ruleset, RunRulesetResult } from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
 import { getRuleset, runRuleset } from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
 import type { AsyncRequestHandler } from '@planning-inspectorate/core/util';
 import { buildCaseMapConfig, MAX_SAMPLED_MAP_MATCHES } from '../../../maps/case-geojson.ts';
@@ -22,13 +22,14 @@ async function runRulesetSafely(
 	db: ManageService['db'],
 	project: CaseBoundaryFeature,
 	ruleset: Ruleset,
+	nearbyRadiusMetres: number,
 	logger: ManageService['logger']
-): Promise<ConsulteeAreaMatch[]> {
+): Promise<RunRulesetResult> {
 	try {
-		return await runRuleset(db, project.geometry, ruleset);
+		return await runRuleset(db, project.geometry, ruleset, nearbyRadiusMetres);
 	} catch (error) {
 		logger.error({ error, caseId: project.id, rulesetId: ruleset.id }, 'Failed to run ruleset');
-		return [];
+		return { matches: [], allNearby: [] };
 	}
 }
 
@@ -46,7 +47,7 @@ function toMatchRow(match: ConsulteeAreaMatch): ConsulteeMatchRow {
  * show the matching consultees, on a map and in a table.
  */
 export function buildConsulteesResultsPage(service: ManageService): AsyncRequestHandler {
-	const { db, logger } = service;
+	const { db, logger, nearbyConsulteeRadiusMetres } = service;
 
 	return async (req, res) => {
 		const caseId = String(req.params.caseId ?? '');
@@ -67,7 +68,7 @@ export function buildConsulteesResultsPage(service: ManageService): AsyncRequest
 			'consultees results page'
 		);
 
-		const matches = await runRulesetSafely(db, project, ruleset, logger);
+		const { matches, allNearby } = await runRulesetSafely(db, project, ruleset, nearbyConsulteeRadiusMetres, logger);
 		const map = buildCaseMapConfig(project, matches, ruleset.name);
 
 		const viewModel: ConsulteesResultsViewModel = {
@@ -87,7 +88,10 @@ export function buildConsulteesResultsPage(service: ManageService): AsyncRequest
 			matches: matches.map(toMatchRow),
 			matchCount: map.matchCount,
 			mapIsSampled: map.isSampled,
-			mapSampleSize: MAX_SAMPLED_MAP_MATCHES
+			mapSampleSize: MAX_SAMPLED_MAP_MATCHES,
+			nearbyMatches: allNearby.map(toMatchRow),
+			nearbyMatchCount: allNearby.length,
+			nearbyRadiusKm: nearbyConsulteeRadiusMetres / 1000
 		};
 
 		return res.render('views/consultees/results/view.njk', viewModel);
@@ -95,7 +99,7 @@ export function buildConsulteesResultsPage(service: ManageService): AsyncRequest
 }
 
 export function buildResultsStaticMap(service: ManageService, forceSvg = false): AsyncRequestHandler {
-	const { db, logger } = service;
+	const { db, logger, nearbyConsulteeRadiusMetres } = service;
 
 	return async (req, res) => {
 		const caseId = String(req.params.caseId ?? '');
@@ -107,7 +111,7 @@ export function buildResultsStaticMap(service: ManageService, forceSvg = false):
 			return;
 		}
 
-		const matches = await runRulesetSafely(db, project, ruleset, logger);
+		const { matches } = await runRulesetSafely(db, project, ruleset, nearbyConsulteeRadiusMetres, logger);
 		const map = buildCaseMapConfig(project, matches, ruleset.name);
 		const ifNoneMatch = typeof req.headers['if-none-match'] === 'string' ? req.headers['if-none-match'] : undefined;
 		const accept = typeof req.headers.accept === 'string' ? req.headers.accept : undefined;
