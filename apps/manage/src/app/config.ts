@@ -1,4 +1,4 @@
-import { DEFAULT_NEARBY_RADIUS_METRES } from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
+import { DEFAULT_NEARBY_RADIUS_METRES } from '@pins/identify-consultees-database/src/geospatial/nearby-radius.ts';
 import type { BaseConfig } from '@planning-inspectorate/core/app';
 import path from 'node:path';
 import { loadEnvFile } from 'node:process';
