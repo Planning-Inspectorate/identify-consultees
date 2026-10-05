@@ -72,6 +72,27 @@ describe('renderStaticMapRaster', () => {
 		assert.equal(body.subarray(0, 4).toString('hex'), '89504e47');
 	});
 
+	test('basemap tiles actually land in the output pixels', async () => {
+		// regression: a second .composite() call replaces the input list in
+		// sharp, which used to silently discard every basemap tile
+		const sharp = (await import('sharp')).default;
+		const solidTile = await sharp({
+			create: { width: 256, height: 256, channels: 3, background: '#204060' }
+		})
+			.png()
+			.toBuffer();
+
+		const body = await renderStaticMapRaster(baseOptions, 'png', [
+			{ tileX: 0, tileY: 0, x: 0, y: 0, png: solidTile },
+			{ tileX: 1, tileY: 0, x: 0, y: 0, png: solidTile }
+		]);
+		const stats = await sharp(body).stats();
+		// a canvas of pure #f5f5f0 averages ~245 per channel; the dark tiles
+		// must pull the means well below that or they were never composited
+		assert.ok(stats.channels[0].mean < 200, `red mean ${stats.channels[0].mean} — basemap tiles missing`);
+		assert.ok(stats.channels[2].mean < 200, `blue mean ${stats.channels[2].mean} — basemap tiles missing`);
+	});
+
 	test('encodes webp and avif', async () => {
 		const webp = await renderStaticMapRaster(baseOptions, 'webp', []);
 		assert.equal(webp.subarray(0, 4).toString(), 'RIFF');
