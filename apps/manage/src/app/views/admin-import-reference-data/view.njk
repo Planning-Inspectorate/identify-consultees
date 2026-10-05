@@ -1,0 +1,54 @@
+{% extends "views/layouts/main.njk" %}
+
+{% from "govuk/components/button/macro.njk" import govukButton %}
+{% from "govuk/components/error-message/macro.njk" import govukErrorMessage %}
+{% from "govuk/components/notification-banner/macro.njk" import govukNotificationBanner %}
+
+{% block pageTitle %}
+    {{ pageHeading }} - {{ config.headerTitle }}
+{% endblock %}
+
+{% block pageContent %}
+    <h1 class="govuk-heading-l">{{ pageHeading }}</h1>
+
+    <p class="govuk-body">
+        Internal tool - downloads a file already uploaded to blob storage
+        (<a class="govuk-link" href="/admin/upload-to-blob">/admin/upload-to-blob</a>) and imports it
+        into the database, using the app's own managed identity. A large import can take a while -
+        wait for the page to finish loading rather than submitting again.
+    </p>
+
+    {% if error %}
+        {{ govukErrorMessage({ text: error }) }}
+    {% endif %}
+
+    {% if consulteeAreasImported != undefined %}
+        {{ govukNotificationBanner({
+            type: "success",
+            titleText: "Success",
+            text: "Imported " ~ consulteeAreasImported ~ " consultee areas."
+        }) }}
+    {% endif %}
+
+    {% if caseBoundariesImported != undefined %}
+        {{ govukNotificationBanner({
+            type: "success",
+            titleText: "Success",
+            text: "Imported " ~ caseBoundariesImported ~ " case boundaries."
+        }) }}
+    {% endif %}
+
+    <h2 class="govuk-heading-m">Consultee areas</h2>
+    <p class="govuk-body">Imports <code>combined_reference_data_v1.geojson</code> from blob storage.</p>
+    <form method="post" action="/admin/import-reference-data/run-consultee-areas" novalidate>
+        <input type="hidden" name="_csrf" value="{{ _csrf }}">
+        {{ govukButton({ text: "Import consultee areas" }) }}
+    </form>
+
+    <h2 class="govuk-heading-m">Case boundaries</h2>
+    <p class="govuk-body">Imports <code>all-project-boundaries.geojson</code> from blob storage.</p>
+    <form method="post" action="/admin/import-reference-data/run-case-boundaries" novalidate>
+        <input type="hidden" name="_csrf" value="{{ _csrf }}">
+        {{ govukButton({ text: "Import case boundaries" }) }}
+    </form>
+{% endblock %}

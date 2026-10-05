@@ -7,6 +7,7 @@ import { Router as createRouter } from 'express';
 import rateLimit from 'express-rate-limit';
 import { buildSanitisingErrorHandler } from './error-handler.ts';
 import { createDefraVendorRouter } from './maps/vendor.ts';
+import { createRoutes as createAdminImportReferenceDataRoutes } from './views/admin-import-reference-data/index.ts';
 import { createRoutes as createAdminUploadToBlobRoutes } from './views/admin-upload-to-blob/index.ts';
 import { createRoutes as createComponentRoutes } from './views/components/index.ts';
 import { createRoutes as createConsulteeAreasDirectRoutes } from './views/consultee-areas-direct/index.ts';
@@ -56,6 +57,7 @@ export function buildRouter(service: ManageService, options: BuildRouterOptions 
 	const consulteeAreasPythonRoutes = createConsulteeAreasPythonRoutes(service);
 	const consulteeAreasDirectRoutes = createConsulteeAreasDirectRoutes(service);
 	const adminUploadToBlobRoutes = createAdminUploadToBlobRoutes(service);
+	const adminImportReferenceDataRoutes = createAdminImportReferenceDataRoutes(service);
 	const authRateLimiter = options.authRateLimiter ?? buildAuthRateLimiter();
 
 	router.use('/', monitoringRoutes);
@@ -108,6 +110,7 @@ export function buildRouter(service: ManageService, options: BuildRouterOptions 
 	router.use('/consultee-areas-python', consulteeAreasPythonRoutes);
 	router.use('/consultee-areas-direct', consulteeAreasDirectRoutes);
 	router.use('/admin/upload-to-blob', adminUploadToBlobRoutes);
+	router.use('/admin/import-reference-data', adminImportReferenceDataRoutes);
 	router.use('/error', createErrorRoutes(service));
 
 	// last: route errors render generic copy (full detail goes to the logs only) rather
