@@ -78,20 +78,22 @@ When opening a PR with `gh pr create` (user-requested):
 
 ## Node and npm toolchain (match Azure Pipelines)
 
-Local installs must use the **same Node and npm** as CI so `package-lock.json` stays compatible with `npm ci`.
+Local installs must use the **same Node major and npm** as CI so `package-lock.json` stays compatible with `npm ci`. We pin the **major version only** — minor and patch releases float to the latest automatically, so routine Node releases need no repo change.
 
-| Tool    | Required version | Where it is pinned                                                                         |
-| ------- | ---------------- | ------------------------------------------------------------------------------------------ |
-| Node.js | **22.23.2**      | `.nvmrc`, `.node-version`, `.tool-versions`, `package.json` `engines`, Azure `nodeVersion` |
-| npm     | **10.9.8**       | Bundled with Node 22.23.2; also `packageManager` + `engines.npm`                           |
+| Tool    | Required version       | Where it is pinned                                                                                                                                          |
+| ------- | ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Node.js | **24.x** (current LTS) | `.nvmrc`, `.node-version`, `.tool-versions` (`24`), `package.json` `engines.node` `^24`, Azure `nodeVersion: 24`, `apps/manage/Dockerfile` `node:24-alpine` |
+| npm     | **11.x+** (bundled)    | `engines.npm` is a `>=11` floor only — npm ships with Node 24 and is never patch-pinned                                                                     |
 
-Azure jobs use PINS `node_script.yml` with `nodeVersion: 22.23.2` (see `.azure/pipelines/pr.yml` and `infrastructure/pipelines/terraform-ci-commit.yaml`). That Node release ships **npm 10.9.8**.
+Azure jobs use PINS `node_script.yml` with `nodeVersion: 24` (see `.azure/pipelines/pr.yml` and `infrastructure/pipelines/terraform-ci-commit.yaml`), so CI always tracks the latest Node 24.x and its bundled npm.
 
 ### Agent rules for the toolchain
 
-- Before changing dependencies or regenerating the lockfile: `nvm use` (or equivalent) so Node is **22.23.2** and `npm -v` is **10.9.8**. Do **not** run `npm install` under Node 24 / npm 11 against this repo.
+- Pin majors, not patches: `.nvmrc`, `.node-version`, `.tool-versions`, the Dockerfile base tag, and Azure `nodeVersion` all resolve to the **latest 24.x**; `engines.node` `^24` enforces the same range. Only major/LTS bumps should touch these files — never pin an exact patch (it forces a repo change per Node release and causes EBADENGINE drift against the floating tags).
+- Do **not** re-add a `packageManager` field or an exact `engines.npm` — pinning a specific npm defeats the float-above and, under corepack, can force an npm that doesn't match Node's bundled one.
+- Before changing dependencies or regenerating the lockfile: `nvm use` (or equivalent) so Node is **24.x** with its bundled **npm 11.x**. Do **not** regenerate `package-lock.json` under a different Node/npm major.
 - Prefer `npm ci` for a clean tree (same command as CI). Use `npm install` only when intentionally updating dependencies.
-- After any `package-lock.json` change, run `npm run check-toolchain` (also runs at the end of `postinstall`).
+- After any `package-lock.json` change, run `npm run check-toolchain` (also runs at the end of `postinstall`). It validates the running Node/npm against the `engines` ranges — not exact versions.
 - Keep root `optionalDependencies` on `react@19.3.0`, `react-dom@19.3.0`, and `scheduler@0.28.0`. They are not used by app code; they satisfy Prisma Studio / Radix peers so Azure `npm ci` does not fail with “Missing: react@… from lock file” (see PR #53 / commit `2e4f99d`). Never remove those entries or the matching `node_modules/react` (etc.) lockfile packages without replacing the guard.
 - `.npmrc` sets `engine-strict=true` and `legacy-peer-deps=false` (Azure default). Do not enable `legacy-peer-deps` locally — it hides the `preact` 8 vs 10 peer conflict (`accessible-autocomplete` vs `@defra/interactive-map`) that breaks Azure `npm ci`.
 - Keep the root `overrides.preact` on `^10.29.8` so that conflict resolves to Defra’s preact 10 line in the lockfile.
@@ -112,10 +114,10 @@ Do not remove these entries as a “cleanup” — they are enforced by `scripts
 ### Switching locally
 
 ```bash
-nvm install   # reads .nvmrc → 22.23.2
+nvm install   # reads .nvmrc → latest Node 24.x
 nvm use
-node -v       # v22.23.2
-npm -v        # 10.9.8
+node -v       # v24.x.y
+npm -v        # 11.x (bundled with Node 24)
 npm ci
 npm run check-toolchain
 ```
@@ -215,7 +217,7 @@ Public traffic reaches the manage app through **Azure Front Door**, then Azure A
 
 **Do not** add an in-process HTTP/3 or QUIC listener in the Node/TypeScript app:
 
-- Node’s `node:quic` / HTTP/3 server surface is still experimental, needs a specially built binary plus `--experimental-quic`, and is not available on ordinary Node 22/24 runtimes used here.
+- Node’s `node:quic` / HTTP/3 server surface is still experimental, needs a specially built binary plus `--experimental-quic`, and is not available on ordinary Node 24 runtimes used here.
 - Third-party native QUIC packages are not appropriate for this Azure App Service origin: clients never reach Node’s UDP listener while Front Door is in front.
 - Optimum user-facing performance for HTTP/3 comes from enabling it **at the CDN edge**, not in the origin process.
 

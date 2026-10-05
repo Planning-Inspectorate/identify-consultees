@@ -4,18 +4,18 @@
 
 ## Required versions
 
-| Tool                       | Version               | Where pinned                                                |
-| -------------------------- | --------------------- | ----------------------------------------------------------- |
-| Node.js                    | **22.23.2**           | `.nvmrc`, `package.json` `engines`, Azure pipelines         |
-| npm                        | **10.9.8**            | Bundled with Node 22.23.2; `packageManager` / `engines.npm` |
-| Docker                     | Recent stable         | Local SQL Server container                                  |
-| Python                     | **3.12**              | `apps/function-python` / Azure Function config              |
-| Azure Functions Core Tools | **v4**                | Optional; only for Track B locally                          |
-| Azurite                    | Latest via npm global | Optional storage emulator for Functions                     |
+| Tool                       | Version                | Where pinned                                                                      |
+| -------------------------- | ---------------------- | --------------------------------------------------------------------------------- |
+| Node.js                    | **24.x** (current LTS) | `.nvmrc` / `.tool-versions` (`24`), `engines.node` `^24`, Azure `nodeVersion: 24` |
+| npm                        | **11.x+** (bundled)    | Ships with Node 24; `engines.npm` `>=11` floor only — never patch-pinned          |
+| Docker                     | Recent stable          | Local SQL Server container                                                        |
+| Python                     | **3.12**               | `apps/function-python` / Azure Function config                                    |
+| Azure Functions Core Tools | **v4**                 | Optional; only for Track B locally                                                |
+| Azurite                    | Latest via npm global  | Optional storage emulator for Functions                                           |
 
 > **uv:** Not part of the current documented toolchain. Local Python setup uses `python3 -m venv` and `pip install -r requirements.txt`. If the team later standardises on uv, update this page and `apps/function-python/README.md` together.
 
-Do **not** regenerate `package-lock.json` with Node 24 / npm 11. See root `AGENTS.md` toolchain section.
+Do **not** regenerate `package-lock.json` under a different Node/npm major (e.g. Node 26 / npm 12) — minor/patch releases within the 24 line are always fine. See root `AGENTS.md` toolchain section.
 
 ## Why React and Preact appear in `package.json`
 
@@ -33,7 +33,7 @@ From a clean clone:
 ```bash
 git clone git@github.com:Planning-Inspectorate/identify-consultees.git
 cd identify-consultees
-nvm use          # → 22.23.2
+nvm use          # → latest Node 24.x
 node -v && npm -v
 npm ci
 npm start

@@ -10,10 +10,9 @@
     "packages/*"
   ],
   "engines": {
-    "node": "22.23.2",
-    "npm": "10.9.8"
+    "node": "^24",
+    "npm": ">=11"
   },
-  "packageManager": "npm@10.9.8",
   "scripts": {
     "check-toolchain": "node scripts/check-toolchain.mjs",
     "check-types": "npx tsc -p tsconfig.check.json",

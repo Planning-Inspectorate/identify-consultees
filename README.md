@@ -13,8 +13,8 @@ This is the monorepo for the Identify consultees service — a GIS tool for iden
 
 ## Prerequisites
 
-- **Node.js 22.23.2** (see [`.nvmrc`](./.nvmrc); `package.json` engines and Azure Pipelines use the same version)
-- **npm 10.9.8** (ships with Node 22.23.2 — do not use npm 11 / Node 24 for this repo)
+- **Node.js 24.x** — the current LTS (see [`.nvmrc`](./.nvmrc); `package.json` `engines` `^24` and Azure Pipelines `nodeVersion: 24` pin the same major). Use the latest 24.x — the patch is not pinned.
+- **npm 11.x+** (ships with Node 24 — use the bundled version, not a self-installed npm)
 - **Docker** (local SQL Server with spatial types — see [`docker-compose.yml`](./docker-compose.yml))
 - Git access to this repository
 
@@ -24,8 +24,8 @@ Confirm the toolchain after install:
 
 ```bash
 nvm use
-node -v    # v22.23.2
-npm -v     # 10.9.8
+node -v    # v24.x.y
+npm -v     # 11.x.y
 npm run check-toolchain
 ```
 
@@ -36,7 +36,7 @@ From a clean clone, these steps are enough to run the manage app locally:
 ```bash
 git clone git@github.com:Planning-Inspectorate/identify-consultees.git
 cd identify-consultees
-nvm use   # Node 22.23.2 from .nvmrc
+nvm use   # latest Node 24.x from .nvmrc
 npm ci
 npm start
 ```
