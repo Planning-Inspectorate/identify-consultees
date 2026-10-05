@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import type { PrismaClient } from '../client/client.ts';
 import type { ConsulteeAreaMatch } from './consultee-areas.ts';
 import { findConsulteeAreasBordering, findConsulteeAreasNear } from './consultee-areas.ts';
+import { DEFAULT_NEARBY_RADIUS_METRES } from './nearby-radius.ts';
 import type { Geometry } from './wkt.ts';
 
 /**
@@ -213,15 +214,10 @@ async function runCondition(
 // contend with.
 const CONDITION_CONCURRENCY = 6;
 
-/**
- * Fallback for the nearby radius below when a caller doesn't specify one - a caller running inside
- * a configured app (e.g. apps/manage) should normally pass its own value sourced from an env var,
- * so this distance can be tuned without a code change. Consultees within the radius are shown by
- * default regardless of which ruleset condition (if any) actually matches them - both as a simple
- * baseline view in its own right, and as the source every `intersection` condition at or under this
- * radius is filtered from (see runRuleset) rather than each querying the database separately.
- */
-export const DEFAULT_NEARBY_RADIUS_METRES = 20_000;
+// re-exported for callers that want the default radius without importing this module (and so
+// pulling in the generated Prisma client - see nearby-radius.ts's own doc comment for why that
+// matters to apps/manage's build step)
+export { DEFAULT_NEARBY_RADIUS_METRES } from './nearby-radius.ts';
 
 /** True when `rule` can be answered by filtering the shared nearby fetch instead of its own query. */
 function isSatisfiableFromNearby(rule: RuleCondition, nearbyRadiusMetres: number): boolean {
