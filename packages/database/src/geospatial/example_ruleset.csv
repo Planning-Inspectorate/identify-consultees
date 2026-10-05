@@ -10,7 +10,6 @@ a_county_council_unit_auth_nat_park_distr_council_bordering_b_host_unitary_auth	
 d_county_unitary_nat_park_bordering_c_host_county_council		"D" County Councils, Unitary Councils, National Parks and Broads bordering "C" host County Councils 	county_council; unit_auth; nat_park	county_council	Bordering host authority 	bordering	0
 greater_london_authority		Greater London Authority 	greater_london_authority		Intersects 35km buffer of application site 	intersection	35
 canal	canals_epsg27700	Canals 			Intersects 10km buffer of application site 	intersection	10
-railway	rail_epsg27700	Railways 			Intersects 10km buffer of application site 	intersection	10
 ambulance_trust_1km	ambulance_services_epsg27700	Ambulance Trusts 			Intersects 1km buffer of application site 	intersection	1
 ambulance_trust	ambulance_services_epsg27700	Ambulance Trusts 			Intersects10km buffer of application site 	intersection	10
 fire_and_rescue_service		Fire and Rescue Services boundaries 			Intersects 1km of application site 	intersection	1
