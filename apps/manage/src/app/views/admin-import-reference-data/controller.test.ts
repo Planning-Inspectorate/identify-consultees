@@ -1,0 +1,106 @@
+import { mockLogger } from '@planning-inspectorate/core/testing';
+import assert from 'node:assert';
+import { describe, it, mock } from 'node:test';
+import { configureNunjucks } from '../../nunjucks.ts';
+import {
+	buildImportReferenceDataPage,
+	buildRunImportCaseBoundaries,
+	buildRunImportConsulteeAreas,
+	CASE_BOUNDARIES_BLOB_NAME,
+	CONSULTEE_AREAS_BLOB_NAME
+} from './controller.ts';
+
+describe('admin import reference data', () => {
+	const nunjucks = configureNunjucks();
+	const newRes = () => ({ render: mock.fn((view, data) => nunjucks.render(view, data)) });
+	const newDownload = (filePath = '/tmp/does-not-exist-import-reference-data-test') =>
+		mock.fn(async () => ({ filePath, cleanup: mock.fn(async () => undefined) }));
+
+	it('renders the page with no prior result', async () => {
+		const res = newRes();
+		const page = buildImportReferenceDataPage();
+		await page({}, res);
+		assert.strictEqual(res.render.mock.callCount(), 1);
+		assert.strictEqual(res.render.mock.calls[0].arguments[0], 'views/admin-import-reference-data/view.njk');
+		assert.strictEqual(res.render.mock.calls[0].arguments[1].consulteeAreasImported, undefined);
+		assert.strictEqual(res.render.mock.calls[0].arguments[1].caseBoundariesImported, undefined);
+	});
+
+	describe('buildRunImportConsulteeAreas', () => {
+		it('downloads the known blob and reports the imported count on success', async () => {
+			const res = newRes();
+			const download = newDownload('/tmp/consultee-areas.geojson');
+			const runImport = mock.fn(async () => 18258);
+			const run = buildRunImportConsulteeAreas({ db: {}, logger: mockLogger() }, download, runImport);
+			await run({}, res);
+
+			assert.strictEqual(download.mock.calls[0].arguments[0], CONSULTEE_AREAS_BLOB_NAME);
+			assert.strictEqual(runImport.mock.calls[0].arguments[1], '/tmp/consultee-areas.geojson');
+
+			const { error, consulteeAreasImported } = res.render.mock.calls[0].arguments[1];
+			assert.strictEqual(error, undefined);
+			assert.strictEqual(consulteeAreasImported, 18258);
+		});
+
+		it('renders an error when the download fails, without throwing', async () => {
+			const res = newRes();
+			const download = mock.fn(async () => {
+				throw new Error('AuthorizationPermissionMismatch');
+			});
+			const runImport = mock.fn(async () => 0);
+			const run = buildRunImportConsulteeAreas({ db: {}, logger: mockLogger() }, download, runImport);
+			await run({}, res);
+
+			assert.strictEqual(runImport.mock.callCount(), 0);
+			const { error, consulteeAreasImported } = res.render.mock.calls[0].arguments[1];
+			assert.match(error, /Could not import consultee areas/);
+			assert.strictEqual(consulteeAreasImported, undefined);
+		});
+
+		it('renders an error when the import itself fails, without throwing', async () => {
+			const res = newRes();
+			const download = newDownload();
+			const runImport = mock.fn(async () => {
+				throw new Error('bad geometry');
+			});
+			const run = buildRunImportConsulteeAreas({ db: {}, logger: mockLogger() }, download, runImport);
+			await run({}, res);
+
+			const { error, consulteeAreasImported } = res.render.mock.calls[0].arguments[1];
+			assert.match(error, /Could not import consultee areas/);
+			assert.strictEqual(consulteeAreasImported, undefined);
+		});
+	});
+
+	describe('buildRunImportCaseBoundaries', () => {
+		it('downloads the known blob and reports the imported count on success', async () => {
+			const res = newRes();
+			const download = newDownload('/tmp/case-boundaries.geojson');
+			const runImport = mock.fn(async () => 433);
+			const run = buildRunImportCaseBoundaries({ db: {}, logger: mockLogger() }, download, runImport);
+			await run({}, res);
+
+			assert.strictEqual(download.mock.calls[0].arguments[0], CASE_BOUNDARIES_BLOB_NAME);
+			assert.strictEqual(runImport.mock.calls[0].arguments[1], '/tmp/case-boundaries.geojson');
+
+			const { error, caseBoundariesImported } = res.render.mock.calls[0].arguments[1];
+			assert.strictEqual(error, undefined);
+			assert.strictEqual(caseBoundariesImported, 433);
+		});
+
+		it('renders an error when the download fails, without throwing', async () => {
+			const res = newRes();
+			const download = mock.fn(async () => {
+				throw new Error('AuthorizationPermissionMismatch');
+			});
+			const runImport = mock.fn(async () => 0);
+			const run = buildRunImportCaseBoundaries({ db: {}, logger: mockLogger() }, download, runImport);
+			await run({}, res);
+
+			assert.strictEqual(runImport.mock.callCount(), 0);
+			const { error, caseBoundariesImported } = res.render.mock.calls[0].arguments[1];
+			assert.match(error, /Could not import case boundaries/);
+			assert.strictEqual(caseBoundariesImported, undefined);
+		});
+	});
+});
