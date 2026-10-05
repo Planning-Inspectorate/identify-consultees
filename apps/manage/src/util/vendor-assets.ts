@@ -18,7 +18,12 @@ export const DEFRA_VENDOR_ROOTS: Readonly<Record<string, string>> = {
 	'datasets-plugin/js': path.join(defraInteractiveMapRoot, 'plugins', 'datasets', 'dist', 'umd'),
 	'datasets-plugin/css': path.join(defraInteractiveMapRoot, 'plugins', 'datasets', 'dist', 'css'),
 	'map-key-plugin/js': path.join(defraInteractiveMapRoot, 'plugins', 'map-key', 'dist', 'umd'),
-	'map-key-plugin/css': path.join(defraInteractiveMapRoot, 'plugins', 'map-key', 'dist', 'css')
+	'map-key-plugin/css': path.join(defraInteractiveMapRoot, 'plugins', 'map-key', 'dist', 'css'),
+	'interact-plugin/js': path.join(defraInteractiveMapRoot, 'plugins', 'interact', 'dist', 'umd'),
+	'draw-plugin/js': path.join(defraInteractiveMapRoot, 'plugins', 'draw', 'dist', 'umd'),
+	// beta plugin: API may shift between package versions
+	'map-styles-plugin/js': path.join(defraInteractiveMapRoot, 'plugins', 'beta', 'map-styles', 'dist', 'umd'),
+	'map-styles-plugin/css': path.join(defraInteractiveMapRoot, 'plugins', 'beta', 'map-styles', 'dist', 'css')
 };
 
 /**
