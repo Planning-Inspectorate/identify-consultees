@@ -24,7 +24,7 @@ export function addLocalsConfiguration(): Handler {
 			vendorDrawPluginJs: 'vendor/draw-plugin/js/index-2118f08e.js',
 			vendorMapStylesPluginJs: 'vendor/map-styles-plugin/js/index-0ffb4b58.js',
 			vendorMapStylesPluginCss: 'vendor/map-styles-plugin/css/index-6c3e88dc.css',
-			interactiveMapExamplesJs: 'javascripts/interactive-map-examples-1fe8d0ec.js',
+			interactiveMapExamplesJs: 'javascripts/interactive-map-examples-5344217e.js',
 			headerTitle: 'Identify consultees',
 			footerLinks: []
 		};
