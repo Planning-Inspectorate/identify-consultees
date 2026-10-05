@@ -2,10 +2,13 @@
 /**
  * Guardrail so local installs stay aligned with Azure Pipelines `npm ci`.
  *
- * CI (`.azure/pipelines/*` via PINS `node_script.yml`) uses Node 22.23.2, which
- * ships npm 10.9.8. Regenerating the lockfile with Node 24 / npm 11 (or other
- * majors) can drop Prisma Studio peer entries (`react` / `react-dom` /
- * `scheduler`) and break `npm ci` — see PR #53 / commit 2e4f99d.
+ * CI (`.azure/pipelines/*` via PINS `node_script.yml`) runs `nodeVersion: 24`,
+ * which tracks the latest Node 24.x and its bundled npm 11.x. The repo pins the
+ * *major* only - `engines` in package.json (`node: ^24`, `npm: >=11`) is the
+ * single source of truth, and this script checks the running toolchain against
+ * those ranges. Regenerating the lockfile under a different Node/npm major can
+ * drop Prisma Studio peer entries (`react` / `react-dom` / `scheduler`) and
+ * break `npm ci` — see PR #53 / commit 2e4f99d.
  *
  * Set SKIP_TOOLCHAIN_CHECK=1 to bypass (emergencies only).
  */
@@ -13,9 +16,6 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
-
-const REQUIRED_NODE = '22.23.2';
-const REQUIRED_NPM = '10.9.8';
 
 /** Lockfile package keys that must remain present for `npm ci` (Prisma Studio / Radix peers). */
 const REQUIRED_LOCKFILE_PEERS = ['node_modules/react', 'node_modules/react-dom', 'node_modules/scheduler'];
@@ -34,16 +34,47 @@ function versionParts(version) {
 		.map((part) => Number.parseInt(part, 10));
 }
 
-function versionsEqual(actual, expected) {
-	const a = versionParts(actual);
-	const e = versionParts(expected);
-	return a[0] === e[0] && a[1] === e[1] && a[2] === e[2];
+function compareVersions(a, b) {
+	for (let i = 0; i < 3; i += 1) {
+		if ((a[i] || 0) !== (b[i] || 0)) return (a[i] || 0) - (b[i] || 0);
+	}
+	return 0;
 }
 
+/**
+ * Minimal semver-range check for the simple specifiers we use in engines:
+ *   ^24 / ^24.15.0   → same major, >= the given version
+ *   >=11 / >=11.2.0  → >= the given version
+ *   24 / 24.x        → same major (partial version, no operator)
+ *   24.15.0          → exact
+ * Anything more complex fails closed so a malformed range is caught rather
+ * than silently passing.
+ */
+function satisfies(version, range) {
+	const match = String(range)
+		.trim()
+		.match(/^(\^|>=)?\s*v?(\d+)(?:\.(\d+|x|\*))?(?:\.(\d+|x|\*))?$/);
+	if (!match) return false;
+	const [, operator, major, minor, patch] = match;
+	const parts = versionParts(version);
+	const required = [Number(major)];
+	if (minor !== undefined && minor !== 'x' && minor !== '*') required.push(Number(minor));
+	if (patch !== undefined && patch !== 'x' && patch !== '*') required.push(Number(patch));
+	const cmp = compareVersions(parts, required);
+	if (operator === '^') return parts[0] === required[0] && cmp >= 0;
+	if (operator === '>=') return cmp >= 0;
+	if (required.length === 1) return parts[0] === required[0];
+	if (required.length === 2) return parts[0] === required[0] && parts[1] === required[1];
+	return cmp === 0;
+}
+
+const pkg = JSON.parse(readFileSync(path.join(root, 'package.json'), 'utf8'));
+const engines = pkg.engines || {};
+
 const nodeVersion = process.versions.node;
-if (!versionsEqual(nodeVersion, REQUIRED_NODE)) {
+if (!satisfies(nodeVersion, engines.node || '')) {
 	errors.push(
-		`Node ${nodeVersion} does not match required ${REQUIRED_NODE} (see .nvmrc / Azure Pipelines). Run: nvm install && nvm use`
+		`Node ${nodeVersion} does not satisfy engines.node "${engines.node}" (see .nvmrc / Azure Pipelines nodeVersion). Run: nvm install && nvm use`
 	);
 }
 
@@ -58,9 +89,9 @@ if (!resolvedNpm) {
 	}
 }
 
-if (!resolvedNpm || !versionsEqual(resolvedNpm, REQUIRED_NPM)) {
+if (!resolvedNpm || !satisfies(resolvedNpm, engines.npm || '')) {
 	errors.push(
-		`npm ${resolvedNpm || '(unknown)'} does not match required ${REQUIRED_NPM}. Use Node ${REQUIRED_NODE} (bundles npm ${REQUIRED_NPM}), or: npm install -g npm@${REQUIRED_NPM}`
+		`npm ${resolvedNpm || '(unknown)'} does not satisfy engines.npm "${engines.npm}". npm ships with Node ${engines.node} - run: nvm install && nvm use`
 	);
 }
 
@@ -91,22 +122,17 @@ if (lock?.packages) {
 	for (const key of REQUIRED_LOCKFILE_PEERS) {
 		if (!lock.packages[key]) {
 			errors.push(
-				`package-lock.json is missing ${key}. These peers are required for Azure \`npm ci\` (Prisma Studio / Radix). Re-run \`npm install\` with npm ${REQUIRED_NPM} after ensuring optionalDependencies include react/react-dom/scheduler, or restore from commit 2e4f99d.`
+				`package-lock.json is missing ${key}. These peers are required for Azure \`npm ci\` (Prisma Studio / Radix). Re-run \`npm install\` under Node ${engines.node} after ensuring optionalDependencies include react/react-dom/scheduler, or restore from commit 2e4f99d.`
 			);
 		}
 	}
 }
 
-try {
-	const pkg = JSON.parse(readFileSync(path.join(root, 'package.json'), 'utf8'));
-	const preactOverride = pkg.overrides?.preact;
-	if (!preactOverride || !String(preactOverride).startsWith('^10.')) {
-		errors.push(
-			`package.json overrides.preact must be ^10.x (Defra interactive map). Without it Azure npm ci fails on accessible-autocomplete's preact@8 peer.`
-		);
-	}
-} catch {
-	// ignore
+const preactOverride = pkg.overrides?.preact;
+if (!preactOverride || !String(preactOverride).startsWith('^10.')) {
+	errors.push(
+		`package.json overrides.preact must be ^10.x (Defra interactive map). Without it Azure npm ci fails on accessible-autocomplete's preact@8 peer.`
+	);
 }
 
 if (errors.length > 0) {

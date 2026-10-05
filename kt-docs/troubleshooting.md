@@ -6,7 +6,7 @@
 
 | Symptom                            | Likely cause                     | Fix                                                                                              |
 | ---------------------------------- | -------------------------------- | ------------------------------------------------------------------------------------------------ |
-| `engine-strict` / install fails    | Wrong Node/npm                   | `nvm use` → 22.23.2 / 10.9.8; `npm run check-toolchain`                                          |
+| `engine-strict` / install fails    | Wrong Node/npm                   | `nvm use` → latest Node 24.x / bundled npm 11+; `npm run check-toolchain`                        |
 | Azure `npm ci` missing react peers | Lockfile regenerated incorrectly | Keep root `optionalDependencies` for react/react-dom/scheduler; do not enable `legacy-peer-deps` |
 | Port conflicts on 1433             | Old SQL mapping                  | Local host port is **1434** → container 1433                                                     |
 

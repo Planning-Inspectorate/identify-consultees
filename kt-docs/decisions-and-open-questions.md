@@ -4,16 +4,16 @@
 
 ## Recorded / de facto decisions (frontend)
 
-| Decision                                      | Rationale                                              | Where it shows up                 |
-| --------------------------------------------- | ------------------------------------------------------ | --------------------------------- |
-| Server-rendered GOV.UK Frontend + Nunjucks    | GDS alignment, a11y defaults, PINS core patterns       | `apps/manage` templates           |
-| No SPA / no custom design system for manage   | Avoid parallel stack during spike                      | `AGENTS.md`, layout macros        |
-| Sample-data-backed filter journey             | UX can move without CBOS/SQL ownership                 | `dummy-geometries.ts`             |
-| Defra interactive map + static fallback       | Progressive enhancement                                | maps + `consultee-map-region.njk` |
-| Optional Python over HTTP                     | Isolate geo/SQL Python without coupling boot           | `PYTHON_FUNCTION_URL`             |
-| Node 22.23.2 / npm 10.9.8 lockstep with Azure | Avoid lockfile / peer dependency breakage              | `.nvmrc`, toolchain check         |
-| `trust proxy` hop count `1`                   | Secure cookies behind proxy **and** safe rate limiting | `server.ts`                       |
-| Origin stays HTTP/1.1                         | Front Door terminates modern client protocols          | `AGENTS.md`, `server.ts` comments |
+| Decision                                       | Rationale                                                                                              | Where it shows up                    |
+| ---------------------------------------------- | ------------------------------------------------------------------------------------------------------ | ------------------------------------ |
+| Server-rendered GOV.UK Frontend + Nunjucks     | GDS alignment, a11y defaults, PINS core patterns                                                       | `apps/manage` templates              |
+| No SPA / no custom design system for manage    | Avoid parallel stack during spike                                                                      | `AGENTS.md`, layout macros           |
+| Sample-data-backed filter journey              | UX can move without CBOS/SQL ownership                                                                 | `dummy-geometries.ts`                |
+| Defra interactive map + static fallback        | Progressive enhancement                                                                                | maps + `consultee-map-region.njk`    |
+| Optional Python over HTTP                      | Isolate geo/SQL Python without coupling boot                                                           | `PYTHON_FUNCTION_URL`                |
+| Node 24 LTS / npm 11+ majors pinned with Azure | Latest minor/patch floats; avoids lockfile / peer dependency breakage without per-release repo updates | `.nvmrc`, `engines`, toolchain check |
+| `trust proxy` hop count `1`                    | Secure cookies behind proxy **and** safe rate limiting                                                 | `server.ts`                          |
+| Origin stays HTTP/1.1                          | Front Door terminates modern client protocols                                                          | `AGENTS.md`, `server.ts` comments    |
 
 ## Known constraints
 
