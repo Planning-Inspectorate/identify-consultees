@@ -9,23 +9,25 @@
 | `apps/manage`          | Express + Nunjucks + GOV.UK Frontend web app (primary frontend)          |
 | `apps/function-python` | Python Azure Function (`consultee-areas`) called by some manage pages    |
 | `apps/function`        | Separate Node Azure Function app (not the main UI)                       |
-| `packages/database`    | Prisma schema, migrations, geospatial SQL helpers                        |
-| `packages/lib`         | Shared library code                                                      |
+| `packages/database`    | Prisma schema, migrations, geospatial SQL helpers, seed/import tooling   |
+| `packages/lib`         | Shared library code (placeholder today)                                  |
 | `infrastructure`       | Azure / Terraform (App Service container for web, Front Door, SQL, etc.) |
 
-## Track A — Node UI and sample data
+## Track A — Node UI
 
-**Intent:** Ship a government-shaped UI quickly using **fixture / sample** project geometries and map polygons.
+**Intent:** A government-shaped UI running the identify-consultees journey end to end: search project boundaries → pick a ruleset → run it → review matched consultees on a map and in a table.
 
 **In this repo:**
 
-- Homepage list and search over `DUMMY_GEOMETRIES` (`apps/manage/src/app/data/dummy-geometries.ts`)
-- Consultees results page built from dummy geometry metadata + sample GeoJSON helpers
-- Ruleset options as static select items (not loaded from CBOS)
+- Homepage search + paginated list over `case_boundary` via `searchCaseBoundaries` (`packages/database/src/geospatial`)
+- Ruleset picker at `/consultees/:caseId`, results at `/consultees/:caseId/results?ruleset=…`
+- Results run the ruleset's conditions as SQL `GEOGRAPHY` queries (`runRuleset`) and render matches on an interactive map with a static-image fallback
+- Component showcase at `/components` (GOV.UK macros + `/components/interactive-map` worked Defra examples)
+- Admin data-loading routes under `/admin/` (upload file to blob, import reference data into SQL)
 
 **Important guidance for everyone:**
 
-> The main filter / project-selection journey is **sample-data-backed**, not database-backed. Do not assume rows on the homepage come from SQL. A live `case_boundary` count may influence the **total** displayed when there is no search query, but the table rows themselves are still fixtures today.
+> The main journey is **database-backed**, not fixture-backed. Rows on the homepage and matches on the results page come from SQL (`case_boundary` / `consultee_area`). Locally that data is the dev seed (`npm run db-seed`, run automatically by `npm start`); in Dev/Test/Training it can be the full reference dataset (see below). An unreachable or empty database means empty results — pages degrade with logged errors rather than fixtures.
 
 ## Track B — Python-to-TypeScript (HTTP) bridge
 
@@ -33,26 +35,27 @@
 
 **In this repo:**
 
-- Manage config: optional `PYTHON_FUNCTION_URL`
-- UI route: `/consultee-areas-python` (GET form + POST run)
-- Python app: `apps/function-python` querying `consultee_area` via pymssql
+- Manage config: optional `PYTHON_FUNCTION_URL` + `PYTHON_FUNCTION_API_KEY`
+- UI routes: `/consultee-areas-python` (GET form + POST run, calls the function with an `x-api-key` header) and `/consultee-areas-direct` (same query straight from Node — the no-Python sibling page)
+- Python app: `apps/function-python` querying `consultee_area` via pymssql, `x-api-key` shared secret checked in `function_app.py`
 
 **Fallback rule:** Missing Python environment, misconfigured URL, or stopped database must **not** take down the manage app. The bridge page shows an error message; other routes continue.
 
 See [Node–Python integration](./node-python-integration.md).
 
-## Track C — Optional SQL spatial database
+## Track C — SQL spatial database
 
-**Intent:** Persist geometries (for example `case_boundary`, `consultee_area`) with SQL Server spatial types for spike / future journeys.
+**Intent:** Persist geometries (`case_boundary`, `consultee_area`) in SQL Server `GEOGRAPHY` columns and run spatial screening there.
 
 **In this repo:**
 
 - Local Docker SQL Server (host port **1434**) via `docker compose`
-- Prisma + raw geospatial helpers under `packages/database/src/geospatial`
-- Home page may call `db.caseBoundary.count()` and fall back to dummy size if empty or unreachable
+- Prisma + raw geospatial helpers under `packages/database/src/geospatial` (`case-boundaries`, `consultee-areas`, `rulesets`, `wkt`)
+- Ruleset definitions built from a CSV export (`example_ruleset.csv`); conditions run as `STIntersects` / `STDistance` / bordering queries
+- Dev seed loads a real sample of UK boundaries (`npm run db-seed`); full datasets land via `npm run db-import`, `npm run db-import-from-blob`, the DB Seed pipeline's `loadFullReferenceData` option, or `/admin/import-reference-data`
 - `/items` pings the DB with `SELECT 1` as a connectivity smoke page
 
-Track C is **optional** for most UI work: `npm start` brings the DB up for a full local stack, but UI prototype journeys should still degrade if SQL is unavailable where designed to do so.
+Track C is now on the critical path for the main journey: `npm start` brings the DB up and seeds it for a full local stack.
 
 ## How the tracks interact
 
@@ -60,22 +63,25 @@ Track C is **optional** for most UI work: `npm start` brings the DB up for a ful
 Browser
   └─ Azure Front Door (deployed) / localhost (local)
        └─ apps/manage (Track A UI)
-            ├─ fixtures (dummy geometries, sample GeoJSON)
-            ├─ optional: packages/database (Track C)
+            ├─ packages/database → SQL Server (Track C; seeded sample data locally)
             └─ optional HTTP: PYTHON_FUNCTION_URL → apps/function-python (Track B)
-                                    └─ optional: same SQL (Track C)
+                                    └─ same SQL (Track C)
 ```
 
-## Prototype vs optional geometry-database journeys
+## Journey data sources
 
-| Journey                      | Track   | Data source today                |
-| ---------------------------- | ------- | -------------------------------- |
-| Home search / select project | A       | Sample fixtures                  |
-| Consultees results + maps    | A       | Sample GeoJSON + dummy metadata  |
-| Map layers demo              | A       | Demo GeoJSON                     |
-| Consultee areas (Python)     | B (+ C) | Python function → SQL            |
-| Items list                   | C smoke | DB ping + placeholder tasks      |
-| Upload / screening wizard    | —       | Not implemented in manage UI yet |
+| Journey                      | Track    | Data source                                                |
+| ---------------------------- | -------- | ---------------------------------------------------------- |
+| Home search / select project | C        | `case_boundary` via `searchCaseBoundaries`                 |
+| Ruleset picker               | C        | Case summary + `RULESETS` (CSV-built, `packages/database`) |
+| Consultees results + maps    | C        | `runRuleset` spatial matches + case geometry               |
+| Map layers demo              | A        | Demo GeoJSON (`map-layers-demo-geojson.ts`)                |
+| Component showcase           | A        | Static examples (Defra map uses sample GeoJSON)            |
+| Consultee areas (Python)     | B (+ C)  | Python function → SQL                                      |
+| Consultee areas (direct)     | C        | Node → SQL (`listConsulteeAreas`)                          |
+| Items list                   | C smoke  | DB ping + placeholder tasks                                |
+| Admin upload / import        | C + blob | Blob container → `consultee_area` / `case_boundary`        |
+| End-user upload wizard       | —        | Not implemented in manage UI yet                           |
 
 ## Related pages
 

@@ -4,13 +4,16 @@
 
 ## What exists today
 
-| Surface                            | Type                                       | Notes                                                      |
-| ---------------------------------- | ------------------------------------------ | ---------------------------------------------------------- |
-| Most manage routes                 | HTML (Nunjucks)                            | Primary contract is view-models → templates                |
-| `GET/POST /consultee-areas-python` | HTML wrapping JSON from Python             | Server-side `fetch`; browser does not call Python directly |
-| Static map routes                  | `image/png` or `image/svg+xml`             | Cache headers + ETag                                       |
-| Map config on results pages        | JSON in `<script type="application/json">` | Small config for client map init — not full DB dumps       |
-| Monitoring / health                | From shared core controllers               | Used by platform probes                                    |
+| Surface                                   | Type                                                        | Notes                                                                     |
+| ----------------------------------------- | ----------------------------------------------------------- | ------------------------------------------------------------------------- |
+| Most manage routes                        | HTML (Nunjucks)                                             | Primary contract is view-models → templates                               |
+| `GET/POST /consultee-areas-python`        | HTML wrapping JSON from Python                              | Server-side `fetch` with `x-api-key`; browser never calls Python directly |
+| `GET/POST /consultee-areas-direct`        | HTML wrapping `consultee_area` rows                         | Same data, straight from Node → SQL                                       |
+| `POST /admin/upload-to-blob/run`          | `multipart/form-data` upload                                | File → blob container via managed identity                                |
+| `POST /admin/import-reference-data/run-*` | HTML                                                        | Blob → SQL import (`geojson-import`)                                      |
+| Static map routes                         | `image/avif`, `image/webp`, `image/png`, or `image/svg+xml` | `Accept`-negotiated (`Vary: Accept`) + cache headers + ETag               |
+| Map config on results pages               | JSON in `<script type="application/json">`                  | Small config for client map init — not full DB dumps                      |
+| Monitoring / health                       | From shared core controllers                                | Used by platform probes                                                   |
 
 There is no large public JSON “cases API” in manage yet.
 

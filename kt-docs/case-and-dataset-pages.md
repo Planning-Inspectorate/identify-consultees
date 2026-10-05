@@ -1,18 +1,19 @@
 # Case and dataset pages
 
-**Status:** Partial — “case” UX exists as consultees results over fixtures; rich dataset overview content is still light.
+**Status:** Current for the case journey; sparse for a separate dataset catalogue.
 
 ## Case reference routing
 
-Users select a fixture geometry on the homepage. The app redirects to:
+A "case" is a `case_boundary` row — one uploaded boundary for an NSIP project, identified by a UNIQUEIDENTIFIER. Users pick one from the homepage list, which links straight to:
 
 ```
-/consultees/:geometryId?ruleset=<optional>
+/consultees/:caseId            # choose a ruleset
+/consultees/:caseId/results?ruleset=<id>   # run it and see matched consultees
 ```
 
-Examples used in tests: `geo-1`, sometimes with `ruleset=post-30-apr-2024-england-wales`.
+`caseId` must be a UUID — `resolveCase` (`apps/manage/src/app/views/consultees/resolve-case.ts`) returns 404 for anything else without touching the database. Note a `caseReference` (e.g. `EN010025`) is **not** unique — a project can have several boundary submissions — so pages always deep-link by id, not reference.
 
-`GET /consultees` without `geometryId` redirects home. With `geometryId`, it 302s to the canonical path above.
+E2e fixtures use `SAMPLE_CASE_ID` / `SAMPLE_RULESET_ID` from `e2e/fixtures.ts`, derived from the dev seed data.
 
 ## What the results page shows
 
@@ -20,28 +21,28 @@ Controller: `apps/manage/src/app/views/consultees/results/controller.ts`
 
 Typical content:
 
-- Case / project heading from dummy geometry metadata (reference, name, ruleset label)
-- Section blocks (for example ambulance trusts, police force areas, fire and rescue)
-- Per section: consultee name lists + map region (interactive + static fallback)
-- Static map URLs namespaced by section id
+- Page heading with the case name and reference
+- The ruleset used (`Ruleset used: <name>`)
+- One map region (interactive + static fallback) showing the project boundary and the matched consultee areas — sampled to `MAX_SAMPLED_MAP_MATCHES` with a note when the full set is larger
+- A GOV.UK table of matches: consultee, category, region, distance in metres
 
-Section definitions and sample area polygons are **hard-coded in the controller** for the prototype, not loaded from CBOS.
+Matches are real spatial query output: `runRuleset` runs every condition in the ruleset (`intersection` within a buffer, or `bordering` a host area) and returns the de-duplicated union, nearest first. This is the actual screening engine, not a stand-in — though only one ruleset (`example-ruleset`, built from `example_ruleset.csv`) exists so far.
 
-## Fixture cases vs database-only geometry records
+## Which database rows are reachable
 
-| Kind              | How you recognise it                                  | Used by                                                                      |
-| ----------------- | ----------------------------------------------------- | ---------------------------------------------------------------------------- |
-| Fixture case      | Id like `geo-*` from `DUMMY_GEOMETRIES`               | Homepage table, `/consultees/:id`                                            |
-| Database geometry | Rows in SQL (`case_boundary`, `consultee_area`, etc.) | Count on home (optional); Python consultee-areas; geospatial package helpers |
+| Kind           | Table            | Reached via                                                        |
+| -------------- | ---------------- | ------------------------------------------------------------------ |
+| Case boundary  | `case_boundary`  | Homepage search → `/consultees/:caseId` journey                    |
+| Consultee area | `consultee_area` | Ruleset matches on results; `/consultee-areas-direct`; Python page |
 
-A database-only boundary **does not automatically appear** as a selectable homepage row today. Do not tell stakeholders that uploading to SQL alone completes the UI journey.
+Rows land in these tables via `npm run db-seed` (bundled sample), `npm run db-import` / `db-import-from-blob`, the DB Seed pipeline's `loadFullReferenceData` option, or `/admin/import-reference-data`. Anything not loaded simply never matches — there is no fixture layer to fall back to.
 
 ## Dataset overview content
 
-**Sparse:** There is no separate “dataset catalogue” page yet. Closest surfaces:
+**Sparse:** There is no separate "dataset catalogue" page yet. Closest surfaces:
 
-- Homepage project table (fixture catalogue stand-in)
-- `/consultee-areas-python` (raw-ish rows from Python/SQL)
+- Homepage project table (the `case_boundary` catalogue)
+- `/consultee-areas-python` / `/consultee-areas-direct` (raw-ish `consultee_area` rows)
 - `/map-layers-demo` (overlay experimentation)
 
 ## Related pages

@@ -52,7 +52,8 @@ Then open **http://localhost:8090**.
 3. Starts the database container (`docker compose up -d`)
 4. Waits for SQL Server on **localhost:1434**
 5. Runs migrations (`npm run db-migrate-dev`)
-6. Starts the manage app in watch mode
+6. Seeds the database (`npm run db-seed`) with a real sample of UK case boundaries and consultee areas — the main search → ruleset → results journey and the Playwright e2e tests need this data
+7. Starts the manage app in watch mode
 
 Stop with `Ctrl+C`. The SQL container keeps running until you stop it (`docker compose down`).
 
@@ -67,13 +68,17 @@ Stop with `Ctrl+C`. The SQL container keeps running until you stop it (`docker c
 
 Do not commit `.env` files. Copy from the `.env.example` files only as a template.
 
-### Optional: seed data
+### Seed data
 
-After migrations, you can seed (currently mostly placeholders):
+`npm start` seeds automatically. To re-seed later (the seed is idempotent — rows are merged, not duplicated):
 
 ```bash
 npm run db-seed
 ```
+
+The dev seed loads a real sample of UK infrastructure case boundaries and consultee-area reference data (from `apps/function-python/setup_database/sample_data`) into `case_boundary` and `consultee_area`. Without it the homepage search returns nothing and the e2e suite fails.
+
+To load the full reference dataset instead, use `npm run db-import` / `npm run db-import-from-blob` — see the "Database operations" section of [AGENTS.md](./AGENTS.md).
 
 ### Optional: Entra authentication
 
@@ -108,14 +113,18 @@ Useful npm scripts from the repo root:
 
 | Script | Purpose |
 | ------ | ------- |
-| `npm start` | Full local bootstrap (env, DB, migrate, manage app) |
+| `npm start` | Full local bootstrap (env, DB, migrate, seed, manage app) |
 | `npm run db-migrate-dev` | Apply Prisma migrations (dev) |
-| `npm run db-seed` | Seed the database |
+| `npm run db-seed` | Seed the database (sample boundary data) |
+| `npm run db-import -- --type=<consultee-areas\|case-boundaries> --file=<path>` | Import a GeoJSON dataset from a local file |
+| `npm run db-import-from-blob -- --type=<...> --blob=<name>` | Import a GeoJSON dataset from the app's blob container |
 | `npm run lint` / `npm test` / `npm run check-types` | Local quality checks |
+
+`npm test` includes Playwright e2e, which needs the seeded local database — run `npm start` first (or leave the SQL container up from an earlier run).
 
 Frontend testing (unit, GOV.UK fixtures, a11y, Playwright e2e, coverage gate, and optional visual regression) is documented in [`docs/frontend-testing.md`](./docs/frontend-testing.md). Install Chromium, Firefox, and WebKit once with `npm run playwright:install` before browser tests.
 
-For contribution workflow (branches, commits, PRs) see [CONTRIBUTING.md](./CONTRIBUTING.md). To report a security vulnerability see [SECURITY.md](./SECURITY.md). Agent / GDS guidance for this repo lives in [AGENTS.md](./AGENTS.md).
+For contribution workflow (branches, commits, PRs) see [CONTRIBUTING.md](./CONTRIBUTING.md). To report a security vulnerability see [SECURITY.md](./SECURITY.md). Agent / GDS guidance for this repo lives in [AGENTS.md](./AGENTS.md). Deeper onboarding material (architecture, routes, maps, testing, troubleshooting) lives in [`kt-docs/`](./kt-docs/README.md).
 
 ## Editor setup
 

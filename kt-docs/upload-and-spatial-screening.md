@@ -1,43 +1,45 @@
 # Upload and spatial screening
 
-**Status:** Planned / sparse in the manage frontend — keep this page so Confluence has a stub.
+**Status:** Partial — data loading and ruleset screening exist; there is still no end-user upload wizard.
 
 ## What exists today
 
-| Piece                                                     | State                                                                                                 |
-| --------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
-| In-app upload wizard (file → validate → screen → results) | **Not implemented** as manage routes                                                                  |
-| Fixture “screening results” UI                            | **Yes** — `/consultees/:id` sections simulate outcomes                                                |
-| External shapefile packaging / Astun GIS report process   | Documented in `docs/gis-shapefile-upload-and-report.md`                                               |
-| Helpers anticipating uploads maps                         | `geometry-bounds.ts` (fit viewport from GeoJSON)                                                      |
-| Python directories for write / intersect / orchestrate    | Referenced as future mirrors of PINS-data-spike in `apps/function-python/README.md` — not all present |
+| Piece                                                     | State                                                                                                                                                               |
+| --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| In-app upload wizard for users (file → validate → screen) | **Not implemented** as manage routes                                                                                                                                |
+| Admin upload to blob storage                              | **Yes** — `GET/POST /admin/upload-to-blob` (multer, managed identity, `BLOB_STORE_*` config)                                                                        |
+| Admin import of reference data into SQL                   | **Yes** — `GET/POST /admin/import-reference-data` for the two known blobs (consultee areas + case boundaries)                                                       |
+| Real ruleset screening                                    | **Yes** — `runRuleset` in `packages/database/src/geospatial` runs `STIntersects`/`STDistance`/bordering queries; `/consultees/:caseId/results` presents the matches |
+| Pipeline equivalent                                       | DB Seed pipeline `loadFullReferenceData` option → `npm run import-from-blob`; CLI: `npm run db-import` for local files                                              |
+| External shapefile packaging / Astun GIS report process   | Documented in `docs/gis-shapefile-upload-and-report.md`                                                                                                             |
+| Helpers anticipating uploads maps                         | `geometry-bounds.ts` (fit viewport from GeoJSON)                                                                                                                    |
+| Python directories for write / intersect / orchestrate    | Referenced as future mirrors of PINS-data-spike in `apps/function-python/README.md` — not all present                                                               |
 
-## Intended journey (target sketch)
+## Intended end-user journey (target sketch)
 
 Use this as the KT narrative until routes land:
 
 1. **Upload** geometry (shapefile / GeoJSON — format TBD)
-2. **Best-effort load** into optional spatial DB (Track C) or working store
-3. **Choose ruleset** (align with homepage `RULESETS` vocabulary where possible)
-4. **Run screening** (likely Track B Python / rule engine)
-5. **Present results** with maps using the same interactive + static pattern as consultees results
+2. **Best-effort load** into the spatial DB (probably reusing `geojson-import.ts`)
+3. **Choose ruleset** (reuse `RULESETS` vocabulary from the picker page)
+4. **Run screening** — `runRuleset` already does this in Node; Python equivalents remain a Track B option
+5. **Present results** with the same interactive + static map pattern as `/consultees/:caseId/results`
 
-## When the optional database is unavailable
+## When the database is unavailable
 
-Agreed direction for the spike (mirror existing Python page behaviour):
+Agreed direction (mirrors existing behaviour):
 
-- Manage app **keeps serving** prototype journeys
-- Upload / DB-backed screening should show a clear, non-fatal error state
-- Do not block homepage fixture search on SQL health
+- Manage app **keeps serving** non-DB journeys (component showcase, map demos)
+- DB-backed pages show a clear, non-fatal error state (`/consultee-areas-direct`, `/admin/*` already do)
 - Logging should explain the failure without dumping secrets or full connection strings
 
-## Results presentation (current stand-in)
+## Results presentation
 
-Until real screening exists, treat `/consultees/:geometryId` as the **UX reference** for:
+`/consultees/:caseId/results` is the reference implementation:
 
-- Grouping consultees by theme / distance band
-- Pairing lists with maps
-- Carrying `ruleset` in the query string for labelling
+- Matched consultees in a GOV.UK table (consultee, category, region, distance)
+- Project boundary + matches on one map (interactive, static fallback)
+- `ruleset` carried in the query string for labelling and cache identity
 
 ## Related pages
 

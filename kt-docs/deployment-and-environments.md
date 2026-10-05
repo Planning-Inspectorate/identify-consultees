@@ -4,14 +4,16 @@
 
 ## Local development vs deployed spike
 
-| Concern     | Local                         | Deployed (Azure)                                          |
-| ----------- | ----------------------------- | --------------------------------------------------------- |
-| Entry       | `npm start` / manage watch    | Container image `consultees/web` on **Azure App Service** |
-| Public edge | localhost:8090                | **Azure Front Door** → App Service origin                 |
-| Auth        | Usually disabled              | Entra settings from Terraform app settings                |
-| SQL         | Docker on host port 1434      | Azure SQL (infra modules)                                 |
-| Python      | Optional Functions Core Tools | Function App (see `infrastructure/app-function.tf`)       |
-| Secrets     | `.env` files (gitignored)     | Key Vault references in app settings                      |
+| Concern     | Local                           | Deployed (Azure)                                                                           |
+| ----------- | ------------------------------- | ------------------------------------------------------------------------------------------ |
+| Entry       | `npm start` / manage watch      | Container image `consultees/web` on **Azure App Service**                                  |
+| Public edge | localhost:8090                  | **Azure Front Door** → App Service origin                                                  |
+| Auth        | Usually disabled                | Entra settings from Terraform app settings                                                 |
+| SQL         | Docker on host port 1434        | Azure SQL (infra modules)                                                                  |
+| Python      | Optional Functions Core Tools   | Function App (see `infrastructure/app-function.tf`)                                        |
+| Blob data   | `BLOB_STORE_*` unset by default | Storage account + `data` container (`infrastructure/storage.tf`) for reference-data import |
+| Sessions    | In-memory                       | Azure Managed Redis (`MANAGED_REDIS_URL`)                                                  |
+| Secrets     | `.env` files (gitignored)       | Key Vault references in app settings                                                       |
 
 > Naming note: some spike conversations say “Container Apps”. **This repo’s web module is App Service with a container image** (`infrastructure/app-web.tf`). Prefer that wording in Confluence unless infra deliberately moves.
 
@@ -19,7 +21,7 @@
 
 Safe to use locally / in spike:
 
-- Fixture geometries and sample map polygons
+- The bundled sample boundary dataset (`apps/function-python/setup_database/sample_data`, loaded by `npm run db-seed`)
 - Docker SA password from compose examples
 - Placeholder `SESSION_SECRET`
 - Non-production Entra app registrations when provided by the team
@@ -46,6 +48,8 @@ Browser  --HTTP/2-->  Azure Front Door  --HTTP/1.1-->  App Service (Node origin)
 - Static asset build (`npm run build` in manage) as part of image pipeline
 
 Infra-only changes (Front Door rules, SKUs, DNS) go through `infrastructure/` with the usual Terraform review path.
+
+Data loading into a deployed environment does not need an app deploy: the `db-seed.yml` pipeline (manual, `loadFullReferenceData` option for Dev/Test/Training) or the `/admin/import-reference-data` + `/admin/upload-to-blob` routes in a running environment both import the known reference-data blobs. See the "Database operations" section of `AGENTS.md`.
 
 ## Related pages
 
