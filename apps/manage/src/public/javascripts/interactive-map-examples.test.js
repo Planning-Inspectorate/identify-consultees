@@ -28,9 +28,13 @@ afterEach(() => {
 });
 
 function pageHtml(config, mapId = 'demo-map') {
+	const json = JSON.stringify({
+		fallback: { src: '/static-map', alt: 'Static map', width: 960, height: 516 },
+		...config
+	});
 	return `<!DOCTYPE html><html><body>
-		<div id="${mapId}" data-interactive-map-example data-static-map-src="/static-map" data-static-map-alt="Static map" data-map-width="960" data-map-height="516"></div>
-		<script id="${mapId}-data" type="application/json">${JSON.stringify(config)}</script>
+		<div id="${mapId}" class="app-interactive-map-example"></div>
+		<script id="${mapId}-data" type="application/json">${json}</script>
 	</body></html>`;
 }
 
@@ -124,11 +128,12 @@ describe('interactive-map-examples client helpers', () => {
 		installDom(pageHtml({ kind: 'basic' }));
 		initInteractiveMapExample('no-such-map');
 
+		// unparseable config means the fallback details are unknown too → text message
 		installDom(
-			'<!DOCTYPE html><html><body><div id="broken" data-interactive-map-example data-static-map-src="/s"></div><script id="broken-data" type="application/json">{bad</script></body></html>'
+			'<!DOCTYPE html><html><body><div id="broken" class="app-interactive-map-example"></div><script id="broken-data" type="application/json">{bad</script></body></html>'
 		);
 		initInteractiveMapExample('broken');
-		assert.ok(document.querySelector('#broken img.app-case-map-static'));
+		assert.match(document.getElementById('broken').textContent, /could not load/);
 	});
 
 	test('initInteractiveMapExample injects the static fallback when defra is missing', () => {
@@ -350,6 +355,7 @@ describe('interactive-map-examples client helpers', () => {
 			pageHtml({
 				kind: 'select-feature',
 				behaviour: 'hybrid',
+				interact: { interactionModes: ['selectFeature'] },
 				panel: { id: 'parcel-info', label: 'x', property: 'name', fallback: 'fb' }
 			})
 		);
@@ -361,20 +367,26 @@ describe('interactive-map-examples client helpers', () => {
 
 		initInteractiveMapExample('demo-map');
 		const map = InteractiveMap.mock.calls[0].this;
-		// config has no interact options so no plugin was built → panelclose is a no-op
-		fire('app:panelclosed', { panelId: 'parcel-info' });
 		// selection before map:ready → the panel element is not in the DOM yet
 		fire('interact:selectionchange', { selectedFeatures: [{ properties: { name: 'x' } }] });
 		assert.equal(map.hidePanel.mock.callCount(), 1);
+
+		// map:ready fires the enable hook — a plugin object without the late-bound
+		// api is a harmless no-op; the configured panel is still registered
+		fire('map:ready');
+		assert.equal(map.addPanel.mock.callCount(), 1);
+
+		// panelclose for this panel can't clear a plugin with no clear helper
+		fire('app:panelclosed', { panelId: 'parcel-info' });
 	});
 
 	test('initAllInteractiveMapExamples skips containers without an id and non-HTML elements', () => {
 		installDom(
-			'<!DOCTYPE html><html><body><div data-interactive-map-example></div><div id="m2" data-interactive-map-example data-static-map-src="/s" data-static-map-alt="a"></div><script id="m2-data" type="application/json">{"kind":"basic"}</script></body></html>'
+			'<!DOCTYPE html><html><body><div class="app-interactive-map-example"></div><div id="m2" class="app-interactive-map-example"></div><script id="m2-data" type="application/json">{"kind":"basic","fallback":{"src":"/s","alt":"a"}}</script></body></html>'
 		);
-		// a namespaced SVG element carrying the marker attribute must be ignored
+		// a namespaced SVG element carrying the marker class must be ignored
 		const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-		svg.setAttribute('data-interactive-map-example', '');
+		svg.classList.add('app-interactive-map-example');
 		document.body.appendChild(svg);
 
 		initAllInteractiveMapExamples();
@@ -480,15 +492,23 @@ describe('interactive-map-examples client helpers', () => {
 
 	test('showStaticMapFallback is idempotent and works without a src', () => {
 		const dom = installDom(
-			'<!DOCTYPE html><html><body><div id="a" data-interactive-map-example><img class="app-case-map-static"></div><div id="b"></div></body></html>'
+			'<!DOCTYPE html><html><body><div id="a" class="app-interactive-map-example"><img class="app-case-map-static"></div><div id="b"></div><div id="c"></div></body></html>'
 		);
 		const withImg = dom.window.document.getElementById('a');
-		showStaticMapFallback(withImg);
+		showStaticMapFallback(withImg, { src: '/s' });
 		assert.equal(withImg.querySelectorAll('img').length, 1);
 
 		const noSrc = dom.window.document.getElementById('b');
 		showStaticMapFallback(noSrc);
 		assert.match(noSrc.textContent, /could not load/);
+
+		// a src with no alt/width/height falls back to safe defaults
+		const bare = dom.window.document.getElementById('c');
+		showStaticMapFallback(bare, { src: '/s' });
+		const img = bare.querySelector('img.app-case-map-static');
+		assert.equal(img.getAttribute('src'), '/s');
+		assert.equal(img.getAttribute('alt'), '');
+		assert.equal(img.getAttribute('width'), '960');
 	});
 
 	test('initAllInteractiveMapExamples covers every container; register handles readyState', () => {

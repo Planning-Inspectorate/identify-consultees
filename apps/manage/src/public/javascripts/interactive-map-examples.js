@@ -7,9 +7,9 @@
  * they need; `kind` selects the example-specific event wiring.
  *
  * Progressive enhancement: if the Defra bundles did not load or init throws,
- * the server-rendered static map (data-static-map-src) is injected — the same
- * image the <noscript> fallback shows. The static image is only requested on
- * that failure path; a working map never downloads it.
+ * the server-rendered static map (from `config.fallback`) is injected — the
+ * same image the <noscript> fallback shows. The static image is only requested
+ * on that failure path; a working map never downloads it.
  */
 
 /**
@@ -31,24 +31,27 @@ export function readMapConfig(mapId) {
 
 /**
  * Inject the cached server-rendered static map when the interactive map
- * cannot start (missing bundles, init error).
+ * cannot start (missing bundles, init error). Fallback details come from
+ * the page's JSON config — data-* attributes can't be used because the
+ * InteractiveMap constructor JSON.parses every one it finds.
  *
  * @param {HTMLElement} container
+ * @param {object | undefined} fallback - `config.fallback` from the JSON block
  */
-export function showStaticMapFallback(container) {
+export function showStaticMapFallback(container, fallback) {
 	if (container.querySelector('.app-case-map-static')) {
 		return;
 	}
 
-	const src = container.dataset.staticMapSrc;
-	const alt = container.dataset.staticMapAlt ?? '';
-	if (!src) {
+	if (!fallback?.src) {
 		container.textContent = 'The interactive map could not load.';
 		return;
 	}
 
-	const width = Number(container.dataset.mapWidth) || 960;
-	const height = Number(container.dataset.mapHeight) || 516;
+	const src = fallback.src;
+	const alt = fallback.alt ?? '';
+	const width = fallback.width || 960;
+	const height = fallback.height || 516;
 
 	const img = document.createElement('img');
 	img.className = 'app-case-map-static';
@@ -122,8 +125,10 @@ function escapeHtml(value) {
  * @param {object | undefined} interactPlugin
  */
 function wireExampleBehaviour(map, config, interactPlugin) {
-	if (interactPlugin?.enable) {
-		map.on('map:ready', () => interactPlugin.enable());
+	// the core attaches plugin api methods (enable etc.) onto the plugin object
+	// when the plugin mounts — at map:ready it exists, at wiring time it doesn't
+	if (interactPlugin) {
+		map.on('map:ready', () => interactPlugin.enable?.());
 	}
 
 	if (config.marker) {
@@ -205,7 +210,7 @@ export function initInteractiveMapExample(mapId) {
 
 	const defra = window.defra;
 	if (!config || !defra?.InteractiveMap || !defra.maplibreProvider) {
-		showStaticMapFallback(container);
+		showStaticMapFallback(container, config?.fallback);
 		return;
 	}
 
@@ -240,12 +245,12 @@ export function initInteractiveMapExample(mapId) {
 
 		wireExampleBehaviour(map, config, interactPlugin);
 	} catch {
-		showStaticMapFallback(container);
+		showStaticMapFallback(container, config.fallback);
 	}
 }
 
 export function initAllInteractiveMapExamples() {
-	for (const container of document.querySelectorAll('[data-interactive-map-example]')) {
+	for (const container of document.querySelectorAll('.app-interactive-map-example')) {
 		if (container instanceof HTMLElement && container.id) {
 			initInteractiveMapExample(container.id);
 		}

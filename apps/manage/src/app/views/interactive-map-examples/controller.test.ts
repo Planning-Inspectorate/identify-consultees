@@ -120,6 +120,14 @@ describe('interactive map example page', () => {
 		assert.equal(config.mapKey, true);
 		assert.equal(config.datasets[0].id, 'field-parcels');
 		assert.equal(config.mapStyle.attribution.length > 0, true);
+		// fallback details live in the JSON block — data-* attributes would be
+		// JSON.parsed by the InteractiveMap constructor and log console errors
+		assert.deepEqual(config.fallback, {
+			src: '/components/interactive-map/polygons/static-map',
+			alt: model.staticMapAlt,
+			width: 960,
+			height: 516
+		});
 	});
 
 	test('draw-tools wires interact and draw plugins', async () => {

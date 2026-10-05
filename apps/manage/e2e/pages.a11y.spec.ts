@@ -91,7 +91,7 @@ test.describe('browser accessibility landmarks and skip link', () => {
 	test('interactive map example host remains an accessible region', async ({ page }) => {
 		await page.goto('/components/interactive-map/basic?components=true');
 
-		const host = page.locator('[data-interactive-map-example][role="region"]');
+		const host = page.locator('.app-interactive-map-example[role="region"]');
 		await expect(host).toBeAttached();
 		await expect(host).toHaveAttribute('aria-label', /.+/);
 

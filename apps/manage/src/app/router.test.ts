@@ -196,7 +196,7 @@ describe('manage router wiring', () => {
 		assert.equal(response.status, 200);
 		assert.match(response.text, /Polygon overlay/);
 		assert.match(response.text, /role="region"/);
-		assert.match(response.text, /data-interactive-map-example/);
+		assert.match(response.text, /app-interactive-map-example/);
 		assert.match(response.text, /<noscript>[\s\S]*src="\/components\/interactive-map\/polygons\/static-map"/);
 		// only the plugins this example uses are loaded
 		assert.match(response.text, /datasets-plugin\/js\/index(?:-[0-9a-f]{8})?\.js/);

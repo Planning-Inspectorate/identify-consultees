@@ -149,14 +149,18 @@ test.describe('cross-browser render completeness', () => {
 
 	test('interactive map example host is present for progressive enhancement', async ({ page }) => {
 		await page.goto('/components/interactive-map/basic?components=true', { waitUntil: 'domcontentloaded' });
-		const host = page.locator('[data-interactive-map-example].app-case-map');
+		const host = page.locator('.app-interactive-map-example.app-case-map');
 		await expect(host).toBeAttached();
 		await expect(host).toHaveAttribute('role', 'region');
-		await expect(host).toHaveAttribute('data-map-width', '960');
-		await expect(host).toHaveAttribute('data-map-height', '516');
-		await expect(host).toHaveAttribute('data-static-map-src', '/components/interactive-map/basic/static-map');
 		await expect(host).toHaveAttribute('aria-label', /.+/);
-		await expect(page.locator('#interactive-map-example-basic-data')).toBeAttached();
+		// the noscript fallback carries the heavily-cached static map — assert on
+		// the raw HTML since noscript children never enter the DOM under JS
+		const html = await (await page.request.get('/components/interactive-map/basic?components=true')).text();
+		expect(html).toContain('<noscript>');
+		expect(html).toContain('src="/components/interactive-map/basic/static-map"');
+		// the page config block feeds the client module (including the fallback details)
+		const configJson = await page.locator('#interactive-map-example-basic-data').textContent();
+		expect(JSON.parse(configJson).fallback.src).toBe('/components/interactive-map/basic/static-map');
 	});
 
 	test('map layers demo host is present for progressive enhancement', async ({ page }) => {
