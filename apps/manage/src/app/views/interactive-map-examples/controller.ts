@@ -123,6 +123,9 @@ export function buildInteractiveMapExamplePage(): AsyncRequestHandler {
 			mapHeight: MAP_VIEWPORT.height,
 			mapConfigJson: stringifyForInlineScript({
 				mapStyle: {
+					// id namespaces per-style draw properties in the Defra draw adapter
+					// and the localStorage key used to persist style/size state
+					id: 'liberty',
 					url: INTERACTIVE_MAP_STYLE_URL,
 					attribution: INTERACTIVE_MAP_OPENFREEMAP_ATTRIBUTION,
 					backgroundColor: '#f5f5f0'
@@ -138,7 +141,14 @@ export function buildInteractiveMapExamplePage(): AsyncRequestHandler {
 			pluginStylesheets,
 			pluginScripts,
 			behaviourLabel: BEHAVIOUR_LABELS[clientConfig.behaviour],
-			pluginsLabel: pluginsLabel(example.plugins)
+			pluginsLabel: pluginsLabel(example.plugins),
+			featureLegend: example.staticMap.legend
+				? {
+						heading: example.staticMap.legend.heading,
+						head: example.staticMap.legend.columns.map((text) => ({ text })),
+						rows: example.staticMap.legend.rows.map((row) => row.map((text) => ({ text })))
+					}
+				: undefined
 		};
 
 		res.render('views/interactive-map-examples/example.njk', model);
@@ -170,6 +180,8 @@ export function buildInteractiveMapStaticMap(forceSvg = false): AsyncRequestHand
 				height: MAP_VIEWPORT.height,
 				projectGeojson: example.staticMap.projectGeojson,
 				consulteeGeojson: example.staticMap.consulteeGeojson,
+				markers: example.staticMap.markers,
+				featureBadges: example.staticMap.featureBadges,
 				title: example.title,
 				description: example.staticMap.alt
 			},

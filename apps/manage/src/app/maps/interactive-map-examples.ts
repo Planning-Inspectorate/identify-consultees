@@ -13,7 +13,8 @@
  */
 
 import { FIELD_PARCELS_GEOJSON, HISTORIC_MONUMENTS_GEOJSON } from './interactive-map-examples-data.ts';
-import type { GeoJsonFeatureCollection } from './sample-geojson.ts';
+import type { GeoJsonFeature, GeoJsonFeatureCollection } from './sample-geojson.ts';
+import { centroidOfGeometry, type LngLat } from './static-map.ts';
 
 export const INTERACTIVE_MAP_OPENFREEMAP_ATTRIBUTION = 'OpenFreeMap © OpenMapTiles Data from OpenStreetMap';
 export const INTERACTIVE_MAP_STYLE_URL = 'https://tiles.openfreemap.org/styles/liberty';
@@ -71,6 +72,16 @@ export interface InteractiveMapExample {
 		projectGeojson: GeoJsonFeatureCollection;
 		consulteeGeojson: GeoJsonFeatureCollection;
 		alt: string;
+		/** Pin glyphs for marker-style examples. */
+		markers?: { coords: LngLat; label?: string }[];
+		/** Numbered badges tying map features to the legend rows below the image. */
+		featureBadges?: { coords: LngLat; label: string; fill?: string }[];
+		/** Feature details listed under the map for no-JS / init-failure users. */
+		legend?: {
+			heading: string;
+			columns: string[];
+			rows: string[][];
+		};
 	};
 }
 
@@ -126,10 +137,25 @@ const MONUMENT_SUBLAYER_COLOURS: Record<string, string> = {
 	medieval: '#1565C0'
 };
 
+/** Numbered badges positioned at each feature's centroid (or the point itself). Exported for tests. */
+export function numberedBadges(
+	features: GeoJsonFeature[],
+	fillBy?: (feature: GeoJsonFeature) => string | undefined
+): { coords: LngLat; label: string; fill?: string }[] {
+	return features.flatMap((feature, i) => {
+		const coords = centroidOfGeometry(feature.geometry);
+		return coords ? [{ coords, label: String(i + 1), fill: fillBy?.(feature) }] : [];
+	});
+}
+
+function capitalise(value: string): string {
+	return `${value.charAt(0).toUpperCase()}${value.slice(1)}`;
+}
+
 function monumentSublayers() {
 	return (Object.keys(MONUMENT_SUBLAYER_COLOURS) as (keyof typeof MONUMENT_SUBLAYER_COLOURS)[]).map((category) => ({
 		id: category,
-		label: category === 'roman' ? 'Roman' : `${category[0].toUpperCase()}${category.slice(1)}`,
+		label: capitalise(category),
 		filter: ['in', ['get', 'category'], category],
 		style: {
 			symbol: 'square',
@@ -238,7 +264,20 @@ export const INTERACTIVE_MAP_EXAMPLES: readonly InteractiveMapExample[] = [
 		staticMap: {
 			projectGeojson: EMPTY_COLLECTION,
 			consulteeGeojson: EMPTY_COLLECTION,
-			alt: 'Static map of the Ambleside area where prehistoric, Roman and medieval monument points are marked.'
+			alt: 'Static map of the Ambleside area where prehistoric, Roman and medieval monument points are marked.',
+			featureBadges: numberedBadges(
+				HISTORIC_MONUMENTS_GEOJSON.features,
+				(feature) => MONUMENT_SUBLAYER_COLOURS[String(feature.properties.category)]
+			),
+			legend: {
+				heading: 'Monuments shown on the map',
+				columns: ['Number', 'Name', 'Period'],
+				rows: HISTORIC_MONUMENTS_GEOJSON.features.map((feature, i) => [
+					String(i + 1),
+					String(feature.properties.name),
+					capitalise(String(feature.properties.category))
+				])
+			}
 		}
 	},
 	{
@@ -268,7 +307,13 @@ export const INTERACTIVE_MAP_EXAMPLES: readonly InteractiveMapExample[] = [
 		staticMap: {
 			projectGeojson: EMPTY_COLLECTION,
 			consulteeGeojson: EMPTY_COLLECTION,
-			alt: 'Static map centred on the marker location near Windermere.'
+			alt: 'Static map centred on the marker location near Windermere.',
+			markers: [{ coords: WINDERMERE_MARKER, label: 'Demo marker' }],
+			legend: {
+				heading: 'Marker details',
+				columns: ['Details'],
+				rows: [['Demo marker near Windermere']]
+			}
 		}
 	},
 	{
@@ -292,7 +337,13 @@ export const INTERACTIVE_MAP_EXAMPLES: readonly InteractiveMapExample[] = [
 		staticMap: {
 			projectGeojson: EMPTY_COLLECTION,
 			consulteeGeojson: EMPTY_COLLECTION,
-			alt: 'Static map centred on the labelled marker near Windermere.'
+			alt: 'Static map centred on the labelled marker near Windermere.',
+			markers: [{ coords: WINDERMERE_MARKER, label: 'Demo location' }],
+			legend: {
+				heading: 'Marker details',
+				columns: ['Details'],
+				rows: [['Demo location — near Windermere']]
+			}
 		}
 	},
 	{
@@ -356,7 +407,17 @@ export const INTERACTIVE_MAP_EXAMPLES: readonly InteractiveMapExample[] = [
 		staticMap: {
 			projectGeojson: FIELD_PARCELS_GEOJSON,
 			consulteeGeojson: EMPTY_COLLECTION,
-			alt: 'Static map of selectable field parcel polygons near Ambleside.'
+			alt: 'Static map of selectable field parcel polygons near Ambleside.',
+			featureBadges: numberedBadges(FIELD_PARCELS_GEOJSON.features),
+			legend: {
+				heading: 'Parcels shown on the map',
+				columns: ['Number', 'Name', 'Land use'],
+				rows: FIELD_PARCELS_GEOJSON.features.map((feature, i) => [
+					String(i + 1),
+					String(feature.properties.name),
+					String(feature.properties.landUse)
+				])
+			}
 		}
 	},
 	{

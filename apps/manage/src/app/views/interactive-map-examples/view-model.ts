@@ -33,4 +33,14 @@ export interface InteractiveMapExampleViewModel {
 	pluginScripts: string[];
 	behaviourLabel: string;
 	pluginsLabel: string;
+	/**
+	 * Feature details for the static fallback — rendered inside <noscript> and
+	 * in a hidden block the client reveals when interactive init fails.
+	 * `head`/`rows` are already in govukTable shape.
+	 */
+	featureLegend?: {
+		heading: string;
+		head: { text: string }[];
+		rows: { text: string }[][];
+	};
 }

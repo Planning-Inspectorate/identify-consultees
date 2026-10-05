@@ -39,6 +39,10 @@ export function readMapConfig(mapId) {
  * @param {object | undefined} fallback - `config.fallback` from the JSON block
  */
 export function showStaticMapFallback(container, fallback) {
+	// the server-rendered feature list is hidden while the interactive map is
+	// expected to work — reveal it whenever we fall back to the static image
+	document.getElementById(`${container.id}-fallback`)?.removeAttribute('hidden');
+
 	if (container.querySelector('.app-case-map-static')) {
 		return;
 	}
@@ -79,6 +83,7 @@ export function showStaticMapFallback(container, fallback) {
 export function buildPlugins(defra, config) {
 	const plugins = [];
 	let interact;
+	let draw;
 
 	if (config.datasets?.length && defra.datasetsPlugin) {
 		plugins.push(defra.datasetsPlugin({ datasets: config.datasets }));
@@ -88,7 +93,8 @@ export function buildPlugins(defra, config) {
 		plugins.push(interact);
 	}
 	if (config.draw && defra.drawPlugin) {
-		plugins.push(defra.drawPlugin(config.draw));
+		draw = defra.drawPlugin(config.draw);
+		plugins.push(draw);
 	}
 	if (config.mapStyles?.length && defra.mapStylesPlugin) {
 		plugins.push(defra.mapStylesPlugin({ mapStyles: config.mapStyles }));
@@ -97,7 +103,7 @@ export function buildPlugins(defra, config) {
 		plugins.push(defra.mapKeyPlugin());
 	}
 
-	return { plugins, interact };
+	return { plugins, interact, draw };
 }
 
 /**
@@ -123,12 +129,25 @@ function escapeHtml(value) {
  * @param {object} map - InteractiveMap instance
  * @param {object} config
  * @param {object | undefined} interactPlugin
+ * @param {object | undefined} drawPlugin
  */
-function wireExampleBehaviour(map, config, interactPlugin) {
+function wireExampleBehaviour(map, config, interactPlugin, drawPlugin) {
 	// the core attaches plugin api methods (enable etc.) onto the plugin object
 	// when the plugin mounts — at map:ready it exists, at wiring time it doesn't
 	if (interactPlugin) {
 		map.on('map:ready', () => interactPlugin.enable?.());
+	}
+
+	// the draw plugin renders in-session controls (Done/Cancel/Menu) itself but
+	// the entry button is the consumer's job — newPolygon only works once the
+	// adapter emits draw:ready, which always precedes a user click
+	if (drawPlugin) {
+		map.on('map:ready', () => {
+			map.addButton('drawPolygon', {
+				label: 'Draw polygon',
+				onClick: () => drawPlugin.newPolygon?.(crypto.randomUUID())
+			});
+		});
 	}
 
 	if (config.marker) {
@@ -218,7 +237,7 @@ export function initInteractiveMapExample(mapId) {
 	container.classList.add('app-case-map-interactive');
 
 	try {
-		const { plugins, interact: interactPlugin } = buildPlugins(defra, config);
+		const { plugins, interact: interactPlugin, draw: drawPlugin } = buildPlugins(defra, config);
 
 		const mapStyle = config.mapStyles?.length ? config.mapStyles[0] : config.mapStyle;
 
@@ -243,7 +262,7 @@ export function initInteractiveMapExample(mapId) {
 				: {})
 		});
 
-		wireExampleBehaviour(map, config, interactPlugin);
+		wireExampleBehaviour(map, config, interactPlugin, drawPlugin);
 	} catch {
 		showStaticMapFallback(container, config.fallback);
 	}

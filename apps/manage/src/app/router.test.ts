@@ -203,6 +203,17 @@ describe('manage router wiring', () => {
 		assert.doesNotMatch(response.text, /draw-plugin\/js\/index/);
 	});
 
+	test('GET /components/interactive-map/select-feature renders the numbered feature legend', async () => {
+		const response = await request(authDisabledApp).get('/components/interactive-map/select-feature');
+		assert.equal(response.status, 200);
+		assert.match(response.text, /Parcels shown on the map/);
+		// once inside noscript (JS disabled) and once in the hidden block the
+		// client reveals on init failure
+		assert.match(response.text, /<noscript>[\s\S]*Permanent grassland/);
+		assert.match(response.text, /id="interactive-map-example-select-feature-fallback"[^>]*hidden/);
+		assert.match(response.text, /Land use/);
+	});
+
 	test('GET /components/interactive-map/:example 404s for an unknown example', async () => {
 		const response = await request(authDisabledApp).get('/components/interactive-map/not-an-example');
 		assert.equal(response.status, 404);
