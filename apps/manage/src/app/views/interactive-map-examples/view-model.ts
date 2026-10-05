@@ -34,6 +34,12 @@ export interface InteractiveMapExampleViewModel {
 	behaviourLabel: string;
 	pluginsLabel: string;
 	/**
+	 * True for `buttonFirst` behaviour — the collapsed container must size to
+	 * the "Map view" button (Defra's shell sets its own root to height:auto),
+	 * so the fixed-height `.app-case-map` box gets a modifier class.
+	 */
+	isButtonFirst: boolean;
+	/**
 	 * Feature details for the static fallback — rendered inside <noscript> and
 	 * in a hidden block the client reveals when interactive init fails.
 	 * `head`/`rows` are already in govukTable shape.

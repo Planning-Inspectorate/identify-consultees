@@ -214,6 +214,22 @@ describe('manage router wiring', () => {
 		assert.match(response.text, /Land use/);
 	});
 
+	test('GET /components/interactive-map/button-first collapses the fixed-height map box', async () => {
+		const response = await request(authDisabledApp).get('/components/interactive-map/button-first');
+		assert.equal(response.status, 200);
+		assert.match(response.text, /app-case-map app-interactive-map-example app-case-map--button-first/);
+		// interaction instructions are JS-only — hidden when JavaScript is off
+		assert.match(response.text, /<noscript><style>\.app-js-only \{ display: none; \}<\/style><\/noscript>/);
+		assert.match(response.text, /govuk-inset-text app-js-only/);
+	});
+
+	test('GET /components/interactive-map/:example keeps the fixed-height box for inline maps', async () => {
+		const response = await request(authDisabledApp).get('/components/interactive-map/basic');
+		assert.equal(response.status, 200);
+		assert.match(response.text, /class="app-case-map app-interactive-map-example"/);
+		assert.doesNotMatch(response.text, /app-case-map--button-first/);
+	});
+
 	test('GET /components/interactive-map/:example 404s for an unknown example', async () => {
 		const response = await request(authDisabledApp).get('/components/interactive-map/not-an-example');
 		assert.equal(response.status, 404);

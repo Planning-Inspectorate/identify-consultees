@@ -18,11 +18,13 @@
 {% block pageContent %}
 	<p class="govuk-body">{{ summary }}</p>
 
-	{{ govukInsetText({ text: interaction }) }}
+	{# interaction instructions only make sense when the interactive map exists #}
+	<noscript><style>.app-js-only { display: none; }</style></noscript>
+	{{ govukInsetText({ text: interaction, classes: 'app-js-only' }) }}
 
 	<div
 		id="{{ mapId }}"
-		class="app-case-map app-interactive-map-example"
+		class="app-case-map app-interactive-map-example{% if isButtonFirst %} app-case-map--button-first{% endif %}"
 		role="region"
 		aria-label="{{ mapRegionLabel }}"
 	>

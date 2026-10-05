@@ -190,8 +190,9 @@ export const INTERACTIVE_MAP_EXAMPLES: readonly InteractiveMapExample[] = [
 		id: 'button-first',
 		title: 'Button-first map',
 		summary:
-			'The map starts as a static-style placeholder with a "Map view" button. Activating the button opens the ' +
-			'interactive map fullscreen — the recommended pattern for low-resource devices and keyboard users.',
+			'The interactive map starts collapsed behind a "Map view" button. Activating it opens the map ' +
+			'fullscreen — the recommended pattern for low-resource devices and keyboard users. Without ' +
+			'JavaScript only the static map below is shown.',
 		interaction: 'Activate the Map view button to open the map, then use the Exit button to leave it.',
 		plugins: [],
 		clientConfig: {
