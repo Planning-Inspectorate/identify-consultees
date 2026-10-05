@@ -142,6 +142,7 @@ export function buildInteractiveMapExamplePage(): AsyncRequestHandler {
 			pluginScripts,
 			behaviourLabel: BEHAVIOUR_LABELS[clientConfig.behaviour],
 			pluginsLabel: pluginsLabel(example.plugins),
+			isButtonFirst: clientConfig.behaviour === 'buttonFirst',
 			featureLegend: example.staticMap.legend
 				? {
 						heading: example.staticMap.legend.heading,

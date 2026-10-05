@@ -7,7 +7,7 @@ import type { Handler } from 'express';
 export function addLocalsConfiguration(): Handler {
 	return (req, res, next) => {
 		res.locals.config = {
-			styleFile: 'style-983f2e7f.css',
+			styleFile: 'style-9836de53.css',
 			govukFrontendJs: 'assets/js/govuk-frontend.min-38b6270a.js',
 			consulteesMapJs: 'javascripts/consultees-map-edecec94.js',
 			mapLayersDemoJs: 'javascripts/map-layers-demo-5c32a650.js',

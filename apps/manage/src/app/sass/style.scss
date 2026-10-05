@@ -22,6 +22,13 @@ $font-family: arial, helvetica, sans-serif;
 	background: index.govuk-colour('black', $variant: 'tint-95');
 }
 
+// button-first maps collapse to just their "Map view" button (the Defra shell
+// sizes its own root to auto) — a fixed-height box would leave an empty grey area
+/* stylelint-disable-next-line selector-class-pattern */
+.app-case-map--button-first {
+	height: auto;
+}
+
 /* stylelint-disable-next-line selector-class-pattern */
 .app-case-map-static {
 	display: block;
