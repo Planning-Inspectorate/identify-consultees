@@ -223,6 +223,44 @@ describe('consultees results static map', () => {
 		}
 	});
 
+	it('should negotiate a raster format and set Vary: Accept', async () => {
+		const originalFetch = globalThis.fetch;
+		globalThis.fetch = async () =>
+			new Response(
+				Buffer.from(
+					'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
+					'base64'
+				),
+				{ status: 200, headers: { 'content-type': 'image/png' } }
+			);
+
+		const mockRes = {
+			status: mock.fn(() => mockRes),
+			type: mock.fn(() => mockRes),
+			set: mock.fn(() => mockRes),
+			send: mock.fn(),
+			end: mock.fn()
+		};
+
+		try {
+			const db = dbReturning([[realProjectRow()], []]);
+			const handler = buildResultsStaticMap({ db, logger: mockLogger() });
+			await handler(
+				{
+					params: { caseId: realProjectId },
+					query: { ruleset: 'example-ruleset' },
+					headers: { accept: 'image/avif' }
+				},
+				mockRes
+			);
+			assert.strictEqual(mockRes.status.mock.calls[0].arguments[0], 200);
+			assert.strictEqual(mockRes.type.mock.calls[0].arguments[0], 'image/avif');
+			assert.strictEqual(mockRes.set.mock.calls[0].arguments[0].Vary, 'Accept');
+		} finally {
+			globalThis.fetch = originalFetch;
+		}
+	});
+
 	it('should 404 when caseId is missing', async () => {
 		const mockRes = {
 			status: mock.fn(() => mockRes),

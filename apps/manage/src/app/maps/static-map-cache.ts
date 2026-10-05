@@ -27,6 +27,8 @@ export type StaticMapFingerprintInput = {
 	height: number;
 	forceSvg: boolean;
 	preferGoogle: boolean;
+	/** Negotiated raster format (avif/webp/png) or 'svg' — each variant needs its own ETag. */
+	format: string;
 };
 
 export function buildStaticMapFingerprint(input: StaticMapFingerprintInput): string {
@@ -40,7 +42,8 @@ export function buildStaticMapFingerprint(input: StaticMapFingerprintInput): str
 		width: input.width,
 		height: input.height,
 		forceSvg: input.forceSvg,
-		preferGoogle: input.preferGoogle
+		preferGoogle: input.preferGoogle,
+		format: input.format
 	});
 	return createHash('sha256').update(payload).digest('hex');
 }

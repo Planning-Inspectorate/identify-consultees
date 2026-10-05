@@ -110,20 +110,23 @@ export function buildResultsStaticMap(service: ManageService, forceSvg = false):
 		const matches = await runRulesetSafely(db, project, ruleset, logger);
 		const map = buildCaseMapConfig(project, matches, ruleset.name);
 		const ifNoneMatch = typeof req.headers['if-none-match'] === 'string' ? req.headers['if-none-match'] : undefined;
+		const accept = typeof req.headers.accept === 'string' ? req.headers.accept : undefined;
 
 		const image = await buildConsulteeStaticMapResponse({
 			geometryId: project.id,
 			sectionId: ruleset.id,
 			map,
 			forceSvg,
-			ifNoneMatch
+			ifNoneMatch,
+			accept
 		});
 
 		res
 			.status(image.status)
 			.set({
 				'Cache-Control': image.cacheControl,
-				ETag: image.etag
+				ETag: image.etag,
+				...(image.vary ? { Vary: image.vary } : {})
 			})
 			.type(image.contentType);
 

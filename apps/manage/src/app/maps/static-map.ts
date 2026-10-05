@@ -349,10 +349,10 @@ function pathForFeature(
 }
 
 /**
- * Render SVG with optional OSM PNG tiles as a basemap.
- * When tile fetch fails, polygons still draw on a plain background.
+ * Vector overlays only (transparent background) — for compositing on top of a
+ * raster basemap when encoding to AVIF/WebP/PNG via sharp.
  */
-export function renderStaticMapSvg(options: StaticMapBuildOptions, basemapTiles: OsmBasemapTile[] = []): string {
+export function renderStaticMapOverlaySvg(options: StaticMapBuildOptions): string {
 	const width = options.width ?? MAP_VIEWPORT.width;
 	const height = options.height ?? MAP_VIEWPORT.height;
 	const zoom = Math.round(options.zoom);
@@ -363,13 +363,6 @@ export function renderStaticMapSvg(options: StaticMapBuildOptions, basemapTiles:
 		return [worldX - left, worldY - top];
 	};
 
-	const basemapMarkup = basemapTiles
-		.map((tile) => {
-			const href = `data:image/png;base64,${tile.png.toString('base64')}`;
-			return `<image href="${href}" xlink:href="${href}" x="${tile.x.toFixed(1)}" y="${tile.y.toFixed(1)}" width="${OSM_TILE_SIZE}" height="${OSM_TILE_SIZE}" preserveAspectRatio="none"/>`;
-		})
-		.join('\n');
-
 	const consulteePaths = options.consulteeGeojson.features
 		.map((feature) => pathForFeature(feature, project, CONSULTEE_COLOUR))
 		.filter(Boolean)
@@ -377,6 +370,28 @@ export function renderStaticMapSvg(options: StaticMapBuildOptions, basemapTiles:
 	const projectPaths = options.projectGeojson.features
 		.map((feature) => pathForFeature(feature, project, PROJECT_COLOUR))
 		.filter(Boolean)
+		.join('\n');
+
+	return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
+  ${consulteePaths}
+  ${projectPaths}
+  <rect x="1" y="1" width="${width - 2}" height="${height - 2}" fill="none" stroke="#b1b4b6"/>
+</svg>`;
+}
+
+/**
+ * Render SVG with optional OSM PNG tiles as a basemap.
+ * When tile fetch fails, polygons still draw on a plain background.
+ */
+export function renderStaticMapSvg(options: StaticMapBuildOptions, basemapTiles: OsmBasemapTile[] = []): string {
+	const width = options.width ?? MAP_VIEWPORT.width;
+	const height = options.height ?? MAP_VIEWPORT.height;
+
+	const basemapMarkup = basemapTiles
+		.map((tile) => {
+			const href = `data:image/png;base64,${tile.png.toString('base64')}`;
+			return `<image href="${href}" xlink:href="${href}" x="${tile.x.toFixed(1)}" y="${tile.y.toFixed(1)}" width="${OSM_TILE_SIZE}" height="${OSM_TILE_SIZE}" preserveAspectRatio="none"/>`;
+		})
 		.join('\n');
 
 	const title = escapeXml(options.title ?? 'Static map of project site and consultee areas');
@@ -388,9 +403,7 @@ export function renderStaticMapSvg(options: StaticMapBuildOptions, basemapTiles:
   <desc id="desc">${desc}</desc>
   <rect width="100%" height="100%" fill="#f5f5f0"/>
   ${basemapMarkup}
-  ${consulteePaths}
-  ${projectPaths}
-  <rect x="1" y="1" width="${width - 2}" height="${height - 2}" fill="none" stroke="#b1b4b6"/>
+  ${renderStaticMapOverlaySvg({ ...options, width, height })}
 </svg>
 `;
 }

@@ -166,7 +166,7 @@ describe('serve-static-map', () => {
 		assert.equal(second.contentType, 'image/png');
 	});
 
-	it('falls back to SVG when the Google Static Map request fails', async () => {
+	it('falls back to the OSM-tile raster when the Google Static Map request fails', async () => {
 		clearOsmTileCacheForTests();
 		const map = {
 			center: [-1.78, 50.62] as const,
@@ -192,7 +192,7 @@ describe('serve-static-map', () => {
 			}
 		});
 		assert.equal(nonOk.status, 200);
-		assert.match(nonOk.contentType, /image\/svg\+xml/);
+		assert.equal(nonOk.contentType, 'image/png');
 
 		const thrown = await buildConsulteeStaticMapResponse({
 			geometryId: 'geo-1',
@@ -207,6 +207,109 @@ describe('serve-static-map', () => {
 			}
 		});
 		assert.equal(thrown.status, 200);
-		assert.match(thrown.contentType, /image\/svg\+xml/);
+		assert.equal(thrown.contentType, 'image/png');
+	});
+
+	it('negotiates avif / webp / png from the Accept header and varies on it', async () => {
+		clearOsmTileCacheForTests();
+		const map = {
+			center: [-1.78, 50.62] as const,
+			zoom: 10,
+			projectGeojson: buildProjectSiteGeojson('EN010024', 'Navitus'),
+			consulteeGeojson: buildConsulteeAreaGeojson('Ambulance', [
+				{ name: 'A', code: 'A', offsetLng: 0, offsetLat: 0, size: 0.02 }
+			]),
+			width: 256,
+			height: 256
+		};
+		const fetchImpl: typeof fetch = async () =>
+			new Response(tinyPng, { status: 200, headers: { 'content-type': 'image/png' } });
+
+		const avif = await buildConsulteeStaticMapResponse({
+			geometryId: 'geo-1',
+			sectionId: 'ambulance-trusts',
+			map,
+			accept: 'image/avif,image/webp,image/png,*/*;q=0.8',
+			fetchImpl
+		});
+		assert.equal(avif.contentType, 'image/avif');
+		assert.equal(avif.vary, 'Accept');
+		assert.ok(Buffer.isBuffer(avif.body));
+
+		const webp = await buildConsulteeStaticMapResponse({
+			geometryId: 'geo-1',
+			sectionId: 'ambulance-trusts',
+			map,
+			accept: 'image/webp,image/png,*/*;q=0.8',
+			fetchImpl
+		});
+		assert.equal(webp.contentType, 'image/webp');
+
+		const png = await buildConsulteeStaticMapResponse({
+			geometryId: 'geo-1',
+			sectionId: 'ambulance-trusts',
+			map,
+			accept: 'image/png,*/*;q=0.8',
+			fetchImpl
+		});
+		assert.equal(png.contentType, 'image/png');
+
+		// each variant gets its own ETag so caches do not cross-validate formats
+		assert.notEqual(avif.etag, webp.etag);
+		assert.notEqual(webp.etag, png.etag);
+	});
+
+	it('transcodes a Google Static Map PNG into the negotiated format', async () => {
+		clearOsmTileCacheForTests();
+		const map = {
+			center: [-1.78, 50.62] as const,
+			zoom: 10,
+			projectGeojson: buildProjectSiteGeojson('EN010024', 'Navitus'),
+			consulteeGeojson: buildConsulteeAreaGeojson('Ambulance', [
+				{ name: 'A', code: 'A', offsetLng: 0, offsetLat: 0, size: 0.02 }
+			]),
+			width: 256,
+			height: 256
+		};
+
+		const response = await buildConsulteeStaticMapResponse({
+			geometryId: 'geo-1',
+			sectionId: 'ambulance-trusts',
+			map,
+			googleMapsApiKey: 'test-key',
+			accept: 'image/avif,image/webp,*/*;q=0.8',
+			fetchImpl: async () => new Response(tinyPng, { status: 200, headers: { 'content-type': 'image/png' } })
+		});
+
+		assert.equal(response.status, 200);
+		assert.equal(response.contentType, 'image/avif');
+		assert.ok(Buffer.isBuffer(response.body));
+	});
+
+	it('keeps SVG output on the explicit forceSvg route, without Vary: Accept', async () => {
+		clearOsmTileCacheForTests();
+		const map = {
+			center: [-1.78, 50.62] as const,
+			zoom: 10,
+			projectGeojson: buildProjectSiteGeojson('EN010024', 'Navitus'),
+			consulteeGeojson: buildConsulteeAreaGeojson('Ambulance', [
+				{ name: 'A', code: 'A', offsetLng: 0, offsetLat: 0, size: 0.02 }
+			]),
+			width: 256,
+			height: 256
+		};
+
+		const response = await buildConsulteeStaticMapResponse({
+			geometryId: 'geo-1',
+			sectionId: 'ambulance-trusts',
+			map,
+			forceSvg: true,
+			accept: 'image/avif,image/webp,*/*;q=0.8',
+			fetchImpl: async () => new Response(tinyPng, { status: 200, headers: { 'content-type': 'image/png' } })
+		});
+
+		assert.equal(response.status, 200);
+		assert.match(response.contentType, /image\/svg\+xml/);
+		assert.equal(response.vary, undefined);
 	});
 });
