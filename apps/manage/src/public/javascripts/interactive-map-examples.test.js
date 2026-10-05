@@ -201,6 +201,16 @@ describe('interactive-map-examples client helpers', () => {
 		assert.equal(options.plugins.length, 2);
 	});
 
+	test('hasExitButton passes through to the map config, defaulting to false', () => {
+		installDom(pageHtml({ kind: 'button-first', behaviour: 'buttonFirst', hasExitButton: true }));
+		const { defra, InteractiveMap } = mockDefra();
+		globalThis.defra = defra;
+		globalThis.window.defra = defra;
+
+		initInteractiveMapExample('demo-map');
+		assert.equal(InteractiveMap.mock.calls[0].arguments[1].hasExitButton, true);
+	});
+
 	test('style-switcher uses the first configured style', () => {
 		installDom(pageHtml({ kind: 'style-switcher', mapStyles: [{ id: 's1' }, { id: 's2' }] }));
 		const { defra, InteractiveMap } = mockDefra();

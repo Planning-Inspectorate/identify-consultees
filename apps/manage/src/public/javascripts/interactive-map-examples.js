@@ -249,6 +249,9 @@ export function initInteractiveMapExample(mapId) {
 			zoom: config.zoom,
 			containerHeight: `${config.height ?? 516}px`,
 			mapLabel: config.mapLabel,
+			// the built-in Exit button (top-left, fullscreen only) is opt-in via
+			// hasExitButton — buttonFirst/hybrid maps need it to leave the map
+			hasExitButton: config.hasExitButton ?? false,
 			plugins,
 			...(config.backAndContinue
 				? {

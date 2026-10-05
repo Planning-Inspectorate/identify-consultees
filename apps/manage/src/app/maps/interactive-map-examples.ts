@@ -42,6 +42,8 @@ export type InteractiveMapExampleKind =
 export interface InteractiveMapExampleConfig {
 	kind: InteractiveMapExampleKind;
 	behaviour: 'inline' | 'buttonFirst' | 'hybrid';
+	/** Shows the built-in Exit button when the map is fullscreen (buttonFirst/hybrid). */
+	hasExitButton?: boolean;
 	center: [number, number];
 	zoom: number;
 	height: number;
@@ -198,6 +200,7 @@ export const INTERACTIVE_MAP_EXAMPLES: readonly InteractiveMapExample[] = [
 		clientConfig: {
 			kind: 'button-first',
 			behaviour: 'buttonFirst',
+			hasExitButton: true,
 			center: DORSET_CENTER,
 			zoom: 11,
 			height: DEFAULT_HEIGHT,
