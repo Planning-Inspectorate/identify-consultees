@@ -237,7 +237,11 @@ describe('runRuleset', () => {
 			};
 
 			// well within the 10km buffer
-			const nearMatches = await runRuleset(dbClient, { type: 'Point', coordinates: [0.001, 0.001] }, railwayRuleset);
+			const { matches: nearMatches } = await runRuleset(
+				dbClient,
+				{ type: 'Point', coordinates: [0.001, 0.001] },
+				railwayRuleset
+			);
 			assert.ok(nearMatches.some((match) => match.feature.id === testAreaId));
 
 			// a ruleset whose only condition targets a different category shouldn't match a Railway area
@@ -254,11 +258,19 @@ describe('runRuleset', () => {
 					}
 				]
 			};
-			const wrongCategory = await runRuleset(dbClient, { type: 'Point', coordinates: [0.001, 0.001] }, hospitalRuleset);
+			const { matches: wrongCategory } = await runRuleset(
+				dbClient,
+				{ type: 'Point', coordinates: [0.001, 0.001] },
+				hospitalRuleset
+			);
 			assert.ok(!wrongCategory.some((match) => match.feature.id === testAreaId));
 
 			// well outside the 10km buffer
-			const farMatches = await runRuleset(dbClient, { type: 'Point', coordinates: [10, 10] }, railwayRuleset);
+			const { matches: farMatches } = await runRuleset(
+				dbClient,
+				{ type: 'Point', coordinates: [10, 10] },
+				railwayRuleset
+			);
 			assert.ok(!farMatches.some((match) => match.feature.id === testAreaId));
 		} finally {
 			await cleanup();
@@ -313,7 +325,7 @@ describe('runRuleset', () => {
 				]
 			};
 
-			const matches = await runRuleset(dbClient, { type: 'Point', coordinates: [0.001, 0.001] }, ruleset);
+			const { matches } = await runRuleset(dbClient, { type: 'Point', coordinates: [0.001, 0.001] }, ruleset);
 			const ids = matches.map((match) => match.feature.id).sort();
 			assert.deepEqual(ids, [testAreaId, secondAreaId].sort());
 		} finally {
@@ -357,7 +369,7 @@ describe('runRuleset', () => {
 			const runs = await Promise.all(
 				Array.from({ length: 5 }, () => runRuleset(dbClient, { type: 'Point', coordinates: [0, 0] }, ruleset))
 			);
-			const orderings = runs.map((matches) => matches.map((match) => match.feature.id).join(','));
+			const orderings = runs.map(({ matches }) => matches.map((match) => match.feature.id).join(','));
 			assert.ok(
 				orderings.every((ordering) => ordering === orderings[0]),
 				`expected every run to return matches in the same order, got: ${orderings.join(' | ')}`
@@ -429,7 +441,7 @@ describe('runRuleset', () => {
 			};
 
 			// a point inside the host parish
-			const matches = await runRuleset(dbClient, { type: 'Point', coordinates: [0.5, 0.5] }, borderingRuleset);
+			const { matches } = await runRuleset(dbClient, { type: 'Point', coordinates: [0.5, 0.5] }, borderingRuleset);
 			assert.ok(matches.some((match) => match.feature.id === neighbourAreaId));
 			assert.ok(!matches.some((match) => match.feature.id === hostAreaId));
 		} finally {
@@ -444,8 +456,53 @@ describe('runRuleset', () => {
 			name: 'No host',
 			rules: [{ id: 'no_host', name: 'No host', logicType: 'bordering', categories: ['Parish Council'] }]
 		};
-		const matches = await runRuleset(dbClient, { type: 'Point', coordinates: [0, 0] }, ruleset);
+		const { matches } = await runRuleset(dbClient, { type: 'Point', coordinates: [0, 0] }, ruleset);
 		assert.deepEqual(matches, []);
+	});
+
+	test('allNearby includes every nearby area regardless of category, excludes anything beyond the radius', async (t) => {
+		if (!dbAvailable) return t.skip('SQL Server database not available');
+
+		await cleanup();
+		try {
+			await loadConsulteeAreas(dbClient, {
+				type: 'FeatureCollection',
+				features: [
+					{
+						id: testAreaId,
+						type: 'Feature',
+						geometry: { type: 'Point', coordinates: [0, 0] },
+						properties: { consulteeCategory: 'Railway', consultee: 'Test Railway' }
+					},
+					{
+						id: secondAreaId,
+						type: 'Feature',
+						// a category with no condition in this ad-hoc ruleset at all - allNearby should
+						// still surface it, since it isn't filtered by what the ruleset itself checks for
+						geometry: { type: 'Point', coordinates: [0, 0] },
+						properties: { consulteeCategory: 'Electricity Generator', consultee: 'Test Generator' }
+					}
+				]
+			});
+
+			// far enough outside the test's custom 1km radius below
+			const ruleset: Ruleset = { id: 'empty', name: 'Empty', rules: [] };
+			const { allNearby } = await runRuleset(dbClient, { type: 'Point', coordinates: [0.001, 0.001] }, ruleset, 1_000);
+
+			const nearbyIds = new Set(allNearby.map((match) => match.feature.id));
+			assert.ok(nearbyIds.has(testAreaId), 'expected a Railway area to appear in allNearby with no matching condition');
+			assert.ok(nearbyIds.has(secondAreaId), 'expected an Electricity Generator area to appear in allNearby');
+
+			const { allNearby: farAway } = await runRuleset(
+				dbClient,
+				{ type: 'Point', coordinates: [10, 10] },
+				ruleset,
+				1_000
+			);
+			assert.deepEqual(farAway, []);
+		} finally {
+			await cleanup();
+		}
 	});
 });
 
@@ -509,7 +566,7 @@ describe('runRuleset against a real project (EN0110019 - EcoPower Suffolk Solar)
 				]
 			});
 
-			const matches = await runRuleset(dbClient, project.geometry, RULESETS[0]);
+			const { matches, allNearby } = await runRuleset(dbClient, project.geometry, RULESETS[0]);
 
 			const categories = new Set(matches.map((match) => match.feature.properties.consulteeCategory));
 			assert.ok(
@@ -524,6 +581,19 @@ describe('runRuleset against a real project (EN0110019 - EcoPower Suffolk Solar)
 				'Ambulance Trust'
 			]) {
 				assert.ok(categories.has(expectedCategory), `expected a match in category "${expectedCategory}"`);
+			}
+
+			// allNearby is the default "everyone nearby" view - every fixture here is well within the
+			// default 20km radius, so all five should appear regardless of category
+			const nearbyIds = new Set(allNearby.map((match) => match.feature.id));
+			for (const id of [
+				realCouncilAreaId,
+				realDistrictAreaId,
+				realPoliceAreaId,
+				realHospitalAreaId,
+				realAmbulanceAreaId
+			]) {
+				assert.ok(nearbyIds.has(id), `expected allNearby to include fixture ${id}`);
 			}
 		} finally {
 			await cleanup();

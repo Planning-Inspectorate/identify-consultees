@@ -203,32 +203,93 @@ async function runCondition(
 	return findConsulteeAreasNear(dbClient, geometry, rule.bufferMetres ?? 0, rule.categories);
 }
 
-// Conditions run concurrently in batches of this size, not all ~34 at once. Running every
-// condition fully in parallel maximises throughput for a single ruleset run in isolation, but
-// multiplies how many simultaneous connections/locks it holds against the same table - confirmed
-// to matter for real, not just in theory: running everything fully parallel produced real
-// deadlocks and lock-wait timeouts once other work was hitting the same table concurrently. A
-// bounded batch size keeps most of the speed-up over a fully sequential run while giving the
-// database far less simultaneous load to contend with.
+// Conditions that can't be satisfied from the shared "nearby" fetch below (see runRuleset) run
+// concurrently in batches of this size, not all at once. Running every condition fully in parallel
+// maximises throughput for a single ruleset run in isolation, but multiplies how many simultaneous
+// connections/locks it holds against the same table - confirmed to matter for real, not just in
+// theory: running everything fully parallel produced real deadlocks and lock-wait timeouts once
+// other work was hitting the same table concurrently. A bounded batch size keeps most of the
+// speed-up over a fully sequential run while giving the database far less simultaneous load to
+// contend with.
 const CONDITION_CONCURRENCY = 6;
+
+/**
+ * Fallback for the nearby radius below when a caller doesn't specify one - a caller running inside
+ * a configured app (e.g. apps/manage) should normally pass its own value sourced from an env var,
+ * so this distance can be tuned without a code change. Consultees within the radius are shown by
+ * default regardless of which ruleset condition (if any) actually matches them - both as a simple
+ * baseline view in its own right, and as the source every `intersection` condition at or under this
+ * radius is filtered from (see runRuleset) rather than each querying the database separately.
+ */
+export const DEFAULT_NEARBY_RADIUS_METRES = 20_000;
+
+/** True when `rule` can be answered by filtering the shared nearby fetch instead of its own query. */
+function isSatisfiableFromNearby(rule: RuleCondition, nearbyRadiusMetres: number): boolean {
+	return rule.logicType === 'intersection' && (rule.bufferMetres ?? 0) <= nearbyRadiusMetres;
+}
+
+/** Mirrors the SQL `consulteeCategory IN (...) AND STDistance(...) <= radius` findConsulteeAreasNear runs. */
+function matchesCondition(match: ConsulteeAreaMatch, rule: RuleCondition): boolean {
+	const category = match.feature.properties.consulteeCategory ?? '';
+	const categoryMatches = rule.categories.length === 0 || rule.categories.includes(category);
+	return categoryMatches && match.distanceMetres <= (rule.bufferMetres ?? 0);
+}
+
+// tie-break on id: SQL Server's `ORDER BY distanceMetres` (in findConsulteeAreasNear) has no
+// secondary key, so rows tied at the same distance (very common here - most conditions require an
+// outright intersection, i.e. distance 0) aren't returned in a guaranteed-stable order between
+// separate executions of the same query. Without this, the map/static-map's result order - and so
+// its cache fingerprint - could differ between two requests for the exact same underlying matches,
+// breaking ETag caching (confirmed: this caused a real, intermittent test failure).
+function sortMatches(matches: ConsulteeAreaMatch[]): ConsulteeAreaMatch[] {
+	return [...matches].sort((a, b) => a.distanceMetres - b.distanceMetres || a.feature.id.localeCompare(b.feature.id));
+}
+
+export interface RunRulesetResult {
+	/** The ruleset's own matches - the union of every condition, deduplicated, nearest first. */
+	matches: ConsulteeAreaMatch[];
+	/** Every consultee area within DEFAULT_NEARBY_RADIUS_METRES, any category - see its own doc comment. */
+	allNearby: ConsulteeAreaMatch[];
+}
 
 /**
  * Run every condition in a ruleset against a project's geometry and combine the results - a
  * ruleset finding "all relevant consultees" means the union of what each of its conditions finds
  * (e.g. the site's hosting council *and* nearby railways *and* nearby hospitals...), not any one
- * condition in isolation. Conditions run in bounded-concurrency batches (see
+ * condition in isolation.
+ *
+ * Most conditions are `intersection` conditions at or under `nearbyRadiusMetres` (defaulted to
+ * DEFAULT_NEARBY_RADIUS_METRES if not given, but a caller running inside a configured app should
+ * pass its own value - see e.g. apps/manage's NEARBY_CONSULTEE_RADIUS_KM - so this can be tuned
+ * without a code change) - rather than each running its own "is this category within this radius"
+ * query, one query fetches everything within that radius up front (which doubles as the default
+ * "all nearby consultees" view - see allNearby above) and those conditions are filtered from it in
+ * memory. Only conditions needing a wider radius, or `bordering` logic (a different query shape
+ * entirely - see runCondition), still run their own query, in bounded-concurrency batches (see
  * CONDITION_CONCURRENCY) - each condition's own query already retries on deadlock (see
- * findConsulteeAreasNear/findConsulteeAreasBordering in consultee-areas.ts) - and duplicates (the
- * same consultee area matching more than one condition) are removed, nearest first.
+ * findConsulteeAreasNear/findConsulteeAreasBordering in consultee-areas.ts). Duplicates (the same
+ * consultee area matching more than one condition) are removed, nearest first.
  */
 export async function runRuleset(
 	dbClient: PrismaClient,
 	geometry: Geometry,
-	ruleset: Ruleset
-): Promise<ConsulteeAreaMatch[]> {
+	ruleset: Ruleset,
+	nearbyRadiusMetres: number = DEFAULT_NEARBY_RADIUS_METRES
+): Promise<RunRulesetResult> {
+	const allNearby = await findConsulteeAreasNear(dbClient, geometry, nearbyRadiusMetres);
+
 	const resultsByRule: ConsulteeAreaMatch[][] = [];
-	for (let i = 0; i < ruleset.rules.length; i += CONDITION_CONCURRENCY) {
-		const batch = ruleset.rules.slice(i, i + CONDITION_CONCURRENCY);
+	const remainingRules: RuleCondition[] = [];
+	for (const rule of ruleset.rules) {
+		if (isSatisfiableFromNearby(rule, nearbyRadiusMetres)) {
+			resultsByRule.push(allNearby.filter((match) => matchesCondition(match, rule)));
+		} else {
+			remainingRules.push(rule);
+		}
+	}
+
+	for (let i = 0; i < remainingRules.length; i += CONDITION_CONCURRENCY) {
+		const batch = remainingRules.slice(i, i + CONDITION_CONCURRENCY);
 		const batchResults = await Promise.all(batch.map((rule) => runCondition(dbClient, geometry, rule)));
 		resultsByRule.push(...batchResults);
 	}
@@ -243,14 +304,5 @@ export async function runRuleset(
 		}
 	}
 
-	// tie-break on id: SQL Server's `ORDER BY distanceMetres` (in findConsulteeAreasNear) has no
-	// secondary key, so rows tied at the same distance (very common here - most conditions require
-	// an outright intersection, i.e. distance 0) aren't returned in a guaranteed-stable order
-	// between separate executions of the same query. Without this, the map/static-map's result
-	// order - and so its cache fingerprint - could differ between two requests for the exact same
-	// underlying matches, breaking ETag caching (confirmed: this caused a real, intermittent test
-	// failure).
-	return [...matchesById.values()].sort(
-		(a, b) => a.distanceMetres - b.distanceMetres || a.feature.id.localeCompare(b.feature.id)
-	);
+	return { matches: sortMatches([...matchesById.values()]), allNearby: sortMatches(allNearby) };
 }

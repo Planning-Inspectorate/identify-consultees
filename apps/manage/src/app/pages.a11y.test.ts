@@ -276,7 +276,10 @@ describe('manage page accessibility smoke', () => {
 			matches: [{ consultee: 'Network Rail', consulteeCategory: 'Railway', region: 'South West', distanceMetres: 123 }],
 			matchCount: 1,
 			mapIsSampled: false,
-			mapSampleSize: 30
+			mapSampleSize: 30,
+			nearbyMatches: [],
+			nearbyMatchCount: 0,
+			nearbyRadiusKm: 20
 		});
 		await assertNoSeriousA11yViolations(html);
 	});
@@ -300,7 +303,13 @@ describe('manage page accessibility smoke', () => {
 			matches: [{ consultee: 'Network Rail', consulteeCategory: 'Railway', region: 'South West', distanceMetres: 123 }],
 			matchCount: 120,
 			mapIsSampled: true,
-			mapSampleSize: 30
+			mapSampleSize: 30,
+			nearbyMatches: [
+				{ consultee: 'Network Rail', consulteeCategory: 'Railway', region: 'South West', distanceMetres: 123 },
+				{ consultee: 'Example Hospital', consulteeCategory: 'Hospital', region: 'South West', distanceMetres: 4500 }
+			],
+			nearbyMatchCount: 2,
+			nearbyRadiusKm: 20
 		});
 		await assertNoSeriousA11yViolations(html);
 	});
