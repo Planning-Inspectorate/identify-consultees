@@ -4,6 +4,7 @@ import type { GeoJsonFeatureCollection } from './sample-geojson.ts';
 import {
 	buildGoogleStaticMapUrl,
 	buildStaticMapSvg,
+	centroidOfGeometry,
 	clearOsmTileCacheForTests,
 	escapeXml,
 	fetchOsmBasemapTiles,
@@ -118,6 +119,76 @@ describe('static-map helpers', () => {
 		// no opaque background or embedded tiles — composites over a raster basemap
 		assert.doesNotMatch(svg, /#f5f5f0/);
 		assert.doesNotMatch(svg, /data:image/);
+	});
+
+	test('renderStaticMapOverlaySvg draws markers, badges and point symbols', () => {
+		const svg = renderStaticMapOverlaySvg({
+			center: [-1.75, 50.65],
+			zoom: 10,
+			projectGeojson: emptyCollection,
+			consulteeGeojson: emptyCollection,
+			markers: [{ coords: [-1.75, 50.65], label: 'Demo marker' }, { coords: [-1.74, 50.66] }],
+			featureBadges: [
+				{ coords: [-1.75, 50.65], label: '1' },
+				{ coords: [-1.74, 50.66], label: '2', fill: '#00897B' }
+			]
+		});
+
+		// pin glyph + optional label
+		assert.match(svg, /#1d70b8/);
+		assert.match(svg, /Demo marker/);
+		// badges: default dark fill and a custom category colour
+		assert.match(svg, /#0b0c0c/);
+		assert.match(svg, /#00897B/);
+	});
+
+	test('centroidOfGeometry centres rings, points and falls back to the first vertex', () => {
+		assert.deepEqual(centroidOfGeometry({ type: 'Point', coordinates: [-1, 50] }), [-1, 50]);
+		assert.deepEqual(
+			centroidOfGeometry({
+				type: 'Polygon',
+				coordinates: [
+					[
+						[0, 0],
+						[2, 0],
+						[2, 2],
+						[0, 2],
+						[0, 0]
+					]
+				]
+			}),
+			[0.8, 0.8]
+		);
+		assert.deepEqual(
+			centroidOfGeometry({
+				type: 'MultiPolygon',
+				coordinates: [
+					[
+						[
+							[0, 0],
+							[4, 0],
+							[4, 4],
+							[0, 4],
+							[0, 0]
+						]
+					]
+				]
+			}),
+			[1.6, 1.6]
+		);
+		// non-areal types fall back to the first collected vertex
+		assert.deepEqual(
+			centroidOfGeometry({
+				type: 'LineString',
+				coordinates: [
+					[-1, 50],
+					[-2, 51]
+				]
+			}),
+			[-1, 50]
+		);
+		// an empty geometry yields undefined rather than NaN
+		assert.equal(centroidOfGeometry({ type: 'Polygon', coordinates: [[]] }), undefined);
 	});
 
 	test('buildStaticMapSvg delegates to renderStaticMapSvg', () => {

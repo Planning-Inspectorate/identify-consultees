@@ -85,7 +85,9 @@ export async function buildConsulteeStaticMapResponse(
 		height,
 		forceSvg,
 		preferGoogle,
-		format
+		format,
+		markers: options.map.markers,
+		featureBadges: options.map.featureBadges
 	};
 	const etag = etagFromFingerprint(buildStaticMapFingerprint(fingerprintInput));
 

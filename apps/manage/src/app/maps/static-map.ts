@@ -32,6 +32,10 @@ export type StaticMapBuildOptions = {
 	googleMapsApiKey?: string;
 	title?: string;
 	description?: string;
+	/** Pin glyphs for marker-style examples. */
+	markers?: { coords: LngLat; label?: string }[];
+	/** Small numbered badges tying map features to the legend list below the page image. */
+	featureBadges?: { coords: LngLat; label: string; fill?: string }[];
 };
 
 const GOOGLE_STATIC_MAP_MAX_URL_LENGTH = 16_384;
@@ -349,6 +353,32 @@ function pathForFeature(
 }
 
 /**
+ * Rough centroid of a feature's first ring (or the point itself) — used for
+ * numbered badges that tie static-map polygons to the fallback legend.
+ */
+export function centroidOfGeometry(geometry: Geometry): Position | undefined {
+	const ring =
+		geometry.type === 'Polygon'
+			? geometry.coordinates[0]
+			: geometry.type === 'MultiPolygon'
+				? geometry.coordinates[0]?.[0]
+				: undefined;
+	if (geometry.type === 'Point') {
+		return geometry.coordinates;
+	}
+	if (!ring?.length) {
+		return collectLines(geometry)[0]?.[0];
+	}
+	let lng = 0;
+	let lat = 0;
+	for (const [x, y] of ring) {
+		lng += x;
+		lat += y;
+	}
+	return [lng / ring.length, lat / ring.length];
+}
+
+/**
  * Vector overlays only (transparent background) — for compositing on top of a
  * raster basemap when encoding to AVIF/WebP/PNG via sharp.
  */
@@ -372,9 +402,39 @@ export function renderStaticMapOverlaySvg(options: StaticMapBuildOptions): strin
 		.filter(Boolean)
 		.join('\n');
 
+	const markerMarkup = (options.markers ?? [])
+		.map(({ coords, label }) => {
+			const [x, y] = project(coords[0], coords[1]);
+			const labelMarkup = label
+				? `<text x="0" y="14" text-anchor="middle" font-size="12" font-weight="600" fill="#0b0c0c" stroke="#ffffff" stroke-width="3" paint-order="stroke">${escapeXml(label)}</text>`
+				: '';
+			return (
+				`<g transform="translate(${x.toFixed(1)} ${y.toFixed(1)})">` +
+				'<path d="M0 0C-5.5-6.5-9-10.5-9-15a9 9 0 1 1 18 0c0 4.5-3.5 8.5-9 15z" fill="#1d70b8" stroke="#ffffff" stroke-width="1.5"/>' +
+				'<circle cy="-14.5" r="3.5" fill="#ffffff"/>' +
+				labelMarkup +
+				'</g>'
+			);
+		})
+		.join('\n');
+
+	const badgeMarkup = (options.featureBadges ?? [])
+		.map(({ coords, label, fill }) => {
+			const [x, y] = project(coords[0], coords[1]);
+			return (
+				`<g transform="translate(${x.toFixed(1)} ${y.toFixed(1)})">` +
+				`<circle r="9" fill="${fill ?? '#0b0c0c'}" stroke="#ffffff" stroke-width="1.5"/>` +
+				`<text y="3.5" text-anchor="middle" font-size="10" font-weight="700" fill="#ffffff">${escapeXml(label)}</text>` +
+				'</g>'
+			);
+		})
+		.join('\n');
+
 	return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
   ${consulteePaths}
   ${projectPaths}
+  ${markerMarkup}
+  ${badgeMarkup}
   <rect x="1" y="1" width="${width - 2}" height="${height - 2}" fill="none" stroke="#b1b4b6"/>
 </svg>`;
 }

@@ -50,6 +50,7 @@ function mockDefra(overrides = {}) {
 		});
 		this.addMarker = mock.fn();
 		this.updateMarker = mock.fn();
+		this.addButton = mock.fn();
 		this.addPanel = mock.fn((panelId, panelConfig) => {
 			const match = /id="([^"]+)"/.exec(panelConfig?.html ?? '');
 			if (match && globalThis.document && !globalThis.document.getElementById(match[1])) {
@@ -113,15 +114,41 @@ describe('interactive-map-examples client helpers', () => {
 		assert.ok(interact);
 	});
 
-	test('draw-tools instantiates the draw plugin', () => {
+	test('draw-tools instantiates the draw plugin and adds the polygon button at map:ready', () => {
 		installDom(pageHtml({ kind: 'draw-tools', interact: {}, draw: { snapLayers: ['field-parcels'] } }));
-		const { defra } = mockDefra();
+		const drawInstance = { newPolygon: mock.fn() };
+		const { defra, InteractiveMap, fire } = mockDefra({ drawPlugin: mock.fn(() => drawInstance) });
 		globalThis.defra = defra;
 		globalThis.window.defra = defra;
 
 		initInteractiveMapExample('demo-map');
 		assert.equal(defra.drawPlugin.mock.callCount(), 1);
 		assert.deepEqual(defra.drawPlugin.mock.calls[0].arguments[0], { snapLayers: ['field-parcels'] });
+
+		const map = InteractiveMap.mock.calls[0].this;
+		fire('map:ready');
+		const [buttonId, buttonConfig] = map.addButton.mock.calls[0].arguments;
+		assert.equal(buttonId, 'drawPolygon');
+		assert.equal(buttonConfig.label, 'Draw polygon');
+
+		// clicking wires through to the plugin api (attached late by the core)
+		buttonConfig.onClick();
+		assert.equal(drawInstance.newPolygon.mock.callCount(), 1);
+		assert.equal(typeof drawInstance.newPolygon.mock.calls[0].arguments[0], 'string');
+	});
+
+	test('a draw plugin without the late-bound api is a harmless no-op', () => {
+		installDom(pageHtml({ kind: 'draw-tools', interact: {}, draw: {} }));
+		const { defra, InteractiveMap, fire } = mockDefra();
+		globalThis.defra = defra;
+		globalThis.window.defra = defra;
+
+		initInteractiveMapExample('demo-map');
+		const map = InteractiveMap.mock.calls[0].this;
+		fire('map:ready');
+		// button still registers; onClick tolerates a plugin with no api attached
+		const [, buttonConfig] = map.addButton.mock.calls[0].arguments;
+		assert.doesNotThrow(() => buttonConfig.onClick());
 	});
 
 	test('initInteractiveMapExample tolerates a missing container and a bad config block', () => {
@@ -501,6 +528,13 @@ describe('interactive-map-examples client helpers', () => {
 		const noSrc = dom.window.document.getElementById('b');
 		showStaticMapFallback(noSrc);
 		assert.match(noSrc.textContent, /could not load/);
+
+		// the hidden feature list is revealed whenever the fallback shows
+		const dom2 = installDom(
+			'<!DOCTYPE html><html><body><div id="d" class="app-interactive-map-example"></div><div id="d-fallback" hidden><p>listed</p></div></body></html>'
+		);
+		showStaticMapFallback(dom2.window.document.getElementById('d'), { src: '/s' });
+		assert.equal(dom2.window.document.getElementById('d-fallback').hidden, false);
 
 		// a src with no alt/width/height falls back to safe defaults
 		const bare = dom.window.document.getElementById('c');

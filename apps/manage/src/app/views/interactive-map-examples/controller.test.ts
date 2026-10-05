@@ -120,6 +120,9 @@ describe('interactive map example page', () => {
 		assert.equal(config.mapKey, true);
 		assert.equal(config.datasets[0].id, 'field-parcels');
 		assert.equal(config.mapStyle.attribution.length > 0, true);
+		// the draw adapter namespaces style-override properties by mapStyle.id and
+		// crashes with 'charAt of undefined' when it is missing
+		assert.equal(config.mapStyle.id, 'liberty');
 		// fallback details live in the JSON block — data-* attributes would be
 		// JSON.parsed by the InteractiveMap constructor and log console errors
 		assert.deepEqual(config.fallback, {

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
-import { getInteractiveMapExample, INTERACTIVE_MAP_EXAMPLES } from './interactive-map-examples.ts';
+import { getInteractiveMapExample, INTERACTIVE_MAP_EXAMPLES, numberedBadges } from './interactive-map-examples.ts';
 
 describe('interactive map example registry', () => {
 	test('every example has a unique id matching its client config kind', () => {
@@ -42,5 +42,37 @@ describe('interactive map example registry', () => {
 		for (const style of example?.clientConfig.mapStyles ?? []) {
 			assert.match(String(style.thumbnail), /^data:image\/svg\+xml,/, String(style.id));
 		}
+	});
+
+	test('examples with feature content ship badges and a legend for the static fallback', () => {
+		const select = getInteractiveMapExample('select-feature');
+		assert.equal(select?.staticMap.featureBadges?.length, 7);
+		assert.deepEqual(select?.staticMap.legend?.columns, ['Number', 'Name', 'Land use']);
+		assert.equal(select?.staticMap.legend?.rows[0]?.[0], '1');
+		// badge numbers must match legend row order
+		assert.deepEqual(
+			select?.staticMap.featureBadges?.map((badge) => badge.label),
+			select?.staticMap.legend?.rows.map((row) => row[0])
+		);
+
+		const symbols = getInteractiveMapExample('symbols');
+		assert.equal(symbols?.staticMap.featureBadges?.length, 3);
+		assert.equal(symbols?.staticMap.featureBadges?.[0]?.fill, '#00897B');
+		assert.equal(symbols?.staticMap.legend?.rows.length, 3);
+
+		for (const id of ['marker-panel', 'marker-label'] as const) {
+			const example = getInteractiveMapExample(id);
+			assert.equal(example?.staticMap.markers?.length, 1, id);
+			assert.ok(example?.staticMap.legend?.rows.length, id);
+		}
+	});
+
+	test('numberedBadges skips features whose geometry has no centroid', () => {
+		const badges = numberedBadges([
+			{ type: 'Feature', geometry: { type: 'Polygon', coordinates: [[]] }, properties: {} },
+			{ type: 'Feature', geometry: { type: 'Point', coordinates: [-1, 50] }, properties: {} }
+		]);
+		assert.equal(badges.length, 1);
+		assert.equal(badges[0]?.label, '2');
 	});
 });

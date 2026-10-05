@@ -41,7 +41,27 @@
 			This static image shows the same map content without JavaScript.
 			The interactive version also supports the plugins listed below.
 		</p>
+		{% if featureLegend %}
+			<h2 class="govuk-heading-m">{{ featureLegend.heading }}</h2>
+			{{ govukTable({
+				caption: featureLegend.heading,
+				captionClasses: "govuk-visually-hidden",
+				head: featureLegend.head,
+				rows: featureLegend.rows
+			}) }}
+		{% endif %}
 	</noscript>
+	{% if featureLegend %}
+		<div id="{{ mapId }}-fallback" class="app-map-example-fallback" hidden>
+			<h2 class="govuk-heading-m">{{ featureLegend.heading }}</h2>
+			{{ govukTable({
+				caption: featureLegend.heading,
+				captionClasses: "govuk-visually-hidden",
+				head: featureLegend.head,
+				rows: featureLegend.rows
+			}) }}
+		</div>
+	{% endif %}
 	<script type="application/json" id="{{ mapId }}-data">{{ mapConfigJson | safe }}</script>
 
 	<h2 class="govuk-heading-m govuk-!-margin-top-6">About this example</h2>
