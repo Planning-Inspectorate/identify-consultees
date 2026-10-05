@@ -47,9 +47,12 @@ Open **http://localhost:8090**.
 2. Default local manage auth to disabled and point SQL at Docker
 3. Start SQL (`docker compose up -d`) and wait on **localhost:1434**
 4. Run Prisma migrations
-5. Start the manage app in watch mode
+5. Seed the database with the bundled sample of UK case boundaries and consultee areas (`npm run db-seed` — re-runnable; rows merge rather than duplicate)
+6. Start the manage app in watch mode
 
 Stop the app with `Ctrl+C`. Stop SQL with `docker compose down` when finished.
+
+The seed data is what the homepage search, the `/consultees/:caseId` journey, and the Playwright e2e tests run against — an empty database means empty search results and failing e2e specs.
 
 ## Environment configuration
 
@@ -60,13 +63,17 @@ Templates:
 
 Key manage variables:
 
-| Variable                | Local note                                          |
-| ----------------------- | --------------------------------------------------- |
-| `AUTH_DISABLED`         | `true` for day-one UI work                          |
-| `SQL_CONNECTION_STRING` | Docker SA user; host port **1434**                  |
-| `PYTHON_FUNCTION_URL`   | Default `http://localhost:7071/api/consultee-areas` |
-| `SESSION_SECRET`        | Local placeholder only                              |
-| `LOG_LEVEL`             | Often `debug` locally (includes Prisma query logs)  |
+| Variable                                   | Local note                                                                     |
+| ------------------------------------------ | ------------------------------------------------------------------------------ |
+| `AUTH_DISABLED`                            | `true` for day-one UI work                                                     |
+| `SQL_CONNECTION_STRING`                    | Docker SA user; host port **1434**                                             |
+| `PYTHON_FUNCTION_URL`                      | Default `http://localhost:7071/api/consultee-areas`                            |
+| `PYTHON_FUNCTION_API_KEY`                  | Optional locally; in Azure the shared `x-api-key` secret the function requires |
+| `BLOB_STORE_HOST` / `BLOB_STORE_CONTAINER` | Optional; enables `/admin/upload-to-blob` + `/admin/import-reference-data`     |
+| `SESSION_SECRET`                           | Local placeholder only                                                         |
+| `LOG_LEVEL`                                | Often `debug` locally (includes Prisma query logs)                             |
+| `MANAGED_REDIS_URL`                        | Optional; unset means in-memory sessions locally                               |
+| `CACHE_CONTROL_MAX_AGE`                    | Optional; defaults to `1d`                                                     |
 
 Never commit `.env` files or production secrets.
 
@@ -96,7 +103,7 @@ Set `AUTH_DISABLED=false` and fill MSAL-related values in `apps/manage/.env`. Co
 npm run check-toolchain
 npm run lint
 npm run check-types
-npm test   # heavy; see Testing page for lighter targets
+npm test   # heavy; needs the seeded local DB for e2e — see Testing page for lighter targets
 ```
 
 ## Related pages

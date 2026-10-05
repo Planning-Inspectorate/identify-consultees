@@ -1,5 +1,5 @@
 # Function
-This package includes and example Azure Function, which can b e used for integration. See [Create a function in Azure from the command line](https://learn.microsoft.com/en-gb/azure/azure-functions/how-to-create-function-azure-cli) for adding new functions.
+This package includes an example Azure Function, which can be used for integration. See [Create a function in Azure from the command line](https://learn.microsoft.com/en-gb/azure/azure-functions/how-to-create-function-azure-cli) for adding new functions.
 
 ## Setup
 

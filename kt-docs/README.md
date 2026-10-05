@@ -31,10 +31,10 @@ Used at the top of each page:
 4. [Application structure](./application-structure.md) — tour of `apps/manage`
 5. [Routes and user journeys](./routes-and-user-journeys.md) — homepage through maps and optional journeys
 6. [GOV.UK Frontend conventions](./govuk-frontend-conventions.md) — macros, layout, progressive enhancement
-7. [Search and filtering](./search-and-filtering.md) — homepage search (maps conceptual `/filter` wording)
-8. [Case and dataset pages](./case-and-dataset-pages.md) — case routing and fixture vs database records
+7. [Search and filtering](./search-and-filtering.md) — homepage search over `case_boundary` (maps conceptual `/filter` wording)
+8. [Case and dataset pages](./case-and-dataset-pages.md) — case routing and the ruleset-driven results page
 9. [Maps](./maps.md) — Defra Interactive Map and static-map fallback
-10. [Upload and spatial screening](./upload-and-spatial-screening.md) — upload / screening (mostly sparse today)
+10. [Upload and spatial screening](./upload-and-spatial-screening.md) — admin data loading + ruleset screening; end-user upload still sparse
 11. [Node–Python integration](./node-python-integration.md) — safe UI calls and fallbacks
 12. [API and data contracts](./api-and-data-contracts.md) — JSON / GeoJSON conventions
 13. [Accessibility and quality](./accessibility-and-quality.md) — WCAG expectations and no-JS

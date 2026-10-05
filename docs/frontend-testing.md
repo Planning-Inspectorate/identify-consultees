@@ -2,6 +2,18 @@
 
 The manage app is a server-rendered GOV.UK service. Tests cover application logic, Nunjucks pages, GOV.UK Frontend macros, accessibility, and browser journeys.
 
+## Prerequisites
+
+The Playwright projects (e2e, a11y, render, visual) boot a test server on port **8091** that queries the **real local SQL Server** — the journey specs deep-link to rows created by the dev seed (`e2e/fixtures.ts` defines `SAMPLE_CASE_ID` / `SAMPLE_RULESET_ID`). Before running browser tests:
+
+```bash
+npm start   # once — brings up SQL, migrates, and seeds; Ctrl+C after seeding is fine
+# or equivalently:
+docker compose up -d && npm run db-migrate-dev && npm run db-seed
+```
+
+In CI the equivalent is provided by the "Start SQL Server for tests" step in `.azure/pipelines/pr.yml`. Unit/integration tests under `node --test` mock or stub the database and do not need it.
+
 ## What runs under `npm test`
 
 From the repo root:

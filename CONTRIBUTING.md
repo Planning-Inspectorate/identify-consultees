@@ -11,7 +11,7 @@ Use `nvm use` then `npm ci`. Do not regenerate the lockfile under a different No
 
 ## Getting started
 
-Follow the day-one setup in the [README](./README.md) (`npm i` then `npm start`). That covers env files, SQL Server on port 1434, migrations, and the manage app at http://localhost:8090.
+Follow the day-one setup in the [README](./README.md) (`npm ci` then `npm start`). That covers env files, SQL Server on port 1434, migrations, seed data, and the manage app at http://localhost:8090.
 
 ## Development workflow
 

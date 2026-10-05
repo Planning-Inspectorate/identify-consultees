@@ -17,6 +17,7 @@ be read back over pymssql directly - the same pattern the Node data-access layer
 function_app.py            HTTP trigger entry point (required at the app root by Azure Functions)
 setup_database/
   db.py                    connection string parsing + pymssql connection params
+  sample_data/             real UK boundary GeoJSON exports - also loaded by `npm run db-seed`
 querying/
   consultee_areas.py       the consultee_area query
 ```
@@ -52,11 +53,17 @@ To set up your local dev environment, in `/apps/function-python`:
     "Values": {
       "FUNCTIONS_WORKER_RUNTIME": "python",
       "AzureWebJobsStorage": "UseDevelopmentStorage=true",
-      "SQL_CONNECTION_STRING": "sqlserver://localhost:1434;database=identify-consultees;user=sa;password=DockerDatabaseP@22word!;trustServerCertificate=true"
+      "SQL_CONNECTION_STRING": "sqlserver://localhost:1434;database=identify-consultees;user=sa;password=DockerDatabaseP@22word!;trustServerCertificate=true",
+      "CONSULTEE_AREAS_API_KEY": "any-local-shared-secret"
     }
   }
   ```
   (match the connection string to whatever's in `packages/database/.env`)
+
+  `CONSULTEE_AREAS_API_KEY` is the shared `x-api-key` secret the `consultee-areas` route checks -
+  **the endpoint fails closed without it** (500 "Endpoint is not configured"). Set the same value as
+  `PYTHON_FUNCTION_API_KEY` in `apps/manage/.env` for the manage app to call it; a wrong or missing
+  header gets a 401. `/api/health` needs no key.
 
 See also [Code and test Azure Functions locally](https://learn.microsoft.com/en-us/azure/azure-functions/functions-develop-local?pivots=programming-language-python).
 

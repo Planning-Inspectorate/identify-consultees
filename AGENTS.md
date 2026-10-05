@@ -37,11 +37,14 @@ PINS expects specific GitHub practices on their repos. Follow these for every PR
 
 ### Requirements
 
-| Requirement                    | What it means here                                                                                                                                                                      |
-| ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Linear history                 | Prefer a straight line of commits on the PR branch (rebase onto `main`; avoid merge commits from `main` into the feature branch).                                                       |
-| Squashed commits before review | Before requesting or refreshing review, squash noisy WIP / fixup commits so the PR presents a clean, reviewable history (often one commit per logical change, or a small coherent set). |
-| Semantic commit messages       | Use Conventional Commits-style subjects, e.g. `feat:`, `fix:`, `docs:`, `test:`, `refactor:`, `chore:`, `perf:`, `ci:`. Imperative mood; explain the why in the body when needed.       |
+| Requirement                    | What it means here                                                                                                                                                                                                                                                                  |
+| ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| No direct changes to `main`    | Merging or pushing directly to `main` is not possible or recommended — every change lands through a pull request on a feature branch, reviewed before merge.                                                                                                                        |
+| Descriptive branch names       | Name the branch after the change it makes, using the Conventional Commit type as a prefix: `feat/`, `fix/`, `docs/`, `chore/`, `ci/`, `perf/`, `test/` + a short kebab-case description (e.g. `feat/real-ruleset-engine`, `fix/auth-rate-limiting`, `docs/react-preact-peer-deps`). |
+| Linear history                 | Prefer a straight line of commits on the PR branch (rebase onto `main`; avoid merge commits from `main` into the feature branch).                                                                                                                                                   |
+| Squashed commits before review | Before requesting or refreshing review, squash noisy WIP / fixup commits so the PR presents a clean, reviewable history (often one commit per logical change, or a small coherent set).                                                                                             |
+| Semantic commit messages       | Use Conventional Commits-style subjects, e.g. `feat:`, `fix:`, `docs:`, `test:`, `refactor:`, `chore:`, `perf:`, `ci:`. Imperative mood; explain the why in the body when needed.                                                                                                   |
+| Comprehensive PR summary       | The PR body must let a reviewer understand the change without reading the diff: what changed and why, the advantages, any disadvantages or trade-offs, and the risks (see the PR description checklist below).                                                                      |
 
 Do not open or hand over a PR for review with a messy stack of “wip”, “fix typo”, or merge-from-main commits. Clean the history first.
 
@@ -59,6 +62,8 @@ When the feature branch has diverged or accumulated noise:
 
 ### Agent rules for PRs
 
+- Never push or merge directly to `main` — always open a new pull request from a feature branch.
+- Choose a branch name that reflects the changes: `<type>/<short-kebab-case-description>` using the Conventional Commit type (e.g. `feat/interactive-map-examples`, `fix/azure-playwright-e2e-ci`, `chore/pin-npm-dependencies-policy`).
 - Before creating or updating a PR for review: rebase onto latest `main`, squash to a clean history, ensure commit messages are semantic, then push with `--force-with-lease` if history was rewritten.
 - Prefer rebasing the feature branch onto `main` over merging `main` into the feature branch.
 - `--force-with-lease` is allowed on feature / PR branches only, and only after an intentional history rewrite (rebase/squash).
@@ -68,11 +73,19 @@ When the feature branch has diverged or accumulated noise:
 
 ### PR description checklist
 
-When opening a PR with `gh pr create` (user-requested):
+When opening a PR with `gh pr create` (user-requested), the body must include comprehensive summary notes:
 
+- **What changed** — the change or outcome, at a level a reviewer can grasp without reading the diff.
+- **Advantages** — what this improves or unblocks.
+- **Disadvantages / trade-offs** — costs, complexity, or anything intentionally deferred.
+- **Risks** — what could go wrong, rollout/rollback notes, and any Service Standard / TCoP impact when material.
+- **Test plan** — concrete steps a reviewer can run or verify.
+
+And mechanically:
+
+- [ ] Branch name reflects the change (`<type>/<kebab-case-description>`).
 - [ ] Branch is based on current `main` with linear, squashed history.
 - [ ] Commit subjects are semantic (`feat:` / `fix:` / `docs:` / …).
-- [ ] Summary explains the change or outcome; test plan is concrete.
 - [ ] No secrets, `.env`, or production data dumps in the diff.
 - [ ] No AI self-identification in the PR description, commits, or diff.
 
@@ -410,11 +423,15 @@ job:
   environment's real database without touching the running app or its slots at all.
 - **Data operations**: `.azure/pipelines/db-seed.yml` (`trigger: none`, manually run via
   `az pipelines run` or the Azure DevOps UI, parameterised by `environment`) is a fully separate
-  pipeline for loading data - currently only the small built-in sample dataset
-  (`npm run seed`/`seed-prod`). Extending it to run `npm run db-import` (see
-  `packages/database/src/seed/import-cli.ts`) against a real, large GeoJSON file is the natural
-  next step once that file is reachable by the pipeline (e.g. from blob storage - see
-  `infrastructure/storage.tf`, provisioned but not yet wired to anything).
+  pipeline for loading data. Its default is the small built-in sample dataset
+  (`npm run seed`/`seed-prod`); passing `loadFullReferenceData=true` (Dev/Test/Training only)
+  instead runs `npm run import-from-blob` for the two known reference-data blobs
+  (`combined_reference_data_v1.geojson`, `all-project-boundaries.geojson`) in the app's storage
+  container (`infrastructure/storage.tf`).
+- **In-app import**: the same blobs can be imported from the manage app itself at
+  `/admin/import-reference-data` (with `/admin/upload-to-blob` for getting files into the
+  container) - the app's managed identity already has Storage Blob Data Contributor, unlike the
+  seed pipeline's.
 - **One-off local imports**: `npm run db-import -- --type=<consultee-areas|case-boundaries> --file=<path>`
   works against any `SQL_CONNECTION_STRING` you can reach directly (e.g. from a machine with a
   route to a real environment's database), independently of any pipeline.

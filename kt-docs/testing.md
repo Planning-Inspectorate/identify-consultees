@@ -25,6 +25,8 @@ npm run playwright:install   # once per machine
 npm run test:visual          # optional
 ```
 
+> **Prerequisite:** the Playwright projects (e2e / a11y / render) boot a test server on port 8091 that queries the **real local database** — the specs deep-link to rows from the dev seed (`e2e/fixtures.ts` defines `SAMPLE_CASE_ID`, `SAMPLE_RULESET_ID`). Run `npm start` first (or at least `docker compose up -d` + `npm run db-migrate-dev && npm run db-seed`) or the journey specs will fail. The unit/`node --test` layers mock or stub the DB and work without it.
+
 Lighter manage-only example:
 
 ```bash

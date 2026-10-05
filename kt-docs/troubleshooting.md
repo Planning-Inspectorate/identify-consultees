@@ -21,12 +21,13 @@
 
 ## Maps / render
 
-| Symptom                        | Likely cause                   | Fix                                                   |
-| ------------------------------ | ------------------------------ | ----------------------------------------------------- |
-| Interactive map blank          | Vendor assets / JS / CSP       | Check browser console, CSP nonce, Defra vendor routes |
-| Only static map shows          | JS disabled or init failure    | Confirm `data-static-map-src` returns 200             |
-| Static map slow / flaky        | Upstream tiles uncached        | Confirm cache / ETag path; avoid prefetch storms      |
-| Interactive vs static disagree | Divergent viewports or GeoJSON | Reuse shared sample helpers / `mapViewForCollections` |
+| Symptom                        | Likely cause                   | Fix                                                                          |
+| ------------------------------ | ------------------------------ | ---------------------------------------------------------------------------- |
+| Interactive map blank          | Vendor assets / JS / CSP       | Check browser console, CSP nonce, Defra vendor routes                        |
+| Only static map shows          | JS disabled or init failure    | Confirm `data-static-map-src` returns 200                                    |
+| Static map slow / flaky        | Upstream tiles uncached        | Confirm cache / ETag path; avoid prefetch storms                             |
+| Interactive vs static disagree | Divergent viewports or GeoJSON | Both must derive from the same `buildCaseMapConfig` output / shared viewport |
+| Static map looks wrong format  | `Accept` negotiation           | Raster route negotiates AVIF→WebP→PNG; use the `.svg` route for markup       |
 
 ## Python bridge
 
@@ -38,11 +39,13 @@
 
 ## Database connectivity
 
-| Symptom               | Likely cause                      | Fix                                                           |
-| --------------------- | --------------------------------- | ------------------------------------------------------------- |
-| Migrations fail       | Container not ready               | Wait for healthy SQL on 1434; re-run `npm run db-migrate-dev` |
-| Home total unexpected | `case_boundary` empty vs fixtures | Empty/unavailable → fixture length fallback                   |
-| `/items` fails        | DB down                           | Start compose; check connection string                        |
+| Symptom                          | Likely cause                                        | Fix                                                           |
+| -------------------------------- | --------------------------------------------------- | ------------------------------------------------------------- |
+| Migrations fail                  | Container not ready                                 | Wait for healthy SQL on 1434; re-run `npm run db-migrate-dev` |
+| Homepage search shows no results | `case_boundary` empty / not seeded                  | `npm run db-seed` (or `npm start`, which seeds)               |
+| Results page 404s for a case     | `caseId` isn't a UUID, or the row isn't seeded      | Deep-link by case id from the homepage, not by case reference |
+| e2e journey specs fail           | Seeded DB missing (server on 8091 queries real SQL) | `npm start` first; check `e2e/fixtures.ts` ids match the seed |
+| `/items` fails                   | DB down                                             | Start compose; check connection string                        |
 
 ## Apple Silicon note
 

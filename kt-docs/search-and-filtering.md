@@ -1,6 +1,6 @@
 # Search and filtering
 
-**Status:** Partial — behaviour is implemented on `/`, not on `/filter` … `/filter-4`.
+**Status:** Current — behaviour is implemented on `/` against `case_boundary`, not on `/filter` … `/filter-4`.
 
 ## Vocabulary mapping
 
@@ -8,58 +8,64 @@ Earlier spike / CBOS notes may say “filter journey” or `/filter` through `/f
 
 **In this repository today:**
 
-| Conceptual step               | Actual route / UI                               |
-| ----------------------------- | ----------------------------------------------- |
-| Start filter / choose ruleset | `GET /` — ruleset `<select>`                    |
-| Keyword search                | `GET /?q=…`                                     |
-| Pagination size               | `GET /?pageSize=25\|50\|100`                    |
-| Pick a case / geometry        | Radio table on `/`, submit to `GET /consultees` |
-| Results                       | `GET /consultees/:geometryId?ruleset=…`         |
+| Conceptual step        | Actual route / UI                              |
+| ---------------------- | ---------------------------------------------- |
+| Start / find a project | `GET /` — project list                         |
+| Keyword search         | `GET /?q=…`                                    |
+| Pagination size        | `GET /?pageSize=25\|50\|100`                   |
+| Pick a case            | Project link → `GET /consultees/:caseId`       |
+| Choose ruleset         | `GET /consultees/:caseId` — ruleset `<select>` |
+| Results                | `GET /consultees/:caseId/results?ruleset=…`    |
 
 If you add real `/filter-n` routes later, update this page and [Routes and user journeys](./routes-and-user-journeys.md) in the same change.
 
-## Query parameters (homepage)
+## Query parameters
 
-| Param      | Purpose                               | Notes                                    |
-| ---------- | ------------------------------------- | ---------------------------------------- |
-| `ruleset`  | Selected screening ruleset value      | From `RULESETS` fixture list             |
-| `q`        | Case reference or project name search | Case-insensitive substring over fixtures |
-| `pageSize` | Rows to show                          | Allowed: 25, 50, 100 (default 25)        |
+On the homepage:
 
-Selection continues with:
+| Param      | Purpose                               | Notes                                                                              |
+| ---------- | ------------------------------------- | ---------------------------------------------------------------------------------- |
+| `q`        | Case reference or project name search | SQL `LIKE` over `case_boundary` (leading wildcard — fine while the table is small) |
+| `pageSize` | Rows to show                          | Allowed: 25, 50, 100 (default 25)                                                  |
 
-| Param        | Purpose                                                      |
-| ------------ | ------------------------------------------------------------ |
-| `geometryId` | Fixture id (for example `geo-1`) posted/get to `/consultees` |
-| `ruleset`    | Carried through to results                                   |
+Continuing the journey:
+
+| Param / segment | Purpose                                              |
+| --------------- | ---------------------------------------------------- |
+| `caseId`        | `case_boundary` row id (a UNIQUEIDENTIFIER)          |
+| `ruleset`       | Ruleset id from `RULESETS` (`example-ruleset` today) |
+
+## Search behaviour
+
+- `searchCaseBoundaries` (`packages/database/src/geospatial/case-boundaries.ts`) runs the query in SQL: filtered rows plus `COUNT(*) OVER()` as the total, limited to `pageSize`
+- “Showing X to Y of Z” comes from the real result count — no fixture fallback
+- An unreachable database logs an error and renders an empty list rather than breaking the page
+- The homepage also shows one random example case (`getRandomCaseSummary`) as a hint for what a reference looks like
 
 ## Pagination behaviour
 
-- Homepage slices the **filtered fixture list** client-side in the controller (`slice(0, pageSize)`)
-- “Showing X to Y of Z” uses `resultsTotal`
-- With an empty search string, `resultsTotal` prefers `caseBoundary.count()` when greater than 0, else fixture length
-- With a non-empty search, total is the filtered fixture length
-
-> Reminder: **rows are still fixtures**. A non-zero SQL count only adjusts the summary total when not searching.
+- `pageSize` is a row limit passed to the SQL query, applied server-side in the controller
+- Page navigation beyond page size (an offset/page-number param) is not built yet — the list shows the first `pageSize` matches
 
 ## Facets
 
-**Sparse:** There is no multi-facet facet panel (stage, sector, nation, etc.) beyond ruleset + keyword today. Product may add facets later; keep them sample-data-backed until Track C ownership is explicit.
+**Sparse:** There is no multi-facet panel (stage, sector, nation, etc.) beyond keyword search today. Product may add facets later; the columns exist on `case_boundary` if they are needed.
 
-## Fixture ownership
+## Data ownership
 
-| Concern                       | Owner module                                   |
-| ----------------------------- | ---------------------------------------------- |
-| Project rows + helper finders | `apps/manage/src/app/data/dummy-geometries.ts` |
-| Ruleset labels/values         | Same module (`RULESETS`)                       |
-| Map polygons for results      | `apps/manage/src/app/maps/sample-geojson.ts`   |
+| Concern               | Owner module / path                                                                                |
+| --------------------- | -------------------------------------------------------------------------------------------------- |
+| Project rows + search | `packages/database/src/geospatial/case-boundaries.ts`                                              |
+| Ruleset definitions   | `packages/database/src/geospatial/rulesets.ts` + `example_ruleset.csv`                             |
+| Results map config    | `apps/manage/src/app/maps/case-geojson.ts`                                                         |
+| Seeded sample rows    | `packages/database/src/seed/data-dev.ts` (loads `apps/function-python/setup_database/sample_data`) |
 
-When changing fixture shape, update:
+When changing the case model or ruleset shape, update:
 
-1. Homepage view-model types
-2. Consultees results controller assumptions
-3. Unit tests under `home/` and `dummy-geometries`
-4. Playwright journeys that deep-link to `geo-1` (or whichever ids you keep)
+1. `home` and `consultees` view-model types
+2. `resolveCase` assumptions (ids are UNIQUEIDENTIFIERs — non-UUID path segments 404 without a DB round trip)
+3. Unit tests under `home/` and `consultees/`
+4. Playwright fixtures — `e2e/fixtures.ts` keys off ids produced by the dev seed (`SAMPLE_CASE_ID`, `SAMPLE_RULESET_ID`)
 
 ## Related pages
 
