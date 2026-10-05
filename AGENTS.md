@@ -364,8 +364,30 @@ OpenStreetMap tile servers and commercial static-map APIs rate-limit and block a
 1. **Proxy through our app** — serve `/…/static-map` (and optional `/…/static-map.svg`) from Express; do not put `tile.openstreetmap.org` (or equivalent) URLs in page HTML/CSS/JS for the static fallback.
 2. **Cache heavily** — responses must send long-lived `Cache-Control` (and preferably `ETag`). Matching `If-None-Match` must return **`304` and skip upstream Google/OSM fetches**. Prefer an in-process tile cache so repeat renders of the same viewport do not re-hit tile servers.
 3. **Keep concurrency low** when fetching tiles (small batches; identifying `User-Agent` naming this service and repo).
-4. **Only load static `<img>` when needed** — put the image in `<noscript>` and/or inject from `data-static-map-src` after interactive-map failure; never eager-load static images for JS-capable users who will use the interactive map.
+4. **Only load static `<img>` when needed** — put the image in `<noscript>` and/or inject it after interactive-map failure; never eager-load static images for JS-capable users who will use the interactive map. Pass fallback details via the page's `<script type="application/json">` config block, not `data-*` attributes on the map container (see the `data-*` hazard below).
 5. **Do not invent uncached polling or prefetch** of static maps or tiles (e.g. pre-warming every section on every page view without cache).
+
+When changing static-map code, preserve ETag fingerprinting of framing + geometry so validators continue to avoid unnecessary upstream work.
+
+### Interactive map component showcase
+
+`/components/interactive-map` (reachable via the `?components=true` showcase) renders one page per worked Defra Interactive Map example from `src/app/maps/interactive-map-examples.ts`. Each page loads only the plugin bundles that example needs, and reuses the shared static-map pipeline for its `<noscript>` / init-failure fallback. Vendor bundles under `/vendor/*` are served with lazy in-process Brotli (`src/app/maps/vendor.ts`); entry points are fingerprinted at build time, lazy chunks keep stable names.
+
+### Defra component integration gotchas (learned from real bugs)
+
+- **`data-*` attributes are JSON-parsed.** The `InteractiveMap` constructor runs `JSON.parse` on every `data-*` attribute it finds on the map container. Plain strings like `data-static-map-src="/static-map"` or `data-map-width="960"` log `SyntaxError`s to the console (harmless but noisy, and confusing to diagnose). Keep `data-*` off the container — put configuration in the page's `<script type="application/json">` block and discover containers by a class selector (`initAllInteractiveMapExamples` uses `.app-interactive-map-example`). The older `consultee-map-region.njk` partial still uses `data-*` attributes — migrate it the same way if that page is touched.
+- **Plugin API methods attach late.** The object returned by `defra.interactPlugin()` (and siblings) has no `enable`/`clear` methods at construction — the core attaches them when the plugin's init component mounts, around `map:ready`. Guard wiring on the plugin object existing, then call the API lazily: `map.on('map:ready', () => interactPlugin.enable?.())`. A jsdom mock that exposes `enable` immediately masks this and lets the bug ship — model the late attachment (plugin object without the API until `map:ready`) in tests.
+- **`mapStyles` entries need a `thumbnail`.** The `map-styles` plugin renders `mapStyle.thumbnail` as an `<img>`; an omitted field leaves an empty placeholder box in the style panel. Inline SVG `data:` URIs work well — zero requests, decorative `alt=""`, and CSP already allows `img-src data:`.
+- **Feature info is a panel, not a tooltip.** The component has no floating-tooltip API for clicked features (its internal tooltips are only control labels). The supported pattern is `interact` + `interact:selectionchange` writing into an `addPanel` side panel — also the more accessible option for keyboard and touch users. Escape property values (`escapeHtml`) before `innerHTML`.
+
+## Asset fingerprinting and the local dev server
+
+`npm run build` (`src/util/build.ts`) copies assets into `apps/manage/src/.static`, renames selected files with an 8-char content hash (`fingerprint-assets.ts`), writes Brotli `.br` sidecars, and rewrites the manifest values in `src/util/config-middleware.ts`.
+
+- **Never hand-edit the hashes** in `config-middleware.ts` — run `npm run build` so the filename and manifest stay in sync.
+- **Any change to a fingerprinted source file changes its hash.** The old filename is deleted from `.static`, so a running server that rendered a page earlier now references a file that no longer exists (`404` / `ERR_EMPTY_RESPONSE`). After editing files under `src/public/` or rerunning the build, restart the dev server — nodemon watches `src` and normally handles this.
+- **Orphaned dev server:** if a restart attempt crashes with `EADDRINUSE` (an old `node src/server.ts` still holds `:8090`), nodemon leaves the stale process serving old code and hash manifest. Check `lsof -nP -iTCP:8090 -sTCP:LISTEN`, kill the orphan, and nodemon respawns on the next file change.
+- **Playwright e2e uses `reuseExistingServer: !CI`**, so a stale `e2e-server.mjs` left listening on `:8091` serves old code and produces confusing render failures. Kill it before re-running e2e after source changes.
 
 ## Database operations without redeploying the app
 
@@ -387,9 +409,3 @@ job:
 - **One-off local imports**: `npm run db-import -- --type=<consultee-areas|case-boundaries> --file=<path>`
   works against any `SQL_CONNECTION_STRING` you can reach directly (e.g. from a machine with a
   route to a real environment's database), independently of any pipeline.
-
-When changing static-map code, preserve ETag fingerprinting of framing + geometry so validators continue to avoid unnecessary upstream work.
-
-### Interactive map component showcase
-
-`/components/interactive-map` (reachable via the `?components=true` showcase) renders one page per worked Defra Interactive Map example from `src/app/maps/interactive-map-examples.ts`. Each page loads only the plugin bundles that example needs, and reuses the shared static-map pipeline for its `<noscript>` / init-failure fallback. Vendor bundles under `/vendor/*` are served with lazy in-process Brotli (`src/app/maps/vendor.ts`); entry points are fingerprinted at build time, lazy chunks keep stable names.
