@@ -76,6 +76,24 @@ export interface InteractiveMapExample {
 
 const EMPTY_COLLECTION: GeoJsonFeatureCollection = { type: 'FeatureCollection', features: [] };
 
+/**
+ * Stylised 60x60 basemap swatch for the style-switcher thumbnails, served as a
+ * data URI so the decorative preview costs no request. Colours loosely match
+ * each OpenFreeMap style's palette.
+ */
+function mapStyleThumbnail(palette: { background: string; water: string; green: string; road: string }): string {
+	const svg =
+		`<svg xmlns="http://www.w3.org/2000/svg" width="60" height="60" viewBox="0 0 60 60">` +
+		`<rect width="60" height="60" fill="${palette.background}"/>` +
+		`<path d="M0 0h60v14C42 24 20 10 0 20Z" fill="${palette.water}"/>` +
+		`<circle cx="15" cy="45" r="10" fill="${palette.green}"/>` +
+		`<rect x="38" y="36" width="11" height="9" fill="${palette.road}" opacity="0.85"/>` +
+		`<path d="M0 58C18 50 38 46 60 48" stroke="${palette.road}" stroke-width="4" fill="none"/>` +
+		`<path d="M44 60L52 24" stroke="${palette.road}" stroke-width="3" fill="none"/>` +
+		`</svg>`;
+	return `data:image/svg+xml,${encodeURIComponent(svg)}`;
+}
+
 const AMBLESIDE_CENTER: [number, number] = [-2.464, 54.558];
 const WINDERMERE_MARKER: [number, number] = [-2.96, 54.43];
 const DORSET_CENTER: [number, number] = [-1.78, 50.62];
@@ -309,9 +327,9 @@ export const INTERACTIVE_MAP_EXAMPLES: readonly InteractiveMapExample[] = [
 		id: 'select-feature',
 		title: 'Select a feature',
 		summary:
-			'Feature selection on the field parcels dataset — selecting a polygon opens a panel showing its name. ' +
-			'Demonstrates the interact plugin selectFeature mode.',
-		interaction: 'Click a field parcel to select it and see its name in the panel.',
+			'Feature selection on the field parcels dataset — selecting a polygon opens a panel showing its name and ' +
+			'land use. Demonstrates the interact plugin selectFeature mode.',
+		interaction: 'Click a field parcel to select it and see its details in the panel.',
 		plugins: ['datasets', 'interact'],
 		clientConfig: {
 			kind: 'select-feature',
@@ -330,6 +348,8 @@ export const INTERACTIVE_MAP_EXAMPLES: readonly InteractiveMapExample[] = [
 				id: 'parcel-info',
 				label: 'Selected parcel',
 				property: 'name',
+				detailProperty: 'landUse',
+				detailLabel: 'Land use',
 				fallback: 'Selected parcel'
 			}
 		},
@@ -393,21 +413,39 @@ export const INTERACTIVE_MAP_EXAMPLES: readonly InteractiveMapExample[] = [
 					label: 'Liberty',
 					url: 'https://tiles.openfreemap.org/styles/liberty',
 					attribution: INTERACTIVE_MAP_OPENFREEMAP_ATTRIBUTION,
-					backgroundColor: MAP_BACKGROUND
+					backgroundColor: MAP_BACKGROUND,
+					thumbnail: mapStyleThumbnail({
+						background: '#f8f4f0',
+						water: '#9ec8ee',
+						green: '#a8d598',
+						road: '#f0b84f'
+					})
 				},
 				{
 					id: 'positron',
 					label: 'Positron',
 					url: 'https://tiles.openfreemap.org/styles/positron',
 					attribution: INTERACTIVE_MAP_OPENFREEMAP_ATTRIBUTION,
-					backgroundColor: MAP_BACKGROUND
+					backgroundColor: MAP_BACKGROUND,
+					thumbnail: mapStyleThumbnail({
+						background: '#fafaf7',
+						water: '#d9e8f3',
+						green: '#e6eadf',
+						road: '#d5d0c8'
+					})
 				},
 				{
 					id: 'bright',
 					label: 'Bright',
 					url: 'https://tiles.openfreemap.org/styles/bright',
 					attribution: INTERACTIVE_MAP_OPENFREEMAP_ATTRIBUTION,
-					backgroundColor: MAP_BACKGROUND
+					backgroundColor: MAP_BACKGROUND,
+					thumbnail: mapStyleThumbnail({
+						background: '#f8f4f0',
+						water: '#58b4f2',
+						green: '#92d088',
+						road: '#f8a83c'
+					})
 				},
 				{
 					id: 'dark',
@@ -416,7 +454,13 @@ export const INTERACTIVE_MAP_EXAMPLES: readonly InteractiveMapExample[] = [
 					attribution: INTERACTIVE_MAP_OPENFREEMAP_ATTRIBUTION,
 					backgroundColor: '#0b0c0c',
 					mapColorScheme: 'dark',
-					appColorScheme: 'dark'
+					appColorScheme: 'dark',
+					thumbnail: mapStyleThumbnail({
+						background: '#1a1b1b',
+						water: '#2b3d52',
+						green: '#243a2c',
+						road: '#4c5555'
+					})
 				}
 			]
 		},

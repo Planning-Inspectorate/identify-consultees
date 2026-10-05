@@ -36,4 +36,11 @@ describe('interactive map example registry', () => {
 		assert.equal(getInteractiveMapExample('style-switcher')?.id, 'style-switcher');
 		assert.equal(getInteractiveMapExample('missing'), undefined);
 	});
+
+	test('every style-switcher option ships a data-uri thumbnail', () => {
+		const example = getInteractiveMapExample('style-switcher');
+		for (const style of example?.clientConfig.mapStyles ?? []) {
+			assert.match(String(style.thumbnail), /^data:image\/svg\+xml,/, String(style.id));
+		}
+	});
 });

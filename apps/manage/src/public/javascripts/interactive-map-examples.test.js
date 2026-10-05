@@ -411,6 +411,60 @@ describe('interactive-map-examples client helpers', () => {
 		assert.equal(interactInstance.clear.mock.callCount(), 1);
 	});
 
+	test('select-feature renders the detail line only when the feature has the detail property', () => {
+		installDom(
+			pageHtml({
+				kind: 'select-feature',
+				interact: { interactionModes: ['selectFeature'] },
+				panel: {
+					id: 'parcel-info',
+					label: 'Selected parcel',
+					property: 'name',
+					detailProperty: 'landUse',
+					detailLabel: 'Land use',
+					fallback: 'Selected'
+				}
+			})
+		);
+		const { defra, InteractiveMap, fire } = mockDefra();
+		globalThis.defra = defra;
+		globalThis.window.defra = defra;
+
+		initInteractiveMapExample('demo-map');
+		fire('map:ready');
+
+		fire('interact:selectionchange', {
+			selectedFeatures: [{ properties: { name: 'Large meadow', landUse: 'Permanent grassland' } }]
+		});
+		const html = document.getElementById('parcel-info-content').innerHTML;
+		assert.match(html, /Large meadow/);
+		assert.match(html, /Land use: Permanent grassland/);
+
+		// a feature without the detail property renders the name line only
+		fire('interact:selectionchange', { selectedFeatures: [{ properties: { name: 'Lamb field' } }] });
+		const htmlNoDetail = document.getElementById('parcel-info-content').innerHTML;
+		assert.match(htmlNoDetail, /Lamb field/);
+		assert.doesNotMatch(htmlNoDetail, /Land use/);
+	});
+
+	test('select-feature falls back to the property name when no detail label is configured', () => {
+		installDom(
+			pageHtml({
+				kind: 'select-feature',
+				interact: { interactionModes: ['selectFeature'] },
+				panel: { id: 'parcel-info', label: 'Selected parcel', property: 'name', detailProperty: 'landUse' }
+			})
+		);
+		const { defra, InteractiveMap, fire } = mockDefra();
+		globalThis.defra = defra;
+		globalThis.window.defra = defra;
+
+		initInteractiveMapExample('demo-map');
+		fire('map:ready');
+		fire('interact:selectionchange', { selectedFeatures: [{ properties: { name: 'x', landUse: 'Woodland' } }] });
+		assert.match(document.getElementById('parcel-info-content').innerHTML, /landUse: Woodland/);
+	});
+
 	test('init falls back to the static map when the constructor throws', () => {
 		installDom(pageHtml({ kind: 'basic' }));
 		const Throwing = mockDefra();

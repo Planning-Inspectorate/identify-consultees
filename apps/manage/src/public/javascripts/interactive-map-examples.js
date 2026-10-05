@@ -109,6 +109,14 @@ function panelInnerId(panel) {
 }
 
 /**
+ * @param {unknown} value
+ * @returns {string}
+ */
+function escapeHtml(value) {
+	return String(value).replace(/</g, '&lt;');
+}
+
+/**
  * @param {object} map - InteractiveMap instance
  * @param {object} config
  * @param {object | undefined} interactPlugin
@@ -157,7 +165,7 @@ function wireExampleBehaviour(map, config, interactPlugin) {
 		map.on('interact:selectionchange', ({ selectedMarkers }) => {
 			const target = document.getElementById(panelInnerId(config.panel));
 			if (selectedMarkers.includes(config.marker.id) && target) {
-				target.innerHTML = `<p class="govuk-body govuk-!-margin-bottom-1">${String(config.panel.fallback).replace(/</g, '&lt;')}</p>`;
+				target.innerHTML = `<p class="govuk-body govuk-!-margin-bottom-1">${escapeHtml(config.panel.fallback)}</p>`;
 				map.showPanel(config.panel.id);
 			} else {
 				map.hidePanel(config.panel.id);
@@ -169,8 +177,14 @@ function wireExampleBehaviour(map, config, interactPlugin) {
 		map.on('interact:selectionchange', ({ selectedFeatures }) => {
 			const target = document.getElementById(panelInnerId(config.panel));
 			if (selectedFeatures.length > 0 && target) {
-				const name = selectedFeatures[0].properties?.[config.panel.property] ?? config.panel.fallback;
-				target.innerHTML = `<p class="govuk-body govuk-!-margin-bottom-1">${String(name).replace(/</g, '&lt;')}</p>`;
+				const properties = selectedFeatures[0].properties ?? {};
+				const name = properties[config.panel.property] ?? config.panel.fallback;
+				const detail = config.panel.detailProperty ? properties[config.panel.detailProperty] : undefined;
+				target.innerHTML =
+					`<p class="govuk-body govuk-!-margin-bottom-1">${escapeHtml(name)}</p>` +
+					(detail
+						? `<p class="govuk-body-s govuk-!-margin-bottom-1">${escapeHtml(config.panel.detailLabel ?? config.panel.detailProperty)}: ${escapeHtml(detail)}</p>`
+						: '');
 				map.showPanel(config.panel.id);
 			} else {
 				map.hidePanel(config.panel.id);
