@@ -1,5 +1,10 @@
 import { BROTLI_EXTENSIONS } from '#util/fingerprint-assets.ts';
-import { acceptsBrotli, contentTypeFor, staticAssetRequestKey } from '#util/static-assets-middleware.ts';
+import {
+	acceptsBrotli,
+	buildStaticAssetsRateLimiter,
+	contentTypeFor,
+	staticAssetRequestKey
+} from '#util/static-assets-middleware.ts';
 import { DEFRA_VENDOR_ROOTS } from '#util/vendor-assets.ts';
 import type { IRouter, Request, RequestHandler, Response } from 'express';
 import express, { Router as createRouter } from 'express';
@@ -18,6 +23,8 @@ export type DefraVendorRouterOptions = {
 	 * un-immutable because their names do not change between releases.
 	 */
 	maxAge?: string | number;
+	/** Rate limiter for the filesystem-backed vendor responses (tests inject a no-op). */
+	rateLimiter?: RequestHandler;
 };
 
 /**
@@ -200,6 +207,8 @@ export function createVendorBrotliHandler(
  */
 export function createDefraVendorRouter(options: DefraVendorRouterOptions = {}): IRouter {
 	const router = createRouter();
+
+	router.use(options.rateLimiter ?? buildStaticAssetsRateLimiter());
 
 	for (const [prefix, root] of Object.entries(DEFRA_VENDOR_ROOTS)) {
 		router.use(`/vendor/${prefix}`, createVendorBrotliHandler(root, options.maxAge));

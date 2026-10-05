@@ -39,6 +39,24 @@ describe('defra vendor router', () => {
 		assert.equal(revalidated.status, 304);
 	});
 
+	test('applies the configured rate limiter before serving vendor files', async () => {
+		const app = express();
+		let limited = 0;
+		app.use(
+			createDefraVendorRouter({
+				maxAge: '1d',
+				rateLimiter: (req, res, next) => {
+					limited++;
+					next();
+				}
+			})
+		);
+
+		const response = await request(app).get(VENDOR_CSS);
+		assert.equal(response.status, 200);
+		assert.equal(limited, 1);
+	});
+
 	test('defaults to revalidation (max-age=0) when no lifetime is configured', async () => {
 		const app = express();
 		app.use(createDefraVendorRouter());
