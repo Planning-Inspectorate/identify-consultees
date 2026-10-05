@@ -127,6 +127,12 @@ export function buildInteractiveMapExamplePage(): AsyncRequestHandler {
 					attribution: INTERACTIVE_MAP_OPENFREEMAP_ATTRIBUTION,
 					backgroundColor: '#f5f5f0'
 				},
+				fallback: {
+					src: `${BASE_PATH}/${example.id}/static-map`,
+					alt: example.staticMap.alt,
+					width: MAP_VIEWPORT.width,
+					height: MAP_VIEWPORT.height
+				},
 				...clientConfig
 			}),
 			pluginStylesheets,
