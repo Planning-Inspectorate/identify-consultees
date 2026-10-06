@@ -28,16 +28,23 @@
 
 Mark these clearly in Confluence as **Experimental**:
 
-| Topic                                           | Current state                                                        | Open question                                                         |
-| ----------------------------------------------- | -------------------------------------------------------------------- | --------------------------------------------------------------------- |
-| Multi-step `/filter-n` IA                       | Not implemented; `/` → `/consultees/:caseId` → `/results` stands in  | Do we adopt filter URLs or keep the current shape?                    |
-| End-user upload wizard                          | Not built; admin blob upload + import routes exist                   | Which formats? Who owns persistence?                                  |
-| Full reference dataset                          | Seed loads a sample; pipeline/admin routes can import the full blobs | When does the full dataset replace the sample in each env?            |
-| Additional rulesets                             | One (`example-ruleset`) built from the real CSV export               | Where do the ~8 real rulesets come from, and who owns the CSV format? |
-| Broader Python orchestrator / intersector ports | Mentioned in function-python README                                  | How much stays Python vs moves to Node?                               |
-| Visual regression baselines                     | Scaffolded, not in default CI gate                                   | When is UI stable enough to snapshot?                                 |
-| Faceted search                                  | Not built                                                            | Which facets matter for consultee identification?                     |
-| Production data path                            | Explicitly out of scope for spike secrets                            | What anonymised datasets are allowed in non-prod?                     |
+| Topic                                           | Current state                                                                                | Open question                                                         |
+| ----------------------------------------------- | -------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
+| Multi-step `/filter-n` IA                       | Not implemented; `/` → `/consultees/:caseId` → `/results` stands in                          | Do we adopt filter URLs or keep the current shape?                    |
+| End-user upload wizard                          | Not built; admin blob upload + import routes exist                                           | Which formats? Who owns persistence?                                  |
+| Full reference dataset                          | Seed loads a sample; pipeline/admin routes can import the full blobs                         | When does the full dataset replace the sample in each env?            |
+| Additional rulesets                             | One (`example-ruleset`) built from the real CSV export                                       | Where do the ~8 real rulesets come from, and who owns the CSV format? |
+| Broader Python orchestrator / intersector ports | Mentioned in function-python README                                                          | How much stays Python vs moves to Node?                               |
+| Visual regression baselines                     | Implemented (`chromium-visual`, covers every current page); opt-in — not in `npm test` or CI | When are screens final enough to gate PRs on snapshots?               |
+| Faceted search                                  | Not built                                                                                    | Which facets matter for consultee identification?                     |
+| Production data path                            | Explicitly out of scope for spike secrets                                                    | What anonymised datasets are allowed in non-prod?                     |
+
+## Wrap-up tasks
+
+Things deliberately deferred until the screens are final / the project is finished — clear this list before go-live:
+
+- [ ] **Enable visual regression in the PR pipeline.** Add the `chromium-visual` project to the test run (`apps/manage` `package.json` `test:e2e`, `.azure/pipelines/pr.yml` via `npm run test-coverage` or a dedicated step) once screens are final. Snapshot baselines are platform-specific — generate Linux baselines on the CI OS (`npm run test:visual:update`) when enabling, then keep them refreshed as the UI changes.
+- [ ] **Remove the hidden components showcase.** Delete the `/components/*` routes (`apps/manage/src/app/views/components`, `views/interactive-map-examples`), the `?components=true` URL-parameter gating in `src/util/config-middleware.ts` (`res.locals.showComponentsNav`), the nav item in `views/layouts/components/header.njk`, and the `/components` entries in the e2e a11y/render/visual specs.
 
 ## Where to record new decisions
 
