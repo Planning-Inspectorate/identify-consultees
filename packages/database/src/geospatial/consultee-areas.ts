@@ -36,7 +36,18 @@ export interface ConsulteeAreaMatch {
 	distanceMetres: number;
 }
 
-interface ConsulteeAreaRow {
+/** A consultee area without its geometry - for listings that never draw it. */
+export interface ConsulteeAreaSummary {
+	id: string;
+	properties: ConsulteeAreaProperties;
+}
+
+export interface ConsulteeAreaSummaryMatch {
+	feature: ConsulteeAreaSummary;
+	distanceMetres: number;
+}
+
+interface ConsulteeAreaSummaryRow {
 	id: string;
 	geometryType: string;
 	consulteeCategory: string | null;
@@ -48,14 +59,15 @@ interface ConsulteeAreaRow {
 	organisationId: string | null;
 	currentVersion: number;
 	metadata: string;
+}
+
+interface ConsulteeAreaRow extends ConsulteeAreaSummaryRow {
 	geometryWkt: string;
 }
 
-function rowToFeature(row: ConsulteeAreaRow): ConsulteeAreaFeature {
+function rowToSummary(row: ConsulteeAreaSummaryRow): ConsulteeAreaSummary {
 	return {
 		id: row.id,
-		type: 'Feature',
-		geometry: wktToGeometry(row.geometryWkt),
 		properties: {
 			consulteeCategory: row.consulteeCategory,
 			consultee: row.consultee,
@@ -68,6 +80,10 @@ function rowToFeature(row: ConsulteeAreaRow): ConsulteeAreaFeature {
 			metadata: JSON.parse(row.metadata)
 		}
 	};
+}
+
+function rowToFeature(row: ConsulteeAreaRow): ConsulteeAreaFeature {
+	return { ...rowToSummary(row), type: 'Feature', geometry: wktToGeometry(row.geometryWkt) };
 }
 
 export interface LoadOptions {
@@ -188,10 +204,12 @@ export async function loadConsulteeAreas(
 
 // a plain, developer-controlled (never user input) column list - safe to inline as raw SQL via
 // Prisma.raw() below, which is Prisma's documented escape hatch for trusted, non-parameter SQL text
-const selectColumns = Prisma.raw(`
+const summaryColumnList = `
 	id, geometryType, consulteeCategory, consultee, region, caseReference, documentId,
-	consulteeId, organisationId, currentVersion, metadata, geometry.STAsText() AS geometryWkt
-`);
+	consulteeId, organisationId, currentVersion, metadata
+`;
+const summaryColumns = Prisma.raw(summaryColumnList);
+const selectColumns = Prisma.raw(`${summaryColumnList}, geometry.STAsText() AS geometryWkt`);
 
 /**
  * Look up a single consultee area by id. Returns `null` rather than throwing when the id is
@@ -274,6 +292,49 @@ export async function findConsulteeAreasNear(
 	consulteeCategories?: string[],
 	excludeCategories?: string[]
 ): Promise<ConsulteeAreaMatch[]> {
+	const rows = await queryAreasNear<ConsulteeAreaRow>(
+		dbClient,
+		selectColumns,
+		geometry,
+		radiusMetres,
+		consulteeCategories,
+		excludeCategories
+	);
+	return rows.map((row) => ({ feature: rowToFeature(row), distanceMetres: row.distanceMetres }));
+}
+
+/**
+ * findConsulteeAreasNear without each area's geometry - for a listing that only shows names,
+ * categories and distances. Geometry is by far the largest part of a row (a county or National
+ * Park boundary runs to tens of KB of WKT), so a wide "everything nearby" fetch that skips it
+ * moves and parses a fraction of the data.
+ */
+export async function findConsulteeAreaSummariesNear(
+	dbClient: PrismaClient,
+	geometry: Geometry,
+	radiusMetres: number,
+	consulteeCategories?: string[],
+	excludeCategories?: string[]
+): Promise<ConsulteeAreaSummaryMatch[]> {
+	const rows = await queryAreasNear<ConsulteeAreaSummaryRow>(
+		dbClient,
+		summaryColumns,
+		geometry,
+		radiusMetres,
+		consulteeCategories,
+		excludeCategories
+	);
+	return rows.map((row) => ({ feature: rowToSummary(row), distanceMetres: row.distanceMetres }));
+}
+
+async function queryAreasNear<Row>(
+	dbClient: PrismaClient,
+	columns: Prisma.Sql,
+	geometry: Geometry,
+	radiusMetres: number,
+	consulteeCategories?: string[],
+	excludeCategories?: string[]
+): Promise<(Row & { distanceMetres: number })[]> {
 	const wkt = geometryToWkt(geometry);
 	const categoryFilter =
 		consulteeCategories && consulteeCategories.length > 0
@@ -286,10 +347,10 @@ export async function findConsulteeAreasNear(
 		excludeCategories && excludeCategories.length > 0
 			? Prisma.sql`AND (consulteeCategory IS NULL OR consulteeCategory NOT IN (${Prisma.join(excludeCategories)}))`
 			: Prisma.empty;
-	const rows = await withDeadlockRetry(
+	return withDeadlockRetry(
 		() =>
-			dbClient.$queryRaw<(ConsulteeAreaRow & { distanceMetres: number })[]>`
-			SELECT ${selectColumns},
+			dbClient.$queryRaw<(Row & { distanceMetres: number })[]>`
+			SELECT ${columns},
 				geometry.STDistance(geography::STGeomFromText(${wkt}, 4326)) AS distanceMetres
 			FROM consultee_area WITH (INDEX(consultee_area_geometry_sidx))
 			WHERE geometry.STDistance(geography::STGeomFromText(${wkt}, 4326)) <= ${radiusMetres}
@@ -298,7 +359,29 @@ export async function findConsulteeAreasNear(
 			ORDER BY distanceMetres
 		`
 	);
-	return rows.map((row) => ({ feature: rowToFeature(row), distanceMetres: row.distanceMetres }));
+}
+
+// SQL Server caps a single statement at 2,100 parameters
+const GEOMETRY_LOOKUP_BATCH_SIZE = 1000;
+
+/** Fetch the geometries of specific consultee areas by id. Ids with no matching row are absent. */
+export async function getConsulteeAreaGeometries(
+	dbClient: PrismaClient,
+	ids: string[]
+): Promise<Map<string, Geometry>> {
+	const geometries = new Map<string, Geometry>();
+	for (let i = 0; i < ids.length; i += GEOMETRY_LOOKUP_BATCH_SIZE) {
+		const batch = ids.slice(i, i + GEOMETRY_LOOKUP_BATCH_SIZE);
+		const rows = await withDeadlockRetry(
+			() => dbClient.$queryRaw<{ id: string; geometryWkt: string }[]>`
+				SELECT id, geometry.STAsText() AS geometryWkt FROM consultee_area WHERE id IN (${Prisma.join(batch)})
+			`
+		);
+		for (const row of rows) {
+			geometries.set(row.id, wktToGeometry(row.geometryWkt));
+		}
+	}
+	return geometries;
 }
 
 /**

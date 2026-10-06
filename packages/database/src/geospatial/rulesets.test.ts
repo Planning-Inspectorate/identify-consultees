@@ -617,6 +617,18 @@ describe('runRuleset against a real project (EN0110019 - EcoPower Suffolk Solar)
 			]) {
 				assert.ok(nearbyIds.has(id), `expected allNearby to include fixture ${id}`);
 			}
+
+			// allNearby is only listed, so it carries no geometry - but every match is drawn on the
+			// map, including those filtered from allNearby, so each must have had its geometry fetched
+			assert.ok(allNearby.every((match) => !('geometry' in match.feature)));
+			for (const match of matches) {
+				assert.ok(match.feature.geometry, `expected match ${match.feature.id} to have its geometry`);
+			}
+			const hospital = matches.find((match) => match.feature.id === realHospitalAreaId);
+			assert.deepEqual(hospital?.feature.geometry, {
+				type: 'Point',
+				coordinates: [1.1828714294908717, 52.38917544689788]
+			});
 		} finally {
 			await cleanup();
 			await dbClient.$executeRaw`DELETE FROM case_boundary WHERE id = ${project.id}`;

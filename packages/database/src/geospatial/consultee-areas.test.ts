@@ -5,9 +5,11 @@ import { loadConfig } from '../configuration/config.ts';
 import { newDatabaseClient } from '../index.ts';
 import type { ConsulteeAreaFeatureCollection } from './consultee-areas.ts';
 import {
+	findConsulteeAreaSummariesNear,
 	findConsulteeAreasIntersecting,
 	findConsulteeAreasNear,
 	getConsulteeAreaById,
+	getConsulteeAreaGeometries,
 	loadConsulteeAreas
 } from './consultee-areas.ts';
 
@@ -109,6 +111,21 @@ describe('consultee areas (requires a local SQL Server - see docker-compose.yml)
 
 			const notExcluded = await findConsulteeAreasNear(dbClient, insidePoint, 5000, undefined, ['railway']);
 			assert.ok(notExcluded.some((match) => match.feature.id === testAreaId));
+
+			// summaries: same rows and distances, no geometry
+			const summaries = await findConsulteeAreaSummariesNear(dbClient, insidePoint, 5000, ['Environment Agency']);
+			const summary = summaries.find((match) => match.feature.id === testAreaId);
+			assert.ok(summary, 'expected the loaded area in the summary results');
+			assert.equal(summary.feature.properties.consultee, 'Environment Agency');
+			assert.equal('geometry' in summary.feature, false);
+
+			const geometries = await getConsulteeAreaGeometries(dbClient, [
+				testAreaId,
+				'00000000-0000-0000-0000-000000000000'
+			]);
+			assert.deepEqual(geometries.get(testAreaId), featureCollection.features[0].geometry);
+			assert.equal(geometries.has('00000000-0000-0000-0000-000000000000'), false);
+			assert.equal((await getConsulteeAreaGeometries(dbClient, [])).size, 0);
 		} finally {
 			await cleanup();
 		}

@@ -22,6 +22,15 @@
 {% endblock %}
 
 {% block pageContent %}
+	{% if rulesetFailed %}
+		{% from "govuk/components/notification-banner/macro.njk" import govukNotificationBanner %}
+		{% set failureHtml %}
+			<h3 class="govuk-notification-banner__heading">The ruleset could not be run</h3>
+			<p class="govuk-body">No consultees are shown because the search did not finish. This is not the same as finding no consultees. <a class="govuk-notification-banner__link" href="{{ retryUrl }}">Try again</a>.</p>
+		{% endset %}
+		{{ govukNotificationBanner({ html: failureHtml }) }}
+	{% endif %}
+
 	<p class="govuk-body">
 		Ruleset used: {{ rulesetName }}
 	</p>
@@ -41,6 +50,7 @@
 	{% set mapConfigJson = mapConfigJson %}
 	{% include "views/partials/consultee-map-region.njk" %}
 
+	{% if not rulesetFailed %}
 	<h2 class="govuk-heading-m govuk-!-margin-top-6">Consultees identified ({{ matchCount }})</h2>
 
 	{% if matches.length == 0 %}
@@ -96,6 +106,7 @@
 			],
 			rows: nearbyTableRows
 		}) }}
+	{% endif %}
 	{% endif %}
 {% endblock %}
 

@@ -314,6 +314,36 @@ describe('manage page accessibility smoke', () => {
 		await assertNoSeriousA11yViolations(html);
 	});
 
+	test('consultees results page when the ruleset could not be run has no serious a11y violations', async () => {
+		const html = nunjucks.render('views/consultees/results/view.njk', {
+			...pageLocals,
+			pageHeading: 'Consultees identified for Example Project (EN01)',
+			backLinkUrl: '/consultees/11111111-1111-1111-1111-111111111111',
+			rulesetName: 'Example ruleset',
+			reference: 'EN01',
+			caseName: 'Example Project',
+			caseId: '11111111-1111-1111-1111-111111111111',
+			mapId: 'case-map',
+			mapRegionLabel: 'Map showing Example ruleset for Example Project',
+			staticMapSrc: '/consultees/11111111-1111-1111-1111-111111111111/results/static-map?ruleset=example-ruleset',
+			rulesetFailed: true,
+			retryUrl: '/consultees/11111111-1111-1111-1111-111111111111/results?ruleset=example-ruleset',
+			staticMapAlt: 'Static map showing Example ruleset for Example Project',
+			mapWidth: 960,
+			mapHeight: 516,
+			mapConfigJson: '{"center":[-1.78,50.62],"zoom":11}',
+			matches: [],
+			matchCount: 0,
+			mapIsSampled: false,
+			mapSampleSize: 30,
+			nearbyMatches: [],
+			nearbyMatchCount: 0,
+			nearbyRadiusKm: 20
+		});
+		assert.match(html, /The ruleset could not be run/);
+		await assertNoSeriousA11yViolations(html);
+	});
+
 	test('firewall error page has no serious a11y violations', async () => {
 		const html = nunjucks.render('views/static/error/firewall-error.njk', {
 			...pageLocals,

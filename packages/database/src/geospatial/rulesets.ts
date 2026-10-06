@@ -2,8 +2,13 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { PrismaClient } from '../client/client.ts';
-import type { ConsulteeAreaMatch } from './consultee-areas.ts';
-import { findConsulteeAreasBordering, findConsulteeAreasNear } from './consultee-areas.ts';
+import type { ConsulteeAreaMatch, ConsulteeAreaSummaryMatch } from './consultee-areas.ts';
+import {
+	findConsulteeAreaSummariesNear,
+	findConsulteeAreasBordering,
+	findConsulteeAreasNear,
+	getConsulteeAreaGeometries
+} from './consultee-areas.ts';
 import { DEFAULT_NEARBY_RADIUS_METRES } from './nearby-radius.ts';
 import type { Geometry } from './wkt.ts';
 
@@ -251,7 +256,7 @@ function isSatisfiableFromNearby(rule: RuleCondition, nearbyRadiusMetres: number
 }
 
 /** Mirrors the SQL `consulteeCategory IN (...) AND STDistance(...) <= radius` findConsulteeAreasNear runs. */
-function matchesCondition(match: ConsulteeAreaMatch, rule: RuleCondition): boolean {
+function matchesCondition(match: ConsulteeAreaSummaryMatch, rule: RuleCondition): boolean {
 	const category = match.feature.properties.consulteeCategory ?? '';
 	const categoryMatches = rule.categories.length === 0 || rule.categories.includes(category);
 	return categoryMatches && match.distanceMetres <= (rule.bufferMetres ?? 0);
@@ -263,7 +268,7 @@ function matchesCondition(match: ConsulteeAreaMatch, rule: RuleCondition): boole
 // separate executions of the same query. Without this, the map/static-map's result order - and so
 // its cache fingerprint - could differ between two requests for the exact same underlying matches,
 // breaking ETag caching (confirmed: this caused a real, intermittent test failure).
-function sortMatches(matches: ConsulteeAreaMatch[]): ConsulteeAreaMatch[] {
+function sortMatches<T extends ConsulteeAreaSummaryMatch>(matches: T[]): T[] {
 	return [...matches].sort((a, b) => a.distanceMetres - b.distanceMetres || a.feature.id.localeCompare(b.feature.id));
 }
 
@@ -273,8 +278,9 @@ export interface RunRulesetResult {
 	/**
 	 * Every consultee area within DEFAULT_NEARBY_RADIUS_METRES, any category, except
 	 * CATEGORIES_EXCLUDED_FROM_NEARBY - see its own doc comment and nearbyRadiusMetres below.
+	 * Without geometry: this is only ever listed, never drawn.
 	 */
-	allNearby: ConsulteeAreaMatch[];
+	allNearby: ConsulteeAreaSummaryMatch[];
 }
 
 /**
@@ -294,6 +300,10 @@ export interface RunRulesetResult {
  * CONDITION_CONCURRENCY) - each condition's own query already retries on deadlock (see
  * findConsulteeAreasNear/findConsulteeAreasBordering in consultee-areas.ts). Duplicates (the same
  * consultee area matching more than one condition) are removed, nearest first.
+ *
+ * The shared fetch skips geometry (a few hundred rows, some of them whole county or National Park
+ * boundaries) - geometry is then fetched by id for just the final matches, the only rows the map
+ * draws.
  */
 export async function runRuleset(
 	dbClient: PrismaClient,
@@ -301,7 +311,7 @@ export async function runRuleset(
 	ruleset: Ruleset,
 	nearbyRadiusMetres: number = DEFAULT_NEARBY_RADIUS_METRES
 ): Promise<RunRulesetResult> {
-	const allNearby = await findConsulteeAreasNear(
+	const allNearby = await findConsulteeAreaSummariesNear(
 		dbClient,
 		geometry,
 		nearbyRadiusMetres,
@@ -309,7 +319,7 @@ export async function runRuleset(
 		CATEGORIES_EXCLUDED_FROM_NEARBY
 	);
 
-	const resultsByRule: ConsulteeAreaMatch[][] = [];
+	const resultsByRule: ConsulteeAreaSummaryMatch[][] = [];
 	const remainingRules: RuleCondition[] = [];
 	for (const rule of ruleset.rules) {
 		if (isSatisfiableFromNearby(rule, nearbyRadiusMetres)) {
@@ -319,13 +329,19 @@ export async function runRuleset(
 		}
 	}
 
+	const knownGeometries = new Map<string, Geometry>();
 	for (let i = 0; i < remainingRules.length; i += CONDITION_CONCURRENCY) {
 		const batch = remainingRules.slice(i, i + CONDITION_CONCURRENCY);
 		const batchResults = await Promise.all(batch.map((rule) => runCondition(dbClient, geometry, rule)));
-		resultsByRule.push(...batchResults);
+		for (const matches of batchResults) {
+			resultsByRule.push(matches);
+			for (const match of matches) {
+				knownGeometries.set(match.feature.id, match.feature.geometry);
+			}
+		}
 	}
 
-	const matchesById = new Map<string, ConsulteeAreaMatch>();
+	const matchesById = new Map<string, ConsulteeAreaSummaryMatch>();
 	for (const matches of resultsByRule) {
 		for (const match of matches) {
 			const existing = matchesById.get(match.feature.id);
@@ -335,5 +351,20 @@ export async function runRuleset(
 		}
 	}
 
-	return { matches: sortMatches([...matchesById.values()]), allNearby: sortMatches(allNearby) };
+	const missingIds = [...matchesById.keys()].filter((id) => !knownGeometries.has(id));
+	const fetchedGeometries = await getConsulteeAreaGeometries(dbClient, missingIds);
+	const matches: ConsulteeAreaMatch[] = [];
+	for (const match of matchesById.values()) {
+		const matchGeometry = knownGeometries.get(match.feature.id) ?? fetchedGeometries.get(match.feature.id);
+		// absent only if the row was deleted between the two queries (a reference data reload
+		// mid-request) - there's nothing left to draw or notify
+		if (matchGeometry) {
+			matches.push({
+				distanceMetres: match.distanceMetres,
+				feature: { ...match.feature, type: 'Feature', geometry: matchGeometry }
+			});
+		}
+	}
+
+	return { matches: sortMatches(matches), allNearby: sortMatches(allNearby) };
 }
