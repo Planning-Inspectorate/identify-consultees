@@ -244,17 +244,32 @@ export async function listConsulteeAreas(
  * `consulteeCategories`, when given, restricts to those categories only (e.g. `['Railway']`) -
  * this is the query a ruleset runs (see geospatial/rulesets.ts): each ruleset is just a
  * categories + radius pair, so one generic, index-backed query covers all of them.
+ *
+ * `excludeCategories`, when given, drops those categories instead of restricting to them - for a
+ * query with no `consulteeCategories` filter at all (i.e. "any category"), this is the only way to
+ * keep a known-pathological category (see rulesets.ts's CATEGORIES_EXCLUDED_FROM_NEARBY) out of the
+ * result: unlike `consulteeCategories`, it can't be pushed down onto the `consulteeCategory` index,
+ * since there's no useful list to seek on, so it's applied as a residual filter after the spatial
+ * predicate - still correct, just not what makes an unfiltered query fast on its own.
  */
 export async function findConsulteeAreasNear(
 	dbClient: PrismaClient,
 	geometry: Geometry,
 	radiusMetres: number,
-	consulteeCategories?: string[]
+	consulteeCategories?: string[],
+	excludeCategories?: string[]
 ): Promise<ConsulteeAreaMatch[]> {
 	const wkt = geometryToWkt(geometry);
 	const categoryFilter =
 		consulteeCategories && consulteeCategories.length > 0
 			? Prisma.sql`AND consulteeCategory IN (${Prisma.join(consulteeCategories)})`
+			: Prisma.empty;
+	// NULL-safe: a plain "NOT IN" would also drop any row with no category at all, since
+	// `NULL NOT IN (...)` is unknown, not true - that's a real row, not a pathological one, and
+	// should still show up here
+	const excludeFilter =
+		excludeCategories && excludeCategories.length > 0
+			? Prisma.sql`AND (consulteeCategory IS NULL OR consulteeCategory NOT IN (${Prisma.join(excludeCategories)}))`
 			: Prisma.empty;
 	const rows = await withDeadlockRetry(
 		() =>
@@ -264,6 +279,7 @@ export async function findConsulteeAreasNear(
 			FROM consultee_area
 			WHERE geometry.STDistance(geography::STGeomFromText(${wkt}, 4326)) <= ${radiusMetres}
 				${categoryFilter}
+				${excludeFilter}
 			ORDER BY distanceMetres
 		`
 	);

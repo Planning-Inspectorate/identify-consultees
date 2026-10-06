@@ -57,6 +57,20 @@ export interface Ruleset {
 // which just means that condition matches nothing until it is, rather than guessing wrong.
 // a Map, not an object literal - these keys are snake_case source identifiers, not JS property
 // names, and an object literal's keys get flagged (rightly) by the camelcase lint rule
+// Categories excluded from the unconstrained "any category" nearby fetch (see runRuleset's
+// allNearby) regardless of distance, because their reference data isn't fit for a radius query:
+// Railway's rows are merged nationwide by type/status rather than split by region (one feature -
+// "Freight And Passenger - Main Line - Active" - is a single MultiLineString covering the whole GB
+// network, ~116k parts), so a) its bounding box covers the entire country, meaning the spatial
+// index can't rule it out for *any* location, forcing the full, expensive exact-distance
+// computation against that geometry on every single call (confirmed locally: roughly doubles this
+// query's cost - see consultee-areas.ts findConsulteeAreasNear), and b) even once computed, "within
+// any sensible radius of the merged national network" is true for almost every project in Great
+// Britain, so the result carries no real information anyway. Already excluded from every ruleset
+// condition for the same reason (see example_ruleset.csv) - this is the matching exclusion for the
+// one query that has no per-condition category filter to exclude it via otherwise.
+const CATEGORIES_EXCLUDED_FROM_NEARBY = ['Railway'];
+
 const CATEGORY_ALIASES = new Map<string, string[]>([
 	['parish', ['Parish Council']],
 	['distr_council', ['Lower Tier Authority']],
@@ -219,9 +233,21 @@ const CONDITION_CONCURRENCY = 6;
 // matters to apps/manage's build step)
 export { DEFAULT_NEARBY_RADIUS_METRES } from './nearby-radius.ts';
 
-/** True when `rule` can be answered by filtering the shared nearby fetch instead of its own query. */
+/**
+ * True when `rule` can be answered by filtering the shared nearby fetch instead of its own query.
+ * False for any rule touching a category excluded from that fetch (or matching every category,
+ * `categories.length === 0`, which includes an excluded one implicitly) - the shared fetch simply
+ * doesn't have those rows to filter, so a rule like that must run its own query instead (still
+ * fast: unlike the shared "any category" fetch, a real rule's own query is always category-scoped,
+ * so it never pays CATEGORIES_EXCLUDED_FROM_NEARBY's cost in the first place).
+ */
 function isSatisfiableFromNearby(rule: RuleCondition, nearbyRadiusMetres: number): boolean {
-	return rule.logicType === 'intersection' && (rule.bufferMetres ?? 0) <= nearbyRadiusMetres;
+	const touchesExcludedCategory =
+		rule.categories.length === 0 ||
+		rule.categories.some((category) => CATEGORIES_EXCLUDED_FROM_NEARBY.includes(category));
+	return (
+		rule.logicType === 'intersection' && (rule.bufferMetres ?? 0) <= nearbyRadiusMetres && !touchesExcludedCategory
+	);
 }
 
 /** Mirrors the SQL `consulteeCategory IN (...) AND STDistance(...) <= radius` findConsulteeAreasNear runs. */
@@ -244,15 +270,18 @@ function sortMatches(matches: ConsulteeAreaMatch[]): ConsulteeAreaMatch[] {
 export interface RunRulesetResult {
 	/** The ruleset's own matches - the union of every condition, deduplicated, nearest first. */
 	matches: ConsulteeAreaMatch[];
-	/** Every consultee area within DEFAULT_NEARBY_RADIUS_METRES, any category - see its own doc comment. */
+	/**
+	 * Every consultee area within DEFAULT_NEARBY_RADIUS_METRES, any category, except
+	 * CATEGORIES_EXCLUDED_FROM_NEARBY - see its own doc comment and nearbyRadiusMetres below.
+	 */
 	allNearby: ConsulteeAreaMatch[];
 }
 
 /**
  * Run every condition in a ruleset against a project's geometry and combine the results - a
  * ruleset finding "all relevant consultees" means the union of what each of its conditions finds
- * (e.g. the site's hosting council *and* nearby railways *and* nearby hospitals...), not any one
- * condition in isolation.
+ * (e.g. the site's hosting council *and* nearby hospitals *and* nearby ambulance trusts...), not
+ * any one condition in isolation.
  *
  * Most conditions are `intersection` conditions at or under `nearbyRadiusMetres` (defaulted to
  * DEFAULT_NEARBY_RADIUS_METRES if not given, but a caller running inside a configured app should
@@ -272,7 +301,13 @@ export async function runRuleset(
 	ruleset: Ruleset,
 	nearbyRadiusMetres: number = DEFAULT_NEARBY_RADIUS_METRES
 ): Promise<RunRulesetResult> {
-	const allNearby = await findConsulteeAreasNear(dbClient, geometry, nearbyRadiusMetres);
+	const allNearby = await findConsulteeAreasNear(
+		dbClient,
+		geometry,
+		nearbyRadiusMetres,
+		undefined,
+		CATEGORIES_EXCLUDED_FROM_NEARBY
+	);
 
 	const resultsByRule: ConsulteeAreaMatch[][] = [];
 	const remainingRules: RuleCondition[] = [];
