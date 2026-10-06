@@ -1,33 +1,77 @@
+import type { Page } from '@playwright/test';
 import { expect, test } from '@playwright/test';
-import { SAMPLE_CASE_ID, SAMPLE_RULESET_ID } from './fixtures.ts';
+import { SAMPLE_CASE_ID, SAMPLE_CASE_REFERENCE, SAMPLE_RULESET_ID } from './fixtures.ts';
 
 /**
- * Visual regression baselines for key manage pages.
+ * Visual regression baselines for every page the manage app currently serves.
  *
- * Scaffolded for later use — not run by `npm test` while the UI is still
- * changing heavily. Run intentionally with:
+ * Opt-in only — not run by `npm test`, `npm run test:e2e`, or the Azure pipeline
+ * while the UI is still changing. Run intentionally with:
  *
- *   npm run test:visual
- *   npm run test:visual -- --update-snapshots
+ *   npm run test:visual          # compare against committed baselines
+ *   npm run test:visual:update   # refresh baselines after a deliberate UI change
+ *
+ * Determinism notes:
+ * - Interactive (maplibre) map regions are masked — canvas/tile rendering is
+ *   timing-dependent and never pixel-stable. The map containers are fixed-size,
+ *   so the surrounding layout is still compared pixel-for-pixel.
+ * - Screenshots are full-page and taken only after webfonts finish loading.
+ * - Baselines are platform-specific (Playwright appends `-darwin`, `-linux`
+ *   etc.) — macOS and Linux do not render identical pixels, so enabling this in
+ *   the pipeline means generating Linux baselines on the CI OS.
  */
+
+// every interactive map host class/attribute in the app: the map canvas itself is
+// masked, everything around it (chrome, tables, keys/legends) is still compared
+const MAP_MASK = '.app-case-map, [data-consultee-map], [data-map-layers-demo], .app-interactive-map-example';
+
+const pages = [
+	{ path: '/', name: 'home' },
+	{ path: `/?q=${SAMPLE_CASE_REFERENCE}`, name: 'home-search-results' },
+	{ path: '/?q=ZZZ-NOMATCH-XXX', name: 'home-no-results' },
+	{ path: '/?pageSize=50', name: 'home-page-size-50' },
+	{ path: `/consultees/${SAMPLE_CASE_ID}`, name: 'ruleset-picker' },
+	{
+		path: `/consultees/${SAMPLE_CASE_ID}/results?ruleset=${SAMPLE_RULESET_ID}`,
+		name: 'consultees-results',
+		mask: MAP_MASK
+	},
+	{ path: '/map-layers-demo', name: 'map-layers-demo', mask: MAP_MASK },
+	{ path: '/components?components=true', name: 'components-index' },
+	{ path: '/components/checkboxes?components=true', name: 'component-detail' },
+	{ path: '/components/interactive-map?components=true', name: 'interactive-map-examples-index' },
+	{
+		path: '/components/interactive-map/polygons?components=true',
+		name: 'interactive-map-example',
+		mask: MAP_MASK
+	},
+	{ path: '/signed-out', name: 'signed-out' },
+	{ path: '/items', name: 'items-list' },
+	{ path: '/consultee-areas-python', name: 'consultee-areas-python' },
+	{ path: '/consultee-areas-direct', name: 'consultee-areas-direct' },
+	{ path: '/admin/upload-to-blob', name: 'admin-upload-to-blob' },
+	{ path: '/admin/import-reference-data', name: 'admin-import-reference-data' },
+	{ path: '/unauthenticated', name: 'unauthenticated-401' },
+	{ path: '/error/firewall-error', name: 'firewall-error' },
+	{ path: '/this-page-does-not-exist', name: 'page-not-found-404' }
+] as const;
+
+/** GOV.UK webfonts swap in after first paint — wait for them so glyph pixels are stable. */
+async function waitForFonts(page: Page) {
+	await page.waitForFunction(() => document.fonts.status === 'loaded');
+}
+
 test.describe('visual regression @visual', () => {
-	test('home page', async ({ page }) => {
-		await page.goto('/');
-		await expect(page).toHaveScreenshot('home.png', { fullPage: true });
-	});
+	for (const pageCase of pages) {
+		test(pageCase.name, async ({ page }) => {
+			await page.goto(pageCase.path);
+			await expect(page.locator('#main-content, main').first()).toBeVisible();
+			await waitForFonts(page);
 
-	test('consultees results page', async ({ page }) => {
-		await page.goto(`/consultees/${SAMPLE_CASE_ID}/results?ruleset=${SAMPLE_RULESET_ID}`);
-		await expect(page).toHaveScreenshot('consultees-results.png', { fullPage: true });
-	});
-
-	test('map layers demo page', async ({ page }) => {
-		await page.goto('/map-layers-demo');
-		await expect(page).toHaveScreenshot('map-layers-demo.png', { fullPage: true });
-	});
-
-	test('signed out page', async ({ page }) => {
-		await page.goto('/signed-out');
-		await expect(page).toHaveScreenshot('signed-out.png', { fullPage: true });
-	});
+			await expect(page).toHaveScreenshot(`${pageCase.name}.png`, {
+				fullPage: true,
+				mask: pageCase.mask ? [page.locator(pageCase.mask)] : []
+			});
+		});
+	}
 });

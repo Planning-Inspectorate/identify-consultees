@@ -51,17 +51,19 @@ npm run playwright:install   # chromium + firefox + webkit (+ OS deps on Linux)
 npm run test:e2e             # includes firefox-render and webkit-render
 ```
 
-## Visual regression (scaffolded, not in `npm test`)
+## Visual regression (opt-in, not in `npm test` or CI)
 
-Baselines are intentionally **not** taken while the UI is still changing heavily.
+`apps/manage/e2e/pages.visual.spec.ts` screenshots every page the app currently serves under the `chromium-visual` project (Chromium only, fixed 1280×720 viewport, full-page). Interactive map regions are masked — maplibre canvas/tile rendering is not pixel-stable — while the fixed-size containers mean the surrounding layout is still compared pixel-for-pixel (2% diff tolerance). GOV.UK webfonts are awaited before each screenshot.
+
+Committed baselines live in `apps/manage/e2e/pages.visual.spec.ts-snapshots/`. They are platform-specific (`*-darwin.png` locally, `*-linux.png` in CI) — macOS and Linux do not render identical pixels — so when these tests join the pipeline, Linux baselines must be generated on the CI OS (run `npm run test:visual:update` there, or in the CI container).
 
 ```bash
 npm run playwright:install   # once
-npm run test:visual          # compare (fails until baselines exist)
-npm run test:visual:update   # write / refresh snapshots
+npm run test:visual          # compare against committed baselines
+npm run test:visual:update   # refresh baselines after a deliberate UI change
 ```
 
-Specs live in `apps/manage/e2e/*.visual.spec.ts` under the `chromium-visual` Playwright project.
+Deliberately excluded from `npm test`, `npm run test:e2e`, and the Azure pipeline until the screens are final — tracked in [`kt-docs/decisions-and-open-questions.md`](../kt-docs/decisions-and-open-questions.md).
 
 ## Useful scripts
 

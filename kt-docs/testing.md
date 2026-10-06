@@ -4,15 +4,15 @@
 
 ## Layers
 
-| Layer                 | How                                 | What it proves                                       |
-| --------------------- | ----------------------------------- | ---------------------------------------------------- |
-| Unit / integration    | `node --test` in manage + packages  | Controllers, helpers, HTTP wiring (`supertest`)      |
-| GOV.UK fixtures       | `govuk-frontend-components.test.ts` | Macro HTML still matches Frontend fixtures           |
-| A11y smoke            | `pages.a11y.test.ts` (axe + jsdom)  | Rendered Nunjucks pages                              |
-| Playwright e2e / a11y | `chromium-e2e`, `chromium-a11y`     | Real browser journeys + axe                          |
-| Cross-browser render  | `firefox-render`, `webkit-render`   | Pages paint chrome/content outside Chromium          |
-| Visual regression     | `chromium-visual` (opt-in)          | Screenshot baselines — not in default `npm test` yet |
-| Coverage gate         | `npm run test:frontend-coverage`    | 100% L/F/B on manage `src` (exclusions apply)        |
+| Layer                 | How                                 | What it proves                                                              |
+| --------------------- | ----------------------------------- | --------------------------------------------------------------------------- |
+| Unit / integration    | `node --test` in manage + packages  | Controllers, helpers, HTTP wiring (`supertest`)                             |
+| GOV.UK fixtures       | `govuk-frontend-components.test.ts` | Macro HTML still matches Frontend fixtures                                  |
+| A11y smoke            | `pages.a11y.test.ts` (axe + jsdom)  | Rendered Nunjucks pages                                                     |
+| Playwright e2e / a11y | `chromium-e2e`, `chromium-a11y`     | Real browser journeys + axe                                                 |
+| Cross-browser render  | `firefox-render`, `webkit-render`   | Pages paint chrome/content outside Chromium                                 |
+| Visual regression     | `chromium-visual` (opt-in)          | Committed screenshot baselines for every page — not in `npm test` or CI yet |
+| Coverage gate         | `npm run test:frontend-coverage`    | 100% L/F/B on manage `src` (exclusions apply)                               |
 
 ## Commands
 
