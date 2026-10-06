@@ -6,6 +6,7 @@ resource "azurerm_mssql_server" "secondary" {
   # checkov:skip=CKV2_AZURE_2: "Ensure that Vulnerability Assessment (VA) is enabled on a SQL server by setting a Storage Account"
   # checkov:skip=CKV_AZURE_23: "Ensure that 'Auditing' is set to 'On' for SQL servers"
   # checkov:skip=CKV_AZURE_24: "Ensure that 'Auditing' Retention is 'greater than 90 days' for SQL servers"
+  # checkov:skip=CKV2_AZURE_45: "has a private endpoint (sql_secondary below) - Checkov can't follow the link to a count-indexed resource"
 
   name                          = "${local.org}-sql-${local.secondary_resource_suffix}"
   resource_group_name           = azurerm_resource_group.secondary[0].name
