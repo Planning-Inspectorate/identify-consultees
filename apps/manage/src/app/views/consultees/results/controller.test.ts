@@ -142,7 +142,7 @@ describe('consultees results page', () => {
 		assert.strictEqual(mockRes.status.mock.calls[0].arguments[0], 404);
 	});
 
-	it('should still render the page with no matches if the ruleset query fails', async () => {
+	it('should show that the ruleset could not be run, not an empty result, if the ruleset query fails', async () => {
 		const nunjucks = configureNunjucks();
 		const mockRes = {
 			status: mock.fn(() => mockRes),
@@ -156,12 +156,31 @@ describe('consultees results page', () => {
 				throw new Error('query failed');
 			})
 		};
-		const handler = buildConsulteesResultsPage({ db, logger: mockLogger(), nearbyConsulteeRadiusMetres: 20_000 });
+		const logger = mockLogger();
+		const handler = buildConsulteesResultsPage({ db, logger, nearbyConsulteeRadiusMetres: 20_000 });
 		await handler({ params: { caseId: realProjectId }, query: { ruleset: 'example-ruleset' } }, mockRes);
 
 		const viewModel = mockRes.render.mock.calls[0].arguments[1];
 		assert.match(viewModel.pageHeading, /Real Test Project/);
+		assert.strictEqual(viewModel.rulesetFailed, true);
+		assert.strictEqual(viewModel.retryUrl, `/consultees/${realProjectId}/results?ruleset=example-ruleset`);
 		assert.deepStrictEqual(viewModel.matches, []);
+		assert.strictEqual(logger.error.mock.callCount(), 1);
+
+		const html = mockRes.render.mock.calls[0].result;
+		assert.match(html, /The ruleset could not be run/);
+		assert.match(html, new RegExp(`href="/consultees/${realProjectId}/results\\?ruleset=example-ruleset"`));
+		assert.doesNotMatch(html, /No consultees matched this ruleset/);
+		assert.doesNotMatch(html, /No consultees found within/);
+	});
+
+	it('should not flag a successful run as failed', async () => {
+		const mockRes = { status: mock.fn(() => mockRes), render: mock.fn() };
+		const db = dbReturning([[realProjectRow()], []]);
+		const handler = buildConsulteesResultsPage({ db, logger: mockLogger(), nearbyConsulteeRadiusMetres: 20_000 });
+		await handler({ params: { caseId: realProjectId }, query: { ruleset: 'example-ruleset' } }, mockRes);
+
+		assert.strictEqual(mockRes.render.mock.calls[0].arguments[1].rulesetFailed, false);
 	});
 
 	it('should 404 for an unknown project', async () => {
@@ -286,6 +305,28 @@ describe('consultees results static map', () => {
 		} finally {
 			globalThis.fetch = originalFetch;
 		}
+	});
+
+	it('should 503 rather than serve a cacheable empty map if the ruleset query fails', async () => {
+		const mockRes = {
+			status: mock.fn(() => mockRes),
+			type: mock.fn(() => mockRes),
+			set: mock.fn(() => mockRes),
+			send: mock.fn()
+		};
+		let call = 0;
+		const db = {
+			$queryRaw: mock.fn(async () => {
+				call += 1;
+				if (call === 1) return [realProjectRow()];
+				throw new Error('query failed');
+			})
+		};
+		const handler = buildResultsStaticMap({ db, logger: mockLogger(), nearbyConsulteeRadiusMetres: 20_000 }, true);
+		await handler({ params: { caseId: realProjectId }, query: { ruleset: 'example-ruleset' }, headers: {} }, mockRes);
+
+		assert.strictEqual(mockRes.status.mock.calls[0].arguments[0], 503);
+		assert.strictEqual(mockRes.set.mock.callCount(), 0);
 	});
 
 	it('should 404 when caseId is missing', async () => {

@@ -8,6 +8,9 @@ export interface ConsulteesResultsViewModel {
 	mapId: string;
 	mapRegionLabel: string;
 	staticMapSrc: string;
+	/** True when the ruleset couldn't be run at all - the page shows an error, not empty results. */
+	rulesetFailed: boolean;
+	retryUrl: string;
 	staticMapAlt: string;
 	mapWidth: number;
 	mapHeight: number;

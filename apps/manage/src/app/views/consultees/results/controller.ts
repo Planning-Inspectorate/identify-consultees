@@ -1,7 +1,7 @@
 import type { ManageService } from '#service';
 import { stringifyForInlineScript } from '#util/inline-json.ts';
 import type { CaseBoundaryFeature } from '@pins/identify-consultees-database/src/geospatial/case-boundaries.ts';
-import type { ConsulteeAreaMatch } from '@pins/identify-consultees-database/src/geospatial/consultee-areas.ts';
+import type { ConsulteeAreaSummaryMatch } from '@pins/identify-consultees-database/src/geospatial/consultee-areas.ts';
 import type { Ruleset, RunRulesetResult } from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
 import { getRuleset, runRuleset } from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
 import type { AsyncRequestHandler } from '@planning-inspectorate/core/util';
@@ -18,22 +18,31 @@ function firstQueryValue(value: unknown): string {
 	return typeof value === 'string' ? value : '';
 }
 
+interface RulesetRun extends RunRulesetResult {
+	// distinguishes "ran and matched nothing" from "couldn't run" - both have empty results
+	failed: boolean;
+}
+
 async function runRulesetSafely(
 	db: ManageService['db'],
 	project: CaseBoundaryFeature,
 	ruleset: Ruleset,
 	nearbyRadiusMetres: number,
 	logger: ManageService['logger']
-): Promise<RunRulesetResult> {
+): Promise<RulesetRun> {
 	try {
-		return await runRuleset(db, project.geometry, ruleset, nearbyRadiusMetres);
+		return { ...(await runRuleset(db, project.geometry, ruleset, nearbyRadiusMetres)), failed: false };
 	} catch (error) {
 		logger.error({ error, caseId: project.id, rulesetId: ruleset.id }, 'Failed to run ruleset');
-		return { matches: [], allNearby: [] };
+		return { matches: [], allNearby: [], failed: true };
 	}
 }
 
-function toMatchRow(match: ConsulteeAreaMatch): ConsulteeMatchRow {
+function resultsUrl(caseId: string, rulesetId: string): string {
+	return `/consultees/${encodeURIComponent(caseId)}/results?ruleset=${encodeURIComponent(rulesetId)}`;
+}
+
+function toMatchRow(match: ConsulteeAreaSummaryMatch): ConsulteeMatchRow {
 	return {
 		consultee: match.feature.properties.consultee ?? null,
 		consulteeCategory: match.feature.properties.consulteeCategory ?? null,
@@ -68,7 +77,13 @@ export function buildConsulteesResultsPage(service: ManageService): AsyncRequest
 			'consultees results page'
 		);
 
-		const { matches, allNearby } = await runRulesetSafely(db, project, ruleset, nearbyConsulteeRadiusMetres, logger);
+		const { matches, allNearby, failed } = await runRulesetSafely(
+			db,
+			project,
+			ruleset,
+			nearbyConsulteeRadiusMetres,
+			logger
+		);
 		const map = buildCaseMapConfig(project, matches, ruleset.name);
 
 		const viewModel: ConsulteesResultsViewModel = {
@@ -81,6 +96,8 @@ export function buildConsulteesResultsPage(service: ManageService): AsyncRequest
 			mapId: 'case-map',
 			mapRegionLabel: `Map showing ${ruleset.name} for ${project.properties.caseName}`,
 			staticMapSrc: `/consultees/${encodeURIComponent(project.id)}/results/static-map?ruleset=${encodeURIComponent(ruleset.id)}`,
+			rulesetFailed: failed,
+			retryUrl: resultsUrl(project.id, ruleset.id),
 			staticMapAlt: `Static map showing ${ruleset.name} for ${project.properties.caseName}`,
 			mapWidth: MAP_VIEWPORT.width,
 			mapHeight: MAP_VIEWPORT.height,
@@ -111,7 +128,13 @@ export function buildResultsStaticMap(service: ManageService, forceSvg = false):
 			return;
 		}
 
-		const { matches } = await runRulesetSafely(db, project, ruleset, nearbyConsulteeRadiusMetres, logger);
+		const { matches, failed } = await runRulesetSafely(db, project, ruleset, nearbyConsulteeRadiusMetres, logger);
+		if (failed) {
+			// not an empty map: that would be cached (see Cache-Control below) as if it were a real
+			// "no matches" result
+			res.status(503).type('text/plain').send('The ruleset could not be run');
+			return;
+		}
 		const map = buildCaseMapConfig(project, matches, ruleset.name);
 		const ifNoneMatch = typeof req.headers['if-none-match'] === 'string' ? req.headers['if-none-match'] : undefined;
 		const accept = typeof req.headers.accept === 'string' ? req.headers.accept : undefined;
