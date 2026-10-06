@@ -171,17 +171,14 @@ describe('withDeadlockRetry', () => {
 		await assert.rejects(() => withDeadlockRetry(fn, 2), /deadlocked/);
 	});
 
-	test('retries on a lock-wait timeout (not a detected deadlock, but the same underlying cause)', async () => {
+	test('does not retry a request timeout - re-running a slow query just repeats the wait', async () => {
 		let attempts = 0;
 		const fn = async () => {
 			attempts += 1;
-			if (attempts < 2) {
-				throw new Error('Timeout: Request failed to complete in 15000ms');
-			}
-			return 'ok';
+			throw new Error('Timeout: Request failed to complete in 15000ms');
 		};
-		assert.equal(await withDeadlockRetry(fn), 'ok');
-		assert.equal(attempts, 2);
+		await assert.rejects(() => withDeadlockRetry(fn), /Request failed to complete/);
+		assert.equal(attempts, 1);
 	});
 
 	test('rethrows a non-deadlock error immediately, without retrying', async () => {
@@ -442,8 +439,15 @@ describe('runRuleset', () => {
 
 			// a point inside the host parish
 			const { matches } = await runRuleset(dbClient, { type: 'Point', coordinates: [0.5, 0.5] }, borderingRuleset);
-			assert.ok(matches.some((match) => match.feature.id === neighbourAreaId));
+			const neighbour = matches.find((match) => match.feature.id === neighbourAreaId);
+			assert.ok(neighbour);
 			assert.ok(!matches.some((match) => match.feature.id === hostAreaId));
+			// its real distance from the site (half a degree of longitude at the equator, ~55.6km),
+			// not 0 - a neighbour of the host isn't necessarily anywhere near the site itself
+			assert.ok(
+				neighbour.distanceMetres > 55_000 && neighbour.distanceMetres < 56_000,
+				`expected ~55.6km, got ${neighbour.distanceMetres}`
+			);
 		} finally {
 			await cleanup();
 		}

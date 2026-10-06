@@ -387,8 +387,9 @@ export async function getConsulteeAreaGeometries(
 /**
  * Find consultee areas of `matchingCategories` that share a border with a `hostCategory` area
  * intersecting `geometry` - e.g. "neighbouring parishes of the parish the site sits in". This is
- * a different shape of query to `findConsulteeAreasNear`: it isn't about distance from the site
- * at all, so `distanceMetres` on the result is always 0 (there's no meaningful value to compute).
+ * a different shape of query to `findConsulteeAreasNear`: matching isn't about distance from the
+ * site, but `distanceMetres` is still each match's real distance from it - a neighbouring authority
+ * can be tens of km from the site itself, and reporting 0 listed it as if it adjoined the site.
  *
  * SQL Server's `geography` type has no `STTouches` ("Could not find method 'STTouches' for type
  * ... SqlGeography" - it's geometry-only), so this uses `STIntersects` plus an explicit id
@@ -420,10 +421,11 @@ export async function findConsulteeAreasBordering(
 				AND geometry.STIntersects(geography::STGeomFromText(${wkt}, 4326)) = 1
 		`;
 
-		const matchesById = new Map<string, ConsulteeAreaRow>();
+		const matchesById = new Map<string, ConsulteeAreaRow & { distanceMetres: number }>();
 		for (const host of hosts) {
-			const rows = await dbClient.$queryRaw<ConsulteeAreaRow[]>`
-				SELECT ${selectColumns}
+			const rows = await dbClient.$queryRaw<(ConsulteeAreaRow & { distanceMetres: number })[]>`
+				SELECT ${selectColumns},
+					geometry.STDistance(geography::STGeomFromText(${wkt}, 4326)) AS distanceMetres
 				FROM consultee_area
 				WHERE consulteeCategory IN (${Prisma.join(matchingCategories)})
 					AND id <> CAST(${host.id} AS UNIQUEIDENTIFIER)
@@ -434,7 +436,7 @@ export async function findConsulteeAreasBordering(
 			}
 		}
 
-		return [...matchesById.values()].map((row) => ({ feature: rowToFeature(row), distanceMetres: 0 }));
+		return [...matchesById.values()].map((row) => ({ feature: rowToFeature(row), distanceMetres: row.distanceMetres }));
 	});
 }
 

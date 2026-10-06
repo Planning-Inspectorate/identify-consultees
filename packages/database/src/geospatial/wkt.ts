@@ -58,16 +58,38 @@ function formatPositions(positions: Position[]): string {
 }
 
 /**
- * Shoelace formula for a ring's signed area - positive means counter-clockwise.
+ * Shoelace formula for a ring's signed area - positive means counter-clockwise. Measured relative
+ * to the first point: on raw lon/lat the products are ~100 while a small ring's area is far below
+ * double precision at that magnitude, so a sliver's computed sign was rounding noise.
  */
 function signedRingArea(ring: Position[]): number {
+	const [originLon, originLat] = ring[0];
 	let total = 0;
 	for (let i = 0; i < ring.length - 1; i++) {
-		const [lon, lat] = ring[i];
-		const [nextLon, nextLat] = ring[i + 1];
+		const lon = ring[i][0] - originLon;
+		const lat = ring[i][1] - originLat;
+		const nextLon = ring[i + 1][0] - originLon;
+		const nextLat = ring[i + 1][1] - originLat;
 		total += lon * nextLat - nextLon * lat;
 	}
 	return total / 2;
+}
+
+// a ring whose area is this small a fraction of its bounding box is collinear to within floating
+// point precision - it has no meaningful winding, so it's left as given rather than "corrected"
+const DEGENERATE_RING_AREA_RATIO = 1e-6;
+
+function isDegenerateRing(ring: Position[], area: number): boolean {
+	// a loop, not Math.min(...ring) - spreading a real ring (100k+ points) overflows the call stack
+	let [minLon, minLat] = ring[0];
+	let [maxLon, maxLat] = ring[0];
+	for (const [lon, lat] of ring) {
+		minLon = Math.min(minLon, lon);
+		maxLon = Math.max(maxLon, lon);
+		minLat = Math.min(minLat, lat);
+		maxLat = Math.max(maxLat, lat);
+	}
+	return Math.abs(area) <= (maxLon - minLon) * (maxLat - minLat) * DEGENERATE_RING_AREA_RATIO;
 }
 
 /**
@@ -81,7 +103,11 @@ function signedRingArea(ring: Position[]): number {
  * unconditionally here rather than trusting the source.
  */
 function orientedRing(ring: Position[], clockwise: boolean): Position[] {
-	const isClockwise = signedRingArea(ring) < 0;
+	const area = signedRingArea(ring);
+	if (isDegenerateRing(ring, area)) {
+		return ring;
+	}
+	const isClockwise = area < 0;
 	return isClockwise !== clockwise ? [...ring].reverse() : ring;
 }
 
