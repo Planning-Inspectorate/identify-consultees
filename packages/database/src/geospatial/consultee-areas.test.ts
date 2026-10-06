@@ -101,6 +101,14 @@ describe('consultee areas (requires a local SQL Server - see docker-compose.yml)
 
 			const wrongCategory = await findConsulteeAreasNear(dbClient, insidePoint, 5000, ['railway']);
 			assert.ok(!wrongCategory.some((match) => match.feature.id === testAreaId));
+
+			// excludeCategories drops a category even with no consulteeCategories filter at all -
+			// the "any category" query runRuleset's allNearby uses (see rulesets.ts)
+			const excluded = await findConsulteeAreasNear(dbClient, insidePoint, 5000, undefined, ['Environment Agency']);
+			assert.ok(!excluded.some((match) => match.feature.id === testAreaId));
+
+			const notExcluded = await findConsulteeAreasNear(dbClient, insidePoint, 5000, undefined, ['railway']);
+			assert.ok(notExcluded.some((match) => match.feature.id === testAreaId));
 		} finally {
 			await cleanup();
 		}

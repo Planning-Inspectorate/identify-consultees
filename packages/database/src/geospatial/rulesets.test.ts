@@ -471,12 +471,6 @@ describe('runRuleset', () => {
 					{
 						id: testAreaId,
 						type: 'Feature',
-						geometry: { type: 'Point', coordinates: [0, 0] },
-						properties: { consulteeCategory: 'Railway', consultee: 'Test Railway' }
-					},
-					{
-						id: secondAreaId,
-						type: 'Feature',
 						// a category with no condition in this ad-hoc ruleset at all - allNearby should
 						// still surface it, since it isn't filtered by what the ruleset itself checks for
 						geometry: { type: 'Point', coordinates: [0, 0] },
@@ -490,8 +484,7 @@ describe('runRuleset', () => {
 			const { allNearby } = await runRuleset(dbClient, { type: 'Point', coordinates: [0.001, 0.001] }, ruleset, 1_000);
 
 			const nearbyIds = new Set(allNearby.map((match) => match.feature.id));
-			assert.ok(nearbyIds.has(testAreaId), 'expected a Railway area to appear in allNearby with no matching condition');
-			assert.ok(nearbyIds.has(secondAreaId), 'expected an Electricity Generator area to appear in allNearby');
+			assert.ok(nearbyIds.has(testAreaId), 'expected an Electricity Generator area to appear in allNearby');
 
 			const { allNearby: farAway } = await runRuleset(
 				dbClient,
@@ -500,6 +493,35 @@ describe('runRuleset', () => {
 				1_000
 			);
 			assert.deepEqual(farAway, []);
+		} finally {
+			await cleanup();
+		}
+	});
+
+	test('allNearby excludes Railway even when within radius, since its reference data is a single nationwide geometry', async (t) => {
+		if (!dbAvailable) return t.skip('SQL Server database not available');
+
+		await cleanup();
+		try {
+			await loadConsulteeAreas(dbClient, {
+				type: 'FeatureCollection',
+				features: [
+					{
+						id: testAreaId,
+						type: 'Feature',
+						geometry: { type: 'Point', coordinates: [0, 0] },
+						properties: { consulteeCategory: 'Railway', consultee: 'Test Railway' }
+					}
+				]
+			});
+
+			const ruleset: Ruleset = { id: 'empty', name: 'Empty', rules: [] };
+			const { allNearby } = await runRuleset(dbClient, { type: 'Point', coordinates: [0, 0] }, ruleset, 1_000);
+
+			assert.ok(
+				!allNearby.some((match) => match.feature.id === testAreaId),
+				'expected Railway to be excluded from allNearby despite being exactly on the site'
+			);
 		} finally {
 			await cleanup();
 		}
