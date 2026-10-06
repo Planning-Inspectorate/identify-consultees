@@ -32,6 +32,13 @@ resource "azurerm_key_vault" "main" {
   }
 
   tags = local.tags
+
+  lifecycle {
+    # Azure only accepts soft_delete_retention_days when a vault is created - vaults
+    # created before it was raised to 90 keep their original value (Dev: 7), and
+    # trying to change it fails every apply
+    ignore_changes = [soft_delete_retention_days]
+  }
 }
 
 # secrets to be manually populated
