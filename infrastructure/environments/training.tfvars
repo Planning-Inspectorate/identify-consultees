@@ -55,6 +55,9 @@ monitoring_config = {
   log_daily_cap                 = 0.1
 }
 
+# no SQL geo-replica or secondary region outside prod - see variables.tf
+secondary_region_enabled = false
+
 sql_config = {
   admin = {
     login_username = "pins-consultees-sql-training"

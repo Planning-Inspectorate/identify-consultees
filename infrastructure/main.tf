@@ -6,6 +6,8 @@ resource "azurerm_resource_group" "primary" {
 }
 
 resource "azurerm_resource_group" "secondary" {
+  count = var.secondary_region_enabled ? 1 : 0
+
   name     = "${local.org}-rg-${local.secondary_resource_suffix}"
   location = module.secondary_region.location
 
@@ -84,3 +86,8 @@ resource "azurerm_private_endpoint" "keyvault" {
   tags = local.tags
 }
 
+
+moved {
+  from = azurerm_resource_group.secondary
+  to   = azurerm_resource_group.secondary[0]
+}

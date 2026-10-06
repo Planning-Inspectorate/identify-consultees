@@ -84,6 +84,12 @@ variable "monitoring_config" {
   })
 }
 
+variable "secondary_region_enabled" {
+  description = "Whether to deploy the secondary region: the SQL geo-replica, its failover group, and the networking it needs"
+  type        = bool
+  default     = true
+}
+
 variable "sql_config" {
   description = "Config for SQL Server and DB"
   type = object({
