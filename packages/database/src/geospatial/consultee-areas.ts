@@ -248,9 +248,24 @@ export async function listConsulteeAreas(
  * `excludeCategories`, when given, drops those categories instead of restricting to them - for a
  * query with no `consulteeCategories` filter at all (i.e. "any category"), this is the only way to
  * keep a known-pathological category (see rulesets.ts's CATEGORIES_EXCLUDED_FROM_NEARBY) out of the
- * result: unlike `consulteeCategories`, it can't be pushed down onto the `consulteeCategory` index,
- * since there's no useful list to seek on, so it's applied as a residual filter after the spatial
- * predicate - still correct, just not what makes an unfiltered query fast on its own.
+ * result.
+ *
+ * `WITH (INDEX(consultee_area_geometry_sidx))` forces the spatial index as the access path - without
+ * it, once this query is genuinely parameterized (as every real caller does it: Prisma always sends
+ * `sp_executesql` with out-of-band parameters, never literal SQL text), SQL Server's optimizer can
+ * choose to seek the `consulteeCategory` index instead and compute exact `STDistance` against
+ * *every* row of that category nationally, ignoring the spatial index's candidate-pruning entirely.
+ * This is easy to miss testing locally: the SAME query with the category/radius inlined as literal
+ * SQL text (rather than passed as parameters) reliably picks the fast, spatial-index plan on its
+ * own, which is why a hint that only nudges the optimizer (e.g. `.Filter()`, or `OPTION (RECOMPILE)`)
+ * tested against literal SQL can look like it works and then do nothing once Prisma's real,
+ * parameterized query hits the same table - confirmed by reproducing Prisma's exact `sp_executesql`
+ * call shape directly: neither `.Filter()` nor `OPTION (RECOMPILE)` changed the plan for every
+ * affected category, while this hint fixed all of them, and is a no-op (confirmed, timed) on a query
+ * with no category filter at all, which already always chooses the spatial index on its own.
+ * Real-data impact measured this way: a 164-row category went from ~1.25s to ~2ms; a 40-row category
+ * of unusually complex geometries (some England/Wales National Landscape boundaries run to
+ * thousands of points) went from ~1.3s to ~70ms.
  */
 export async function findConsulteeAreasNear(
 	dbClient: PrismaClient,
@@ -276,7 +291,7 @@ export async function findConsulteeAreasNear(
 			dbClient.$queryRaw<(ConsulteeAreaRow & { distanceMetres: number })[]>`
 			SELECT ${selectColumns},
 				geometry.STDistance(geography::STGeomFromText(${wkt}, 4326)) AS distanceMetres
-			FROM consultee_area
+			FROM consultee_area WITH (INDEX(consultee_area_geometry_sidx))
 			WHERE geometry.STDistance(geography::STGeomFromText(${wkt}, 4326)) <= ${radiusMetres}
 				${categoryFilter}
 				${excludeFilter}
