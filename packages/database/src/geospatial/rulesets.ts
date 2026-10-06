@@ -227,7 +227,7 @@ async function runCondition(
 // concurrently in batches of this size, not all at once. Running every condition fully in parallel
 // maximises throughput for a single ruleset run in isolation, but multiplies how many simultaneous
 // connections/locks it holds against the same table - confirmed to matter for real, not just in
-// theory: running everything fully parallel produced real deadlocks and lock-wait timeouts once
+// theory: running everything fully parallel produced real deadlocks and request timeouts once
 // other work was hitting the same table concurrently. A bounded batch size keeps most of the
 // speed-up over a fully sequential run while giving the database far less simultaneous load to
 // contend with.
