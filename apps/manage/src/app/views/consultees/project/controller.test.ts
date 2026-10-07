@@ -189,6 +189,7 @@ describe('run intersection submit', () => {
 
 	it('should 404 for an id that is not a well-formed UUID', async () => {
 		const mockRes = { status: mock.fn(() => mockRes), render: mock.fn(), redirect: mock.fn() };
+		await handler({ params: {}, body: {} }, mockRes);
 		await handler({ params: { caseId: 'not-a-uuid' }, body: {} }, mockRes);
 
 		assert.strictEqual(mockRes.status.mock.calls[0].arguments[0], 404);
