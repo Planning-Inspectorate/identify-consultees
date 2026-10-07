@@ -1,6 +1,5 @@
 {% extends "views/layouts/main.njk" %}
 
-{% from "govuk/components/back-link/macro.njk" import govukBackLink %}
 {% from "govuk/components/table/macro.njk" import govukTable %}
 
 {% block pageTitle %}
@@ -12,13 +11,6 @@
 	<link rel="stylesheet" href="/{{ config.vendorInteractiveMapCss }}">
 	<link rel="stylesheet" href="/{{ config.vendorDatasetsPluginCss }}">
 	<link rel="stylesheet" href="/{{ config.vendorMapKeyPluginCss }}">
-{% endblock %}
-
-{% block beforeContent %}
-	{{ govukBackLink({
-		text: "Back to ruleset selection",
-		href: backLinkUrl
-	}) }}
 {% endblock %}
 
 {% block pageContent %}

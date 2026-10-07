@@ -75,12 +75,79 @@ describe('manage router wiring', () => {
 		assert.match(response.text, />50</);
 	});
 
-	test('GET /consultees/:id renders the ruleset picker page', async () => {
+	test('GET /consultees/:id renders the project map page', async () => {
 		const response = await request(authDisabledApp).get(`/consultees/${homePageTestCaseId}`);
 		assert.equal(response.status, 200);
-		assert.match(response.text, /Choose a ruleset/);
 		assert.match(response.text, /Router Test Fixture Wind Farm/);
+		assert.match(response.text, /Back to projects/);
+		assert.match(response.text, /Shapefile/);
 		assert.match(response.text, /Example ruleset/);
+		assert.match(response.text, /Preview report/);
+		assert.match(response.text, /data-consultee-map/);
+	});
+
+	test('GET /consultees/:id/ruleset renders the ruleset radios', async () => {
+		const response = await request(authDisabledApp).get(`/consultees/${homePageTestCaseId}/ruleset`);
+		assert.equal(response.status, 200);
+		assert.match(response.text, /<h1[^>]*>\s*Ruleset|Ruleset\s*<\/h1>/);
+		assert.match(response.text, /type="radio"[^>]*value="example-ruleset"/);
+		assert.match(response.text, /Save and return/);
+	});
+
+	test('GET /consultees/:id/shapefile renders the file radios', async () => {
+		const response = await request(authDisabledApp).get(`/consultees/${homePageTestCaseId}/shapefile`);
+		assert.equal(response.status, 200);
+		assert.match(response.text, /Project shapefile/);
+		assert.match(response.text, /type="radio"[^>]*value="33333333-3333-3333-3333-333333333333"/);
+		assert.match(response.text, /Save and return/);
+	});
+
+	test('POST /consultees/:id/ruleset redirects back to the map page with the chosen ruleset', async () => {
+		const agent = request.agent(authDisabledApp);
+		const page = await agent.get(`/consultees/${homePageTestCaseId}/ruleset`);
+		const csrf = /name="_csrf" value="([^"]+)"/.exec(page.text)?.[1];
+		assert.ok(csrf, 'expected the ruleset form to carry a CSRF token');
+
+		const response = await agent
+			.post(`/consultees/${homePageTestCaseId}/ruleset`)
+			.type('form')
+			.send({ _csrf: csrf, ruleset: 'example-ruleset' });
+		assert.equal(response.status, 302);
+		assert.equal(response.headers.location, `/consultees/${homePageTestCaseId}?ruleset=example-ruleset`);
+	});
+
+	test('POST /consultees/:id/shapefile redirects to the chosen boundary’s map page', async () => {
+		const agent = request.agent(authDisabledApp);
+		const page = await agent.get(`/consultees/${homePageTestCaseId}/shapefile`);
+		const csrf = /name="_csrf" value="([^"]+)"/.exec(page.text)?.[1];
+		assert.ok(csrf, 'expected the shapefile form to carry a CSRF token');
+
+		const response = await agent
+			.post(`/consultees/${homePageTestCaseId}/shapefile`)
+			.type('form')
+			.send({ _csrf: csrf, shapefile: homePageTestCaseId, ruleset: 'example-ruleset' });
+		assert.equal(response.status, 302);
+		assert.equal(response.headers.location, `/consultees/${homePageTestCaseId}?ruleset=example-ruleset`);
+	});
+
+	test('GET /consultees/:id/report renders the report check page', async () => {
+		const response = await request(authDisabledApp).get(
+			`/consultees/${homePageTestCaseId}/report?ruleset=example-ruleset`
+		);
+		assert.equal(response.status, 200);
+		assert.match(response.text, /Check consultees before creating the report/);
+		assert.match(response.text, /Report details/);
+		assert.match(response.text, /Identified consultees/);
+		assert.match(response.text, /Generate report/);
+	});
+
+	test('GET /consultees/:id/report/created renders the report created page', async () => {
+		const response = await request(authDisabledApp).get(
+			`/consultees/${homePageTestCaseId}/report/created?ruleset=example-ruleset`
+		);
+		assert.equal(response.status, 200);
+		assert.match(response.text, /Report created/);
+		assert.match(response.text, /Download Router Test Fixture Wind Farm scoping report/);
 	});
 
 	test('GET /consultees/:id/results runs the ruleset and renders the results page', async () => {

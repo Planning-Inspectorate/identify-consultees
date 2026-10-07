@@ -1,7 +1,7 @@
 import assert from 'node:assert';
 import { describe, it, mock } from 'node:test';
 import { configureNunjucks } from '../../../nunjucks.ts';
-import { buildRulesetPickerPage } from './controller.ts';
+import { buildRulesetPickerPage, buildRulesetPickerSubmit } from './controller.ts';
 
 const realProjectId = '44444444-4444-4444-4444-444444444444';
 
@@ -19,24 +19,53 @@ function realProjectRow() {
 	};
 }
 
+function summaryDb() {
+	return { $queryRaw: mock.fn(async () => [realProjectRow()]) };
+}
+
 describe('ruleset picker page', () => {
-	it('should render the ruleset options for a known project', async () => {
+	it('should render the ruleset radios with the current ruleset checked', async () => {
 		const nunjucks = configureNunjucks();
 		const mockRes = {
 			status: mock.fn(() => mockRes),
 			render: mock.fn((view, data) => nunjucks.render(view, data))
 		};
-		const db = { $queryRaw: mock.fn(async () => [realProjectRow()]) };
-		const handler = buildRulesetPickerPage({ db });
-		await handler({ params: { caseId: realProjectId } }, mockRes);
+		const handler = buildRulesetPickerPage({ db: summaryDb() });
+		await handler({ params: { caseId: realProjectId }, query: { ruleset: 'example-ruleset' } }, mockRes);
 
 		assert.strictEqual(mockRes.render.mock.callCount(), 1);
 		assert.strictEqual(mockRes.render.mock.calls[0].arguments[0], 'views/consultees/ruleset/view.njk');
 		const viewModel = mockRes.render.mock.calls[0].arguments[1];
-		assert.match(viewModel.pageHeading, /Real Test Project/);
+		assert.strictEqual(viewModel.pageHeading, 'Ruleset');
 		assert.strictEqual(viewModel.caseId, realProjectId);
+		assert.strictEqual(viewModel.backLinkUrl, `/consultees/${realProjectId}?ruleset=example-ruleset`);
 		assert.ok(viewModel.rulesets.length >= 1);
-		assert.ok(viewModel.rulesets.some((ruleset) => ruleset.value === 'example-ruleset'));
+		const current = viewModel.rulesets.find((ruleset) => ruleset.value === 'example-ruleset');
+		assert.strictEqual(current.checked, true);
+	});
+
+	it('should pre-check the top option when no ruleset is selected yet', async () => {
+		const mockRes = {
+			status: mock.fn(() => mockRes),
+			render: mock.fn()
+		};
+		const handler = buildRulesetPickerPage({ db: summaryDb() });
+		await handler({ params: { caseId: realProjectId }, query: {} }, mockRes);
+
+		const viewModel = mockRes.render.mock.calls[0].arguments[1];
+		assert.strictEqual(viewModel.rulesets[0].checked, true);
+	});
+
+	it('should fall back to the top option when the selected ruleset is unknown', async () => {
+		const mockRes = {
+			status: mock.fn(() => mockRes),
+			render: mock.fn()
+		};
+		const handler = buildRulesetPickerPage({ db: summaryDb() });
+		await handler({ params: { caseId: realProjectId }, query: { ruleset: 'not-a-real-ruleset' } }, mockRes);
+
+		const viewModel = mockRes.render.mock.calls[0].arguments[1];
+		assert.strictEqual(viewModel.rulesets[0].checked, true);
 	});
 
 	it('should 404 when caseId is missing', async () => {
@@ -45,7 +74,7 @@ describe('ruleset picker page', () => {
 			render: mock.fn()
 		};
 		const handler = buildRulesetPickerPage({ db: { $queryRaw: mock.fn() } });
-		await handler({ params: {} }, mockRes);
+		await handler({ params: {}, query: {} }, mockRes);
 		assert.strictEqual(mockRes.status.mock.calls[0].arguments[0], 404);
 	});
 
@@ -55,7 +84,7 @@ describe('ruleset picker page', () => {
 			render: mock.fn()
 		};
 		const handler = buildRulesetPickerPage({ db: { $queryRaw: mock.fn() } });
-		await handler({ params: { caseId: 'not-a-uuid' } }, mockRes);
+		await handler({ params: { caseId: 'not-a-uuid' }, query: {} }, mockRes);
 		assert.strictEqual(mockRes.status.mock.calls[0].arguments[0], 404);
 	});
 
@@ -66,7 +95,57 @@ describe('ruleset picker page', () => {
 		};
 		const db = { $queryRaw: mock.fn(async () => []) };
 		const handler = buildRulesetPickerPage({ db });
-		await handler({ params: { caseId: realProjectId } }, mockRes);
+		await handler({ params: { caseId: realProjectId }, query: {} }, mockRes);
 		assert.strictEqual(mockRes.status.mock.calls[0].arguments[0], 404);
+	});
+});
+
+describe('ruleset picker submit', () => {
+	it('should redirect to the map page with the chosen ruleset', async () => {
+		const mockRes = {
+			status: mock.fn(() => mockRes),
+			render: mock.fn(),
+			redirect: mock.fn()
+		};
+		const handler = buildRulesetPickerSubmit();
+		await handler({ params: { caseId: realProjectId }, body: { ruleset: 'example-ruleset' } }, mockRes);
+		assert.strictEqual(
+			mockRes.redirect.mock.calls[0].arguments[0],
+			`/consultees/${realProjectId}?ruleset=example-ruleset`
+		);
+	});
+
+	it('should return to the picker when the submitted ruleset is unknown or missing', async () => {
+		const mockRes = {
+			status: mock.fn(() => mockRes),
+			render: mock.fn(),
+			redirect: mock.fn()
+		};
+		const handler = buildRulesetPickerSubmit();
+		await handler({ params: { caseId: realProjectId }, body: { ruleset: 'not-a-real-ruleset' } }, mockRes);
+		assert.strictEqual(
+			mockRes.redirect.mock.calls[0].arguments[0],
+			`/consultees/${realProjectId}/ruleset?ruleset=example-ruleset`
+		);
+
+		// and a missing body entirely (no parser on a bare handler call)
+		await handler({ params: { caseId: realProjectId } }, mockRes);
+		assert.strictEqual(
+			mockRes.redirect.mock.calls[1].arguments[0],
+			`/consultees/${realProjectId}/ruleset?ruleset=example-ruleset`
+		);
+	});
+
+	it('should 404 when caseId is missing or malformed', async () => {
+		const mockRes = {
+			status: mock.fn(() => mockRes),
+			render: mock.fn(),
+			redirect: mock.fn()
+		};
+		const handler = buildRulesetPickerSubmit();
+		await handler({ params: {}, body: {} }, mockRes);
+		await handler({ params: { caseId: 'not-a-uuid' }, body: {} }, mockRes);
+		assert.strictEqual(mockRes.status.mock.calls[0].arguments[0], 404);
+		assert.strictEqual(mockRes.status.mock.calls[1].arguments[0], 404);
 	});
 });

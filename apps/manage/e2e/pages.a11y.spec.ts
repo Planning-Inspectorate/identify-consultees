@@ -14,7 +14,11 @@ const pages = [
 	{ path: '/', name: 'home' },
 	{ path: '/?q=ZZZ-NOMATCH-XXX', name: 'home with no search results' },
 	{ path: '/?pageSize=50', name: 'home with 50 results per page' },
-	{ path: `/consultees/${SAMPLE_CASE_ID}`, name: 'ruleset picker' },
+	{ path: `/consultees/${SAMPLE_CASE_ID}`, name: 'project map' },
+	{ path: `/consultees/${SAMPLE_CASE_ID}/ruleset`, name: 'ruleset picker' },
+	{ path: `/consultees/${SAMPLE_CASE_ID}/shapefile`, name: 'shapefile picker' },
+	{ path: `/consultees/${SAMPLE_CASE_ID}/report?ruleset=${SAMPLE_RULESET_ID}`, name: 'report check' },
+	{ path: `/consultees/${SAMPLE_CASE_ID}/report/created?ruleset=${SAMPLE_RULESET_ID}`, name: 'report created' },
 	{
 		path: `/consultees/${SAMPLE_CASE_ID}/results?ruleset=${SAMPLE_RULESET_ID}`,
 		name: 'consultees results'
@@ -130,8 +134,8 @@ test.describe('browser accessibility keyboard focus', () => {
 		await expectNoSeriousAxeViolations(page);
 	});
 
-	test('ruleset picker select is reachable in tab order', async ({ page }) => {
-		await page.goto(`/consultees/${SAMPLE_CASE_ID}`);
+	test('ruleset picker radio is reachable in tab order', async ({ page }) => {
+		await page.goto(`/consultees/${SAMPLE_CASE_ID}/ruleset`);
 
 		expect(await tabUntil(page, 'ruleset')).toBe(true);
 

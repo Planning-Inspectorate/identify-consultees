@@ -11,6 +11,7 @@ import {
 	getCaseBoundarySummaryById,
 	getRandomCaseSummary,
 	listCaseBoundaries,
+	listCaseBoundaryFiles,
 	loadCaseBoundaries,
 	searchCaseBoundaries
 } from './case-boundaries.ts';
@@ -247,6 +248,59 @@ describe('case boundaries (requires a local SQL Server - see docker-compose.yml)
 			assert.equal(noMatch.total, 0);
 		} finally {
 			await cleanup();
+		}
+	});
+
+	test('listCaseBoundaryFiles returns every file for a caseReference, newest first', async (t) => {
+		if (!dbAvailable) return t.skip('SQL Server database not available');
+
+		const olderFileId = '22222222-2222-2222-2222-222222222223';
+		const cleanupFiles = async () => {
+			await dbClient.$executeRaw`DELETE FROM case_boundary WHERE id IN (${testBoundaryId}, ${olderFileId})`;
+		};
+
+		await cleanupFiles();
+		try {
+			await loadCaseBoundaries(dbClient, {
+				type: 'FeatureCollection',
+				features: [
+					{
+						id: testBoundaryId,
+						type: 'Feature',
+						geometry: { type: 'Point', coordinates: [0, 0] },
+						properties: {
+							caseReference: 'ZZ888888',
+							caseName: 'Multi-file case',
+							fileName: 'newer.geojson',
+							receivedDate: new Date(Date.UTC(2026, 8, 19, 11, 20))
+						}
+					},
+					{
+						id: olderFileId,
+						type: 'Feature',
+						geometry: { type: 'Point', coordinates: [0, 0] },
+						properties: {
+							caseReference: 'ZZ888888',
+							caseName: 'Multi-file case',
+							fileName: 'older.geojson',
+							receivedDate: new Date(Date.UTC(2026, 6, 29, 12, 16))
+						}
+					}
+				]
+			});
+
+			const files = await listCaseBoundaryFiles(dbClient, 'ZZ888888');
+			assert.deepEqual(
+				files.map((file) => file.id),
+				[testBoundaryId, olderFileId]
+			);
+			assert.equal(files[0].fileName, 'newer.geojson');
+			assert.deepEqual(files[1].receivedDate, new Date(Date.UTC(2026, 6, 29, 12, 16)));
+
+			const none = await listCaseBoundaryFiles(dbClient, 'NO-SUCH-REFERENCE');
+			assert.deepEqual(none, []);
+		} finally {
+			await cleanupFiles();
 		}
 	});
 

@@ -10,7 +10,7 @@ import {
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-function isCaseId(caseId: string): boolean {
+export function isCaseId(caseId: string): boolean {
 	// case_boundary ids are UNIQUEIDENTIFIERs - anything else can't match, and isn't worth a round
 	// trip (or a raw-SQL CAST error) to find out
 	return UUID_PATTERN.test(caseId);

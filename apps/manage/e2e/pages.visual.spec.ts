@@ -30,7 +30,14 @@ const pages = [
 	{ path: `/?q=${SAMPLE_CASE_REFERENCE}`, name: 'home-search-results' },
 	{ path: '/?q=ZZZ-NOMATCH-XXX', name: 'home-no-results' },
 	{ path: '/?pageSize=50', name: 'home-page-size-50' },
-	{ path: `/consultees/${SAMPLE_CASE_ID}`, name: 'ruleset-picker' },
+	{ path: `/consultees/${SAMPLE_CASE_ID}`, name: 'project-map', mask: MAP_MASK },
+	{ path: `/consultees/${SAMPLE_CASE_ID}/ruleset`, name: 'ruleset-picker' },
+	{ path: `/consultees/${SAMPLE_CASE_ID}/shapefile`, name: 'shapefile-picker' },
+	{ path: `/consultees/${SAMPLE_CASE_ID}/report?ruleset=${SAMPLE_RULESET_ID}`, name: 'report-check' },
+	{
+		path: `/consultees/${SAMPLE_CASE_ID}/report/created?ruleset=${SAMPLE_RULESET_ID}`,
+		name: 'report-created'
+	},
 	{
 		path: `/consultees/${SAMPLE_CASE_ID}/results?ruleset=${SAMPLE_RULESET_ID}`,
 		name: 'consultees-results',
