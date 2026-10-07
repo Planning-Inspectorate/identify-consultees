@@ -1,10 +1,18 @@
 import type { ManageService } from '#service';
 import { stringifyForInlineScript } from '#util/inline-json.ts';
 import type { CaseBoundaryFeature } from '@pins/identify-consultees-database/src/geospatial/case-boundaries.ts';
-import type { ConsulteeAreaSummaryMatch } from '@pins/identify-consultees-database/src/geospatial/consultee-areas.ts';
+import type {
+	ConsulteeAreaMatch,
+	ConsulteeAreaSummaryMatch
+} from '@pins/identify-consultees-database/src/geospatial/consultee-areas.ts';
+import {
+	bufferGeometryForDisplay,
+	getConsulteeAreaDisplayGeometries
+} from '@pins/identify-consultees-database/src/geospatial/consultee-areas.ts';
 import type { Ruleset, RunRulesetResult } from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
 import { getRuleset, runRuleset } from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
 import type { AsyncRequestHandler } from '@planning-inspectorate/core/util';
+import type { SearchAreaDisplay } from '../../../maps/case-geojson.ts';
 import { buildCaseMapConfig, MAX_SAMPLED_MAP_MATCHES } from '../../../maps/case-geojson.ts';
 import { MAP_VIEWPORT } from '../../../maps/sample-geojson.ts';
 import { buildConsulteeStaticMapResponse } from '../../../maps/serve-static-map.ts';
@@ -35,6 +43,39 @@ async function runRulesetSafely(
 	} catch (error) {
 		logger.error({ error, caseId: project.id, rulesetId: ruleset.id }, 'Failed to run ruleset');
 		return { matches: [], allNearby: [], failed: true };
+	}
+}
+
+/**
+ * The interactive map's search area - the site grown by the nearby radius - with every nearby
+ * consultee and ruleset match clipped to it. The map is an extra: if this fails, the page still
+ * lists every consultee in its tables.
+ */
+async function buildSearchAreaSafely(
+	db: ManageService['db'],
+	project: CaseBoundaryFeature,
+	matches: ConsulteeAreaMatch[],
+	nearby: ConsulteeAreaSummaryMatch[],
+	nearbyRadiusMetres: number,
+	logger: ManageService['logger']
+): Promise<SearchAreaDisplay | undefined> {
+	if (nearby.length === 0 && matches.length === 0) {
+		return undefined;
+	}
+	try {
+		const area = await bufferGeometryForDisplay(db, project.geometry, nearbyRadiusMetres);
+		const ids = [...new Set([...nearby, ...matches].map((match) => match.feature.id))];
+		const radiusKm = nearbyRadiusMetres / 1000;
+		return {
+			area,
+			areaLabel: `Search area (${radiusKm}km)`,
+			nearbyLabel: `All consultees within ${radiusKm}km`,
+			nearby,
+			geometries: await getConsulteeAreaDisplayGeometries(db, ids, area)
+		};
+	} catch (error) {
+		logger.error({ error, caseId: project.id }, 'Failed to build the map search area');
+		return undefined;
 	}
 }
 
@@ -84,7 +125,15 @@ export function buildConsulteesResultsPage(service: ManageService): AsyncRequest
 			nearbyConsulteeRadiusMetres,
 			logger
 		);
-		const map = buildCaseMapConfig(project, matches, ruleset.name);
+		const searchArea = await buildSearchAreaSafely(
+			db,
+			project,
+			matches,
+			allNearby,
+			nearbyConsulteeRadiusMetres,
+			logger
+		);
+		const map = buildCaseMapConfig(project, matches, ruleset.name, searchArea);
 
 		const viewModel: ConsulteesResultsViewModel = {
 			pageHeading: `Consultees identified for ${project.properties.caseName} (${project.properties.caseReference})`,
@@ -128,14 +177,30 @@ export function buildResultsStaticMap(service: ManageService, forceSvg = false):
 			return;
 		}
 
-		const { matches, failed } = await runRulesetSafely(db, project, ruleset, nearbyConsulteeRadiusMetres, logger);
+		const { matches, allNearby, failed } = await runRulesetSafely(
+			db,
+			project,
+			ruleset,
+			nearbyConsulteeRadiusMetres,
+			logger
+		);
 		if (failed) {
 			// not an empty map: that would be cached (see Cache-Control below) as if it were a real
 			// "no matches" result
 			res.status(503).type('text/plain').send('The ruleset could not be run');
 			return;
 		}
-		const map = buildCaseMapConfig(project, matches, ruleset.name);
+		// same search area as the interactive map, so both open on the same view - the static renderer
+		// draws the project and matches only, not the nearby layer
+		const searchArea = await buildSearchAreaSafely(
+			db,
+			project,
+			matches,
+			allNearby,
+			nearbyConsulteeRadiusMetres,
+			logger
+		);
+		const map = buildCaseMapConfig(project, matches, ruleset.name, searchArea);
 		const ifNoneMatch = typeof req.headers['if-none-match'] === 'string' ? req.headers['if-none-match'] : undefined;
 		const accept = typeof req.headers.accept === 'string' ? req.headers.accept : undefined;
 

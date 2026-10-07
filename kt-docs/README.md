@@ -12,6 +12,7 @@ Working draft of frontend knowledge-transfer material for the Identify consultee
 | Someone changing UI / GOV.UK pages | [Application structure](./application-structure.md) → [GOV.UK Frontend conventions](./govuk-frontend-conventions.md) |
 | Someone working on maps or Python | [Maps](./maps.md) → [Node–Python integration](./node-python-integration.md) |
 | Someone investigating failures | [Troubleshooting](./troubleshooting.md) |
+| Data architect / anyone working on the spatial data | [Data KT pack](./data/README.md) |
 
 ## Document status legend
 
@@ -42,6 +43,10 @@ Used at the top of each page:
 15. [Troubleshooting](./troubleshooting.md) — common local failures
 16. [Deployment and environments](./deployment-and-environments.md) — local vs Azure
 17. [Decisions and open questions](./decisions-and-open-questions.md) — constraints and experiments
+
+### Data KT
+
+A separate pack in [`data/`](./data/README.md) covers the intersection logic — how a case is screened against consultee areas — along with the open issues affecting it, the reference data catalogue, and the current data architecture.
 
 ## Related repo docs (keep linking from Confluence too)
 

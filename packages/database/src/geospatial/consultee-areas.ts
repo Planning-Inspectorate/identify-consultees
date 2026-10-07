@@ -473,6 +473,65 @@ export async function getConsulteeAreaGeometries(
 	return geometries;
 }
 
+/** Douglas-Peucker tolerance for geometry that's only drawn, never measured - see getConsulteeAreaDisplayGeometries. */
+export const DISPLAY_SIMPLIFY_TOLERANCE_METRES = 25;
+
+/**
+ * `geometry` grown by `metres`, for drawing - e.g. a site's search area. Simplified first and
+ * built to display tolerance: a detailed 180km route would otherwise take seconds to buffer by
+ * kilometres, into an outline with far more points than any map needs.
+ */
+export async function bufferGeometryForDisplay(
+	dbClient: PrismaClient,
+	geometry: Geometry,
+	metres: number
+): Promise<Geometry> {
+	const [row] = await withDeadlockRetry(
+		() => dbClient.$queryRaw<{ wkt: string }[]>`
+			SELECT geography::STGeomFromText(${geometryToWkt(geometry)}, 4326)
+				.Reduce(${DISPLAY_SIMPLIFY_TOLERANCE_METRES})
+				.BufferWithTolerance(${metres}, ${DISPLAY_SIMPLIFY_TOLERANCE_METRES}, 0)
+				.STAsText() AS wkt
+		`
+	);
+	return wktToGeometry(row.wkt);
+}
+
+/**
+ * Geometry of specific consultee areas for drawing around a site: each clipped to `window` and
+ * simplified. Regional areas - counties, police forces, health boards - stretch far beyond any
+ * site's surroundings, coastline and all, so clipping is what keeps this small: the ~470 areas
+ * within 20km of a central London site come to ~300KB of GeoJSON clipped, against ~3MB whole.
+ * Display only - never measure distances on these. Ids with no matching row, or nothing inside
+ * `window`, are absent.
+ */
+export async function getConsulteeAreaDisplayGeometries(
+	dbClient: PrismaClient,
+	ids: string[],
+	window: Geometry
+): Promise<Map<string, Geometry>> {
+	const windowWkt = geometryToWkt(window);
+	const geometries = new Map<string, Geometry>();
+	for (let i = 0; i < ids.length; i += GEOMETRY_LOOKUP_BATCH_SIZE) {
+		const batch = ids.slice(i, i + GEOMETRY_LOOKUP_BATCH_SIZE);
+		const rows = await withDeadlockRetry(
+			() => dbClient.$queryRaw<{ id: string; geometryWkt: string }[]>`
+				SELECT id, clipped.geometry.STAsText() AS geometryWkt
+				FROM consultee_area
+				CROSS APPLY (
+					SELECT geometrySimplified.STIntersection(geography::STGeomFromText(${windowWkt}, 4326))
+						.Reduce(${DISPLAY_SIMPLIFY_TOLERANCE_METRES}) AS geometry
+				) AS clipped
+				WHERE id IN (${Prisma.join(batch)}) AND clipped.geometry.STIsEmpty() = 0
+			`
+		);
+		for (const row of rows) {
+			geometries.set(row.id, wktToGeometry(row.geometryWkt));
+		}
+	}
+	return geometries;
+}
+
 /**
  * Find consultee areas of `matchingCategories` that share a border with a `hostCategory` area
  * the site is in - e.g. "neighbouring parishes of the parish the site sits in".

@@ -3,11 +3,13 @@ import assert from 'node:assert/strict';
 import { afterEach, describe, mock, test } from 'node:test';
 import {
 	buildDatasets,
+	buildNearbySublayers,
 	initAllConsulteeMaps,
 	initConsulteeMap,
 	readMapConfig,
 	registerConsulteeMaps,
-	showStaticMapFallback
+	showStaticMapFallback,
+	translucent
 } from './consultees-map.js';
 
 function installDom(html = '<!DOCTYPE html><html><body></body></html>') {
@@ -85,6 +87,75 @@ describe('consultees-map client helpers', () => {
 			datasets.map((dataset) => dataset.id),
 			['project-site', 'consultee-areas']
 		);
+	});
+
+	test('buildDatasets puts the nearby consultees layer first, with a sublayer per category', () => {
+		const point = (category) => ({
+			type: 'Feature',
+			properties: { consulteeCategory: category },
+			geometry: { type: 'Point', coordinates: [0, 0] }
+		});
+		const area = (category) => ({
+			type: 'Feature',
+			properties: { consulteeCategory: category },
+			geometry: { type: 'Polygon', coordinates: [] }
+		});
+		const datasets = buildDatasets({
+			searchAreaLabel: 'Search area (20km)',
+			searchAreaGeojson: { features: [{}] },
+			nearbyLayerLabel: 'All consultees within 20km',
+			nearbyGeojson: { features: [area('Police'), point('Hospital'), point('Hospital'), area('Parish Council')] },
+			projectGeojson: { features: [{}] },
+			consulteeGeojson: { features: [{}] }
+		});
+
+		assert.deepEqual(
+			datasets.map((dataset) => dataset.id),
+			['search-area', 'nearby-consultees', 'project-site', 'consultee-areas']
+		);
+		const [searchArea, nearby, , matches] = datasets;
+		assert.equal(searchArea.label, 'Search area (20km)');
+		assert.deepEqual(searchArea.style.strokeDashArray, [4, 3]);
+		// translucent fills - the plugin has no fill-opacity option, so it's in the colour
+		assert.equal(matches.style.fill, 'rgba(85, 168, 104, 0.05)');
+		assert.equal(nearby.label, 'All consultees within 20km');
+		assert.deepEqual(
+			nearby.sublayers.map((sublayer) => sublayer.label),
+			['Hospital (2)', 'Parish Council (1)', 'Police (1)']
+		);
+		assert.deepEqual(nearby.sublayers[0].filter, ['==', ['get', 'consulteeCategory'], 'Hospital']);
+		// points as circles, areas as outlines
+		assert.equal(nearby.sublayers[0].style.symbol, 'circle');
+		assert.match(nearby.sublayers[0].style.symbolSvgContent, /{{haloColor}}/);
+		assert.equal(nearby.sublayers[1].style.fill, 'transparent');
+		assert.ok(nearby.sublayers[1].style.stroke);
+	});
+
+	test('buildNearbySublayers groups uncategorised areas and cycles colours past the palette', () => {
+		const features = Array.from({ length: 12 }, (_, i) => ({
+			properties: { consulteeCategory: `Category ${String(i).padStart(2, '0')}` },
+			geometry: { type: 'Polygon' }
+		}));
+		features.push({ properties: {}, geometry: { type: 'Polygon' } });
+		const sublayers = buildNearbySublayers(features);
+
+		assert.equal(sublayers.length, 13);
+		assert.equal(sublayers.at(-1).label, 'Other (1)');
+		assert.equal(sublayers[0].style.stroke, sublayers[10].style.stroke);
+		assert.notEqual(sublayers[0].style.stroke, sublayers[1].style.stroke);
+	});
+
+	test('buildDatasets defaults the nearby and search area labels', () => {
+		const [searchArea, nearby] = buildDatasets({
+			searchAreaGeojson: { features: [{}] },
+			nearbyGeojson: { features: [{ properties: { consulteeCategory: 'Hospital' }, geometry: { type: 'Point' } }] }
+		});
+		assert.equal(searchArea.label, 'Search area');
+		assert.equal(nearby.label, 'All consultees nearby');
+	});
+
+	test('translucent turns a hex colour into an rgba fill', () => {
+		assert.equal(translucent('#C44E52', 0.45), 'rgba(196, 78, 82, 0.45)');
 	});
 
 	test('buildDatasets omits empty collections', () => {

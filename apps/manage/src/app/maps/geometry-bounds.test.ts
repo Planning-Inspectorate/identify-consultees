@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
-import { computeMapView } from './geometry-bounds.ts';
+import { computeBounds, computeMapView } from './geometry-bounds.ts';
 
 describe('computeMapView', () => {
 	test('returns England/Wales fallback for an empty collection', () => {
@@ -57,5 +57,41 @@ describe('computeMapView', () => {
 			}),
 			{ center: [-2.5, 52.5], zoom: 6 }
 		);
+	});
+});
+
+describe('computeBounds', () => {
+	test('returns null when there is no geometry', () => {
+		assert.equal(computeBounds({ features: [] }), null);
+	});
+
+	test('returns the bounding box of every feature', () => {
+		assert.deepEqual(
+			computeBounds({
+				features: [
+					{ geometry: { type: 'Point', coordinates: [-1, 52] } },
+					{
+						geometry: {
+							type: 'LineString',
+							coordinates: [
+								[0.5, 51],
+								[-2, 53]
+							]
+						}
+					}
+				]
+			}),
+			{ west: -2, south: 51, east: 0.5, north: 53 }
+		);
+	});
+
+	test('handles geometries far too large to spread into Math.min', () => {
+		const coordinates = Array.from({ length: 200_000 }, (_, i) => [i / 100_000, 50 + i / 100_000]);
+		assert.deepEqual(computeBounds({ features: [{ geometry: { type: 'LineString', coordinates } }] }), {
+			west: 0,
+			south: 50,
+			east: 1.99999,
+			north: 51.99999
+		});
 	});
 });
