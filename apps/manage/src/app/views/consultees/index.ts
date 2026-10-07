@@ -3,6 +3,7 @@ import { asyncHandler } from '@planning-inspectorate/core/util';
 import type { IRouter } from 'express';
 import { Router as createRouter } from 'express';
 import { buildConsulteeProjectPage } from './project/controller.ts';
+import { buildReportConsulteeAddPage, buildReportConsulteeAddSubmit } from './report/consultees/add/controller.ts';
 import { buildReportConsulteesPage } from './report/consultees/controller.ts';
 import { buildReportCheckPage, buildReportCreatedPage } from './report/controller.ts';
 import { buildConsulteesResultsPage, buildResultsStaticMap } from './results/controller.ts';
@@ -18,6 +19,8 @@ export function createRoutes(service: ManageService): IRouter {
 	const shapefilePickerSubmit = buildShapefilePickerSubmit(service);
 	const reportCheckPage = buildReportCheckPage(service);
 	const reportConsulteesPage = buildReportConsulteesPage(service);
+	const reportConsulteeAddPage = buildReportConsulteeAddPage(service);
+	const reportConsulteeAddSubmit = buildReportConsulteeAddSubmit(service);
 	const reportCreatedPage = buildReportCreatedPage(service);
 	const resultsPage = buildConsulteesResultsPage(service);
 	const resultsStaticMap = buildResultsStaticMap(service);
@@ -34,6 +37,9 @@ export function createRoutes(service: ManageService): IRouter {
 	router.get('/:caseId/report', asyncHandler(reportCheckPage));
 	// each identified category's "Change" page - remove consultees, save and return to the check page
 	router.get('/:caseId/report/consultees', asyncHandler(reportConsulteesPage));
+	// its "Add consultee" form - adds a consultee to the category and returns to the Change page
+	router.get('/:caseId/report/consultees/add', asyncHandler(reportConsulteeAddPage));
+	router.post('/:caseId/report/consultees/add', asyncHandler(reportConsulteeAddSubmit));
 	// "Generate report": confirmation page with the report download link (a placeholder for now)
 	router.get('/:caseId/report/created', asyncHandler(reportCreatedPage));
 	// the consultee report (tables) for the current shapefile/ruleset selection

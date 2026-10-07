@@ -10,7 +10,15 @@ import { MAP_VIEWPORT } from '../../../../maps/sample-geojson.ts';
 import { resolveCase } from '../../resolve-case.ts';
 import { buildSearchAreaSafely, firstQueryValue, runRulesetSafely } from '../../run-ruleset.ts';
 import { rulesetCategories } from '../categories.ts';
-import { categoryStaticMapUrl, consulteesUrl, excludedIds, reportUrl } from '../urls.ts';
+import type { ConsulteeSelection } from '../urls.ts';
+import {
+	addConsulteeUrl,
+	addedConsultees,
+	categoryStaticMapUrl,
+	consulteesUrl,
+	excludedIds,
+	reportUrl
+} from '../urls.ts';
 import type { ConsulteeRow, ReportConsulteesViewModel } from './view-model.ts';
 
 /**
@@ -41,9 +49,10 @@ function identifiedBy(match: ConsulteeAreaMatch, ruleset: Ruleset, category: str
 
 /**
  * A check-page category's Change page: the consultees the ruleset identified in that category,
- * mapped and listed, each with a Remove link that excludes it (the exclusion lives in the URL, so
- * the check page's counts stay in step). "Save and return" goes back to the check page; "Add
- * consultee" is a placeholder.
+ * mapped and listed, each with a Remove link that excludes it. Consultees added by hand on the
+ * linked "Add consultee" page appear after the ruleset's matches. The whole selection lives in
+ * the URL (see urls.ts), so the check page's counts stay in step. "Save and return" goes back to
+ * the check page.
  */
 export function buildReportConsulteesPage(service: ManageService): AsyncRequestHandler {
 	const { db, logger, nearbyConsulteeRadiusMetres } = service;
@@ -72,6 +81,8 @@ export function buildReportConsulteesPage(service: ManageService): AsyncRequestH
 		}
 
 		const excluded = excludedIds(req.query.exclude);
+		const adds = addedConsultees(req.query.add);
+		const selection: ConsulteeSelection = { excluded, adds };
 		const { matches, failed } = await runRulesetSafely(db, project, ruleset, nearbyConsulteeRadiusMetres, logger);
 		const visible = matches.filter(
 			(match) => match.feature.properties.consulteeCategory === category && !excluded.has(match.feature.id)
@@ -79,29 +90,50 @@ export function buildReportConsulteesPage(service: ManageService): AsyncRequestH
 		const searchArea = await buildSearchAreaSafely(db, project, visible, [], nearbyConsulteeRadiusMetres, logger);
 		const map = buildCaseMapConfig(project, visible, category, searchArea);
 
-		const rows: ConsulteeRow[] = visible.map((match) => ({
-			name: match.feature.properties.consultee ?? 'Unnamed consultee',
-			identified: identifiedBy(match, ruleset, category),
-			removeUrl: consulteesUrl(project.id, ruleset.id, category, new Set([...excluded, match.feature.id]))
-		}));
+		// ruleset matches first, then hand-added consultees (each removable by dropping its add
+		// param - removal by index so duplicate entries each get their own link)
+		const rows: ConsulteeRow[] = [
+			...visible.map((match) => ({
+				name: match.feature.properties.consultee ?? 'Unnamed consultee',
+				identified: identifiedBy(match, ruleset, category),
+				removeUrl: consulteesUrl(project.id, ruleset.id, category, {
+					excluded: new Set([...excluded, match.feature.id]),
+					adds
+				})
+			})),
+			...adds.flatMap((add, index) => {
+				if (add.category !== category) {
+					return [];
+				}
+				return [
+					{
+						name: add.name,
+						identified: add.reason || 'Manually added',
+						removeUrl: consulteesUrl(project.id, ruleset.id, category, {
+							excluded,
+							adds: adds.filter((_, i) => i !== index)
+						})
+					}
+				];
+			})
+		];
 
 		const viewModel: ReportConsulteesViewModel = {
 			pageHeading: category,
 			pageCaption: project.properties.caseName,
-			backLinkUrl: reportUrl(project.id, ruleset.id, excluded),
+			backLinkUrl: reportUrl(project.id, ruleset.id, selection),
 			rows,
-			// placeholder until "add a consultee" exists
-			addConsulteeUrl: '#',
-			saveAndReturnUrl: reportUrl(project.id, ruleset.id, excluded),
+			addConsulteeUrl: addConsulteeUrl(project.id, ruleset.id, category, selection),
+			saveAndReturnUrl: reportUrl(project.id, ruleset.id, selection),
 			mapId: 'case-map',
 			mapRegionLabel: `Map showing ${category} consultees for ${project.properties.caseName}`,
-			staticMapSrc: categoryStaticMapUrl(project.id, ruleset.id, category, excluded),
+			staticMapSrc: categoryStaticMapUrl(project.id, ruleset.id, category, selection),
 			staticMapAlt: `Static map showing ${category} consultees for ${project.properties.caseName}`,
 			mapWidth: MAP_VIEWPORT.width,
 			mapHeight: MAP_VIEWPORT.height,
 			mapConfigJson: stringifyForInlineScript(map),
 			rulesetFailed: failed,
-			retryUrl: consulteesUrl(project.id, ruleset.id, category, excluded),
+			retryUrl: consulteesUrl(project.id, ruleset.id, category, selection),
 			matchCount: map.matchCount,
 			mapIsSampled: map.isSampled,
 			mapSampleSize: MAX_SAMPLED_MAP_MATCHES

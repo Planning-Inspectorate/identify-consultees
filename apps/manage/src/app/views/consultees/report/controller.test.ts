@@ -115,6 +115,31 @@ describe('consultee report check page', () => {
 		assert.ok(viewModel.generateReportUrl.includes(`&exclude=${excludedId}`));
 	});
 
+	it('should add hand-added consultees to their category count and carry them through the links', async () => {
+		const mockRes = { status: mock.fn(() => mockRes), render: mock.fn() };
+		const parishAdd = JSON.stringify({ c: 'Parish Council', n: 'Test Consultee', r: 'Adjacent' });
+		const hospitalAdd = JSON.stringify({ c: 'Hospital', n: 'Other Test Consultee', r: '' });
+		const db = dbReturning([[realProjectRow()], [parishMatchRow()]]);
+		await handlerFor(db)(
+			{
+				params: { caseId: realProjectId },
+				query: { ruleset: 'example-ruleset', add: [parishAdd, hospitalAdd] }
+			},
+			mockRes
+		);
+
+		const viewModel = mockRes.render.mock.calls[0].arguments[1];
+		const parishRow = viewModel.consultees.find((row: { name: string }) => row.name === 'Parish Council');
+		const hospitalRow = viewModel.consultees.find((row: { name: string }) => row.name === 'Hospital');
+		// one ruleset match + one hand-added row
+		assert.strictEqual(parishRow.count, '2');
+		assert.strictEqual(hospitalRow.count, '1');
+		// the adds reach the Change pages and the report-created link unchanged
+		assert.ok(parishRow.changeUrl.includes(`add=${encodeURIComponent(parishAdd)}`));
+		assert.ok(hospitalRow.changeUrl.includes(`add=${encodeURIComponent(hospitalAdd)}`));
+		assert.ok(viewModel.generateReportUrl.includes(`add=${encodeURIComponent(parishAdd)}`));
+	});
+
 	it('should run the default (first) ruleset when none is selected', async () => {
 		const mockRes = { status: mock.fn(() => mockRes), render: mock.fn() };
 		const db = dbReturning([[realProjectRow()], []]);

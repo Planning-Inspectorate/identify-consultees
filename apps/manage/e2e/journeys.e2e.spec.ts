@@ -120,16 +120,56 @@ test.describe('manage journeys', () => {
 		await expect(removeLinks).toHaveCount(parishCount);
 
 		// removing a consultee reloads the page with it excluded, so the table drops a row
+		let removed = 0;
 		if (parishCount > 0) {
 			await removeLinks.first().click();
 			await expect(page).toHaveURL(/exclude=/);
 			await expect(page.getByRole('link', { name: /Remove/ })).toHaveCount(parishCount - 1);
+			removed = 1;
 		}
 
-		// "Save and return" lands back on the check page
+		// "Add consultee" opens its form - a blank name fails validation with the entered reason kept
+		await page.getByRole('button', { name: 'Add consultee' }).click();
+		await expect(page).toHaveURL(/\/report\/consultees\/add\?.*category=Parish/);
+		await expect(page.getByRole('heading', { level: 1 })).toContainText('Select a consultee');
+		await page.getByLabel('Reason for identification').fill('Entered first');
+		await page.getByRole('button', { name: 'Add consultee' }).click();
+		await expect(page.getByText('There is a problem')).toBeVisible();
+		await expect(page.getByRole('link', { name: 'Enter the consultee name' })).toBeVisible();
+		await expect(page.getByText('Error: Enter the consultee name')).toBeVisible();
+		await expect(page.getByLabel('Reason for identification')).toHaveValue('Entered first');
+
+		// saving a consultee returns to the category page with it listed below the map - and any
+		// number can be added one at a time
+		await page.getByLabel('Name of consultee').fill('First Test Consultee');
+		await page.getByRole('button', { name: 'Add consultee' }).click();
+		await expect(page).toHaveURL(/\/report\/consultees\?.*category=Parish.*add=/);
+		await expect(page.getByRole('rowheader', { name: 'First Test Consultee' })).toBeVisible();
+		await expect(page.getByText('Entered first')).toBeVisible();
+
+		await page.getByRole('button', { name: 'Add consultee' }).click();
+		await page.getByLabel('Name of consultee').fill('Second Test Consultee');
+		await page.getByRole('button', { name: 'Add consultee' }).click();
+		await expect(page.getByRole('rowheader', { name: 'Second Test Consultee' })).toBeVisible();
+		await expect(page.getByText('Manually added')).toBeVisible();
+		await expect(page.getByRole('link', { name: /Remove/ })).toHaveCount(parishCount - removed + 2);
+
+		// a hand-added consultee's Remove link drops just that row
+		await page.getByRole('link', { name: 'Remove Second Test Consultee' }).click();
+		await expect(page.getByRole('rowheader', { name: 'Second Test Consultee' })).toHaveCount(0);
+		await expect(page.getByRole('rowheader', { name: 'First Test Consultee' })).toBeVisible();
+		await expect(page.getByRole('link', { name: /Remove/ })).toHaveCount(parishCount - removed + 1);
+
+		// "Save and return" lands back on the check page, its count matching the rows just listed
 		await page.getByRole('button', { name: 'Save and return' }).click();
 		await expect(page).toHaveURL(new RegExp(`/consultees/${SAMPLE_CASE_ID}/report\\?ruleset=${SAMPLE_RULESET_ID}`));
 		await expect(page.getByRole('heading', { level: 1 })).toContainText('Check consultees before creating the report');
+		await expect(
+			page
+				.locator('.govuk-summary-list__row', { hasText: 'Parish Council' })
+				.locator('.govuk-summary-list__value')
+				.first()
+		).toHaveText(String(parishCount - removed + 1));
 
 		// "Generate report" leads to the confirmation page with the download link
 		await page.getByRole('button', { name: 'Generate report' }).click();

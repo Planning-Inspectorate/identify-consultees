@@ -157,6 +157,55 @@ describe('manage router wiring', () => {
 		assert.equal(response.status, 404);
 	});
 
+	test('GET /consultees/:id/report/consultees/add renders the select-a-consultee form', async () => {
+		const response = await request(authDisabledApp).get(
+			`/consultees/${homePageTestCaseId}/report/consultees/add?ruleset=example-ruleset&category=Parish%20Council`
+		);
+		assert.equal(response.status, 200);
+		assert.match(response.text, /Select a consultee/);
+		assert.match(response.text, /Name of consultee/);
+		assert.match(response.text, /Reason for identification/);
+	});
+
+	test('POST /consultees/:id/report/consultees/add adds the consultee and lists it on the category page', async () => {
+		const agent = request.agent(authDisabledApp);
+		const page = await agent.get(
+			`/consultees/${homePageTestCaseId}/report/consultees/add?ruleset=example-ruleset&category=Parish%20Council`
+		);
+		const csrf = /name="_csrf" value="([^"]+)"/.exec(page.text)?.[1];
+		assert.ok(csrf, 'expected the add form to carry a CSRF token');
+
+		const response = await agent
+			.post(`/consultees/${homePageTestCaseId}/report/consultees/add?ruleset=example-ruleset&category=Parish%20Council`)
+			.type('form')
+			.send({ _csrf: csrf, name: 'Router Test Consultee', reason: 'Adjacent landowner' });
+		assert.equal(response.status, 302);
+		const location = response.headers.location;
+		assert.match(location, /\/report\/consultees\?ruleset=example-ruleset&category=Parish%20Council&add=/);
+
+		const categoryPage = await agent.get(location);
+		assert.equal(categoryPage.status, 200);
+		assert.match(categoryPage.text, /Router Test Consultee/);
+		assert.match(categoryPage.text, /Adjacent landowner/);
+	});
+
+	test('POST /consultees/:id/report/consultees/add re-renders with an error when the name is blank', async () => {
+		const agent = request.agent(authDisabledApp);
+		const page = await agent.get(
+			`/consultees/${homePageTestCaseId}/report/consultees/add?ruleset=example-ruleset&category=Parish%20Council`
+		);
+		const csrf = /name="_csrf" value="([^"]+)"/.exec(page.text)?.[1];
+		assert.ok(csrf, 'expected the add form to carry a CSRF token');
+
+		const response = await agent
+			.post(`/consultees/${homePageTestCaseId}/report/consultees/add?ruleset=example-ruleset&category=Parish%20Council`)
+			.type('form')
+			.send({ _csrf: csrf, name: '', reason: 'no name' });
+		assert.equal(response.status, 200);
+		assert.match(response.text, /There is a problem/);
+		assert.match(response.text, /Enter the consultee name/);
+	});
+
 	test('GET /consultees/:id/report/created renders the report created page', async () => {
 		const response = await request(authDisabledApp).get(
 			`/consultees/${homePageTestCaseId}/report/created?ruleset=example-ruleset`
