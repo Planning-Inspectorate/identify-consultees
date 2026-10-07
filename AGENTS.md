@@ -126,6 +126,7 @@ Azure jobs use PINS `node_script.yml` with `nodeVersion: 24` (see `.azure/pipeli
 - Keep root `optionalDependencies` on `react@19.3.0`, `react-dom@19.3.0`, and `scheduler@0.28.0`. They are not used by app code; they satisfy Prisma Studio / Radix peers so Azure `npm ci` does not fail with “Missing: react@… from lock file” (see PR #53 / commit `2e4f99d`). Never remove those entries or the matching `node_modules/react` (etc.) lockfile packages without replacing the guard.
 - `.npmrc` sets `engine-strict=true` and `legacy-peer-deps=false` (Azure default). Do not enable `legacy-peer-deps` locally — it hides the `preact` 8 vs 10 peer conflict (`accessible-autocomplete` vs `@defra/interactive-map`) that breaks Azure `npm ci`.
 - Keep the root `overrides.preact` on `^10.29.8` so that conflict resolves to Defra’s preact 10 line in the lockfile.
+- Keep the root `overrides.sprintf-js` on `file:vendor/sprintf-js` — a vendored copy of upstream 1.1.3 patched for CVE-2026-97058 (see `vendor/README.md`). Upstream has no fixed release; remove the override and `vendor/sprintf-js/` only when a patched version is published.
 - Emergency bypass only: `SKIP_TOOLCHAIN_CHECK=1` (do not use for normal PR work).
 
 ### Why React and Preact appear in `package.json`

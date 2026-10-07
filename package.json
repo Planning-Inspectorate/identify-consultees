@@ -134,6 +134,7 @@
     "@humanfs/node": "^0.16.8",
     "maplibre-gl": "6.6.0",
     "preact": "^10.29.8",
+    "sprintf-js": "file:vendor/sprintf-js",
     "polygon-splitter": {
       "glob": "^13.0.6"
     }
