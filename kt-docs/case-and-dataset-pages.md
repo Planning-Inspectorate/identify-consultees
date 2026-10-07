@@ -23,8 +23,8 @@ Typical content:
 
 - Page heading with the case name and reference
 - The ruleset used (`Ruleset used: <name>`)
-- One map region (interactive + static fallback) showing the project boundary and the matched consultee areas — sampled to `MAX_SAMPLED_MAP_MATCHES` with a note when the full set is larger
-- A GOV.UK table of matches: consultee, category, region, distance in metres
+- One map region (interactive + static fallback) showing the project boundary and the matched consultee areas, filled by category — see [Maps](./maps.md#results-map-layers)
+- A GOV.UK table of matches: consultee, category, region. Distances aren't shown
 
 Matches are real spatial query output: `runRuleset` runs every condition in the ruleset (`intersection` within a buffer, or `bordering` a host area) and returns the de-duplicated union, nearest first. This is the actual screening engine, not a stand-in — though only one ruleset (`example-ruleset`, built from `example_ruleset.csv`) exists so far.
 

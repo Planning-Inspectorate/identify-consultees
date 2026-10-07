@@ -6,6 +6,7 @@ import {
 	buildStaticMapSvg,
 	centroidOfGeometry,
 	clearOsmTileCacheForTests,
+	consulteeColours,
 	escapeXml,
 	fetchOsmBasemapTiles,
 	googleMapsApiKeyFromEnv,
@@ -103,6 +104,25 @@ describe('static-map helpers', () => {
 
 		assert.match(svg, /#55A868/);
 		assert.match(svg, /#C44E52/);
+	});
+
+	test("consulteeColours uses a feature's own colour, or the default green", () => {
+		const feature = (colour?: string, fillOpacity?: string) => ({
+			type: 'Feature' as const,
+			properties: { ...(colour ? { colour } : {}), ...(fillOpacity ? { fillOpacity } : {}) },
+			geometry: { type: 'Point' as const, coordinates: [0, 0] as [number, number] }
+		});
+		assert.deepEqual(consulteeColours(feature('#1d70b8', '0.06')), {
+			stroke: '#1d70b8',
+			fill: '#1d70b8',
+			fillOpacity: 0.06,
+			googleFill: '0x1D70B80F',
+			googleStroke: '0x1D70B8FF'
+		});
+		assert.equal(consulteeColours(feature('#1d70b8')).fillOpacity, 0.45);
+		assert.equal(consulteeColours(feature('#1d70b8', 'lots')).googleFill, '0x1D70B873');
+		assert.equal(consulteeColours(feature()).fill, '#55A868');
+		assert.equal(consulteeColours(feature('red')).fill, '#55A868');
 	});
 
 	test('renderStaticMapOverlaySvg draws vectors on a transparent background', () => {

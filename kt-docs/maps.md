@@ -24,7 +24,7 @@ For `/consultees/:caseId/results?ruleset=…`:
 1. Load the case boundary from `case_boundary` (`resolveCase` / `getCaseBoundaryById`)
 2. Run the ruleset — `runRuleset` returns the ruleset's matches, plus every consultee area within the nearby radius (`allNearby`, 20km by default)
 3. Build the **search area** — the site grown by the nearby radius (`bufferGeometryForDisplay`) — and fetch **display geometry** for every nearby area and match, clipped to it (`getConsulteeAreaDisplayGeometries`, simplified to 25m). Regional areas such as counties and ambulance trusts would otherwise fill the map and the page: clipping cut one page's map data from 1.5MB to 360KB
-4. `buildCaseMapConfig` (`app/maps/case-geojson.ts`) turns the project, matches, nearby areas and search area into the map config, capping drawn matches at `MAX_SAMPLED_MAP_MATCHES`
+4. `buildCaseMapConfig` (`app/maps/case-geojson.ts`) turns the project, matches, nearby areas and search area into the map config. It gives every consultee its category's colour (`colour`) and fill opacity (`fillOpacity`), so the interactive and static maps colour them the same way. It draws every match; only the fallback without a search area, which uses original geometry, caps drawn matches at `MAX_SAMPLED_MAP_MATCHES`
 5. Embed map config JSON in the page; point the static fallback at `/consultees/:caseId/results/static-map?ruleset=…`
 
 If step 3 fails, the page still renders: the map falls back to the project and matches, and the tables list every consultee.
@@ -35,16 +35,18 @@ Everything on that map comes from SQL — there is no fixture layer.
 
 Drawn bottom to top (`buildDatasets` in `javascripts/consultees-map.js`):
 
-| Layer                      | What it shows                                                                                                     | Style                                                                                                       |
-| -------------------------- | ----------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
-| Search area (20km)         | The site grown by the nearby radius; the map opens on it                                                          | Dashed outline                                                                                              |
-| All consultees within 20km | Every nearby consultee area, one sublayer per category with a count, each toggleable from the Key and Layers menu | Areas as coloured outlines; point categories (hospitals, harbours, generators, nuclear sites) as small dots |
-| Project site               | The case boundary                                                                                                 | Red, translucent fill                                                                                       |
-| The ruleset's name         | The ruleset's matches (up to `MAX_SAMPLED_MAP_MATCHES`)                                                           | Green outline, very light fill                                                                              |
+| Layer                      | What it shows                                                                                                          | Style                                                                                                                  |
+| -------------------------- | ---------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| Search area (20km)         | The site grown by the nearby radius; the map opens on it                                                               | Dashed outline                                                                                                         |
+| All consultees within 20km | Every nearby consultee area, one sublayer per category with a count. **Hidden until switched on** from the Layers menu | Outlines in the category's colour; point categories as small dots                                                      |
+| The ruleset's name         | The consultees the ruleset identified, one sublayer per category with a count                                          | Areas filled in the category's colour; point categories (hospitals, harbours, generators, nuclear sites) as small dots |
+| Project site               | The case boundary                                                                                                      | Red, translucent fill                                                                                                  |
 
-The static fallback opens on the same search area, but draws only the project and the ruleset's matches.
+**Regional categories are only tinted.** Police forces, ambulance trusts, ICBs and counties each cover the whole search area. A dozen of them stacked at a normal fill hide everything else. So a category with any area covering half or more of the search area's bounding box is filled at `REGIONAL_FILL_OPACITY` (6%) and drawn first. Local areas such as parishes and districts are filled at `LOCAL_FILL_OPACITY` (35%).
 
-> **Category colours are interim.** They're a placeholder palette (`NEARBY_CATEGORY_COLOURS`), assigned per map in alphabetical order. Consultee categories aren't in the GIS Tool Styling tables, so per [`AGENTS.md`](../AGENTS.md) they need product/design sign-off.
+The static fallback opens on the same search area and uses the same colours and opacities. It draws only the project and the ruleset's matches.
+
+> **Category colours are interim.** They're a placeholder palette of 14 (`CONSULTEE_CATEGORY_COLOURS` in `app/maps/category-colours.ts`). On each map, the ruleset's match categories are coloured first in alphabetical order, then any other nearby categories, so a category's colour can differ between projects. Consultee categories aren't in the GIS Tool Styling tables, so per [`AGENTS.md`](../AGENTS.md) they need product/design sign-off.
 
 ### Defra map styling gotchas
 

@@ -61,8 +61,7 @@
 			{% set tableRows = (tableRows.push([
 				{ text: match.consultee | default("") },
 				{ text: match.consulteeCategory | default("") },
-				{ text: match.region | default("") },
-				{ text: match.distanceMetres ~ "m" }
+				{ text: match.region | default("") }
 			]), tableRows) %}
 		{% endfor %}
 		{{ govukTable({
@@ -72,15 +71,14 @@
 			head: [
 				{ text: "Consultee" },
 				{ text: "Category" },
-				{ text: "Region" },
-				{ text: "Distance" }
+				{ text: "Region" }
 			],
 			rows: tableRows
 		}) }}
 	{% endif %}
 
 	<h2 class="govuk-heading-m govuk-!-margin-top-6">All consultees within {{ nearbyRadiusKm }}km ({{ nearbyMatchCount }})</h2>
-	<p class="govuk-body">Every consultee near the site regardless of category, shown by default alongside the ruleset's own matches above.</p>
+	<p class="govuk-body">Every consultee near the site, in any category. To see them on the map, turn on "All consultees within {{ nearbyRadiusKm }}km" in the map's layers.</p>
 
 	{% if nearbyMatches.length == 0 %}
 		<p class="govuk-body">No consultees found within {{ nearbyRadiusKm }}km.</p>
@@ -90,8 +88,7 @@
 			{% set nearbyTableRows = (nearbyTableRows.push([
 				{ text: match.consultee | default("") },
 				{ text: match.consulteeCategory | default("") },
-				{ text: match.region | default("") },
-				{ text: match.distanceMetres ~ "m" }
+				{ text: match.region | default("") }
 			]), nearbyTableRows) %}
 		{% endfor %}
 		{{ govukTable({
@@ -101,8 +98,7 @@
 			head: [
 				{ text: "Consultee" },
 				{ text: "Category" },
-				{ text: "Region" },
-				{ text: "Distance" }
+				{ text: "Region" }
 			],
 			rows: nearbyTableRows
 		}) }}

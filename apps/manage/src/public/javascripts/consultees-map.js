@@ -7,22 +7,12 @@
  * - Static map fallback (PNG or SVG) via data-static-map-src when interactive init fails
  */
 
-const CONSULTEE_COLOURS = ['#55A868', '#4C72B0', '#DD8452', '#8172B2', '#C44E52'];
+// consultee features carry their category colour (`colour`), assigned server-side so the static map
+// matches - see app/maps/category-colours.ts. This is only for features without one
+const DEFAULT_CONSULTEE_COLOUR = '#55A868';
 
-// one per category in the "all consultees nearby" layer - none reuse the project (red) or ruleset
-// match (green) colours
-const NEARBY_CATEGORY_COLOURS = [
-	'#1d70b8',
-	'#f47738',
-	'#912b88',
-	'#28a197',
-	'#b58840',
-	'#d53880',
-	'#5694ca',
-	'#85994b',
-	'#6f72af',
-	'#505a5f'
-];
+// each consultee also carries its fill opacity (`fillOpacity`) - regional areas are only tinted
+const DEFAULT_FILL_OPACITY = 0.35;
 
 const POINT_TYPES = new Set(['Point', 'MultiPoint']);
 
@@ -53,14 +43,17 @@ const SMALL_CIRCLE_SYMBOL = {
 };
 
 /**
- * One sublayer per consultee category, so each can be shown or hidden from the map's layers menu.
- * Areas are drawn as outlines - regional areas (counties, police forces) overlap and would bury
- * each other if filled - and point categories (hospitals, harbours) as circles.
+ * One sublayer per consultee category, in the category's colour, so each can be shown or hidden
+ * from the map's layers menu. Points (hospitals, harbours) are drawn as small dots; areas are
+ * filled at the category's `fillOpacity`, lightest first so the regional tints sit under the local
+ * areas - or drawn as outlines only when `filled` is false.
  *
  * @param {object[]} features
+ * @param {string} idPrefix
+ * @param {boolean} filled
  * @returns {object[]}
  */
-export function buildNearbySublayers(features) {
+export function buildCategorySublayers(features, idPrefix, filled) {
 	const byCategory = new Map();
 	for (const feature of features) {
 		const category = feature.properties?.consulteeCategory || 'Other';
@@ -69,17 +62,29 @@ export function buildNearbySublayers(features) {
 		byCategory.set(category, members);
 	}
 
-	return [...byCategory.keys()].sort().map((category, index) => {
-		const colour = NEARBY_CATEGORY_COLOURS[index % NEARBY_CATEGORY_COLOURS.length];
+	const categories = [...byCategory.keys()].sort().map((category) => {
 		const members = byCategory.get(category);
+		return { category, members, opacity: Number(members[0].properties?.fillOpacity) || DEFAULT_FILL_OPACITY };
+	});
+	// sublayers draw in order
+	categories.sort((a, b) => a.opacity - b.opacity);
+
+	return categories.map(({ category, members, opacity }, index) => {
+		const colour = members[0].properties?.colour || DEFAULT_CONSULTEE_COLOUR;
 		const isPoints = members.every((feature) => POINT_TYPES.has(feature.geometry?.type));
+		let style;
+		if (isPoints) {
+			style = { ...SMALL_CIRCLE_SYMBOL, symbolBackgroundColor: colour };
+		} else if (filled) {
+			style = { stroke: colour, strokeWidth: 2, fill: translucent(colour, opacity) };
+		} else {
+			style = { stroke: colour, strokeWidth: 2, fill: 'transparent' };
+		}
 		return {
-			id: `nearby-${index}`,
+			id: `${idPrefix}-${index}`,
 			label: `${category} (${members.length})`,
 			filter: ['==', ['get', 'consulteeCategory'], category],
-			style: isPoints
-				? { ...SMALL_CIRCLE_SYMBOL, symbolBackgroundColor: colour }
-				: { stroke: colour, strokeWidth: 2, fill: 'transparent' }
+			style
 		};
 	});
 }
@@ -144,8 +149,9 @@ export function showStaticMapFallback(container) {
 export function buildDatasets(config) {
 	const datasets = [];
 
-	// datasets draw in order, so the search area and the nearby consultees go under the project
-	// site and the ruleset's matches
+	// datasets draw in order: the search area and the nearby consultees under the ruleset's matches,
+	// and the project site on top of them all. The nearby layer starts hidden - the matches are what the
+	// ruleset identified - and can be switched on from the layers menu
 	if (config.searchAreaGeojson?.features?.length > 0) {
 		datasets.push({
 			id: 'search-area',
@@ -168,8 +174,27 @@ export function buildDatasets(config) {
 			maxZoom: 24,
 			showInKey: true,
 			showInMenu: true,
+			visible: false,
 			style: { stroke: '#505a5f', strokeWidth: 2, fill: 'transparent' },
-			sublayers: buildNearbySublayers(config.nearbyGeojson.features)
+			sublayers: buildCategorySublayers(config.nearbyGeojson.features, 'nearby', false)
+		});
+	}
+
+	if (config.consulteeGeojson?.features?.length > 0) {
+		datasets.push({
+			id: 'consultee-areas',
+			label: config.consulteeLayerLabel ?? 'Consultee areas',
+			geojson: config.consulteeGeojson,
+			minZoom: 0,
+			maxZoom: 24,
+			showInKey: true,
+			showInMenu: true,
+			style: {
+				stroke: DEFAULT_CONSULTEE_COLOUR,
+				strokeWidth: 2,
+				fill: translucent(DEFAULT_CONSULTEE_COLOUR, DEFAULT_FILL_OPACITY)
+			},
+			sublayers: buildCategorySublayers(config.consulteeGeojson.features, 'identified', true)
 		});
 	}
 
@@ -185,26 +210,6 @@ export function buildDatasets(config) {
 			style: {
 				stroke: '#C44E52',
 				fill: translucent('#C44E52', 0.45)
-			}
-		});
-	}
-
-	if (config.consulteeGeojson?.features?.length > 0) {
-		const colour = CONSULTEE_COLOURS[0];
-		datasets.push({
-			id: 'consultee-areas',
-			label: config.consulteeLayerLabel ?? 'Consultee areas',
-			geojson: config.consulteeGeojson,
-			minZoom: 0,
-			maxZoom: 24,
-			showInKey: true,
-			showInMenu: true,
-			// a very light fill: the site's council, parish, police force and so on all cover the
-			// same ground, and their fills stack - the outlines carry the layer
-			style: {
-				stroke: colour,
-				strokeWidth: 3,
-				fill: translucent(colour, 0.05)
 			}
 		});
 	}

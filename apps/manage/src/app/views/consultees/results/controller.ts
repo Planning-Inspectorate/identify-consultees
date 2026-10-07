@@ -87,8 +87,7 @@ function toMatchRow(match: ConsulteeAreaSummaryMatch): ConsulteeMatchRow {
 	return {
 		consultee: match.feature.properties.consultee ?? null,
 		consulteeCategory: match.feature.properties.consulteeCategory ?? null,
-		region: match.feature.properties.region ?? null,
-		distanceMetres: Math.round(match.distanceMetres)
+		region: match.feature.properties.region ?? null
 	};
 }
 

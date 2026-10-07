@@ -63,16 +63,16 @@ Notable features:
 
 ## Data and sample data
 
-| Module / path                                          | Purpose                                                                         |
-| ------------------------------------------------------ | ------------------------------------------------------------------------------- |
-| `packages/database/src/geospatial/*`                   | `case-boundaries`, `consultee-areas`, `rulesets`, `wkt` — the real query layer  |
-| `packages/database/src/seed/*`                         | Dev seed + GeoJSON import (`import-cli`, `import-from-blob`, `geojson-import`)  |
-| `apps/function-python/setup_database/sample_data/`     | The bundled sample GeoJSON the dev seed loads (real UK boundary exports)        |
-| `packages/database/src/geospatial/example_ruleset.csv` | The one real ruleset export `RULESETS` is built from                            |
-| `app/maps/sample-geojson.ts`                           | Shared map viewport constants + GeoJSON helpers used by demos/examples          |
-| `app/maps/map-layers-demo-geojson.ts`                  | Overlay demo features                                                           |
-| `app/maps/case-geojson.ts`                             | Builds the results map config (project + matched consultee areas, sampling cap) |
-| `app/maps/interactive-map-examples-data.ts`            | Worked Defra examples for `/components/interactive-map`                         |
+| Module / path                                          | Purpose                                                                                       |
+| ------------------------------------------------------ | --------------------------------------------------------------------------------------------- |
+| `packages/database/src/geospatial/*`                   | `case-boundaries`, `consultee-areas`, `rulesets`, `wkt` — the real query layer                |
+| `packages/database/src/seed/*`                         | Dev seed + GeoJSON import (`import-cli`, `import-from-blob`, `geojson-import`)                |
+| `apps/function-python/setup_database/sample_data/`     | The bundled sample GeoJSON the dev seed loads (real UK boundary exports)                      |
+| `packages/database/src/geospatial/example_ruleset.csv` | The one real ruleset export `RULESETS` is built from                                          |
+| `app/maps/sample-geojson.ts`                           | Shared map viewport constants + GeoJSON helpers used by demos/examples                        |
+| `app/maps/map-layers-demo-geojson.ts`                  | Overlay demo features                                                                         |
+| `app/maps/case-geojson.ts`                             | Builds the results map config (project, matches, nearby areas, search area, category colours) |
+| `app/maps/interactive-map-examples-data.ts`            | Worked Defra examples for `/components/interactive-map`                                       |
 
 ## Maps and shared utilities
 

@@ -6,7 +6,7 @@
 
 Given a case boundary and a ruleset, the engine finds every consultee the ruleset says should be contacted. A ruleset is a list of **conditions**, such as "the district council the site is in", "hospitals within 10km" or "parishes bordering the site's parish". The result is everything any condition matches, de-duplicated.
 
-The guiding policy: **when in doubt, include.** Consulting one body too many is acceptable; missing one is not. Distances shown are approximate.
+The guiding policy: **when in doubt, include.** Consulting one body too many is acceptable; missing one is not. Distances are used to decide matches, but aren't reported to users.
 
 ## Rulesets
 
@@ -39,11 +39,12 @@ The example ruleset has 27 conditions: 7 that must touch the site, 16 within a d
 
 ## Results map
 
-After the run, the results page draws everything within the nearby radius, not just the matches:
+After the run, the results map shows the ruleset's matches. Every other consultee within the nearby radius is on a layer that starts hidden.
 
 1. **Search area:** the site grown by 20km (`bufferGeometryForDisplay`), drawn as a dashed outline. Both the interactive and static maps open on it.
 2. **Display geometry:** each nearby area and match is clipped to the search area and simplified to 25m (`getConsulteeAreaDisplayGeometries`, `DISPLAY_SIMPLIFY_TOLERANCE_METRES`), from `geometrySimplified`. Without clipping, regional areas such as counties and ambulance trusts made the page several megabytes; Hinkley Point C went from 1.5MB to 360KB.
 3. Areas with nothing inside the search area aren't drawn, but are still listed in the tables. This includes bordering matches more than 20km away.
+4. Matches are filled in their category's colour; regional categories are only tinted. See [Maps](../maps.md#results-map-layers).
 
 If building the search area fails, the page still renders, with the project and matches drawn from original geometry. See [Maps](../maps.md#results-map-layers) for the layers and styling.
 
@@ -76,7 +77,7 @@ The site straddles five authorities: Luton and Central Bedfordshire (unitary), H
 | Ambulance Trust, Fire and Rescue Authority, ICB, Local Resilience Forum, Police, Internal Drainage District |     2 each |
 | National Landscape, Greater London Authority                                                                |     1 each |
 
-**Why bordering results can be far from the site:** the condition "county, unitary or national park bordering the host county" uses Hertfordshire as a host. Everything bordering Hertfordshire is therefore included, among them the London boroughs of Hillingdon, Barnet and Harrow, each about 24km from the site. That's the rule working as written. Bordering is about the host area's neighbours, not about distance from the site; the distance shown is only for information.
+**Why bordering results can be far from the site:** the condition "county, unitary or national park bordering the host county" uses Hertfordshire as a host. Everything bordering Hertfordshire is therefore included, among them the London boroughs of Hillingdon, Barnet and Harrow, each about 24km from the site. That's the rule working as written. Bordering is about the host area's neighbours, not about distance from the site.
 
 ## Query plans
 
