@@ -69,6 +69,44 @@ function collectPositionsFromGeometry(
 	collectPositionsFromCoordinates(geometry.coordinates, positions);
 }
 
+/** A longitude/latitude bounding box. */
+export interface Bounds {
+	west: number;
+	south: number;
+	east: number;
+	north: number;
+}
+
+type GeometryLike = { type: string; coordinates?: unknown; geometries?: unknown };
+
+/**
+ * Bounding box of every feature in a FeatureCollection, or `null` when there's no geometry. A loop
+ * rather than `Math.min(...positions)`: real geometries run to hundreds of thousands of points,
+ * which overflows the call stack as spread arguments.
+ */
+export function computeBounds(featureCollection: { features: { geometry: GeometryLike }[] }): Bounds | null {
+	const positions: LngLat[] = [];
+	for (const feature of featureCollection.features) {
+		collectPositionsFromGeometry(feature.geometry, positions);
+	}
+	if (positions.length === 0) {
+		return null;
+	}
+	const bounds: Bounds = {
+		west: positions[0][0],
+		south: positions[0][1],
+		east: positions[0][0],
+		north: positions[0][1]
+	};
+	for (const [longitude, latitude] of positions) {
+		bounds.west = Math.min(bounds.west, longitude);
+		bounds.east = Math.max(bounds.east, longitude);
+		bounds.south = Math.min(bounds.south, latitude);
+		bounds.north = Math.max(bounds.north, latitude);
+	}
+	return bounds;
+}
+
 /**
  * Compute a centre and zoom that fits every feature in a FeatureCollection.
  *
@@ -80,33 +118,16 @@ function collectPositionsFromGeometry(
  *   fixed England / Wales fallback view
  * @returns Map centre and zoom
  */
-export function computeMapView(featureCollection: {
-	features: { geometry: { type: string; coordinates?: unknown; geometries?: unknown } }[];
-}): MapView {
-	const positions: LngLat[] = [];
-	for (const feature of featureCollection.features) {
-		collectPositionsFromGeometry(feature.geometry, positions);
-	}
-
-	if (positions.length === 0) {
+export function computeMapView(featureCollection: { features: { geometry: GeometryLike }[] }): MapView {
+	const bounds = computeBounds(featureCollection);
+	if (!bounds) {
 		return FALLBACK_MAP_VIEW;
 	}
 
-	let minLongitude = positions[0][0];
-	let maxLongitude = positions[0][0];
-	let minLatitude = positions[0][1];
-	let maxLatitude = positions[0][1];
-	for (const [longitude, latitude] of positions) {
-		minLongitude = Math.min(minLongitude, longitude);
-		maxLongitude = Math.max(maxLongitude, longitude);
-		minLatitude = Math.min(minLatitude, latitude);
-		maxLatitude = Math.max(maxLatitude, latitude);
-	}
-
-	const center: LngLat = [(minLongitude + maxLongitude) / 2, (minLatitude + maxLatitude) / 2];
+	const center: LngLat = [(bounds.west + bounds.east) / 2, (bounds.south + bounds.north) / 2];
 
 	// Pad the span slightly so edge features are not flush against the viewport.
-	const span = Math.max(maxLongitude - minLongitude, maxLatitude - minLatitude, 0.001) * 1.3;
+	const span = Math.max(bounds.east - bounds.west, bounds.north - bounds.south, 0.001) * 1.3;
 	const zoom = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, Math.floor(Math.log2(360 / span))));
 
 	return { center, zoom };

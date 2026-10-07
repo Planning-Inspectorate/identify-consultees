@@ -80,6 +80,35 @@ describe('consultees results page', () => {
 		assert.strictEqual(viewModel.nearbyMatches[0].consultee, 'Network Rail');
 		assert.strictEqual(viewModel.nearbyMatchCount, 1);
 		assert.strictEqual(viewModel.nearbyRadiusKm, 20);
+		// and on the interactive map, as its own layer
+		const mapConfig = JSON.parse(viewModel.mapConfigJson);
+		assert.strictEqual(mapConfig.searchAreaLabel, 'Search area (20km)');
+		assert.strictEqual(mapConfig.nearbyLayerLabel, 'All consultees within 20km');
+		assert.strictEqual(mapConfig.nearbyGeojson.features.length, 1);
+		assert.strictEqual(mapConfig.nearbyGeojson.features[0].properties.name, 'Network Rail');
+	});
+
+	it('still renders every nearby consultee in the table if their map geometry fails to load', async () => {
+		const mockRes = { status: mock.fn(() => mockRes), render: mock.fn() };
+		const rows = [[realProjectRow()], [railwayMatchRow()]];
+		let call = 0;
+		const db = {
+			$queryRaw: mock.fn(async (sql: TemplateStringsArray) => {
+				const text = sql.join('');
+				if (!/\bFROM\b/.test(text)) return [{ wkt: realProjectRow().geometryWkt }];
+				if (text.includes('STIntersection')) throw new Error('display query failed');
+				return rows[Math.min(call++, rows.length - 1)];
+			})
+		};
+		const logger = mockLogger();
+		const handler = buildConsulteesResultsPage({ db, logger, nearbyConsulteeRadiusMetres: 20_000 });
+		await handler({ params: { caseId: realProjectId }, query: { ruleset: 'example-ruleset' } }, mockRes);
+
+		const viewModel = mockRes.render.mock.calls[0].arguments[1];
+		assert.strictEqual(viewModel.rulesetFailed, false);
+		assert.strictEqual(viewModel.nearbyMatches.length, 1);
+		assert.strictEqual('nearbyGeojson' in JSON.parse(viewModel.mapConfigJson), false);
+		assert.strictEqual(logger.error.mock.callCount(), 1);
 	});
 
 	it('derives nearbyRadiusKm from the configured radius, not a hardcoded default', async () => {
@@ -312,6 +341,22 @@ describe('consultees results static map', () => {
 		} finally {
 			globalThis.fetch = originalFetch;
 		}
+	});
+
+	it('should frame the static map on the same search area as the interactive map', async () => {
+		const mockRes = {
+			status: mock.fn(() => mockRes),
+			type: mock.fn(() => mockRes),
+			set: mock.fn(() => mockRes),
+			send: mock.fn()
+		};
+		const db = dbReturning([[realProjectRow()], [railwayMatchRow()]]);
+		const handler = buildResultsStaticMap({ db, logger: mockLogger(), nearbyConsulteeRadiusMetres: 20_000 }, true);
+		await handler({ params: { caseId: realProjectId }, query: { ruleset: 'example-ruleset' }, headers: {} }, mockRes);
+
+		assert.strictEqual(mockRes.status.mock.calls[0].arguments[0], 200);
+		// the display geometry query - clipped to the search area - ran for the static map too
+		assert.ok(db.$queryRaw.mock.calls.some((call) => call.arguments[0].join('').includes('STIntersection')));
 	});
 
 	it('should 503 rather than serve a cacheable empty map if the ruleset query fails', async () => {

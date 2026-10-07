@@ -5,10 +5,12 @@ import { loadConfig } from '../configuration/config.ts';
 import { newDatabaseClient } from '../index.ts';
 import type { ConsulteeAreaFeatureCollection } from './consultee-areas.ts';
 import {
+	bufferGeometryForDisplay,
 	findConsulteeAreaSummariesNear,
 	findConsulteeAreasIntersecting,
 	findConsulteeAreasNear,
 	getConsulteeAreaById,
+	getConsulteeAreaDisplayGeometries,
 	getConsulteeAreaGeometries,
 	loadConsulteeAreas,
 	simplifyGeometry
@@ -127,6 +129,50 @@ describe('consultee areas (requires a local SQL Server - see docker-compose.yml)
 			assert.deepEqual(geometries.get(testAreaId), featureCollection.features[0].geometry);
 			assert.equal(geometries.has('00000000-0000-0000-0000-000000000000'), false);
 			assert.equal((await getConsulteeAreaGeometries(dbClient, [])).size, 0);
+
+			// display geometry is clipped to the window: the eastern half of the stored polygon
+			const window = {
+				type: 'Polygon' as const,
+				coordinates: [
+					[
+						[-0.125, 51.49],
+						[-0.09, 51.49],
+						[-0.09, 51.53],
+						[-0.125, 51.53],
+						[-0.125, 51.49]
+					]
+				] as [number, number][][]
+			};
+			const clipped = (await getConsulteeAreaDisplayGeometries(dbClient, [testAreaId], window)).get(testAreaId);
+			assert.ok(clipped && clipped.type === 'Polygon', 'expected a clipped polygon');
+			const longitudes = clipped.coordinates[0].map(([longitude]) => longitude);
+			assert.ok(
+				Math.min(...longitudes) > -0.126,
+				`expected nothing west of the window, got ${Math.min(...longitudes)}`
+			);
+			assert.ok(Math.max(...longitudes) < -0.099, 'expected the stored polygon to end at its own eastern edge');
+
+			// a display buffer of a point is a ring roughly the distance away in every direction
+			const buffered = await bufferGeometryForDisplay(dbClient, { type: 'Point', coordinates: [-0.1, 51.5] }, 1_000);
+			assert.ok(buffered.type === 'Polygon');
+			const latitudes = buffered.coordinates[0].map(([, latitude]) => latitude);
+			const latitudeSpanMetres = (Math.max(...latitudes) - Math.min(...latitudes)) * 111_320;
+			assert.ok(Math.abs(latitudeSpanMetres - 2_000) < 60, `expected ~2km across, got ${latitudeSpanMetres}m`);
+
+			// an area with nothing inside the window is left out
+			const farWindow = {
+				type: 'Polygon' as const,
+				coordinates: [
+					[
+						[2.3, 48.8],
+						[2.4, 48.8],
+						[2.4, 48.9],
+						[2.3, 48.9],
+						[2.3, 48.8]
+					]
+				] as [number, number][][]
+			};
+			assert.equal((await getConsulteeAreaDisplayGeometries(dbClient, [testAreaId], farWindow)).size, 0);
 		} finally {
 			await cleanup();
 		}
