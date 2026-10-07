@@ -249,4 +249,29 @@ describe('case boundaries (requires a local SQL Server - see docker-compose.yml)
 			await cleanup();
 		}
 	});
+
+	test('searchCaseBoundaries still reports the match total when the page is out of range', async (t) => {
+		if (!dbAvailable) return t.skip('SQL Server database not available');
+
+		await cleanup();
+		try {
+			await loadCaseBoundaries(dbClient, {
+				type: 'FeatureCollection',
+				features: [
+					{
+						id: testBoundaryId,
+						type: 'Feature',
+						geometry: { type: 'Point', coordinates: [0, 0] },
+						properties: { caseReference: 'PG999999', caseName: 'Pagination target' }
+					}
+				]
+			});
+
+			const outOfRange = await searchCaseBoundaries(dbClient, { query: 'PG999999', limit: 25, offset: 1000 });
+			assert.equal(outOfRange.features.length, 0);
+			assert.ok(outOfRange.total >= 1, 'expected the real match count even with no rows on the page');
+		} finally {
+			await cleanup();
+		}
+	});
 });

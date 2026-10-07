@@ -319,9 +319,23 @@ export async function searchCaseBoundaries(dbClient: PrismaClient, options: Sear
 		`
 	);
 
+	let total = rows[0] ? Number(rows[0].totalCount) : 0;
+
+	// An out-of-range offset returns no rows, so the window count is lost with them. Count matches
+	// directly so callers can still tell "no results" apart from "page beyond the last one".
+	if (total === 0 && offset > 0) {
+		const countRows = await withDeadlockRetry(
+			() => dbClient.$queryRaw<{ total: bigint }[]>`
+				SELECT COUNT(*) AS total FROM case_boundary
+				WHERE caseName LIKE ${likePattern} OR caseReference LIKE ${likePattern}
+			`
+		);
+		total = countRows[0] ? Number(countRows[0].total) : 0;
+	}
+
 	return {
 		features: rows.map(rowToSummary),
-		total: rows[0] ? Number(rows[0].totalCount) : 0
+		total
 	};
 }
 
