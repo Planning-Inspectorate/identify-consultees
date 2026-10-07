@@ -453,6 +453,110 @@ describe('runRuleset', () => {
 		}
 	});
 
+	test('includes an area just past a cut-off rather than risk missing it, but not one well past it', async (t) => {
+		if (!dbAvailable) return t.skip('SQL Server database not available');
+
+		// metres east of the origin, along the equator (1 degree of longitude = 111,319.49m there)
+		const pointAt = (metres: number) => ({ type: 'Point' as const, coordinates: [metres / 111_319.49, 0] });
+		await cleanup();
+		try {
+			await loadConsulteeAreas(dbClient, {
+				type: 'FeatureCollection',
+				features: [
+					{
+						id: testAreaId,
+						type: 'Feature',
+						geometry: pointAt(1_015),
+						properties: { consulteeCategory: 'Hospital', consultee: 'Just Past 1km' }
+					},
+					{
+						id: secondAreaId,
+						type: 'Feature',
+						geometry: pointAt(1_200),
+						properties: { consulteeCategory: 'Hospital', consultee: 'Well Past 1km' }
+					}
+				]
+			});
+			const ruleset: Ruleset = {
+				id: 'hospital-1km',
+				name: 'Hospital 1km',
+				rules: [{ id: 'h', name: 'Hospital', logicType: 'intersection', categories: ['Hospital'], bufferMetres: 1_000 }]
+			};
+
+			const { matches } = await runRuleset(dbClient, pointAt(0), ruleset);
+			const ids = matches.map((match) => match.feature.id);
+			assert.ok(ids.includes(testAreaId), 'expected the area 15m past the cut-off to be included');
+			assert.ok(!ids.includes(secondAreaId), 'expected the area 200m past the cut-off to be left out');
+		} finally {
+			await cleanup();
+		}
+	});
+
+	test("counts an area as bordering the host across a small gap in the data, but not one that's clearly apart", async (t) => {
+		if (!dbAvailable) return t.skip('SQL Server database not available');
+
+		const square = (west: number, east: number) => ({
+			type: 'Polygon' as const,
+			coordinates: [
+				[
+					[west, 0],
+					[east, 0],
+					[east, 1],
+					[west, 1],
+					[west, 0]
+				]
+			]
+		});
+		const metresOfLongitude = (metres: number) => metres / 111_319.49;
+		await cleanup();
+		try {
+			await loadConsulteeAreas(dbClient, {
+				type: 'FeatureCollection',
+				features: [
+					{
+						id: hostAreaId,
+						type: 'Feature',
+						geometry: square(0, 1),
+						properties: { consulteeCategory: 'Parish Council', consultee: 'Host Parish' }
+					},
+					{
+						id: neighbourAreaId,
+						type: 'Feature',
+						// a real neighbour whose boundary, from a different source, stops 30m short
+						geometry: square(1 + metresOfLongitude(30), 2),
+						properties: { consulteeCategory: 'Parish Council', consultee: 'Neighbour Across A Gap' }
+					},
+					{
+						id: testAreaId,
+						type: 'Feature',
+						geometry: square(-1, -metresOfLongitude(300)),
+						properties: { consulteeCategory: 'Parish Council', consultee: 'Not A Neighbour' }
+					}
+				]
+			});
+			const ruleset: Ruleset = {
+				id: 'bordering-only',
+				name: 'Bordering only',
+				rules: [
+					{
+						id: 'a_bordering_b_host_parish_comm_council',
+						name: 'Bordering parishes',
+						logicType: 'bordering',
+						categories: ['Parish Council'],
+						hostCategory: 'Parish Council'
+					}
+				]
+			};
+
+			const { matches } = await runRuleset(dbClient, { type: 'Point', coordinates: [0.5, 0.5] }, ruleset);
+			const ids = matches.map((match) => match.feature.id);
+			assert.ok(ids.includes(neighbourAreaId), 'expected the neighbour across a 30m gap to count as bordering');
+			assert.ok(!ids.includes(testAreaId), 'expected an area 300m away not to count as bordering');
+		} finally {
+			await cleanup();
+		}
+	});
+
 	test('returns no matches for a bordering condition with no resolvable host category', async (t) => {
 		if (!dbAvailable) return t.skip('SQL Server database not available');
 		const ruleset: Ruleset = {

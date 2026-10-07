@@ -42,7 +42,14 @@ function railwayMatchRow(
 
 function dbReturning(rows: unknown[][]) {
 	let call = 0;
-	return { $queryRaw: mock.fn(async () => rows[Math.min(call++, rows.length - 1)] ?? []) };
+	return {
+		$queryRaw: mock.fn(async (sql: TemplateStringsArray) => {
+			// runRuleset simplifies the site, and grows it for bordering checks, with queries on the
+			// site alone (no table) - answer those with the site unchanged
+			if (!/\bFROM\b/.test(sql.join(''))) return [{ wkt: realProjectRow().geometryWkt }];
+			return rows[Math.min(call++, rows.length - 1)] ?? [];
+		})
+	};
 }
 
 describe('consultees results page', () => {
