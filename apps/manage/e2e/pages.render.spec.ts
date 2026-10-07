@@ -25,7 +25,7 @@ const pages = [
 		path: `/consultees/${SAMPLE_CASE_ID}`,
 		name: 'project map',
 		heading: new RegExp(SAMPLE_CASE_NAME, 'i'),
-		mustSee: [/Back to projects/i, /Shapefile/i, /Preview report/i]
+		mustSee: [/Back to projects/i, /Shapefile/i, /Preview report/i, /Run Intersection logic/i]
 	},
 	{
 		path: `/consultees/${SAMPLE_CASE_ID}/ruleset`,

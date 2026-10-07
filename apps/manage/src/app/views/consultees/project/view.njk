@@ -82,11 +82,20 @@
 	{% set mapConfigJson = mapConfigJson %}
 	{% include "views/partials/consultee-map-region.njk" %}
 
-	{{ govukButton({
-		text: "Preview report",
-		href: previewReportUrl,
-		classes: "govuk-!-margin-top-6"
-	}) }}
+	<div class="govuk-button-group govuk-!-margin-top-6">
+		{{ govukButton({
+			text: "Preview report",
+			href: previewReportUrl
+		}) }}
+		<form method="post" action="{{ runIntersectionUrl }}">
+			<input type="hidden" name="_csrf" value="{{ _csrf }}">
+			<input type="hidden" name="ruleset" value="{{ rulesetId }}">
+			{{ govukButton({
+				text: "Run Intersection logic",
+				classes: "govuk-button--secondary"
+			}) }}
+		</form>
+	</div>
 {% endblock %}
 
 {% block bodyEnd %}

@@ -2,7 +2,7 @@ import { mockLogger } from '@planning-inspectorate/core/testing';
 import assert from 'node:assert';
 import { describe, it, mock } from 'node:test';
 import { configureNunjucks } from '../../../nunjucks.ts';
-import { buildConsulteeProjectPage } from './controller.ts';
+import { buildConsulteeProjectPage, buildRunIntersectionSubmit } from './controller.ts';
 
 const realProjectId = '44444444-4444-4444-4444-444444444444';
 
@@ -79,11 +79,14 @@ describe('consultee project map page', () => {
 		assert.strictEqual(viewModel.sectorDescription, 'Energy, Generating Stations');
 		assert.strictEqual(viewModel.stage, null);
 		assert.strictEqual(viewModel.previewReportUrl, `/consultees/${realProjectId}/report?ruleset=example-ruleset`);
+		assert.strictEqual(viewModel.runIntersectionUrl, `/consultees/${realProjectId}/run-intersection`);
+		assert.strictEqual(viewModel.rulesetId, 'example-ruleset');
 		assert.ok(viewModel.mapConfigJson.includes('FeatureCollection'));
 
 		const html = mockRes.render.mock.calls[0].result;
 		assert.match(html, /Back to projects/);
 		assert.match(html, /Preview report/);
+		assert.match(html, /Run Intersection logic/);
 		assert.match(html, /Change/);
 	});
 
@@ -158,5 +161,37 @@ describe('consultee project map page', () => {
 		assert.strictEqual(viewModel.rulesetFailed, true);
 		assert.strictEqual(viewModel.retryUrl, `/consultees/${realProjectId}?ruleset=example-ruleset`);
 		assert.strictEqual(logger.error.mock.callCount(), 1);
+	});
+});
+
+describe('run intersection submit', () => {
+	const handler = buildRunIntersectionSubmit();
+
+	it('should redirect back to the map page with the posted ruleset', async () => {
+		const mockRes = { status: mock.fn(() => mockRes), redirect: mock.fn() };
+		await handler({ params: { caseId: realProjectId }, body: { ruleset: 'example-ruleset' } }, mockRes);
+
+		assert.strictEqual(
+			mockRes.redirect.mock.calls[0].arguments[0],
+			`/consultees/${realProjectId}?ruleset=example-ruleset`
+		);
+	});
+
+	it('should fall back to the first ruleset when the posted one is unknown', async () => {
+		const mockRes = { status: mock.fn(() => mockRes), redirect: mock.fn() };
+		await handler({ params: { caseId: realProjectId }, body: { ruleset: 'not-a-real-ruleset' } }, mockRes);
+
+		assert.strictEqual(
+			mockRes.redirect.mock.calls[0].arguments[0],
+			`/consultees/${realProjectId}?ruleset=example-ruleset`
+		);
+	});
+
+	it('should 404 for an id that is not a well-formed UUID', async () => {
+		const mockRes = { status: mock.fn(() => mockRes), render: mock.fn(), redirect: mock.fn() };
+		await handler({ params: { caseId: 'not-a-uuid' }, body: {} }, mockRes);
+
+		assert.strictEqual(mockRes.status.mock.calls[0].arguments[0], 404);
+		assert.strictEqual(mockRes.redirect.mock.callCount(), 0);
 	});
 });
