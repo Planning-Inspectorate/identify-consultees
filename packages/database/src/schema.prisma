@@ -30,23 +30,25 @@ datasource db {
 /// Consultee catchment/consultation-area geometries. CaseBoundary geometries are screened against
 /// these to work out which consultees are relevant to a case.
 model ConsulteeArea {
-  id                String                   @id @default(dbgenerated("newid()")) @db.UniqueIdentifier
-  geometry          Unsupported("geography")
-  geometryType      String                   @db.NVarChar(50)
-  consulteeCategory String?                  @db.NVarChar(200)
-  consultee         String?                  @db.NVarChar(200)
-  region            String?                  @db.NVarChar(100)
+  id                 String                   @id @default(dbgenerated("newid()")) @db.UniqueIdentifier
+  geometry           Unsupported("geography")
+  // simplified copy of `geometry` that ruleset distance checks run against - see the migration
+  geometrySimplified Unsupported("geography")
+  geometryType       String                   @db.NVarChar(50)
+  consulteeCategory  String?                  @db.NVarChar(200)
+  consultee          String?                  @db.NVarChar(200)
+  region             String?                  @db.NVarChar(100)
   // loose link by value, not an enforced foreign key - an area can relate to several case parts
   // sharing one reference, so this isn't unique and can't be an FK target
-  caseReference     String?                  @db.NVarChar(50)
-  documentId        String?                  @db.UniqueIdentifier
-  consulteeId       String?                  @db.UniqueIdentifier
-  organisationId    String?                  @db.UniqueIdentifier
-  currentVersion    Int                      @default(1)
+  caseReference      String?                  @db.NVarChar(50)
+  documentId         String?                  @db.UniqueIdentifier
+  consulteeId        String?                  @db.UniqueIdentifier
+  organisationId     String?                  @db.UniqueIdentifier
+  currentVersion     Int                      @default(1)
   // JSON catch-all for anything not promoted to a named column above - SQL Server has no native
   // JSON column type; query it with JSON_VALUE()/OPENJSON().
-  metadata          String                   @default("{}") @db.NVarChar(Max)
-  lastUpdated       DateTime                 @default(now())
+  metadata           String                   @default("{}") @db.NVarChar(Max)
+  lastUpdated        DateTime                 @default(now())
 
   @@index([caseReference])
   @@index([consulteeCategory])

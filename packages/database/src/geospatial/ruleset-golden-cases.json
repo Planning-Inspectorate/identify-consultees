@@ -1,1713 +1,1480 @@
 {
-	"_about": "Expected example-ruleset results for five real projects against the full reference dataset (combined_reference_data_v1.geojson). Computed independently of the app (Python/shapely over the raw GeoJSON, EPSG:27700) - see rulesets.golden.test.ts.",
+	"_about": "Expected example-ruleset results for five real projects against the full reference dataset (combined_reference_data_v1.geojson), computed independently of the app (Python/shapely over the raw GeoJSON, EPSG:27700). mustInclude: the exact calculation. mayAlsoInclude: extra consultees a deliberately generous calculation finds (cut-offs widened by 60m + 0.1%, hosts within 60m, neighbours within 80m) - borderline cases the app may include when in doubt. See rulesets.golden.test.ts.",
 	"cases": [
 		{
 			"caseReference": "TR010021",
 			"caseName": "Silvertown Tunnel",
-			"consultees": [
+			"mustInclude": [
 				{
 					"id": "7f3a79bf-61e2-a8cc-bbf1-e3522c08e064",
 					"category": "Ambulance Trust",
-					"consultee": "London Ambulance Service",
-					"distanceMetres": 0
-				},
-				{
-					"id": "c5be4344-1269-ccb6-a7b6-33f625bddbda",
-					"category": "Dock or Harbour",
-					"consultee": "Royal Docks (Non-stat)",
-					"distanceMetres": 0
-				},
-				{
-					"id": "93a14498-d0fe-7b67-66a4-a8c48ba8f846",
-					"category": "Fire and Rescue Authority",
-					"consultee": "London Fire and Emergency Planning Authority",
-					"distanceMetres": 0
-				},
-				{
-					"id": "0299e58e-fecb-4693-626c-4e993055631a",
-					"category": "Greater London Authority",
-					"consultee": "Greater London Authority",
-					"distanceMetres": 0
-				},
-				{
-					"id": "1c699eac-6882-55a9-3ead-0d55324a3cf4",
-					"category": "ICB",
-					"consultee": "NHS North East London Integrated Care Board",
-					"distanceMetres": 0
-				},
-				{
-					"id": "c6e08fd3-1cfe-8fe2-7696-bc9ba40b7b96",
-					"category": "ICB",
-					"consultee": "NHS South East London Integrated Care Board",
-					"distanceMetres": 0
-				},
-				{
-					"id": "0d21a6ad-2ade-afa5-4a7b-172c3d897395",
-					"category": "Local Resilience Forum",
-					"consultee": "London",
-					"distanceMetres": 0
-				},
-				{
-					"id": "a3a6d939-b888-123b-707e-d85fd5053ce8",
-					"category": "Parish Council",
-					"consultee": "Greenwich, unparished area",
-					"distanceMetres": 0
-				},
-				{
-					"id": "1892269e-ecdd-cfb9-c745-bc439207308d",
-					"category": "Parish Council",
-					"consultee": "Newham, unparished area",
-					"distanceMetres": 0
-				},
-				{
-					"id": "8c8f5001-a4f0-e64c-5789-f61b9cecd815",
-					"category": "Police",
-					"consultee": "Metropolitan Police",
-					"distanceMetres": 0
-				},
-				{
-					"id": "df4434df-dc4f-6f4e-7773-2caf26773b3c",
-					"category": "Unitary Authority",
-					"consultee": "Greenwich",
-					"distanceMetres": 0
-				},
-				{
-					"id": "fc8be975-a824-faab-8df8-f853cfc4c7c6",
-					"category": "Unitary Authority",
-					"consultee": "Newham",
-					"distanceMetres": 0
-				},
-				{
-					"id": "f1970a19-eec0-a7ee-4b2b-29276a10c7b6",
-					"category": "Parish Council",
-					"consultee": "Tower Hamlets, unparished area",
-					"distanceMetres": 80
-				},
-				{
-					"id": "1516c657-7881-f8e9-9034-4b583fae1f03",
-					"category": "Unitary Authority",
-					"consultee": "Tower Hamlets",
-					"distanceMetres": 80
-				},
-				{
-					"id": "c2821b90-f54c-3a76-8c4b-699dd46f4c3b",
-					"category": "Dock or Harbour",
-					"consultee": "Silvertown (Non-stat)",
-					"distanceMetres": 1247
-				},
-				{
-					"id": "104b8b5e-35e3-e0d4-6e4f-a7a9c0fde1fb",
-					"category": "Dock or Harbour",
-					"consultee": "Greenwich (Non-stat)",
-					"distanceMetres": 1606
-				},
-				{
-					"id": "3ba8023b-b8ff-e2ea-185d-5db388be1103",
-					"category": "Hospital",
-					"consultee": "NEWHAM GENERAL HOSPITAL",
-					"distanceMetres": 2079
-				},
-				{
-					"id": "56f27ee9-3ade-4b98-5307-d12d525428cf",
-					"category": "Hospital",
-					"consultee": "NEWHAM GENERAL HOSPITAL",
-					"distanceMetres": 2079
-				},
-				{
-					"id": "a3c47afd-2e4b-257f-521e-7d2a37c022b9",
-					"category": "Hospital",
-					"consultee": "NEWHAM HOSPITAL",
-					"distanceMetres": 2079
-				},
-				{
-					"id": "4189b140-8cff-50b2-9bd1-4260a631ec42",
-					"category": "Dock or Harbour",
-					"consultee": "Deptford (Non-stat)",
-					"distanceMetres": 2082
-				},
-				{
-					"id": "9ca50d48-12ef-2c28-72e5-39e655138888",
-					"category": "Unitary Authority",
-					"consultee": "Lewisham",
-					"distanceMetres": 2166
-				},
-				{
-					"id": "5600acd7-18f0-7207-5225-e2eb50e8e362",
-					"category": "Parish Council",
-					"consultee": "Lewisham, unparished area",
-					"distanceMetres": 2178
-				},
-				{
-					"id": "c19e55bb-e0a5-145c-8bce-928463e2a874",
-					"category": "Dock or Harbour",
-					"consultee": "Convoy's Wharf (Non-stat)",
-					"distanceMetres": 2294
-				},
-				{
-					"id": "1ab3f080-e142-b54e-68a4-77c01a1002bb",
-					"category": "Hospital",
-					"consultee": "BLACKHEATH HOSPITAL",
-					"distanceMetres": 3286
-				},
-				{
-					"id": "37902bdf-ea84-48e3-01a8-3377e1049b12",
-					"category": "Hospital",
-					"consultee": "BLACKHEATH HOSPITAL",
-					"distanceMetres": 3286
-				},
-				{
-					"id": "f53eff5e-ce3d-e422-9708-f852f5fbf7f8",
-					"category": "Hospital",
-					"consultee": "KINGS @ QUEEN ELIZABETH HOSPITAL WOOLWICH",
-					"distanceMetres": 3401
-				},
-				{
-					"id": "dc879e2f-90e6-1ad1-299c-3a5689d1e308",
-					"category": "Hospital",
-					"consultee": "PTS QUEEN ELIZABETH HOSPITAL",
-					"distanceMetres": 3401
-				},
-				{
-					"id": "01964215-b810-a363-0842-de9b7c236b47",
-					"category": "Hospital",
-					"consultee": "QUEEN ELIZABETH HOSPITAL",
-					"distanceMetres": 3401
-				},
-				{
-					"id": "0eb9bc35-e0e6-053a-1a87-32cf5bbf40e9",
-					"category": "Hospital",
-					"consultee": "QUEEN ELIZABETH HOSPITAL",
-					"distanceMetres": 3401
-				},
-				{
-					"id": "2c814097-5f3a-87f2-758a-58acc2da0efd",
-					"category": "Hospital",
-					"consultee": "CYGNET HOSPITAL BECKTON",
-					"distanceMetres": 3423
-				},
-				{
-					"id": "630db993-954d-cd9f-55f3-375881fc365c",
-					"category": "Hospital",
-					"consultee": "EAST HAM MEMORIAL HOSPITAL",
-					"distanceMetres": 4026
-				},
-				{
-					"id": "379acc8c-bce7-a112-403d-e3d839844bb2",
-					"category": "Hospital",
-					"consultee": "LONDON INDEPENDENT HOSPITAL",
-					"distanceMetres": 4046
-				},
-				{
-					"id": "ef3f54d9-cb77-c372-7e99-bf29bf043f9f",
-					"category": "Hospital",
-					"consultee": "UCLH OUTREACH - LONDON INDEPENDENT HOSPITAL",
-					"distanceMetres": 4046
-				},
-				{
-					"id": "70f3faa9-fd78-a5a3-9f88-8acb3ec07e86",
-					"category": "Hospital",
-					"consultee": "MILE END HOSPITAL",
-					"distanceMetres": 4082
-				},
-				{
-					"id": "daa8ac6c-8bea-588b-5722-0aaf1f390d36",
-					"category": "Hospital",
-					"consultee": "MILE END HOSPITAL",
-					"distanceMetres": 4082
-				},
-				{
-					"id": "5a070fbd-6da7-7832-9729-a30117534da0",
-					"category": "Parish Council",
-					"consultee": "Hackney, unparished area",
-					"distanceMetres": 4229
-				},
-				{
-					"id": "36cb475d-4e40-1f08-8854-948428ed2af8",
-					"category": "Unitary Authority",
-					"consultee": "Hackney",
-					"distanceMetres": 4229
-				},
-				{
-					"id": "781758c5-db1c-40e2-d496-9175e0657c70",
-					"category": "Parish Council",
-					"consultee": "Waltham Forest, unparished area",
-					"distanceMetres": 4602
-				},
-				{
-					"id": "9dc9e314-a4b9-59e2-11ac-d1a2d9ed9015",
-					"category": "Unitary Authority",
-					"consultee": "Waltham Forest",
-					"distanceMetres": 4602
-				},
-				{
-					"id": "74c8a794-5b75-048d-ceb0-150e58a5cf59",
-					"category": "Parish Council",
-					"consultee": "Barking and Dagenham, unparished area",
-					"distanceMetres": 4623
-				},
-				{
-					"id": "cec747d8-af09-c6b6-db0b-264f714c81b5",
-					"category": "Unitary Authority",
-					"consultee": "Barking and Dagenham",
-					"distanceMetres": 4623
-				},
-				{
-					"id": "f964462a-7cf8-5cc0-d053-1bec7bf1f1f6",
-					"category": "Hospital",
-					"consultee": "BARTS HOSPITAL AT HOME",
-					"distanceMetres": 4766
-				},
-				{
-					"id": "cbce83d4-e52f-a10a-bffb-20df16113c18",
-					"category": "Hospital",
-					"consultee": "BLT PRIVATE HOSPITALS",
-					"distanceMetres": 4766
-				},
-				{
-					"id": "0698f1e7-6b54-d3cd-bb66-ce47ba6d981f",
-					"category": "Hospital",
-					"consultee": "ROYAL LONDON HOSPITAL",
-					"distanceMetres": 4766
-				},
-				{
-					"id": "e621e218-e5e3-0ec7-6348-7e2bc8247642",
-					"category": "Hospital",
-					"consultee": "ROYAL LONDON HOSPITAL",
-					"distanceMetres": 4766
-				},
-				{
-					"id": "6af43442-7e6d-ca7f-fce0-8bb64965d85e",
-					"category": "Hospital",
-					"consultee": "THE ROYAL LONDON HOSPITAL",
-					"distanceMetres": 4766
-				},
-				{
-					"id": "c56c7d5a-d873-0505-78a7-9f23bbc35a41",
-					"category": "Hospital",
-					"consultee": "THE ROYAL LONDON HOSPITAL",
-					"distanceMetres": 4766
-				},
-				{
-					"id": "d976accc-dd17-287d-82b1-a14308f9515b",
-					"category": "Hospital",
-					"consultee": "THE ROYAL LONDON HOSPITAL",
-					"distanceMetres": 4766
-				},
-				{
-					"id": "e7ad293e-5fe5-71e5-c1c4-e0f93f924ba7",
-					"category": "Hospital",
-					"consultee": "THE LEWISHAM HOSPITAL NHS TRUST",
-					"distanceMetres": 4771
-				},
-				{
-					"id": "1da24e33-3ad9-d629-68b2-aa259aa9a999",
-					"category": "Hospital",
-					"consultee": "UNIVERSITY HOSPITAL LEWISHAM",
-					"distanceMetres": 4771
-				},
-				{
-					"id": "e9d7fb8f-ee86-8216-8f7d-902080a708a3",
-					"category": "Hospital",
-					"consultee": "UNIVERSITY HOSPITAL LEWISHAM",
-					"distanceMetres": 4771
-				},
-				{
-					"id": "81d2d068-15ff-57ca-92f3-2f88d63667c5",
-					"category": "Parish Council",
-					"consultee": "Redbridge, unparished area",
-					"distanceMetres": 5065
-				},
-				{
-					"id": "d6f8c46b-0194-328b-b6d5-4f47dc7de4a1",
-					"category": "Unitary Authority",
-					"consultee": "Redbridge",
-					"distanceMetres": 5065
+					"consultee": "London Ambulance Service"
 				},
 				{
 					"id": "cd6b6c3c-d58a-5320-5f36-ea38e85795d4",
 					"category": "Dock or Harbour",
-					"consultee": "Barking (Non-stat)",
-					"distanceMetres": 5207
+					"consultee": "Barking (Non-stat)"
 				},
 				{
-					"id": "d8440270-95c9-cddc-40b2-4bbc02a6fb40",
-					"category": "Hospital",
-					"consultee": "ST CLEMENTS HOSPITAL",
-					"distanceMetres": 5446
-				},
-				{
-					"id": "9689a0f1-de4f-687a-1363-85a8be1784f1",
-					"category": "Parish Council",
-					"consultee": "Bromley, unparished area",
-					"distanceMetres": 5659
-				},
-				{
-					"id": "ca7986c1-a785-7842-a782-2db561c9ef0d",
-					"category": "Unitary Authority",
-					"consultee": "Bromley",
-					"distanceMetres": 5659
-				},
-				{
-					"id": "1e86ef5e-53cd-adad-6b05-6cb6193f55bc",
-					"category": "Hospital",
-					"consultee": "ELTHAM COMMUNITY HOSPITAL",
-					"distanceMetres": 5845
-				},
-				{
-					"id": "c242ba1b-e0e6-176d-9afe-4d68609822ac",
-					"category": "Hospital",
-					"consultee": "GSTT @ ELTHAM COMMUNITY HOSPITAL",
-					"distanceMetres": 5845
-				},
-				{
-					"id": "d63d26ca-9abe-fc24-5b84-58335c5f2a12",
-					"category": "Hospital",
-					"consultee": "PPG HOSPITALS - LOXFORD POLYCLINIC",
-					"distanceMetres": 5976
-				},
-				{
-					"id": "3277e117-619c-15dd-2ac9-5715ee3770d7",
-					"category": "Parish Council",
-					"consultee": "Bexley, unparished area",
-					"distanceMetres": 5985
-				},
-				{
-					"id": "2b237e16-a2a0-117c-d607-0b2048af1942",
-					"category": "Unitary Authority",
-					"consultee": "Bexley",
-					"distanceMetres": 5985
-				},
-				{
-					"id": "549371c6-3b9b-606d-8ea4-089ce454910a",
-					"category": "Hospital",
-					"consultee": "HOMERTON HOSPITAL",
-					"distanceMetres": 6060
-				},
-				{
-					"id": "d5911633-ecad-7a91-9906-2e6fe8108407",
-					"category": "Hospital",
-					"consultee": "HOMERTON UNIVERSITY HOSPITAL",
-					"distanceMetres": 6060
-				},
-				{
-					"id": "9fb2120e-c100-71dd-eaa6-2dee4d0fabbc",
-					"category": "Hospital",
-					"consultee": "GSTT @ LONDON BRIDGE HOSPITAL",
-					"distanceMetres": 6093
-				},
-				{
-					"id": "cbe12791-90af-e064-9abf-877a189be1b8",
-					"category": "Hospital",
-					"consultee": "LONDON BRIDGE HOSPITAL",
-					"distanceMetres": 6093
-				},
-				{
-					"id": "9089db9a-0322-3e80-7dbd-bcc0f9c3a907",
-					"category": "Hospital",
-					"consultee": "UCLH OUTREACH: LONDON BRIDGE HOSPITAL",
-					"distanceMetres": 6093
-				},
-				{
-					"id": "23ecbf35-fa23-dfba-f6a1-3130e2e69aba",
-					"category": "Hospital",
-					"consultee": "GUY'S AND ST THOMAS' HOSPITALS",
-					"distanceMetres": 6120
-				},
-				{
-					"id": "4f551c39-3939-2fb4-f086-960297a19840",
-					"category": "Hospital",
-					"consultee": "GUY'S HOSPITAL",
-					"distanceMetres": 6120
-				},
-				{
-					"id": "2d60d9ce-1c5d-e638-cecb-0eb7252e46d7",
-					"category": "Hospital",
-					"consultee": "MILDMAY UK (MILDMAY MISSION HOSPITAL)",
-					"distanceMetres": 6181
-				},
-				{
-					"id": "7f41e479-ad0d-2657-a0b4-03424436eeee",
-					"category": "ICB",
-					"consultee": "NHS West and North London Integrated Care Board",
-					"distanceMetres": 6442
-				},
-				{
-					"id": "1181398b-2ed2-9e34-8715-9cc2f9f79cf6",
-					"category": "Hospital",
-					"consultee": "BARKING HAVERING & REDBRIDGE HOSPITALS NHS TRUST",
-					"distanceMetres": 6700
-				},
-				{
-					"id": "5dbfa3dd-4c6b-33eb-f38e-18cddf55988a",
-					"category": "Hospital",
-					"consultee": "BARKING HOSPITAL",
-					"distanceMetres": 6700
-				},
-				{
-					"id": "da365322-e678-8004-a8aa-af22eeb6f655",
-					"category": "Hospital",
-					"consultee": "BARKING HOSPITAL",
-					"distanceMetres": 6700
-				},
-				{
-					"id": "700dc516-1481-912e-f956-d17362f352e1",
-					"category": "Hospital",
-					"consultee": "BARKING HOSPITAL COMMUNITY DIAGNOSTIC NOUS",
-					"distanceMetres": 6700
-				},
-				{
-					"id": "c900da21-82aa-2816-8174-76daf6abfbab",
-					"category": "Hospital",
-					"consultee": "BARKING HOSPITAL COMMUNITY DIAGNOSTIC NOUS",
-					"distanceMetres": 6700
-				},
-				{
-					"id": "9a1784a7-be63-eb57-db2b-e1d58f23eab3",
-					"category": "Hospital",
-					"consultee": "MOORFIELDS COMMUNITY EYE CLINIC AT BARKING HOSPITAL",
-					"distanceMetres": 6700
-				},
-				{
-					"id": "2bb6af60-7f4b-c563-1c28-94bcdeb25e2d",
-					"category": "Hospital",
-					"consultee": "MOORFIELDS EYE HOSPITAL (CITY ROAD CAMPUS)",
-					"distanceMetres": 7037
-				},
-				{
-					"id": "912373f8-fbb4-81c3-5382-788fc3d452f1",
-					"category": "Hospital",
-					"consultee": "MOORFIELDS EYE HOSPITAL NHST",
-					"distanceMetres": 7037
-				},
-				{
-					"id": "3de03b59-8cef-7cfe-8d92-34e0dafc28a2",
-					"category": "Hospital",
-					"consultee": "DULWICH COMMUNITY HOSPITAL",
-					"distanceMetres": 7085
-				},
-				{
-					"id": "6f868bcb-a4a5-c82f-cf6e-71a206204f0c",
-					"category": "Hospital",
-					"consultee": "MAUDSLEY HOSPITAL",
-					"distanceMetres": 7153
-				},
-				{
-					"id": "7b76ae44-eeb0-f811-de4f-a3947d905dda",
-					"category": "Hospital",
-					"consultee": "KING'S COLLEGE HOSPITAL",
-					"distanceMetres": 7340
-				},
-				{
-					"id": "3c9da3c3-6901-4a1c-5520-14b88242e96d",
-					"category": "Hospital",
-					"consultee": "KING'S COLLEGE HOSPITAL (DENMARK HILL)",
-					"distanceMetres": 7340
-				},
-				{
-					"id": "e5d98f2a-3b6f-8192-a47f-7ec4fa9f4324",
-					"category": "Hospital",
-					"consultee": "KING'S COLLEGE HOSPITAL (DENMARK HILL)",
-					"distanceMetres": 7340
-				},
-				{
-					"id": "ca64d555-388c-4eb7-87bf-3a4b5d71b67c",
-					"category": "Hospital",
-					"consultee": "KINGS COLLEGE DENTAL HOSPITAL",
-					"distanceMetres": 7340
-				},
-				{
-					"id": "1513c802-3c5e-0075-6f13-b186b6e5ba76",
-					"category": "Hospital",
-					"consultee": "KINGS COLLEGE HOSPITAL",
-					"distanceMetres": 7340
-				},
-				{
-					"id": "1e70178f-eedd-eb64-6772-e8f7236f0101",
-					"category": "Hospital",
-					"consultee": "ST GEORGE'S AT KINGS COLLEGE HOSPITAL",
-					"distanceMetres": 7340
-				},
-				{
-					"id": "b95f636f-edbd-3677-7bac-7ec42777c225",
-					"category": "Hospital",
-					"consultee": "UTC - KING'S COLLEGE HOSPITAL",
-					"distanceMetres": 7340
-				},
-				{
-					"id": "236080d8-5ee2-6a4a-4fae-dc305090d36b",
-					"category": "Hospital",
-					"consultee": "MOORFIELDS EYE UNIT AT ST BARTHOLOMEW'S HOSPITAL",
-					"distanceMetres": 7347
-				},
-				{
-					"id": "59b660d2-4c0a-b852-c4b6-90e33ccc693e",
-					"category": "Hospital",
-					"consultee": "ST BARTHOLOMEW'S HOSPITAL",
-					"distanceMetres": 7347
-				},
-				{
-					"id": "5324f9c7-7225-d8ba-5941-5ec6328cd29d",
-					"category": "Hospital",
-					"consultee": "ST BARTHOLOMEWS HOSPITAL",
-					"distanceMetres": 7352
-				},
-				{
-					"id": "1f1a9a3d-3ee1-a260-d184-5733689744ee",
-					"category": "Hospital",
-					"consultee": "NUFFIELD HEALTH AT ST BARTHOLOMEW'S HOSPITAL",
-					"distanceMetres": 7386
-				},
-				{
-					"id": "86d7d512-3b17-47b3-9975-d50b2af702e0",
-					"category": "Hospital",
-					"consultee": "PTS WHIPPS CROSS HOSPITAL",
-					"distanceMetres": 7743
-				},
-				{
-					"id": "6861b66b-8143-1163-4823-2b0072bd7b54",
-					"category": "Hospital",
-					"consultee": "WHIPPS CROSS HOSPITAL",
-					"distanceMetres": 7743
-				},
-				{
-					"id": "77ce42bb-7b17-3309-e374-3e6d9d2763fe",
-					"category": "Hospital",
-					"consultee": "WHIPPS CROSS HOSPITAL",
-					"distanceMetres": 7743
-				},
-				{
-					"id": "9139b573-58ab-7ed8-a5d2-16fec346139e",
-					"category": "Hospital",
-					"consultee": "WHIPPS CROSS HOSPITAL",
-					"distanceMetres": 7743
-				},
-				{
-					"id": "d6333c4d-c1cc-b848-bcdc-d1aa6f48b885",
-					"category": "Hospital",
-					"consultee": "WHIPPS CROSS HOSPITAL",
-					"distanceMetres": 7743
-				},
-				{
-					"id": "dee25be9-1001-a32e-c1c7-43df61518126",
-					"category": "Hospital",
-					"consultee": "WHIPPS CROSS HOSPITAL",
-					"distanceMetres": 7743
-				},
-				{
-					"id": "1a2f23fd-cfdf-0ae9-94d8-45b444eaa4e6",
-					"category": "Hospital",
-					"consultee": "WHIPPS CROSS UNIVERSITY HOSPITAL",
-					"distanceMetres": 7743
-				},
-				{
-					"id": "22f64f5b-ffdb-f109-c8d7-a4ccd4600f06",
-					"category": "Hospital",
-					"consultee": "WHIPPS CROSS UNIVERSITY HOSPITAL",
-					"distanceMetres": 7743
-				},
-				{
-					"id": "4b789144-09f3-20a8-94d5-b44e50fc0588",
-					"category": "Hospital",
-					"consultee": "WHIPPS CROSS UNIVERSITY HOSPITAL",
-					"distanceMetres": 7743
-				},
-				{
-					"id": "6ca713bc-239f-0dd9-5605-476ea8074819",
-					"category": "Hospital",
-					"consultee": "WHIPPS CROSS UNIVERSITY HOSPITAL",
-					"distanceMetres": 7743
-				},
-				{
-					"id": "e0c134e4-45f8-722d-8290-44dd048a8452",
-					"category": "Hospital",
-					"consultee": "ST THOMAS' HOSPITAL",
-					"distanceMetres": 8297
-				},
-				{
-					"id": "485147e1-9c20-2984-0be2-c8201c20fa0d",
-					"category": "Hospital",
-					"consultee": "ST THOMAS' HOSPITAL (CAMHS MENTAL HEALTH UNIT)",
-					"distanceMetres": 8297
-				},
-				{
-					"id": "d815074b-0d95-ba12-8a61-482cc2be28ee",
-					"category": "Hospital",
-					"consultee": "ST THOMAS' HOSPITAL (MENTAL HEALTH UNIT)",
-					"distanceMetres": 8297
-				},
-				{
-					"id": "1cbace31-da30-f581-1578-9de8e1d8a2bd",
-					"category": "Hospital",
-					"consultee": "CUH AT ST THOMAS' HOSPITAL",
-					"distanceMetres": 8332
-				},
-				{
-					"id": "1806189c-6900-7b60-b9d0-afe775e3188f",
-					"category": "Hospital",
-					"consultee": "EVELINA LONDON CHILDREN'S HOSPITAL",
-					"distanceMetres": 8332
-				},
-				{
-					"id": "0f89004c-18ef-ccf2-3018-fe2cce5f149a",
-					"category": "Hospital",
-					"consultee": "WANSTEAD HOSPITAL",
-					"distanceMetres": 8341
-				},
-				{
-					"id": "63d0725c-92ef-e8c0-24c3-6968cbac07d0",
-					"category": "Hospital",
-					"consultee": "PPG HOSPITALS - PORTERS AVENUE",
-					"distanceMetres": 8633
+					"id": "c19e55bb-e0a5-145c-8bce-928463e2a874",
+					"category": "Dock or Harbour",
+					"consultee": "Convoy's Wharf (Non-stat)"
 				},
 				{
 					"id": "522d62d1-d550-013d-d3a6-1ff844399c12",
 					"category": "Dock or Harbour",
-					"consultee": "Dagenham (Non-stat)",
-					"distanceMetres": 8639
+					"consultee": "Dagenham (Non-stat)"
+				},
+				{
+					"id": "4189b140-8cff-50b2-9bd1-4260a631ec42",
+					"category": "Dock or Harbour",
+					"consultee": "Deptford (Non-stat)"
+				},
+				{
+					"id": "104b8b5e-35e3-e0d4-6e4f-a7a9c0fde1fb",
+					"category": "Dock or Harbour",
+					"consultee": "Greenwich (Non-stat)"
+				},
+				{
+					"id": "c5be4344-1269-ccb6-a7b6-33f625bddbda",
+					"category": "Dock or Harbour",
+					"consultee": "Royal Docks (Non-stat)"
+				},
+				{
+					"id": "c2821b90-f54c-3a76-8c4b-699dd46f4c3b",
+					"category": "Dock or Harbour",
+					"consultee": "Silvertown (Non-stat)"
+				},
+				{
+					"id": "93a14498-d0fe-7b67-66a4-a8c48ba8f846",
+					"category": "Fire and Rescue Authority",
+					"consultee": "London Fire and Emergency Planning Authority"
+				},
+				{
+					"id": "0299e58e-fecb-4693-626c-4e993055631a",
+					"category": "Greater London Authority",
+					"consultee": "Greater London Authority"
+				},
+				{
+					"id": "1181398b-2ed2-9e34-8715-9cc2f9f79cf6",
+					"category": "Hospital",
+					"consultee": "BARKING HAVERING & REDBRIDGE HOSPITALS NHS TRUST"
+				},
+				{
+					"id": "5dbfa3dd-4c6b-33eb-f38e-18cddf55988a",
+					"category": "Hospital",
+					"consultee": "BARKING HOSPITAL"
+				},
+				{
+					"id": "da365322-e678-8004-a8aa-af22eeb6f655",
+					"category": "Hospital",
+					"consultee": "BARKING HOSPITAL"
+				},
+				{
+					"id": "700dc516-1481-912e-f956-d17362f352e1",
+					"category": "Hospital",
+					"consultee": "BARKING HOSPITAL COMMUNITY DIAGNOSTIC NOUS"
+				},
+				{
+					"id": "c900da21-82aa-2816-8174-76daf6abfbab",
+					"category": "Hospital",
+					"consultee": "BARKING HOSPITAL COMMUNITY DIAGNOSTIC NOUS"
+				},
+				{
+					"id": "f964462a-7cf8-5cc0-d053-1bec7bf1f1f6",
+					"category": "Hospital",
+					"consultee": "BARTS HOSPITAL AT HOME"
+				},
+				{
+					"id": "1ab3f080-e142-b54e-68a4-77c01a1002bb",
+					"category": "Hospital",
+					"consultee": "BLACKHEATH HOSPITAL"
+				},
+				{
+					"id": "37902bdf-ea84-48e3-01a8-3377e1049b12",
+					"category": "Hospital",
+					"consultee": "BLACKHEATH HOSPITAL"
+				},
+				{
+					"id": "cbce83d4-e52f-a10a-bffb-20df16113c18",
+					"category": "Hospital",
+					"consultee": "BLT PRIVATE HOSPITALS"
+				},
+				{
+					"id": "1cbace31-da30-f581-1578-9de8e1d8a2bd",
+					"category": "Hospital",
+					"consultee": "CUH AT ST THOMAS' HOSPITAL"
+				},
+				{
+					"id": "2c814097-5f3a-87f2-758a-58acc2da0efd",
+					"category": "Hospital",
+					"consultee": "CYGNET HOSPITAL BECKTON"
+				},
+				{
+					"id": "3de03b59-8cef-7cfe-8d92-34e0dafc28a2",
+					"category": "Hospital",
+					"consultee": "DULWICH COMMUNITY HOSPITAL"
+				},
+				{
+					"id": "630db993-954d-cd9f-55f3-375881fc365c",
+					"category": "Hospital",
+					"consultee": "EAST HAM MEMORIAL HOSPITAL"
 				},
 				{
 					"id": "d5dbbf32-5944-2d49-f246-dec6a7ecd297",
 					"category": "Hospital",
-					"consultee": "EASTMAN DENTAL HOSPITAL",
-					"distanceMetres": 8725
+					"consultee": "EASTMAN DENTAL HOSPITAL"
+				},
+				{
+					"id": "1e86ef5e-53cd-adad-6b05-6cb6193f55bc",
+					"category": "Hospital",
+					"consultee": "ELTHAM COMMUNITY HOSPITAL"
+				},
+				{
+					"id": "1806189c-6900-7b60-b9d0-afe775e3188f",
+					"category": "Hospital",
+					"consultee": "EVELINA LONDON CHILDREN'S HOSPITAL"
 				},
 				{
 					"id": "348afe25-0c5e-e12e-9866-1030b615ecb1",
 					"category": "Hospital",
-					"consultee": "GREAT ORMOND STREET HOSPITAL",
-					"distanceMetres": 8787
+					"consultee": "GREAT ORMOND STREET HOSPITAL"
 				},
 				{
 					"id": "62dedfe9-601d-11a1-741c-f03ed314b097",
 					"category": "Hospital",
-					"consultee": "GREAT ORMOND STREET HOSPITAL CENTRAL LONDON SITE",
-					"distanceMetres": 8787
+					"consultee": "GREAT ORMOND STREET HOSPITAL CENTRAL LONDON SITE"
 				},
 				{
 					"id": "3b4f7376-4e49-bb8c-7de3-7369bc0205e0",
 					"category": "Hospital",
-					"consultee": "GREAT ORMOND STREET HOSPITAL FOR CHILDREN",
-					"distanceMetres": 8787
+					"consultee": "GREAT ORMOND STREET HOSPITAL FOR CHILDREN"
 				},
 				{
 					"id": "c8c5a5f6-6e22-d23d-c9bf-e44c98f26f3c",
 					"category": "Hospital",
-					"consultee": "GREAT ORMOND STREET HOSPITAL FOR CHILDREN",
-					"distanceMetres": 8787
+					"consultee": "GREAT ORMOND STREET HOSPITAL FOR CHILDREN"
 				},
 				{
-					"id": "e36c91a4-ad03-979a-2093-44c98060e009",
+					"id": "c242ba1b-e0e6-176d-9afe-4d68609822ac",
 					"category": "Hospital",
-					"consultee": "THE ITALIAN HOSPITAL",
-					"distanceMetres": 8862
+					"consultee": "GSTT @ ELTHAM COMMUNITY HOSPITAL"
 				},
 				{
-					"id": "23fa0eb5-0338-9529-d8f3-1075927c241c",
+					"id": "9fb2120e-c100-71dd-eaa6-2dee4d0fabbc",
 					"category": "Hospital",
-					"consultee": "ROYAL LONDON HOSPITAL FOR INTEGRATED MEDICINE",
-					"distanceMetres": 8870
+					"consultee": "GSTT @ LONDON BRIDGE HOSPITAL"
 				},
 				{
-					"id": "853aa6fa-232d-a3f3-72a3-a21b6eadbb3a",
+					"id": "23ecbf35-fa23-dfba-f6a1-3130e2e69aba",
 					"category": "Hospital",
-					"consultee": "THE ROYAL LONDON HOSPITAL FOR INTEGRATED MEDICINE",
-					"distanceMetres": 8870
+					"consultee": "GUY'S AND ST THOMAS' HOSPITALS"
+				},
+				{
+					"id": "4f551c39-3939-2fb4-f086-960297a19840",
+					"category": "Hospital",
+					"consultee": "GUY'S HOSPITAL"
+				},
+				{
+					"id": "549371c6-3b9b-606d-8ea4-089ce454910a",
+					"category": "Hospital",
+					"consultee": "HOMERTON HOSPITAL"
+				},
+				{
+					"id": "d5911633-ecad-7a91-9906-2e6fe8108407",
+					"category": "Hospital",
+					"consultee": "HOMERTON UNIVERSITY HOSPITAL"
+				},
+				{
+					"id": "7b76ae44-eeb0-f811-de4f-a3947d905dda",
+					"category": "Hospital",
+					"consultee": "KING'S COLLEGE HOSPITAL"
+				},
+				{
+					"id": "3c9da3c3-6901-4a1c-5520-14b88242e96d",
+					"category": "Hospital",
+					"consultee": "KING'S COLLEGE HOSPITAL (DENMARK HILL)"
+				},
+				{
+					"id": "e5d98f2a-3b6f-8192-a47f-7ec4fa9f4324",
+					"category": "Hospital",
+					"consultee": "KING'S COLLEGE HOSPITAL (DENMARK HILL)"
+				},
+				{
+					"id": "f53eff5e-ce3d-e422-9708-f852f5fbf7f8",
+					"category": "Hospital",
+					"consultee": "KINGS @ QUEEN ELIZABETH HOSPITAL WOOLWICH"
+				},
+				{
+					"id": "ca64d555-388c-4eb7-87bf-3a4b5d71b67c",
+					"category": "Hospital",
+					"consultee": "KINGS COLLEGE DENTAL HOSPITAL"
+				},
+				{
+					"id": "1513c802-3c5e-0075-6f13-b186b6e5ba76",
+					"category": "Hospital",
+					"consultee": "KINGS COLLEGE HOSPITAL"
+				},
+				{
+					"id": "cbe12791-90af-e064-9abf-877a189be1b8",
+					"category": "Hospital",
+					"consultee": "LONDON BRIDGE HOSPITAL"
+				},
+				{
+					"id": "379acc8c-bce7-a112-403d-e3d839844bb2",
+					"category": "Hospital",
+					"consultee": "LONDON INDEPENDENT HOSPITAL"
+				},
+				{
+					"id": "6f868bcb-a4a5-c82f-cf6e-71a206204f0c",
+					"category": "Hospital",
+					"consultee": "MAUDSLEY HOSPITAL"
+				},
+				{
+					"id": "2d60d9ce-1c5d-e638-cecb-0eb7252e46d7",
+					"category": "Hospital",
+					"consultee": "MILDMAY UK (MILDMAY MISSION HOSPITAL)"
+				},
+				{
+					"id": "70f3faa9-fd78-a5a3-9f88-8acb3ec07e86",
+					"category": "Hospital",
+					"consultee": "MILE END HOSPITAL"
+				},
+				{
+					"id": "daa8ac6c-8bea-588b-5722-0aaf1f390d36",
+					"category": "Hospital",
+					"consultee": "MILE END HOSPITAL"
+				},
+				{
+					"id": "9a1784a7-be63-eb57-db2b-e1d58f23eab3",
+					"category": "Hospital",
+					"consultee": "MOORFIELDS COMMUNITY EYE CLINIC AT BARKING HOSPITAL"
+				},
+				{
+					"id": "2bb6af60-7f4b-c563-1c28-94bcdeb25e2d",
+					"category": "Hospital",
+					"consultee": "MOORFIELDS EYE HOSPITAL (CITY ROAD CAMPUS)"
+				},
+				{
+					"id": "912373f8-fbb4-81c3-5382-788fc3d452f1",
+					"category": "Hospital",
+					"consultee": "MOORFIELDS EYE HOSPITAL NHST"
+				},
+				{
+					"id": "236080d8-5ee2-6a4a-4fae-dc305090d36b",
+					"category": "Hospital",
+					"consultee": "MOORFIELDS EYE UNIT AT ST BARTHOLOMEW'S HOSPITAL"
 				},
 				{
 					"id": "8dc39a26-5c3b-73d8-b657-92ff88b88e15",
 					"category": "Hospital",
-					"consultee": "NATIONAL HOSPITAL FOR NEUROLOGY & NEUROSURGERY - QUEEN SQUARE",
-					"distanceMetres": 8924
+					"consultee": "NATIONAL HOSPITAL FOR NEUROLOGY & NEUROSURGERY - QUEEN SQUARE"
+				},
+				{
+					"id": "3ba8023b-b8ff-e2ea-185d-5db388be1103",
+					"category": "Hospital",
+					"consultee": "NEWHAM GENERAL HOSPITAL"
+				},
+				{
+					"id": "56f27ee9-3ade-4b98-5307-d12d525428cf",
+					"category": "Hospital",
+					"consultee": "NEWHAM GENERAL HOSPITAL"
+				},
+				{
+					"id": "a3c47afd-2e4b-257f-521e-7d2a37c022b9",
+					"category": "Hospital",
+					"consultee": "NEWHAM HOSPITAL"
+				},
+				{
+					"id": "1f1a9a3d-3ee1-a260-d184-5733689744ee",
+					"category": "Hospital",
+					"consultee": "NUFFIELD HEALTH AT ST BARTHOLOMEW'S HOSPITAL"
+				},
+				{
+					"id": "d63d26ca-9abe-fc24-5b84-58335c5f2a12",
+					"category": "Hospital",
+					"consultee": "PPG HOSPITALS - LOXFORD POLYCLINIC"
+				},
+				{
+					"id": "63d0725c-92ef-e8c0-24c3-6968cbac07d0",
+					"category": "Hospital",
+					"consultee": "PPG HOSPITALS - PORTERS AVENUE"
+				},
+				{
+					"id": "dc879e2f-90e6-1ad1-299c-3a5689d1e308",
+					"category": "Hospital",
+					"consultee": "PTS QUEEN ELIZABETH HOSPITAL"
+				},
+				{
+					"id": "86d7d512-3b17-47b3-9975-d50b2af702e0",
+					"category": "Hospital",
+					"consultee": "PTS WHIPPS CROSS HOSPITAL"
+				},
+				{
+					"id": "01964215-b810-a363-0842-de9b7c236b47",
+					"category": "Hospital",
+					"consultee": "QUEEN ELIZABETH HOSPITAL"
+				},
+				{
+					"id": "0eb9bc35-e0e6-053a-1a87-32cf5bbf40e9",
+					"category": "Hospital",
+					"consultee": "QUEEN ELIZABETH HOSPITAL"
 				},
 				{
 					"id": "04d60aa1-e278-0c79-f338-5008b6749ca8",
 					"category": "Hospital",
-					"consultee": "RODING HOSPITAL",
-					"distanceMetres": 8926
+					"consultee": "RODING HOSPITAL"
 				},
 				{
 					"id": "46460f62-7f09-ba28-ef54-036a7cfaaaef",
 					"category": "Hospital",
-					"consultee": "RODING HOSPITAL",
-					"distanceMetres": 8926
+					"consultee": "RODING HOSPITAL"
 				},
 				{
-					"id": "c85e85f5-3fe5-2fdd-3463-9d732d16855a",
+					"id": "0698f1e7-6b54-d3cd-bb66-ce47ba6d981f",
 					"category": "Hospital",
-					"consultee": "SPIRE LONDON EAST HOSPITAL",
-					"distanceMetres": 8926
+					"consultee": "ROYAL LONDON HOSPITAL"
 				},
 				{
-					"id": "3646389a-786d-bb6f-13d7-46b3c5b53eb9",
+					"id": "e621e218-e5e3-0ec7-6348-7e2bc8247642",
 					"category": "Hospital",
-					"consultee": "SPIRE RODING HOSPITAL",
-					"distanceMetres": 8926
+					"consultee": "ROYAL LONDON HOSPITAL"
 				},
 				{
-					"id": "0d625b0a-4a94-d8e0-dbbd-efabf80ab950",
-					"category": "ICB",
-					"consultee": "NHS South West London Integrated Care Board",
-					"distanceMetres": 8984
+					"id": "23fa0eb5-0338-9529-d8f3-1075927c241c",
+					"category": "Hospital",
+					"consultee": "ROYAL LONDON HOSPITAL FOR INTEGRATED MEDICINE"
 				},
 				{
 					"id": "aa3b2d23-904f-e1fb-2fd4-8487efd53412",
 					"category": "Hospital",
-					"consultee": "ROYAL NATIONAL THROAT, NOSE & EAR HOSPITAL",
-					"distanceMetres": 8994
+					"consultee": "ROYAL NATIONAL THROAT, NOSE & EAR HOSPITAL"
 				},
 				{
-					"id": "7d43bfde-c559-4f10-1f44-bd12e6306fdc",
+					"id": "c85e85f5-3fe5-2fdd-3463-9d732d16855a",
 					"category": "Hospital",
-					"consultee": "THE SLOANE HOSPITAL",
-					"distanceMetres": 9452
+					"consultee": "SPIRE LONDON EAST HOSPITAL"
+				},
+				{
+					"id": "3646389a-786d-bb6f-13d7-46b3c5b53eb9",
+					"category": "Hospital",
+					"consultee": "SPIRE RODING HOSPITAL"
+				},
+				{
+					"id": "59b660d2-4c0a-b852-c4b6-90e33ccc693e",
+					"category": "Hospital",
+					"consultee": "ST BARTHOLOMEW'S HOSPITAL"
+				},
+				{
+					"id": "5324f9c7-7225-d8ba-5941-5ec6328cd29d",
+					"category": "Hospital",
+					"consultee": "ST BARTHOLOMEWS HOSPITAL"
+				},
+				{
+					"id": "d8440270-95c9-cddc-40b2-4bbc02a6fb40",
+					"category": "Hospital",
+					"consultee": "ST CLEMENTS HOSPITAL"
+				},
+				{
+					"id": "1e70178f-eedd-eb64-6772-e8f7236f0101",
+					"category": "Hospital",
+					"consultee": "ST GEORGE'S AT KINGS COLLEGE HOSPITAL"
+				},
+				{
+					"id": "e0c134e4-45f8-722d-8290-44dd048a8452",
+					"category": "Hospital",
+					"consultee": "ST THOMAS' HOSPITAL"
+				},
+				{
+					"id": "485147e1-9c20-2984-0be2-c8201c20fa0d",
+					"category": "Hospital",
+					"consultee": "ST THOMAS' HOSPITAL (CAMHS MENTAL HEALTH UNIT)"
+				},
+				{
+					"id": "d815074b-0d95-ba12-8a61-482cc2be28ee",
+					"category": "Hospital",
+					"consultee": "ST THOMAS' HOSPITAL (MENTAL HEALTH UNIT)"
 				},
 				{
 					"id": "b6d299a4-0261-65ad-917a-fd18f603cf2e",
 					"category": "Hospital",
-					"consultee": "THE GORDON HOSPITAL",
-					"distanceMetres": 9533
+					"consultee": "THE GORDON HOSPITAL"
 				},
 				{
-					"id": "d8acbff3-f491-508c-9f88-62c052ef664d",
-					"category": "National Landscape",
-					"consultee": "Kent Downs",
-					"distanceMetres": 16928
+					"id": "e36c91a4-ad03-979a-2093-44c98060e009",
+					"category": "Hospital",
+					"consultee": "THE ITALIAN HOSPITAL"
 				},
 				{
-					"id": "bb1e2bbf-934a-d81a-aad6-3f82fccd938f",
-					"category": "National Landscape",
-					"consultee": "Surrey Hills",
-					"distanceMetres": 22417
+					"id": "e7ad293e-5fe5-71e5-c1c4-e0f93f924ba7",
+					"category": "Hospital",
+					"consultee": "THE LEWISHAM HOSPITAL NHS TRUST"
+				},
+				{
+					"id": "6af43442-7e6d-ca7f-fce0-8bb64965d85e",
+					"category": "Hospital",
+					"consultee": "THE ROYAL LONDON HOSPITAL"
+				},
+				{
+					"id": "c56c7d5a-d873-0505-78a7-9f23bbc35a41",
+					"category": "Hospital",
+					"consultee": "THE ROYAL LONDON HOSPITAL"
+				},
+				{
+					"id": "d976accc-dd17-287d-82b1-a14308f9515b",
+					"category": "Hospital",
+					"consultee": "THE ROYAL LONDON HOSPITAL"
+				},
+				{
+					"id": "853aa6fa-232d-a3f3-72a3-a21b6eadbb3a",
+					"category": "Hospital",
+					"consultee": "THE ROYAL LONDON HOSPITAL FOR INTEGRATED MEDICINE"
+				},
+				{
+					"id": "7d43bfde-c559-4f10-1f44-bd12e6306fdc",
+					"category": "Hospital",
+					"consultee": "THE SLOANE HOSPITAL"
+				},
+				{
+					"id": "ef3f54d9-cb77-c372-7e99-bf29bf043f9f",
+					"category": "Hospital",
+					"consultee": "UCLH OUTREACH - LONDON INDEPENDENT HOSPITAL"
+				},
+				{
+					"id": "9089db9a-0322-3e80-7dbd-bcc0f9c3a907",
+					"category": "Hospital",
+					"consultee": "UCLH OUTREACH: LONDON BRIDGE HOSPITAL"
+				},
+				{
+					"id": "1da24e33-3ad9-d629-68b2-aa259aa9a999",
+					"category": "Hospital",
+					"consultee": "UNIVERSITY HOSPITAL LEWISHAM"
+				},
+				{
+					"id": "e9d7fb8f-ee86-8216-8f7d-902080a708a3",
+					"category": "Hospital",
+					"consultee": "UNIVERSITY HOSPITAL LEWISHAM"
+				},
+				{
+					"id": "b95f636f-edbd-3677-7bac-7ec42777c225",
+					"category": "Hospital",
+					"consultee": "UTC - KING'S COLLEGE HOSPITAL"
+				},
+				{
+					"id": "0f89004c-18ef-ccf2-3018-fe2cce5f149a",
+					"category": "Hospital",
+					"consultee": "WANSTEAD HOSPITAL"
+				},
+				{
+					"id": "6861b66b-8143-1163-4823-2b0072bd7b54",
+					"category": "Hospital",
+					"consultee": "WHIPPS CROSS HOSPITAL"
+				},
+				{
+					"id": "77ce42bb-7b17-3309-e374-3e6d9d2763fe",
+					"category": "Hospital",
+					"consultee": "WHIPPS CROSS HOSPITAL"
+				},
+				{
+					"id": "9139b573-58ab-7ed8-a5d2-16fec346139e",
+					"category": "Hospital",
+					"consultee": "WHIPPS CROSS HOSPITAL"
+				},
+				{
+					"id": "d6333c4d-c1cc-b848-bcdc-d1aa6f48b885",
+					"category": "Hospital",
+					"consultee": "WHIPPS CROSS HOSPITAL"
+				},
+				{
+					"id": "dee25be9-1001-a32e-c1c7-43df61518126",
+					"category": "Hospital",
+					"consultee": "WHIPPS CROSS HOSPITAL"
+				},
+				{
+					"id": "1a2f23fd-cfdf-0ae9-94d8-45b444eaa4e6",
+					"category": "Hospital",
+					"consultee": "WHIPPS CROSS UNIVERSITY HOSPITAL"
+				},
+				{
+					"id": "22f64f5b-ffdb-f109-c8d7-a4ccd4600f06",
+					"category": "Hospital",
+					"consultee": "WHIPPS CROSS UNIVERSITY HOSPITAL"
+				},
+				{
+					"id": "4b789144-09f3-20a8-94d5-b44e50fc0588",
+					"category": "Hospital",
+					"consultee": "WHIPPS CROSS UNIVERSITY HOSPITAL"
+				},
+				{
+					"id": "6ca713bc-239f-0dd9-5605-476ea8074819",
+					"category": "Hospital",
+					"consultee": "WHIPPS CROSS UNIVERSITY HOSPITAL"
+				},
+				{
+					"id": "1c699eac-6882-55a9-3ead-0d55324a3cf4",
+					"category": "ICB",
+					"consultee": "NHS North East London Integrated Care Board"
+				},
+				{
+					"id": "c6e08fd3-1cfe-8fe2-7696-bc9ba40b7b96",
+					"category": "ICB",
+					"consultee": "NHS South East London Integrated Care Board"
+				},
+				{
+					"id": "0d625b0a-4a94-d8e0-dbbd-efabf80ab950",
+					"category": "ICB",
+					"consultee": "NHS South West London Integrated Care Board"
+				},
+				{
+					"id": "7f41e479-ad0d-2657-a0b4-03424436eeee",
+					"category": "ICB",
+					"consultee": "NHS West and North London Integrated Care Board"
+				},
+				{
+					"id": "0d21a6ad-2ade-afa5-4a7b-172c3d897395",
+					"category": "Local Resilience Forum",
+					"consultee": "London"
 				},
 				{
 					"id": "0183e047-d866-834f-1c56-3239c98d68b7",
 					"category": "National Landscape",
-					"consultee": "High Weald",
-					"distanceMetres": 33823
+					"consultee": "High Weald"
+				},
+				{
+					"id": "d8acbff3-f491-508c-9f88-62c052ef664d",
+					"category": "National Landscape",
+					"consultee": "Kent Downs"
+				},
+				{
+					"id": "bb1e2bbf-934a-d81a-aad6-3f82fccd938f",
+					"category": "National Landscape",
+					"consultee": "Surrey Hills"
+				},
+				{
+					"id": "74c8a794-5b75-048d-ceb0-150e58a5cf59",
+					"category": "Parish Council",
+					"consultee": "Barking and Dagenham, unparished area"
+				},
+				{
+					"id": "3277e117-619c-15dd-2ac9-5715ee3770d7",
+					"category": "Parish Council",
+					"consultee": "Bexley, unparished area"
+				},
+				{
+					"id": "9689a0f1-de4f-687a-1363-85a8be1784f1",
+					"category": "Parish Council",
+					"consultee": "Bromley, unparished area"
+				},
+				{
+					"id": "a3a6d939-b888-123b-707e-d85fd5053ce8",
+					"category": "Parish Council",
+					"consultee": "Greenwich, unparished area"
+				},
+				{
+					"id": "5a070fbd-6da7-7832-9729-a30117534da0",
+					"category": "Parish Council",
+					"consultee": "Hackney, unparished area"
+				},
+				{
+					"id": "5600acd7-18f0-7207-5225-e2eb50e8e362",
+					"category": "Parish Council",
+					"consultee": "Lewisham, unparished area"
+				},
+				{
+					"id": "1892269e-ecdd-cfb9-c745-bc439207308d",
+					"category": "Parish Council",
+					"consultee": "Newham, unparished area"
+				},
+				{
+					"id": "81d2d068-15ff-57ca-92f3-2f88d63667c5",
+					"category": "Parish Council",
+					"consultee": "Redbridge, unparished area"
+				},
+				{
+					"id": "f1970a19-eec0-a7ee-4b2b-29276a10c7b6",
+					"category": "Parish Council",
+					"consultee": "Tower Hamlets, unparished area"
+				},
+				{
+					"id": "781758c5-db1c-40e2-d496-9175e0657c70",
+					"category": "Parish Council",
+					"consultee": "Waltham Forest, unparished area"
+				},
+				{
+					"id": "8c8f5001-a4f0-e64c-5789-f61b9cecd815",
+					"category": "Police",
+					"consultee": "Metropolitan Police"
+				},
+				{
+					"id": "cec747d8-af09-c6b6-db0b-264f714c81b5",
+					"category": "Unitary Authority",
+					"consultee": "Barking and Dagenham"
+				},
+				{
+					"id": "2b237e16-a2a0-117c-d607-0b2048af1942",
+					"category": "Unitary Authority",
+					"consultee": "Bexley"
+				},
+				{
+					"id": "ca7986c1-a785-7842-a782-2db561c9ef0d",
+					"category": "Unitary Authority",
+					"consultee": "Bromley"
+				},
+				{
+					"id": "df4434df-dc4f-6f4e-7773-2caf26773b3c",
+					"category": "Unitary Authority",
+					"consultee": "Greenwich"
+				},
+				{
+					"id": "36cb475d-4e40-1f08-8854-948428ed2af8",
+					"category": "Unitary Authority",
+					"consultee": "Hackney"
+				},
+				{
+					"id": "9ca50d48-12ef-2c28-72e5-39e655138888",
+					"category": "Unitary Authority",
+					"consultee": "Lewisham"
+				},
+				{
+					"id": "fc8be975-a824-faab-8df8-f853cfc4c7c6",
+					"category": "Unitary Authority",
+					"consultee": "Newham"
+				},
+				{
+					"id": "d6f8c46b-0194-328b-b6d5-4f47dc7de4a1",
+					"category": "Unitary Authority",
+					"consultee": "Redbridge"
+				},
+				{
+					"id": "1516c657-7881-f8e9-9034-4b583fae1f03",
+					"category": "Unitary Authority",
+					"consultee": "Tower Hamlets"
+				},
+				{
+					"id": "9dc9e314-a4b9-59e2-11ac-d1a2d9ed9015",
+					"category": "Unitary Authority",
+					"consultee": "Waltham Forest"
+				}
+			],
+			"mayAlsoInclude": [
+				{
+					"id": "0e2781d9-757a-9826-1e7c-7639beee84d7",
+					"category": "Hospital",
+					"consultee": "UNIVERSITY COLLEGE HOSPITAL"
+				},
+				{
+					"id": "2ebbcbe2-d767-4826-d0c3-3870cd8f866d",
+					"category": "Hospital",
+					"consultee": "UNIVERSITY COLLEGE HOSPITAL ELIZABETH GARRETT ANDERSON WING"
+				},
+				{
+					"id": "8a5212ff-4df4-4400-f62c-4acd1444f518",
+					"category": "Hospital",
+					"consultee": "UNIVERSITY COLLEGE LONDON HOSPITAL"
+				},
+				{
+					"id": "90b9acf0-38f6-b440-d423-7fb4ed4662ae",
+					"category": "Hospital",
+					"consultee": "UNIVERSITY COLLEGE LONDON HOSPITAL"
+				},
+				{
+					"id": "508fce39-7385-0316-dc1d-5bb625c802ac",
+					"category": "Hospital",
+					"consultee": "UNIVERSITY COLLEGE LONDON HOSPITALS NHS FOUNDATION TRUST"
+				},
+				{
+					"id": "8f808072-67b9-5018-61b5-7c981596ff93",
+					"category": "Hospital",
+					"consultee": "UNIVERSITY COLLEGE LONDON HOSPITALS NHS FOUNDATION TRUST HQ"
 				}
 			]
 		},
 		{
 			"caseReference": "EN010102",
 			"caseName": "Hinkley Point C New Nuclear Power Station Material Change 1",
-			"consultees": [
+			"mustInclude": [
 				{
 					"id": "c5991024-6516-3a97-4eba-120f66ae8ac5",
 					"category": "Ambulance Trust",
-					"consultee": "South Western Ambulance Service",
-					"distanceMetres": 0
-				},
-				{
-					"id": "cdb38199-c45c-42c2-18db-b94252805f35",
-					"category": "Fire and Rescue Authority",
-					"consultee": "Devon & Somerset",
-					"distanceMetres": 0
-				},
-				{
-					"id": "5a413968-2740-172d-5289-7217a8b84bfe",
-					"category": "ICB",
-					"consultee": "NHS Somerset Integrated Care Board",
-					"distanceMetres": 0
-				},
-				{
-					"id": "fcc4675d-66bc-841d-c437-f59e637484a6",
-					"category": "Internal Drainage District",
-					"consultee": "Parrett Internal Drainage Board",
-					"distanceMetres": 0
-				},
-				{
-					"id": "5160393d-15d1-25b8-792f-a3a47026a662",
-					"category": "Local Resilience Forum",
-					"consultee": "Avon & Somerset",
-					"distanceMetres": 0
-				},
-				{
-					"id": "6c9b5bf5-a2d2-2f47-decb-50a25671bdde",
-					"category": "Parish Council",
-					"consultee": "Stogursey",
-					"distanceMetres": 0
-				},
-				{
-					"id": "2ec5ff8d-c19a-1946-52f7-d83fb490a56c",
-					"category": "Police",
-					"consultee": "Avon and Somerset",
-					"distanceMetres": 0
-				},
-				{
-					"id": "4fdffae0-dffd-9b93-f235-2cda57297ac2",
-					"category": "Unitary Authority",
-					"consultee": "Somerset",
-					"distanceMetres": 0
-				},
-				{
-					"id": "ddd2419c-96de-6bb8-811c-6dc09e92ac45",
-					"category": "Parish Council",
-					"consultee": "Stringston",
-					"distanceMetres": 1311
+					"consultee": "South Western Ambulance Service"
 				},
 				{
 					"id": "e27d062d-3640-65ee-5545-8f85b551ed6b",
 					"category": "Dock or Harbour",
-					"consultee": "Lilstock (Non-stat)",
-					"distanceMetres": 2030
+					"consultee": "Lilstock (Non-stat)"
 				},
 				{
-					"id": "5ff2489c-db9d-6ba5-be7d-7e5d52af808a",
-					"category": "Parish Council",
-					"consultee": "Stockland Bristol",
-					"distanceMetres": 2564
+					"id": "cdb38199-c45c-42c2-18db-b94252805f35",
+					"category": "Fire and Rescue Authority",
+					"consultee": "Devon & Somerset"
 				},
 				{
-					"id": "8dcf641c-906f-e131-5436-48ffbbcf6dfe",
-					"category": "Parish Council",
-					"consultee": "Fiddington",
-					"distanceMetres": 2705
-				},
-				{
-					"id": "6ca7c077-85ed-d96b-7532-33ef3b7d08d3",
-					"category": "Parish Council",
-					"consultee": "Holford",
-					"distanceMetres": 3068
-				},
-				{
-					"id": "54267ab2-2c67-b013-19fc-4bcf21188268",
-					"category": "Parish Council",
-					"consultee": "Nether Stowey",
-					"distanceMetres": 3307
-				},
-				{
-					"id": "e9c7e018-7cc7-0476-727d-a57ebd0146d1",
-					"category": "National Landscape",
-					"consultee": "Quantock Hills",
-					"distanceMetres": 3824
-				},
-				{
-					"id": "d6847dfe-fd9e-750f-05e2-c5a51d7fa8a6",
-					"category": "Parish Council",
-					"consultee": "Otterhampton",
-					"distanceMetres": 3831
+					"id": "5a413968-2740-172d-5289-7217a8b84bfe",
+					"category": "ICB",
+					"consultee": "NHS Somerset Integrated Care Board"
 				},
 				{
 					"id": "e0f5bba6-d9a3-5021-cf43-8bc1b7311753",
 					"category": "Internal Drainage District",
-					"consultee": "Axe Brue Internal Drainage Board",
-					"distanceMetres": 7985
+					"consultee": "Axe Brue Internal Drainage Board"
 				},
 				{
-					"id": "ef2abdf9-2b76-6a8e-d603-7aa3143eacfc",
-					"category": "Unitary Authority",
-					"consultee": "North Somerset",
-					"distanceMetres": 12028
+					"id": "fcc4675d-66bc-841d-c437-f59e637484a6",
+					"category": "Internal Drainage District",
+					"consultee": "Parrett Internal Drainage Board"
 				},
 				{
-					"id": "da832157-9164-1c11-7dda-c6d8bf3c63fe",
-					"category": "National Park",
-					"consultee": "EXMOOR",
-					"distanceMetres": 13716
-				},
-				{
-					"id": "b7cc2d28-e5b9-1f16-8cd4-33eb2bb456e7",
-					"category": "National Landscape",
-					"consultee": "Mendip Hills",
-					"distanceMetres": 17220
-				},
-				{
-					"id": "58ae2783-c213-99cd-f1f2-4dd1ca871df9",
-					"category": "National Landscape",
-					"consultee": "Blackdown Hills",
-					"distanceMetres": 24099
-				},
-				{
-					"id": "f0ea3067-66af-7063-6d08-1ef2d9cc92ca",
-					"category": "Lower Tier Authority",
-					"consultee": "Mid Devon",
-					"distanceMetres": 25331
-				},
-				{
-					"id": "1349a063-4444-2b25-1c49-79c251aba10b",
-					"category": "Upper Tier Authority",
-					"consultee": "Devon",
-					"distanceMetres": 25331
+					"id": "5160393d-15d1-25b8-792f-a3a47026a662",
+					"category": "Local Resilience Forum",
+					"consultee": "Avon & Somerset"
 				},
 				{
 					"id": "9576ca3d-5715-5052-b786-1b9edc0ebd12",
 					"category": "Lower Tier Authority",
-					"consultee": "East Devon",
-					"distanceMetres": 32132
+					"consultee": "East Devon"
 				},
 				{
-					"id": "08d762ca-6728-9b06-5e56-fb69f4977cf3",
-					"category": "Unitary Authority",
-					"consultee": "Bath and North East Somerset",
-					"distanceMetres": 33139
+					"id": "f0ea3067-66af-7063-6d08-1ef2d9cc92ca",
+					"category": "Lower Tier Authority",
+					"consultee": "Mid Devon"
 				},
 				{
 					"id": "fa334964-09d2-fb6a-8b04-2695a117542e",
 					"category": "Lower Tier Authority",
-					"consultee": "North Devon",
-					"distanceMetres": 34791
+					"consultee": "North Devon"
+				},
+				{
+					"id": "58ae2783-c213-99cd-f1f2-4dd1ca871df9",
+					"category": "National Landscape",
+					"consultee": "Blackdown Hills"
+				},
+				{
+					"id": "b7cc2d28-e5b9-1f16-8cd4-33eb2bb456e7",
+					"category": "National Landscape",
+					"consultee": "Mendip Hills"
+				},
+				{
+					"id": "e9c7e018-7cc7-0476-727d-a57ebd0146d1",
+					"category": "National Landscape",
+					"consultee": "Quantock Hills"
+				},
+				{
+					"id": "da832157-9164-1c11-7dda-c6d8bf3c63fe",
+					"category": "National Park",
+					"consultee": "EXMOOR"
+				},
+				{
+					"id": "8dcf641c-906f-e131-5436-48ffbbcf6dfe",
+					"category": "Parish Council",
+					"consultee": "Fiddington"
+				},
+				{
+					"id": "6ca7c077-85ed-d96b-7532-33ef3b7d08d3",
+					"category": "Parish Council",
+					"consultee": "Holford"
+				},
+				{
+					"id": "54267ab2-2c67-b013-19fc-4bcf21188268",
+					"category": "Parish Council",
+					"consultee": "Nether Stowey"
+				},
+				{
+					"id": "d6847dfe-fd9e-750f-05e2-c5a51d7fa8a6",
+					"category": "Parish Council",
+					"consultee": "Otterhampton"
+				},
+				{
+					"id": "5ff2489c-db9d-6ba5-be7d-7e5d52af808a",
+					"category": "Parish Council",
+					"consultee": "Stockland Bristol"
+				},
+				{
+					"id": "6c9b5bf5-a2d2-2f47-decb-50a25671bdde",
+					"category": "Parish Council",
+					"consultee": "Stogursey"
+				},
+				{
+					"id": "ddd2419c-96de-6bb8-811c-6dc09e92ac45",
+					"category": "Parish Council",
+					"consultee": "Stringston"
+				},
+				{
+					"id": "2ec5ff8d-c19a-1946-52f7-d83fb490a56c",
+					"category": "Police",
+					"consultee": "Avon and Somerset"
+				},
+				{
+					"id": "08d762ca-6728-9b06-5e56-fb69f4977cf3",
+					"category": "Unitary Authority",
+					"consultee": "Bath and North East Somerset"
 				},
 				{
 					"id": "065abba5-e94b-4b7c-5d7a-c2edda6e02ec",
 					"category": "Unitary Authority",
-					"consultee": "Dorset",
-					"distanceMetres": 41976
+					"consultee": "Dorset"
+				},
+				{
+					"id": "ef2abdf9-2b76-6a8e-d603-7aa3143eacfc",
+					"category": "Unitary Authority",
+					"consultee": "North Somerset"
+				},
+				{
+					"id": "4fdffae0-dffd-9b93-f235-2cda57297ac2",
+					"category": "Unitary Authority",
+					"consultee": "Somerset"
 				},
 				{
 					"id": "ac5fe551-ff2d-c599-7862-8ce89c3818ac",
 					"category": "Unitary Authority",
-					"consultee": "Wiltshire",
-					"distanceMetres": 54666
+					"consultee": "Wiltshire"
+				},
+				{
+					"id": "1349a063-4444-2b25-1c49-79c251aba10b",
+					"category": "Upper Tier Authority",
+					"consultee": "Devon"
 				}
-			]
+			],
+			"mayAlsoInclude": []
 		},
 		{
 			"caseReference": "EN010072",
 			"caseName": "Glyn Rhonwy Pumped Storage",
-			"consultees": [
+			"mustInclude": [
 				{
 					"id": "85a06b65-f6d2-7d66-28a6-ee7e89f01c98",
 					"category": "Ambulance Trust",
-					"consultee": "Welsh Ambulance Services",
-					"distanceMetres": 0
-				},
-				{
-					"id": "a1103c22-3131-0965-a140-9a1f0735c458",
-					"category": "Fire and Rescue Authority",
-					"consultee": "North Wales",
-					"distanceMetres": 0
-				},
-				{
-					"id": "6888696b-5ea5-5adb-97f0-04c3c199cc2d",
-					"category": "Local Health Board",
-					"consultee": "Betsi Cadwaladr University Health Board",
-					"distanceMetres": 0
-				},
-				{
-					"id": "d92c2c63-a62e-6e8b-09af-1a6b6069db63",
-					"category": "Local Resilience Forum",
-					"consultee": "North Wales",
-					"distanceMetres": 0
-				},
-				{
-					"id": "0e3907fe-86e9-f026-35f8-e3727f2986ec",
-					"category": "Parish Council",
-					"consultee": "Llanberis",
-					"distanceMetres": 0
-				},
-				{
-					"id": "46a65efc-b248-863f-304a-c5b1f9fc02e5",
-					"category": "Parish Council",
-					"consultee": "Waunfawr",
-					"distanceMetres": 0
-				},
-				{
-					"id": "ef6c368b-2eb6-cc23-adc4-d72927f52bc6",
-					"category": "Police",
-					"consultee": "North Wales",
-					"distanceMetres": 0
-				},
-				{
-					"id": "9d6c8861-70ec-9844-738f-1c4d8c95136d",
-					"category": "Unitary Authority",
-					"consultee": "Gwynedd",
-					"distanceMetres": 0
-				},
-				{
-					"id": "7d848605-6cc6-1fd4-b4a1-1ea8aedaab77",
-					"category": "Parish Council",
-					"consultee": "Llanddeiniolen",
-					"distanceMetres": 131
-				},
-				{
-					"id": "f74c0e8e-94dc-7d16-408b-b645559191a5",
-					"category": "Parish Council",
-					"consultee": "Llanrug",
-					"distanceMetres": 345
-				},
-				{
-					"id": "95cfcaaa-0ecf-1963-4297-97fdfaa37ba7",
-					"category": "National Park",
-					"consultee": "Eryri / Snowdonia National Park",
-					"distanceMetres": 615
-				},
-				{
-					"id": "a7b439ed-c8bd-73c0-8729-4a65246cf058",
-					"category": "Parish Council",
-					"consultee": "Betws Garmon",
-					"distanceMetres": 1606
-				},
-				{
-					"id": "2d89967a-bf16-1fb8-912a-c5047b84d7b3",
-					"category": "Parish Council",
-					"consultee": "Llanwnda",
-					"distanceMetres": 3167
-				},
-				{
-					"id": "ae73d65f-1408-2ce4-6213-8a3fb20725e5",
-					"category": "Parish Council",
-					"consultee": "Llandygai",
-					"distanceMetres": 3502
-				},
-				{
-					"id": "cb75fe0d-5fcd-6e2c-4754-06353aca36f6",
-					"category": "Parish Council",
-					"consultee": "Bontnewydd",
-					"distanceMetres": 4238
-				},
-				{
-					"id": "fa18c196-52af-8c09-c433-cfeb49da5c8b",
-					"category": "Parish Council",
-					"consultee": "Caernarfon",
-					"distanceMetres": 5189
-				},
-				{
-					"id": "5bf2d869-e8a8-82aa-c879-23e96059d91e",
-					"category": "Parish Council",
-					"consultee": "Beddgelert",
-					"distanceMetres": 7022
-				},
-				{
-					"id": "e19845ab-55da-54c9-6157-4ce85792363c",
-					"category": "Unitary Authority",
-					"consultee": "Conwy",
-					"distanceMetres": 7304
-				},
-				{
-					"id": "b3124476-5454-a0df-36b2-14d51864263e",
-					"category": "Parish Council",
-					"consultee": "Capel Curig",
-					"distanceMetres": 7334
+					"consultee": "Welsh Ambulance Services"
 				},
 				{
 					"id": "f2c8293e-4629-5214-435b-aff74f8ca775",
 					"category": "Dock or Harbour",
-					"consultee": "Caernarfon (Stat)",
-					"distanceMetres": 7407
-				},
-				{
-					"id": "da9e94dc-18ae-a1fe-f25f-c1e23a6b55ba",
-					"category": "Dock or Harbour",
-					"consultee": "Port Dinorwic (Non-stat)",
-					"distanceMetres": 7694
-				},
-				{
-					"id": "8e089076-9913-34a3-657c-381fa96effa1",
-					"category": "National Landscape",
-					"consultee": "Anglesey / Ynys Môn National Landscape",
-					"distanceMetres": 7877
-				},
-				{
-					"id": "d3393cb1-b50a-7b3e-11b3-6018334bda90",
-					"category": "Dock or Harbour",
-					"consultee": "Tal-y-Foel (Non-stat)",
-					"distanceMetres": 8955
+					"consultee": "Caernarfon (Stat)"
 				},
 				{
 					"id": "b7e7c92a-1406-fea1-6710-dbcbabb43c71",
 					"category": "Dock or Harbour",
-					"consultee": "Plas Newydd (Unknown)",
-					"distanceMetres": 9370
+					"consultee": "Plas Newydd (Unknown)"
+				},
+				{
+					"id": "da9e94dc-18ae-a1fe-f25f-c1e23a6b55ba",
+					"category": "Dock or Harbour",
+					"consultee": "Port Dinorwic (Non-stat)"
+				},
+				{
+					"id": "d3393cb1-b50a-7b3e-11b3-6018334bda90",
+					"category": "Dock or Harbour",
+					"consultee": "Tal-y-Foel (Non-stat)"
+				},
+				{
+					"id": "a1103c22-3131-0965-a140-9a1f0735c458",
+					"category": "Fire and Rescue Authority",
+					"consultee": "North Wales"
+				},
+				{
+					"id": "6888696b-5ea5-5adb-97f0-04c3c199cc2d",
+					"category": "Local Health Board",
+					"consultee": "Betsi Cadwaladr University Health Board"
+				},
+				{
+					"id": "d92c2c63-a62e-6e8b-09af-1a6b6069db63",
+					"category": "Local Resilience Forum",
+					"consultee": "North Wales"
+				},
+				{
+					"id": "8e089076-9913-34a3-657c-381fa96effa1",
+					"category": "National Landscape",
+					"consultee": "Anglesey / Ynys Môn National Landscape"
 				},
 				{
 					"id": "68cb28eb-58c1-5d85-293a-2219984cf52a",
 					"category": "National Landscape",
-					"consultee": "Llŷn National Landscape",
-					"distanceMetres": 12576
+					"consultee": "Llŷn National Landscape"
+				},
+				{
+					"id": "95cfcaaa-0ecf-1963-4297-97fdfaa37ba7",
+					"category": "National Park",
+					"consultee": "Eryri / Snowdonia National Park"
+				},
+				{
+					"id": "5bf2d869-e8a8-82aa-c879-23e96059d91e",
+					"category": "Parish Council",
+					"consultee": "Beddgelert"
+				},
+				{
+					"id": "a7b439ed-c8bd-73c0-8729-4a65246cf058",
+					"category": "Parish Council",
+					"consultee": "Betws Garmon"
+				},
+				{
+					"id": "cb75fe0d-5fcd-6e2c-4754-06353aca36f6",
+					"category": "Parish Council",
+					"consultee": "Bontnewydd"
+				},
+				{
+					"id": "fa18c196-52af-8c09-c433-cfeb49da5c8b",
+					"category": "Parish Council",
+					"consultee": "Caernarfon"
+				},
+				{
+					"id": "b3124476-5454-a0df-36b2-14d51864263e",
+					"category": "Parish Council",
+					"consultee": "Capel Curig"
+				},
+				{
+					"id": "0e3907fe-86e9-f026-35f8-e3727f2986ec",
+					"category": "Parish Council",
+					"consultee": "Llanberis"
+				},
+				{
+					"id": "7d848605-6cc6-1fd4-b4a1-1ea8aedaab77",
+					"category": "Parish Council",
+					"consultee": "Llanddeiniolen"
+				},
+				{
+					"id": "ae73d65f-1408-2ce4-6213-8a3fb20725e5",
+					"category": "Parish Council",
+					"consultee": "Llandygai"
+				},
+				{
+					"id": "f74c0e8e-94dc-7d16-408b-b645559191a5",
+					"category": "Parish Council",
+					"consultee": "Llanrug"
+				},
+				{
+					"id": "2d89967a-bf16-1fb8-912a-c5047b84d7b3",
+					"category": "Parish Council",
+					"consultee": "Llanwnda"
+				},
+				{
+					"id": "46a65efc-b248-863f-304a-c5b1f9fc02e5",
+					"category": "Parish Council",
+					"consultee": "Waunfawr"
+				},
+				{
+					"id": "ef6c368b-2eb6-cc23-adc4-d72927f52bc6",
+					"category": "Police",
+					"consultee": "North Wales"
+				},
+				{
+					"id": "e19845ab-55da-54c9-6157-4ce85792363c",
+					"category": "Unitary Authority",
+					"consultee": "Conwy"
 				},
 				{
 					"id": "3ce21d5c-7220-1bdc-4def-71a2d1299d7e",
 					"category": "Unitary Authority",
-					"consultee": "Denbighshire",
-					"distanceMetres": 35904
+					"consultee": "Denbighshire"
+				},
+				{
+					"id": "9d6c8861-70ec-9844-738f-1c4d8c95136d",
+					"category": "Unitary Authority",
+					"consultee": "Gwynedd"
 				},
 				{
 					"id": "95b2083d-33ec-c99e-4f74-8dd16b603bf2",
 					"category": "Unitary Authority",
-					"consultee": "Powys",
-					"distanceMetres": 49731
+					"consultee": "Powys"
 				}
-			]
+			],
+			"mayAlsoInclude": []
 		},
 		{
 			"caseReference": "EN010136",
 			"caseName": "Morgan Offshore Wind Project: Generation Assets",
-			"consultees": [
+			"mustInclude": [
 				{
 					"id": "130ae8e5-48fe-a9c3-2525-0845510feb9f",
 					"category": "Offshore Wind Export Cable",
-					"consultee": "Morgan Transmission Asset",
-					"distanceMetres": 0
-				},
-				{
-					"id": "160e02b6-4613-2b12-a465-f501dde023f3",
-					"category": "Offshore Wind Site",
-					"consultee": "R4 Project 6 (Morgan)",
-					"distanceMetres": 0
+					"consultee": "Morgan Transmission Asset"
 				},
 				{
 					"id": "5912d3e3-99cd-f0a7-706d-698e1b8e5b47",
 					"category": "Offshore Wind Export Cable",
-					"consultee": "Walney Extension OFTO",
-					"distanceMetres": 7320
+					"consultee": "Walney Extension OFTO"
+				},
+				{
+					"id": "160e02b6-4613-2b12-a465-f501dde023f3",
+					"category": "Offshore Wind Site",
+					"consultee": "R4 Project 6 (Morgan)"
 				},
 				{
 					"id": "a864c35a-8e62-3a01-6088-087f1e61b412",
 					"category": "Offshore Wind Site",
-					"consultee": "Walney Extension 3",
-					"distanceMetres": 8103
+					"consultee": "Walney Extension 3"
 				},
 				{
 					"id": "92661a75-9392-5166-dad8-5c84f87ce3cc",
 					"category": "Offshore Wind Site",
-					"consultee": "Walney Extension 4",
-					"distanceMetres": 9510
+					"consultee": "Walney Extension 4"
 				}
-			]
+			],
+			"mayAlsoInclude": []
 		},
 		{
 			"caseReference": "TR020001",
 			"caseName": "London Luton Airport Expansion",
-			"consultees": [
+			"mustInclude": [
 				{
 					"id": "a52e5dd2-de42-6ee3-3ebc-1b7c49583e40",
 					"category": "Ambulance Trust",
-					"consultee": "East of England Ambulance Service",
-					"distanceMetres": 0
-				},
-				{
-					"id": "f746219c-8885-4b4d-f6f5-9e6d1d45fb8d",
-					"category": "Fire and Rescue Authority",
-					"consultee": "Bedfordshire",
-					"distanceMetres": 0
-				},
-				{
-					"id": "2c4c15f6-1566-fb4f-7b1c-59419449eb96",
-					"category": "Fire and Rescue Authority",
-					"consultee": "Hertfordshire",
-					"distanceMetres": 0
-				},
-				{
-					"id": "4c8d3e81-4de4-f38e-f1b6-b61eaf46e16c",
-					"category": "ICB",
-					"consultee": "NHS Central East Integrated Care Board",
-					"distanceMetres": 0
-				},
-				{
-					"id": "bc76e990-8c91-b35c-7662-3e0f256a5fc9",
-					"category": "Local Resilience Forum",
-					"consultee": "Bedfordshire",
-					"distanceMetres": 0
-				},
-				{
-					"id": "b943e865-7f6a-9f68-4bec-92ff248ccf7c",
-					"category": "Local Resilience Forum",
-					"consultee": "Hertfordshire",
-					"distanceMetres": 0
-				},
-				{
-					"id": "1a6299de-2fbf-f730-f041-09f50082e821",
-					"category": "Lower Tier Authority",
-					"consultee": "Dacorum",
-					"distanceMetres": 0
-				},
-				{
-					"id": "4975ca6c-8942-acb1-fba0-9aaf988b8fe6",
-					"category": "Lower Tier Authority",
-					"consultee": "North Hertfordshire",
-					"distanceMetres": 0
-				},
-				{
-					"id": "e46aebe3-9476-7726-48e2-c70677ae830f",
-					"category": "Parish Council",
-					"consultee": "Flamstead",
-					"distanceMetres": 0
-				},
-				{
-					"id": "4a696736-f6c1-57a7-8d8c-1458db19281b",
-					"category": "Parish Council",
-					"consultee": "Hyde",
-					"distanceMetres": 0
-				},
-				{
-					"id": "8d02c27a-3c73-4f6f-6098-ac8873b64b56",
-					"category": "Parish Council",
-					"consultee": "King's Walden",
-					"distanceMetres": 0
-				},
-				{
-					"id": "83eeb249-a1db-939a-94b8-76f47e612fad",
-					"category": "Parish Council",
-					"consultee": "Luton, unparished area",
-					"distanceMetres": 0
-				},
-				{
-					"id": "9b195364-17e2-cd40-b271-cf139bb6847a",
-					"category": "Parish Council",
-					"consultee": "North Hertfordshire, unparished area",
-					"distanceMetres": 0
-				},
-				{
-					"id": "abb64bc0-f617-2527-8962-dd6ded4af8fb",
-					"category": "Parish Council",
-					"consultee": "Offley",
-					"distanceMetres": 0
-				},
-				{
-					"id": "019239f3-8857-4819-de9b-a9ac533e2f41",
-					"category": "Parish Council",
-					"consultee": "Slip End",
-					"distanceMetres": 0
-				},
-				{
-					"id": "ca2ed866-e026-c2ff-05ca-d665302bdff7",
-					"category": "Police",
-					"consultee": "Bedfordshire",
-					"distanceMetres": 0
-				},
-				{
-					"id": "6ce1d331-b352-df93-28ee-378b683c305b",
-					"category": "Police",
-					"consultee": "Hertfordshire",
-					"distanceMetres": 0
-				},
-				{
-					"id": "47d1fc5a-d7b4-6a6e-7621-126a66abe551",
-					"category": "Unitary Authority",
-					"consultee": "Central Bedfordshire",
-					"distanceMetres": 0
-				},
-				{
-					"id": "68a1ef35-285a-d0e8-5ab3-f668cfb45e98",
-					"category": "Unitary Authority",
-					"consultee": "Luton",
-					"distanceMetres": 0
-				},
-				{
-					"id": "a4e97c54-0a6d-dde1-8e42-63c3779f0018",
-					"category": "Upper Tier Authority",
-					"consultee": "Hertfordshire",
-					"distanceMetres": 0
-				},
-				{
-					"id": "97c0c437-b532-f895-5fec-00c817e6bbb8",
-					"category": "Parish Council",
-					"consultee": "St Ippolyts",
-					"distanceMetres": 391
-				},
-				{
-					"id": "1282a2b0-254a-7109-8fa9-bda41a8c55f8",
-					"category": "Parish Council",
-					"consultee": "Markyate",
-					"distanceMetres": 651
-				},
-				{
-					"id": "65ead6e6-1243-37b1-ce36-9848a2694044",
-					"category": "Parish Council",
-					"consultee": "Kimpton",
-					"distanceMetres": 794
-				},
-				{
-					"id": "3d8a7a19-e6fd-9362-7282-fee314eec329",
-					"category": "Parish Council",
-					"consultee": "St Paul's Walden",
-					"distanceMetres": 812
-				},
-				{
-					"id": "3bc89534-b32f-2a13-87ae-3d5c12a2ffdf",
-					"category": "Parish Council",
-					"consultee": "Caddington",
-					"distanceMetres": 1072
-				},
-				{
-					"id": "503d9fea-1aa4-54da-d4d6-e383df84ee9c",
-					"category": "Parish Council",
-					"consultee": "Preston",
-					"distanceMetres": 1099
-				},
-				{
-					"id": "b89863e5-146c-b6d2-d1c6-81eb07045691",
-					"category": "Hospital",
-					"consultee": "PINEHILL HOSPITAL",
-					"distanceMetres": 1232
-				},
-				{
-					"id": "52461453-0ebd-4e6d-8480-9aeb8e46c513",
-					"category": "Lower Tier Authority",
-					"consultee": "St Albans",
-					"distanceMetres": 1399
-				},
-				{
-					"id": "be7aebe4-b5dd-7296-0f18-46963ad02238",
-					"category": "Internal Drainage District",
-					"consultee": "Bedfordshire and River Ivel Internal Drainage Board",
-					"distanceMetres": 1416
-				},
-				{
-					"id": "377c2687-c927-74d1-e397-2682d7269b4a",
-					"category": "Parish Council",
-					"consultee": "Harpenden Rural",
-					"distanceMetres": 1461
-				},
-				{
-					"id": "862e7d78-a63e-6ae0-8620-a96a0cda8efe",
-					"category": "National Landscape",
-					"consultee": "Chilterns",
-					"distanceMetres": 1464
-				},
-				{
-					"id": "33dbf437-76c6-61db-4edb-9d0989ad2491",
-					"category": "Parish Council",
-					"consultee": "Wymondley",
-					"distanceMetres": 1629
-				},
-				{
-					"id": "4896e299-c80e-f75f-c470-70e15fb77359",
-					"category": "Parish Council",
-					"consultee": "Pirton",
-					"distanceMetres": 1779
-				},
-				{
-					"id": "9e0c2bf9-29f5-cf6d-15f7-b81c78b5b883",
-					"category": "Parish Council",
-					"consultee": "Ickleford",
-					"distanceMetres": 1852
-				},
-				{
-					"id": "ee684cf6-23f2-c871-4aee-db1b4f437074",
-					"category": "Parish Council",
-					"consultee": "Lilley",
-					"distanceMetres": 2136
-				},
-				{
-					"id": "95906b43-818f-4b8b-e0f3-073b54444f00",
-					"category": "Parish Council",
-					"consultee": "Streatley",
-					"distanceMetres": 2568
-				},
-				{
-					"id": "8dc9e08b-abdf-32c1-9c92-4200eebc41a6",
-					"category": "Parish Council",
-					"consultee": "Wheathampstead",
-					"distanceMetres": 2731
-				},
-				{
-					"id": "d7691464-e2d3-a590-ebfa-57acab77c94d",
-					"category": "Parish Council",
-					"consultee": "Langley",
-					"distanceMetres": 2943
-				},
-				{
-					"id": "f025649c-5275-0a9f-d66d-29c3eceb8d70",
-					"category": "Parish Council",
-					"consultee": "Harpenden Town",
-					"distanceMetres": 3053
-				},
-				{
-					"id": "82270e5d-992b-49ac-cb96-19e71b82be15",
-					"category": "Parish Council",
-					"consultee": "Redbourn",
-					"distanceMetres": 3270
-				},
-				{
-					"id": "9c8b1df2-f50d-8633-adc3-633ea14a1414",
-					"category": "Lower Tier Authority",
-					"consultee": "Stevenage",
-					"distanceMetres": 3440
-				},
-				{
-					"id": "399406ae-c995-1439-fb22-09d55adbf1f2",
-					"category": "Parish Council",
-					"consultee": "Arlesey",
-					"distanceMetres": 3564
-				},
-				{
-					"id": "fc4c7e6a-52b5-1403-db98-9ac9281374f5",
-					"category": "Parish Council",
-					"consultee": "Graveley",
-					"distanceMetres": 3783
-				},
-				{
-					"id": "5901a106-e88e-c07a-3fa5-5b8fb928ed50",
-					"category": "Hospital",
-					"consultee": "CYGNET HOSPITAL STEVENAGE",
-					"distanceMetres": 4286
-				},
-				{
-					"id": "97c6e7ac-ec6d-df7a-b387-9f9ebd8b3fc6",
-					"category": "Hospital",
-					"consultee": "SPIRE HARPENDEN HOSPITAL",
-					"distanceMetres": 4381
-				},
-				{
-					"id": "fda5a746-5795-6a7c-83af-238a0c70c4c8",
-					"category": "Parish Council",
-					"consultee": "Fairfield",
-					"distanceMetres": 4439
-				},
-				{
-					"id": "8d1e3b78-1e7d-c0fe-8f82-ce00864b7f60",
-					"category": "Parish Council",
-					"consultee": "Shillington",
-					"distanceMetres": 4544
-				},
-				{
-					"id": "69c71e1e-747f-9019-3779-72f5807441a3",
-					"category": "Hospital",
-					"consultee": "LISTER HOSPITAL",
-					"distanceMetres": 4620
-				},
-				{
-					"id": "da351752-a7a7-f968-7c3e-603b4f492f26",
-					"category": "Hospital",
-					"consultee": "LISTER HOSPITAL",
-					"distanceMetres": 4620
-				},
-				{
-					"id": "da497cc1-4a7f-89f4-44b2-89a0e0bc88eb",
-					"category": "Hospital",
-					"consultee": "LISTER HOSPITAL",
-					"distanceMetres": 4620
-				},
-				{
-					"id": "e9dd2c33-9bdf-0bf4-77b2-ba17a0832040",
-					"category": "Hospital",
-					"consultee": "LISTER HOSPITAL",
-					"distanceMetres": 4620
-				},
-				{
-					"id": "c5957c72-3150-e334-23bf-aa91486d1d37",
-					"category": "Hospital",
-					"consultee": "MENTAL HEALTH SERVICE (LISTER HOSPITAL)",
-					"distanceMetres": 4620
-				},
-				{
-					"id": "195efb34-d616-cb48-ee82-e83b2f04a65c",
-					"category": "Hospital",
-					"consultee": "LUTON & DUNSTABLE HOSPITAL",
-					"distanceMetres": 4787
-				},
-				{
-					"id": "4051c1c3-0812-6718-24b0-b3be67f26a25",
-					"category": "Parish Council",
-					"consultee": "Dunstable",
-					"distanceMetres": 4798
-				},
-				{
-					"id": "0cec31b4-df97-bf8f-e98f-75c3a2cb2be5",
-					"category": "Hospital",
-					"consultee": "LUTON & DUNSTABLE HOSPITAL",
-					"distanceMetres": 4844
-				},
-				{
-					"id": "8695662e-9465-59d7-6cf2-5ef069b736d8",
-					"category": "Hospital",
-					"consultee": "LUTON & DUNSTABLE HOSPITAL",
-					"distanceMetres": 4844
-				},
-				{
-					"id": "58f6c1cc-7eba-c4a7-5228-85c7838b2a3c",
-					"category": "Hospital",
-					"consultee": "LUTON AND DUNSTABLE UNIVERSITY HOSPITAL",
-					"distanceMetres": 4844
-				},
-				{
-					"id": "76bac9cf-6401-ff84-a0e1-6b2e7bbbcba7",
-					"category": "Hospital",
-					"consultee": "LUTON AND DUNSTABLE UNIVERSITY HOSPITAL",
-					"distanceMetres": 4844
-				},
-				{
-					"id": "a772b7e6-0a84-2a57-6cc2-ae3caa2f656a",
-					"category": "Hospital",
-					"consultee": "LUTON & DUNSTABLE HOSPITAL",
-					"distanceMetres": 5169
-				},
-				{
-					"id": "2abeb4f0-2845-bb74-a4d8-2ea1c70d452e",
-					"category": "Hospital",
-					"consultee": "HARPENDEN MEMORIAL HOSPITAL",
-					"distanceMetres": 5457
-				},
-				{
-					"id": "b72e7dfd-159b-4f0c-ea68-fd6a3198421f",
-					"category": "Hospital",
-					"consultee": "HARPENDEN MEMORIAL HOSPITAL",
-					"distanceMetres": 5457
-				},
-				{
-					"id": "c79a880c-df7d-a75b-fac8-2ba1c36ef46d",
-					"category": "Hospital",
-					"consultee": "HARPENDEN MEMORIAL HOSPITAL",
-					"distanceMetres": 5457
-				},
-				{
-					"id": "4fefba3e-45bc-1378-c8b1-0fdc3af9f8f3",
-					"category": "Parish Council",
-					"consultee": "Weston",
-					"distanceMetres": 5577
-				},
-				{
-					"id": "ebe2b834-3fdb-f46c-01a7-fb090ebb9448",
-					"category": "Parish Council",
-					"consultee": "Great Gaddesden",
-					"distanceMetres": 5593
-				},
-				{
-					"id": "c19d9797-b80b-7dc2-3fe2-0ecb94c55052",
-					"category": "Parish Council",
-					"consultee": "Studham",
-					"distanceMetres": 5638
-				},
-				{
-					"id": "86e58eb4-d714-bb9f-5685-4db365deb57a",
-					"category": "Parish Council",
-					"consultee": "Chalton",
-					"distanceMetres": 6028
-				},
-				{
-					"id": "f26b56d3-15b4-ecfe-c233-2fa0667d83dc",
-					"category": "Lower Tier Authority",
-					"consultee": "Welwyn Hatfield",
-					"distanceMetres": 6034
-				},
-				{
-					"id": "bc4dd8b8-57df-ff95-8ec2-863ffb316bc8",
-					"category": "Parish Council",
-					"consultee": "Stotfold",
-					"distanceMetres": 6274
-				},
-				{
-					"id": "9958ded3-5848-95aa-9a75-e64acf2aa18b",
-					"category": "Parish Council",
-					"consultee": "Houghton Regis",
-					"distanceMetres": 6493
-				},
-				{
-					"id": "5a2a85df-6c4c-2049-d242-50c11b52b260",
-					"category": "Lower Tier Authority",
-					"consultee": "East Hertfordshire",
-					"distanceMetres": 7988
-				},
-				{
-					"id": "2a1f37e0-3464-9e3d-b04c-272f4328f20d",
-					"category": "Parish Council",
-					"consultee": "Radwell",
-					"distanceMetres": 7989
-				},
-				{
-					"id": "c5b82444-69ae-185b-93bd-8612785e1670",
-					"category": "Parish Council",
-					"consultee": "Clothall",
-					"distanceMetres": 8029
-				},
-				{
-					"id": "b834e8a9-5c5e-8d63-eb28-46cc24dfbc66",
-					"category": "Unitary Authority",
-					"consultee": "Buckinghamshire",
-					"distanceMetres": 8078
-				},
-				{
-					"id": "5ffb4643-acc4-d77b-558f-9ecd5ff7cef0",
-					"category": "ICB",
-					"consultee": "NHS Thames Valley Integrated Care Board",
-					"distanceMetres": 8081
+					"consultee": "East of England Ambulance Service"
 				},
 				{
 					"id": "7f3db9d4-317d-fca4-dce0-c6c2061aab84",
 					"category": "Ambulance Trust",
-					"consultee": "South Central Ambulance Service",
-					"distanceMetres": 8083
+					"consultee": "South Central Ambulance Service"
 				},
 				{
-					"id": "2a33f86b-47b3-ccb9-de6b-249bf0eb0ce2",
-					"category": "Parish Council",
-					"consultee": "Bygrave",
-					"distanceMetres": 8128
+					"id": "f746219c-8885-4b4d-f6f5-9e6d1d45fb8d",
+					"category": "Fire and Rescue Authority",
+					"consultee": "Bedfordshire"
 				},
 				{
-					"id": "6b41576f-ee0c-6768-4a2c-e61f1fc81832",
-					"category": "Internal Drainage District",
-					"consultee": "Buckingham and River Ouzel Internal Drainage Board",
-					"distanceMetres": 8801
-				},
-				{
-					"id": "56450ad7-ccf8-4320-364b-69226ff19bf3",
-					"category": "Lower Tier Authority",
-					"consultee": "Three Rivers",
-					"distanceMetres": 12081
-				},
-				{
-					"id": "b825a8eb-1276-7274-e214-7a5e38349fc8",
-					"category": "Lower Tier Authority",
-					"consultee": "South Cambridgeshire",
-					"distanceMetres": 13337
-				},
-				{
-					"id": "eebef653-fae7-1943-01cb-1fdf4e518d30",
-					"category": "Upper Tier Authority",
-					"consultee": "Cambridgeshire",
-					"distanceMetres": 13337
-				},
-				{
-					"id": "0159d8af-15f4-892d-40c4-46735052abf4",
-					"category": "Unitary Authority",
-					"consultee": "Bedford",
-					"distanceMetres": 15708
-				},
-				{
-					"id": "c7ecfc32-a258-bd4f-7ec6-5c3a965795c7",
-					"category": "Unitary Authority",
-					"consultee": "Milton Keynes",
-					"distanceMetres": 19354
-				},
-				{
-					"id": "dbe2ece7-bdc4-4b55-d3b1-94224481650b",
-					"category": "Lower Tier Authority",
-					"consultee": "Huntingdonshire",
-					"distanceMetres": 23831
-				},
-				{
-					"id": "322f8486-34b1-101e-fc21-0dfce3407592",
-					"category": "Lower Tier Authority",
-					"consultee": "Uttlesford",
-					"distanceMetres": 24024
-				},
-				{
-					"id": "a97362b1-4404-d2bd-3485-dcf84f59f76d",
-					"category": "Upper Tier Authority",
-					"consultee": "Essex",
-					"distanceMetres": 24024
+					"id": "2c4c15f6-1566-fb4f-7b1c-59419449eb96",
+					"category": "Fire and Rescue Authority",
+					"consultee": "Hertfordshire"
 				},
 				{
 					"id": "0299e58e-fecb-4693-626c-4e993055631a",
 					"category": "Greater London Authority",
-					"consultee": "Greater London Authority",
-					"distanceMetres": 24275
+					"consultee": "Greater London Authority"
 				},
 				{
-					"id": "c15a10cf-2f0c-896b-4b19-d5a2c6dc41ed",
-					"category": "Unitary Authority",
-					"consultee": "Enfield",
-					"distanceMetres": 24275
+					"id": "5901a106-e88e-c07a-3fa5-5b8fb928ed50",
+					"category": "Hospital",
+					"consultee": "CYGNET HOSPITAL STEVENAGE"
 				},
 				{
-					"id": "bc8c107a-bc30-6f95-9623-92675ec0d883",
-					"category": "Unitary Authority",
-					"consultee": "Harrow",
-					"distanceMetres": 24340
+					"id": "2abeb4f0-2845-bb74-a4d8-2ea1c70d452e",
+					"category": "Hospital",
+					"consultee": "HARPENDEN MEMORIAL HOSPITAL"
+				},
+				{
+					"id": "b72e7dfd-159b-4f0c-ea68-fd6a3198421f",
+					"category": "Hospital",
+					"consultee": "HARPENDEN MEMORIAL HOSPITAL"
+				},
+				{
+					"id": "c79a880c-df7d-a75b-fac8-2ba1c36ef46d",
+					"category": "Hospital",
+					"consultee": "HARPENDEN MEMORIAL HOSPITAL"
+				},
+				{
+					"id": "69c71e1e-747f-9019-3779-72f5807441a3",
+					"category": "Hospital",
+					"consultee": "LISTER HOSPITAL"
+				},
+				{
+					"id": "da351752-a7a7-f968-7c3e-603b4f492f26",
+					"category": "Hospital",
+					"consultee": "LISTER HOSPITAL"
+				},
+				{
+					"id": "da497cc1-4a7f-89f4-44b2-89a0e0bc88eb",
+					"category": "Hospital",
+					"consultee": "LISTER HOSPITAL"
+				},
+				{
+					"id": "e9dd2c33-9bdf-0bf4-77b2-ba17a0832040",
+					"category": "Hospital",
+					"consultee": "LISTER HOSPITAL"
+				},
+				{
+					"id": "0cec31b4-df97-bf8f-e98f-75c3a2cb2be5",
+					"category": "Hospital",
+					"consultee": "LUTON & DUNSTABLE HOSPITAL"
+				},
+				{
+					"id": "195efb34-d616-cb48-ee82-e83b2f04a65c",
+					"category": "Hospital",
+					"consultee": "LUTON & DUNSTABLE HOSPITAL"
+				},
+				{
+					"id": "8695662e-9465-59d7-6cf2-5ef069b736d8",
+					"category": "Hospital",
+					"consultee": "LUTON & DUNSTABLE HOSPITAL"
+				},
+				{
+					"id": "a772b7e6-0a84-2a57-6cc2-ae3caa2f656a",
+					"category": "Hospital",
+					"consultee": "LUTON & DUNSTABLE HOSPITAL"
+				},
+				{
+					"id": "58f6c1cc-7eba-c4a7-5228-85c7838b2a3c",
+					"category": "Hospital",
+					"consultee": "LUTON AND DUNSTABLE UNIVERSITY HOSPITAL"
+				},
+				{
+					"id": "76bac9cf-6401-ff84-a0e1-6b2e7bbbcba7",
+					"category": "Hospital",
+					"consultee": "LUTON AND DUNSTABLE UNIVERSITY HOSPITAL"
+				},
+				{
+					"id": "c5957c72-3150-e334-23bf-aa91486d1d37",
+					"category": "Hospital",
+					"consultee": "MENTAL HEALTH SERVICE (LISTER HOSPITAL)"
+				},
+				{
+					"id": "b89863e5-146c-b6d2-d1c6-81eb07045691",
+					"category": "Hospital",
+					"consultee": "PINEHILL HOSPITAL"
+				},
+				{
+					"id": "97c6e7ac-ec6d-df7a-b387-9f9ebd8b3fc6",
+					"category": "Hospital",
+					"consultee": "SPIRE HARPENDEN HOSPITAL"
+				},
+				{
+					"id": "4c8d3e81-4de4-f38e-f1b6-b61eaf46e16c",
+					"category": "ICB",
+					"consultee": "NHS Central East Integrated Care Board"
+				},
+				{
+					"id": "5ffb4643-acc4-d77b-558f-9ecd5ff7cef0",
+					"category": "ICB",
+					"consultee": "NHS Thames Valley Integrated Care Board"
+				},
+				{
+					"id": "be7aebe4-b5dd-7296-0f18-46963ad02238",
+					"category": "Internal Drainage District",
+					"consultee": "Bedfordshire and River Ivel Internal Drainage Board"
+				},
+				{
+					"id": "6b41576f-ee0c-6768-4a2c-e61f1fc81832",
+					"category": "Internal Drainage District",
+					"consultee": "Buckingham and River Ouzel Internal Drainage Board"
+				},
+				{
+					"id": "bc76e990-8c91-b35c-7662-3e0f256a5fc9",
+					"category": "Local Resilience Forum",
+					"consultee": "Bedfordshire"
+				},
+				{
+					"id": "b943e865-7f6a-9f68-4bec-92ff248ccf7c",
+					"category": "Local Resilience Forum",
+					"consultee": "Hertfordshire"
+				},
+				{
+					"id": "1a6299de-2fbf-f730-f041-09f50082e821",
+					"category": "Lower Tier Authority",
+					"consultee": "Dacorum"
+				},
+				{
+					"id": "5a2a85df-6c4c-2049-d242-50c11b52b260",
+					"category": "Lower Tier Authority",
+					"consultee": "East Hertfordshire"
+				},
+				{
+					"id": "dbe2ece7-bdc4-4b55-d3b1-94224481650b",
+					"category": "Lower Tier Authority",
+					"consultee": "Huntingdonshire"
+				},
+				{
+					"id": "4975ca6c-8942-acb1-fba0-9aaf988b8fe6",
+					"category": "Lower Tier Authority",
+					"consultee": "North Hertfordshire"
+				},
+				{
+					"id": "b825a8eb-1276-7274-e214-7a5e38349fc8",
+					"category": "Lower Tier Authority",
+					"consultee": "South Cambridgeshire"
+				},
+				{
+					"id": "52461453-0ebd-4e6d-8480-9aeb8e46c513",
+					"category": "Lower Tier Authority",
+					"consultee": "St Albans"
+				},
+				{
+					"id": "9c8b1df2-f50d-8633-adc3-633ea14a1414",
+					"category": "Lower Tier Authority",
+					"consultee": "Stevenage"
+				},
+				{
+					"id": "56450ad7-ccf8-4320-364b-69226ff19bf3",
+					"category": "Lower Tier Authority",
+					"consultee": "Three Rivers"
+				},
+				{
+					"id": "322f8486-34b1-101e-fc21-0dfce3407592",
+					"category": "Lower Tier Authority",
+					"consultee": "Uttlesford"
+				},
+				{
+					"id": "f26b56d3-15b4-ecfe-c233-2fa0667d83dc",
+					"category": "Lower Tier Authority",
+					"consultee": "Welwyn Hatfield"
+				},
+				{
+					"id": "862e7d78-a63e-6ae0-8620-a96a0cda8efe",
+					"category": "National Landscape",
+					"consultee": "Chilterns"
+				},
+				{
+					"id": "399406ae-c995-1439-fb22-09d55adbf1f2",
+					"category": "Parish Council",
+					"consultee": "Arlesey"
+				},
+				{
+					"id": "2a33f86b-47b3-ccb9-de6b-249bf0eb0ce2",
+					"category": "Parish Council",
+					"consultee": "Bygrave"
+				},
+				{
+					"id": "3bc89534-b32f-2a13-87ae-3d5c12a2ffdf",
+					"category": "Parish Council",
+					"consultee": "Caddington"
+				},
+				{
+					"id": "86e58eb4-d714-bb9f-5685-4db365deb57a",
+					"category": "Parish Council",
+					"consultee": "Chalton"
+				},
+				{
+					"id": "c5b82444-69ae-185b-93bd-8612785e1670",
+					"category": "Parish Council",
+					"consultee": "Clothall"
+				},
+				{
+					"id": "4051c1c3-0812-6718-24b0-b3be67f26a25",
+					"category": "Parish Council",
+					"consultee": "Dunstable"
+				},
+				{
+					"id": "fda5a746-5795-6a7c-83af-238a0c70c4c8",
+					"category": "Parish Council",
+					"consultee": "Fairfield"
+				},
+				{
+					"id": "e46aebe3-9476-7726-48e2-c70677ae830f",
+					"category": "Parish Council",
+					"consultee": "Flamstead"
+				},
+				{
+					"id": "fc4c7e6a-52b5-1403-db98-9ac9281374f5",
+					"category": "Parish Council",
+					"consultee": "Graveley"
+				},
+				{
+					"id": "ebe2b834-3fdb-f46c-01a7-fb090ebb9448",
+					"category": "Parish Council",
+					"consultee": "Great Gaddesden"
+				},
+				{
+					"id": "377c2687-c927-74d1-e397-2682d7269b4a",
+					"category": "Parish Council",
+					"consultee": "Harpenden Rural"
+				},
+				{
+					"id": "f025649c-5275-0a9f-d66d-29c3eceb8d70",
+					"category": "Parish Council",
+					"consultee": "Harpenden Town"
+				},
+				{
+					"id": "9958ded3-5848-95aa-9a75-e64acf2aa18b",
+					"category": "Parish Council",
+					"consultee": "Houghton Regis"
+				},
+				{
+					"id": "4a696736-f6c1-57a7-8d8c-1458db19281b",
+					"category": "Parish Council",
+					"consultee": "Hyde"
+				},
+				{
+					"id": "9e0c2bf9-29f5-cf6d-15f7-b81c78b5b883",
+					"category": "Parish Council",
+					"consultee": "Ickleford"
+				},
+				{
+					"id": "65ead6e6-1243-37b1-ce36-9848a2694044",
+					"category": "Parish Council",
+					"consultee": "Kimpton"
+				},
+				{
+					"id": "8d02c27a-3c73-4f6f-6098-ac8873b64b56",
+					"category": "Parish Council",
+					"consultee": "King's Walden"
+				},
+				{
+					"id": "d7691464-e2d3-a590-ebfa-57acab77c94d",
+					"category": "Parish Council",
+					"consultee": "Langley"
+				},
+				{
+					"id": "ee684cf6-23f2-c871-4aee-db1b4f437074",
+					"category": "Parish Council",
+					"consultee": "Lilley"
+				},
+				{
+					"id": "83eeb249-a1db-939a-94b8-76f47e612fad",
+					"category": "Parish Council",
+					"consultee": "Luton, unparished area"
+				},
+				{
+					"id": "1282a2b0-254a-7109-8fa9-bda41a8c55f8",
+					"category": "Parish Council",
+					"consultee": "Markyate"
+				},
+				{
+					"id": "9b195364-17e2-cd40-b271-cf139bb6847a",
+					"category": "Parish Council",
+					"consultee": "North Hertfordshire, unparished area"
+				},
+				{
+					"id": "abb64bc0-f617-2527-8962-dd6ded4af8fb",
+					"category": "Parish Council",
+					"consultee": "Offley"
+				},
+				{
+					"id": "4896e299-c80e-f75f-c470-70e15fb77359",
+					"category": "Parish Council",
+					"consultee": "Pirton"
+				},
+				{
+					"id": "503d9fea-1aa4-54da-d4d6-e383df84ee9c",
+					"category": "Parish Council",
+					"consultee": "Preston"
+				},
+				{
+					"id": "2a1f37e0-3464-9e3d-b04c-272f4328f20d",
+					"category": "Parish Council",
+					"consultee": "Radwell"
+				},
+				{
+					"id": "82270e5d-992b-49ac-cb96-19e71b82be15",
+					"category": "Parish Council",
+					"consultee": "Redbourn"
+				},
+				{
+					"id": "8d1e3b78-1e7d-c0fe-8f82-ce00864b7f60",
+					"category": "Parish Council",
+					"consultee": "Shillington"
+				},
+				{
+					"id": "019239f3-8857-4819-de9b-a9ac533e2f41",
+					"category": "Parish Council",
+					"consultee": "Slip End"
+				},
+				{
+					"id": "97c0c437-b532-f895-5fec-00c817e6bbb8",
+					"category": "Parish Council",
+					"consultee": "St Ippolyts"
+				},
+				{
+					"id": "3d8a7a19-e6fd-9362-7282-fee314eec329",
+					"category": "Parish Council",
+					"consultee": "St Paul's Walden"
+				},
+				{
+					"id": "bc4dd8b8-57df-ff95-8ec2-863ffb316bc8",
+					"category": "Parish Council",
+					"consultee": "Stotfold"
+				},
+				{
+					"id": "95906b43-818f-4b8b-e0f3-073b54444f00",
+					"category": "Parish Council",
+					"consultee": "Streatley"
+				},
+				{
+					"id": "c19d9797-b80b-7dc2-3fe2-0ecb94c55052",
+					"category": "Parish Council",
+					"consultee": "Studham"
+				},
+				{
+					"id": "4fefba3e-45bc-1378-c8b1-0fdc3af9f8f3",
+					"category": "Parish Council",
+					"consultee": "Weston"
+				},
+				{
+					"id": "8dc9e08b-abdf-32c1-9c92-4200eebc41a6",
+					"category": "Parish Council",
+					"consultee": "Wheathampstead"
+				},
+				{
+					"id": "33dbf437-76c6-61db-4edb-9d0989ad2491",
+					"category": "Parish Council",
+					"consultee": "Wymondley"
+				},
+				{
+					"id": "ca2ed866-e026-c2ff-05ca-d665302bdff7",
+					"category": "Police",
+					"consultee": "Bedfordshire"
+				},
+				{
+					"id": "6ce1d331-b352-df93-28ee-378b683c305b",
+					"category": "Police",
+					"consultee": "Hertfordshire"
 				},
 				{
 					"id": "30e25bbd-bca3-3e74-d2af-0aa7b048bcbd",
 					"category": "Unitary Authority",
-					"consultee": "Barnet",
-					"distanceMetres": 24537
+					"consultee": "Barnet"
+				},
+				{
+					"id": "0159d8af-15f4-892d-40c4-46735052abf4",
+					"category": "Unitary Authority",
+					"consultee": "Bedford"
+				},
+				{
+					"id": "b834e8a9-5c5e-8d63-eb28-46cc24dfbc66",
+					"category": "Unitary Authority",
+					"consultee": "Buckinghamshire"
+				},
+				{
+					"id": "47d1fc5a-d7b4-6a6e-7621-126a66abe551",
+					"category": "Unitary Authority",
+					"consultee": "Central Bedfordshire"
+				},
+				{
+					"id": "c15a10cf-2f0c-896b-4b19-d5a2c6dc41ed",
+					"category": "Unitary Authority",
+					"consultee": "Enfield"
+				},
+				{
+					"id": "bc8c107a-bc30-6f95-9623-92675ec0d883",
+					"category": "Unitary Authority",
+					"consultee": "Harrow"
 				},
 				{
 					"id": "56f75837-73d3-6806-e3a6-7d7ca04957b5",
 					"category": "Unitary Authority",
-					"consultee": "Hillingdon",
-					"distanceMetres": 24776
+					"consultee": "Hillingdon"
+				},
+				{
+					"id": "68a1ef35-285a-d0e8-5ab3-f668cfb45e98",
+					"category": "Unitary Authority",
+					"consultee": "Luton"
+				},
+				{
+					"id": "c7ecfc32-a258-bd4f-7ec6-5c3a965795c7",
+					"category": "Unitary Authority",
+					"consultee": "Milton Keynes"
+				},
+				{
+					"id": "eebef653-fae7-1943-01cb-1fdf4e518d30",
+					"category": "Upper Tier Authority",
+					"consultee": "Cambridgeshire"
+				},
+				{
+					"id": "a97362b1-4404-d2bd-3485-dcf84f59f76d",
+					"category": "Upper Tier Authority",
+					"consultee": "Essex"
+				},
+				{
+					"id": "a4e97c54-0a6d-dde1-8e42-63c3779f0018",
+					"category": "Upper Tier Authority",
+					"consultee": "Hertfordshire"
+				}
+			],
+			"mayAlsoInclude": [
+				{
+					"id": "3b89ea50-fef3-c8bc-683d-707f3f971468",
+					"category": "Parish Council",
+					"consultee": "Sundon"
+				},
+				{
+					"id": "3c28cb57-c419-76ae-cd35-5113d0268dbc",
+					"category": "Parish Council",
+					"consultee": "Whipsnade"
 				}
 			]
 		}

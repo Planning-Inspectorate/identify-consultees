@@ -10,7 +10,8 @@ import {
 	findConsulteeAreasNear,
 	getConsulteeAreaById,
 	getConsulteeAreaGeometries,
-	loadConsulteeAreas
+	loadConsulteeAreas,
+	simplifyGeometry
 } from './consultee-areas.ts';
 
 // a fixed id, rather than a wholesale table truncate, so this suite can't wipe out other data in
@@ -156,5 +157,31 @@ describe('consultee areas (requires a local SQL Server - see docker-compose.yml)
 		} finally {
 			await cleanup();
 		}
+	});
+
+	test('simplifies an over-digitised boundary down to its corners', async (t) => {
+		if (!dbAvailable) return t.skip('SQL Server database not available');
+
+		// a ~110m square near London with a point every ~0.1m along each side - like real site
+		// boundaries, most of whose points are under a metre apart
+		const side = 0.001;
+		const steps = 1000;
+		const edge = (from: [number, number], to: [number, number]) =>
+			Array.from({ length: steps }, (_, i): [number, number] => [
+				from[0] + ((to[0] - from[0]) * i) / steps,
+				from[1] + ((to[1] - from[1]) * i) / steps
+			]);
+		const [x, y] = [-0.1, 51.5];
+		const ring = [
+			...edge([x, y], [x + side, y]),
+			...edge([x + side, y], [x + side, y + side]),
+			...edge([x + side, y + side], [x, y + side]),
+			...edge([x, y + side], [x, y]),
+			[x, y] as [number, number]
+		];
+
+		const simplified = await simplifyGeometry(dbClient, { type: 'Polygon', coordinates: [ring] });
+		assert.equal(simplified.type, 'Polygon');
+		assert.ok(simplified.type === 'Polygon' && simplified.coordinates[0].length <= 6, 'expected just the corners');
 	});
 });

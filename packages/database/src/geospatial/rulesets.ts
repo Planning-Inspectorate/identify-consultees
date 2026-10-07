@@ -2,12 +2,16 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { PrismaClient } from '../client/client.ts';
-import type { ConsulteeAreaMatch, ConsulteeAreaSummaryMatch } from './consultee-areas.ts';
+import type { ConsulteeAreaFeature, ConsulteeAreaMatch, ConsulteeAreaSummaryMatch } from './consultee-areas.ts';
 import {
+	DISTANCE_MARGIN_METRES,
 	findConsulteeAreaSummariesNear,
 	findConsulteeAreasBordering,
 	findConsulteeAreasNear,
-	getConsulteeAreaGeometries
+	getConsulteeAreaDistances,
+	getConsulteeAreaGeometries,
+	growGeometry,
+	simplifyGeometry
 } from './consultee-areas.ts';
 import { DEFAULT_NEARBY_RADIUS_METRES } from './nearby-radius.ts';
 import type { Geometry } from './wkt.ts';
@@ -209,20 +213,6 @@ export function getRuleset(id: string): Ruleset | undefined {
 // under concurrent load, not just one made from within a ruleset run (see there for why)
 export { isDeadlockError, withDeadlockRetry } from './consultee-areas.ts';
 
-async function runCondition(
-	dbClient: PrismaClient,
-	geometry: Geometry,
-	rule: RuleCondition
-): Promise<ConsulteeAreaMatch[]> {
-	if (rule.logicType === 'bordering') {
-		if (!rule.hostCategory) {
-			return [];
-		}
-		return findConsulteeAreasBordering(dbClient, geometry, rule.hostCategory, rule.categories);
-	}
-	return findConsulteeAreasNear(dbClient, geometry, rule.bufferMetres ?? 0, rule.categories);
-}
-
 // Conditions that can't be satisfied from the shared "nearby" fetch below (see runRuleset) run
 // concurrently in batches of this size, not all at once. Running every condition fully in parallel
 // maximises throughput for a single ruleset run in isolation, but multiplies how many simultaneous
@@ -255,11 +245,15 @@ function isSatisfiableFromNearby(rule: RuleCondition, nearbyRadiusMetres: number
 	);
 }
 
-/** Mirrors the SQL `consulteeCategory IN (...) AND STDistance(...) <= radius` findConsulteeAreasNear runs. */
+/**
+ * Mirrors the SQL `consulteeCategory IN (...) AND STDistance(...) <= radius + margin` that
+ * findConsulteeAreasNear runs - including its DISTANCE_MARGIN_METRES widening, so a condition
+ * answered from the shared nearby fetch includes exactly what its own query would.
+ */
 function matchesCondition(match: ConsulteeAreaSummaryMatch, rule: RuleCondition): boolean {
 	const category = match.feature.properties.consulteeCategory ?? '';
 	const categoryMatches = rule.categories.length === 0 || rule.categories.includes(category);
-	return categoryMatches && match.distanceMetres <= (rule.bufferMetres ?? 0);
+	return categoryMatches && match.distanceMetres <= (rule.bufferMetres ?? 0) + DISTANCE_MARGIN_METRES;
 }
 
 // tie-break on id: SQL Server's `ORDER BY distanceMetres` (in findConsulteeAreasNear) has no
@@ -304,6 +298,11 @@ export interface RunRulesetResult {
  * The shared fetch skips geometry (a few hundred rows, some of them whole county or National Park
  * boundaries) - geometry is then fetched by id for just the final matches, the only rows the map
  * draws.
+ *
+ * Every check runs against simplified shapes - the site is simplified once here, and each area's
+ * simplified copy is stored - with thresholds widened to match (see DISTANCE_MARGIN_METRES in
+ * consultee-areas.ts). Matches are a superset of an exact calculation's: a consultee within a few
+ * tens of metres of a cut-off may be included, never missed. Distances are approximate to match.
  */
 export async function runRuleset(
 	dbClient: PrismaClient,
@@ -311,9 +310,10 @@ export async function runRuleset(
 	ruleset: Ruleset,
 	nearbyRadiusMetres: number = DEFAULT_NEARBY_RADIUS_METRES
 ): Promise<RunRulesetResult> {
+	const site = await simplifyGeometry(dbClient, geometry);
 	const allNearby = await findConsulteeAreaSummariesNear(
 		dbClient,
-		geometry,
+		site,
 		nearbyRadiusMetres,
 		undefined,
 		CATEGORIES_EXCLUDED_FROM_NEARBY
@@ -330,15 +330,34 @@ export async function runRuleset(
 	}
 
 	const knownGeometries = new Map<string, Geometry>();
-	for (let i = 0; i < remainingRules.length; i += CONDITION_CONCURRENCY) {
-		const batch = remainingRules.slice(i, i + CONDITION_CONCURRENCY);
-		const batchResults = await Promise.all(batch.map((rule) => runCondition(dbClient, geometry, rule)));
-		for (const matches of batchResults) {
-			resultsByRule.push(matches);
-			for (const match of matches) {
-				knownGeometries.set(match.feature.id, match.feature.geometry);
+	const borderingAreas = new Map<string, ConsulteeAreaFeature>();
+	// grown at most once, and only if a bordering condition needs it
+	let siteWithinMargin: Promise<Geometry> | undefined;
+	const runCondition = async (rule: RuleCondition) => {
+		if (rule.logicType === 'bordering') {
+			if (!rule.hostCategory) {
+				return;
 			}
+			siteWithinMargin ??= growGeometry(dbClient, site, DISTANCE_MARGIN_METRES);
+			for (const area of await findConsulteeAreasBordering(
+				dbClient,
+				await siteWithinMargin,
+				rule.hostCategory,
+				rule.categories
+			)) {
+				borderingAreas.set(area.id, area);
+				knownGeometries.set(area.id, area.geometry);
+			}
+			return;
 		}
+		const matches = await findConsulteeAreasNear(dbClient, site, rule.bufferMetres ?? 0, rule.categories);
+		resultsByRule.push(matches);
+		for (const match of matches) {
+			knownGeometries.set(match.feature.id, match.feature.geometry);
+		}
+	};
+	for (let i = 0; i < remainingRules.length; i += CONDITION_CONCURRENCY) {
+		await Promise.all(remainingRules.slice(i, i + CONDITION_CONCURRENCY).map(runCondition));
 	}
 
 	const matchesById = new Map<string, ConsulteeAreaSummaryMatch>();
@@ -348,6 +367,17 @@ export async function runRuleset(
 			if (!existing || match.distanceMetres < existing.distanceMetres) {
 				matchesById.set(match.feature.id, match);
 			}
+		}
+	}
+
+	// bordering matches come back without a distance - most already have one from another
+	// condition; measure the rest once here, rather than once per host inside the bordering query
+	const unmeasuredIds = [...borderingAreas.keys()].filter((id) => !matchesById.has(id));
+	const borderingDistances = await getConsulteeAreaDistances(dbClient, site, unmeasuredIds);
+	for (const id of unmeasuredIds) {
+		const distanceMetres = borderingDistances.get(id);
+		if (distanceMetres !== undefined) {
+			matchesById.set(id, { feature: borderingAreas.get(id)!, distanceMetres });
 		}
 	}
 
