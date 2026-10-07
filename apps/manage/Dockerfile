@@ -37,11 +37,12 @@ COPY --chown=node:node apps/manage ./apps/manage
 # check-toolchain.mjs, which intentionally fails under the image's npm-major-only
 # environment check expectations differ from CI - but skipping it means the
 # MapLibre sanitize patch (CVE-2026-85061, see scripts/patch-maplibre-sanitize.ts)
-# is never applied. The app serves Defra's vendored MapLibre UMD straight from
-# node_modules (see src/app/maps/vendor.ts), so the patch must be applied here or
-# the deployed image ships the vulnerable bundle.
+# and the viewport aria-controls patch (see scripts/patch-im-aria-controls.ts)
+# are never applied. The app serves Defra's vendored bundles straight from
+# node_modules (see src/app/maps/vendor.ts), so both patches must be applied
+# here or the deployed image ships the vulnerable/broken bundles.
 RUN npm ci --loglevel notice --workspace=identify-consultees-manage --ignore-scripts
-RUN npm run deps:patch-maplibre
+RUN npm run deps:patch-maplibre && npm run deps:patch-im-aria-controls
 
 ENV NODE_ENV=production
 ENV GIT_SHA=$GIT_SHA
