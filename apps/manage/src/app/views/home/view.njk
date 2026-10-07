@@ -3,6 +3,7 @@
 {% from "govuk/components/button/macro.njk" import govukButton %}
 {% from "govuk/components/input/macro.njk" import govukInput %}
 {% from "govuk/components/inset-text/macro.njk" import govukInsetText %}
+{% from "govuk/components/pagination/macro.njk" import govukPagination %}
 {% from "govuk/components/table/macro.njk" import govukTable %}
 {% from "govuk/components/tag/macro.njk" import govukTag %}
 
@@ -89,6 +90,10 @@
 			],
 			rows: tableRows
 		}) }}
+
+		{% if pagination %}
+			{{ govukPagination(pagination) }}
+		{% endif %}
 	{% else %}
 		<p class="govuk-body govuk-!-margin-top-6">No project geometries match your search.</p>
 	{% endif %}

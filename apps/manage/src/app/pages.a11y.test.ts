@@ -103,6 +103,16 @@ describe('manage page accessibility smoke', () => {
 			resultsFrom: 1,
 			resultsTo: 3,
 			resultsTotal: 100,
+			pagination: {
+				next: { href: '/?q=EN01&pageSize=25&page=2' },
+				items: [
+					{ number: 1, href: '/?q=EN01&pageSize=25&page=1', current: true },
+					{ number: 2, href: '/?q=EN01&pageSize=25&page=2' },
+					{ number: 3, href: '/?q=EN01&pageSize=25&page=3' },
+					{ ellipsis: true },
+					{ number: 100, href: '/?q=EN01&pageSize=25&page=100' }
+				]
+			},
 			exampleCase: { reference: 'EN010025', caseName: 'East Anglia ONE Offshore Windfarm' },
 			geometries: [
 				{

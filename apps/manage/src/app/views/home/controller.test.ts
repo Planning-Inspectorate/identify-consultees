@@ -172,4 +172,78 @@ describe('home page', () => {
 		assert.strictEqual(viewModel.exampleCase, null);
 		assert.strictEqual(viewModel.geometries.length, 1);
 	});
+
+	it('should not render pagination when all results fit on one page', async () => {
+		const mockRes = { render: mock.fn() };
+		const homePage = buildHomePage({ logger: mockLogger(), db: createMockDb([newRow()]) });
+		await homePage({ query: {} }, mockRes);
+
+		assert.strictEqual(mockRes.render.mock.calls[0].arguments[1].pagination, null);
+	});
+
+	it('should report the correct result range and pagination on a later page', async () => {
+		const mockRes = { render: mock.fn() };
+		const rows = [{ ...newRow(), totalCount: 50n }];
+		const homePage = buildHomePage({ logger: mockLogger(), db: createMockDb(rows) });
+		await homePage({ query: { page: '2' } }, mockRes);
+
+		const viewModel = mockRes.render.mock.calls[0].arguments[1];
+		assert.strictEqual(viewModel.page, 2);
+		assert.strictEqual(viewModel.resultsFrom, 26);
+		assert.strictEqual(viewModel.resultsTo, 26);
+		assert.strictEqual(viewModel.resultsTotal, 50);
+		assert.deepStrictEqual(viewModel.pagination.previous, { href: '/?q=&pageSize=25&page=1' });
+		assert.strictEqual(viewModel.pagination.next, undefined);
+		assert.strictEqual(viewModel.pagination.items.filter((item) => item.current)[0].number, 2);
+	});
+
+	it('should keep the search query and page size in pagination links', async () => {
+		const mockRes = { render: mock.fn() };
+		const rows = [{ ...newRow(), totalCount: 120n }];
+		const homePage = buildHomePage({ logger: mockLogger(), db: createMockDb(rows) });
+		await homePage({ query: { q: 'wind farm', pageSize: '50', page: '2' } }, mockRes);
+
+		const viewModel = mockRes.render.mock.calls[0].arguments[1];
+		assert.strictEqual(viewModel.pagination.previous.href, '/?q=wind+farm&pageSize=50&page=1');
+		assert.strictEqual(viewModel.pagination.next.href, '/?q=wind+farm&pageSize=50&page=3');
+	});
+
+	it('should default to page 1 for an unrecognised page value', async () => {
+		const mockRes = { render: mock.fn() };
+		const homePage = buildHomePage({ logger: mockLogger(), db: createMockDb([newRow()]) });
+		await homePage({ query: { page: 'abc' } }, mockRes);
+		assert.strictEqual(mockRes.render.mock.calls[0].arguments[1].page, 1);
+	});
+
+	it('should default to page 1 for a zero or negative page value', async () => {
+		const mockRes = { render: mock.fn() };
+		const homePage = buildHomePage({ logger: mockLogger(), db: createMockDb([newRow()]) });
+		await homePage({ query: { page: '0' } }, mockRes);
+		assert.strictEqual(mockRes.render.mock.calls[0].arguments[1].page, 1);
+	});
+
+	it('should read the first value from an array page param', async () => {
+		const mockRes = { render: mock.fn() };
+		const rows = [{ ...newRow(), totalCount: 50n }];
+		const homePage = buildHomePage({ logger: mockLogger(), db: createMockDb(rows) });
+		await homePage({ query: { page: ['2', '9'] } }, mockRes);
+		assert.strictEqual(mockRes.render.mock.calls[0].arguments[1].page, 2);
+	});
+
+	it('should redirect to the last page when the requested page is out of range', async () => {
+		const mockRes = { render: mock.fn(), redirect: mock.fn() };
+		let call = 0;
+		const db = {
+			$queryRaw: mock.fn(async () => {
+				call += 1;
+				// page 99 of 60 results returns no rows; the follow-up COUNT reports the real total
+				return call === 1 ? [] : [{ total: 60n }];
+			})
+		};
+		const homePage = buildHomePage({ logger: mockLogger(), db });
+		await homePage({ query: { page: '99' } }, mockRes);
+
+		assert.strictEqual(mockRes.render.mock.callCount(), 0);
+		assert.strictEqual(mockRes.redirect.mock.calls[0].arguments[0], '/?q=&pageSize=25&page=3');
+	});
 });

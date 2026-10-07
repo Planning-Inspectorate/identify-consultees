@@ -1,5 +1,31 @@
+import { newDatabaseClient } from '@pins/identify-consultees-database';
 import { expect, test } from '@playwright/test';
+import { loadCaseBoundaries } from '../../../packages/database/src/geospatial/case-boundaries.ts';
 import { SAMPLE_CASE_ID, SAMPLE_CASE_NAME, SAMPLE_CASE_REFERENCE, SAMPLE_RULESET_NAME } from './fixtures.ts';
+
+// same fallback the e2e server resolves - see buildManageTestConfig's database.connectionString
+const connectionString =
+	process.env.SQL_CONNECTION_STRING ??
+	'sqlserver://localhost:1434;database=identify-consultees;user=sa;password=DockerDatabaseP@22word!;trustServerCertificate=true';
+
+const E2E_PAGE_PREFIX = 'E2EPAGE';
+const E2E_PAGE_ROWS = 26; // one more than the smallest page size, so the filtered set spans two pages
+
+function e2ePageFeatures() {
+	return Array.from({ length: E2E_PAGE_ROWS }, (_, i) => {
+		const n = String(i + 1).padStart(3, '0');
+		return {
+			id: `e2e00000-0000-0000-0000-${String(i + 1).padStart(12, '0')}`,
+			type: 'Feature' as const,
+			geometry: { type: 'Point' as const, coordinates: [0, 0] },
+			properties: { caseReference: `${E2E_PAGE_PREFIX}${n}`, caseName: `E2E Page ${n}` }
+		};
+	});
+}
+
+async function deleteE2ePageRows(db: ReturnType<typeof newDatabaseClient>) {
+	await db.$executeRaw`DELETE FROM case_boundary WHERE caseReference LIKE ${E2E_PAGE_PREFIX + '%'}`;
+}
 
 test.describe('manage journeys', () => {
 	test('home page shows identify consultees search', async ({ page }) => {
@@ -16,6 +42,32 @@ test.describe('manage journeys', () => {
 		await expect(
 			page.locator('.govuk-body', { hasText: 'Results per page' }).getByText('50', { exact: true })
 		).toBeVisible();
+	});
+
+	test('home search paginates when results exceed one page', async ({ page }) => {
+		// the fixed seed holds exactly one page of boundaries, so add a temporary set that pushes
+		// the filtered result count past it regardless of what else the environment contains
+		const db = newDatabaseClient(connectionString);
+		try {
+			await deleteE2ePageRows(db);
+			await loadCaseBoundaries(db, { type: 'FeatureCollection', features: e2ePageFeatures() });
+
+			await page.goto(`/?q=${E2E_PAGE_PREFIX}&pageSize=25`);
+			await expect(page.getByText(`Showing 1 to 25 of ${E2E_PAGE_ROWS} results`)).toBeVisible();
+			await expect(page.getByRole('navigation', { name: 'Pagination' })).toBeVisible();
+
+			await page.getByRole('link', { name: 'Page 2', exact: true }).click();
+			await expect(page).toHaveURL(/page=2/);
+			await expect(page.getByText('Showing 26 to 26 of 26 results')).toBeVisible();
+			await expect(page.getByRole('link', { name: `${E2E_PAGE_PREFIX}026 - E2E Page 026` })).toBeVisible();
+
+			await page.getByRole('link', { name: 'Previous page' }).click();
+			await expect(page).toHaveURL(/page=1/);
+			await expect(page.getByText(`Showing 1 to 25 of ${E2E_PAGE_ROWS} results`)).toBeVisible();
+		} finally {
+			await deleteE2ePageRows(db);
+			await db.$disconnect();
+		}
 	});
 
 	test('choosing a project then a ruleset runs it and shows the results', async ({ page }) => {
