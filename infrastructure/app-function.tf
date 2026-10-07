@@ -96,6 +96,12 @@ resource "azurerm_linux_function_app" "function_orchestrator" {
     # apps/function-python/function_app.py; the same secret is given to the web app as
     # PYTHON_FUNCTION_API_KEY (infrastructure/app-web.tf)
     CONSULTEE_AREAS_API_KEY = local.key_vault_refs["function-api-key"]
+
+    ## IDAS back office configuration
+    IDAS_BACK_OFFICE_DATABASE_SERVER        = data.azurerm_mssql_server.idas_sql.fully_qualified_domain_name
+    IDAS_BACK_OFFICE_DATABASE_NAME          = data.azurerm_mssql_database.idas_database.name
+    IDAS_BACK_OFFICE_STORAGE_ENDPOINT       = data.azurerm_storage_account.idas_documents.primary_blob_endpoint
+    IDAS_BACK_OFFICE_STORAGE_CONTAINER_NAME = data.azurerm_storage_container.idas_documents.name
   }
 
   identity {
