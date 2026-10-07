@@ -1,6 +1,22 @@
 # Agent guidance
 
-This file is the single source of truth for agent instructions in this repository. [`CLAUDE.md`](./CLAUDE.md) points here.
+This file is the single source of truth for agent instructions in this repository. [`CLAUDE.md`](./CLAUDE.md) and [`.github/copilot-instructions.md`](./.github/copilot-instructions.md) point here.
+
+## Where guidance lives
+
+Keep instructions in one place and link to them — do not repeat the same rules across files.
+
+| Location                                                                                                                  | Role                                                                                                             |
+| ------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `AGENTS.md` (this file)                                                                                                   | Single source of truth for agent rules and repo conventions                                                      |
+| [`CLAUDE.md`](./CLAUDE.md), [`.github/copilot-instructions.md`](./.github/copilot-instructions.md), `.cursor/rules/*.mdc` | Thin pointers back to this file — add scoped detail here, not in the pointers                                    |
+| `.devin/skills/*/SKILL.md`                                                                                                | Task-specific skills (for example `dependency-update-check` for green-pipeline checks before dependency updates) |
+| [`ACCESSIBILITY.md`](./ACCESSIBILITY.md)                                                                                  | Accessibility policy: WCAG 2.2 AA, testing, audit and statement duties                                           |
+| [`CONTRIBUTING.md`](./CONTRIBUTING.md)                                                                                    | Human-facing contribution workflow                                                                               |
+| [`docs/`](./docs/), [`kt-docs/`](./kt-docs/README.md)                                                                     | Procedural and onboarding detail linked from the relevant sections below                                         |
+
+When adding new guidance: put the rule here (or in a linked doc it points to), reference it from the
+pointers/skills, and do not copy the content between files.
 
 ## AI agent identification and co-authorship
 
@@ -159,7 +175,7 @@ When changing UI or frontend behaviour:
 - Layout wrappers that use Design System classes (for example `govuk-grid-row`, `govuk-width-container`, `govuk-heading-*`) and plain content text are fine; interactive and presentational UI components must still be macros.
 - Prefer documented components (for example button, error summary, text input, radios, table, notification banner) and [patterns](https://design-system.service.gov.uk/patterns/) (for example question pages, check answers, validation errors).
 - Follow Design System guidance for labels/legends, error messages, focus states, and typography — do not restyle GOV.UK components to look “custom”.
-- Keep pages accessible by default: correct heading order, accessible names, keyboard operation, and visible focus. Treat accessibility as a requirement, not a polish step.
+- Keep pages accessible by default: correct heading order, accessible names, keyboard operation, and visible focus. Treat accessibility as a requirement, not a polish step — the policy and testing expectations are in [ACCESSIBILITY.md](./ACCESSIBILITY.md).
 - Prototype and production guidance on the Design System site applies; this manage app is a production-style service, not a one-off prototype.
 
 ### Service Standard (apply when building features)
@@ -208,7 +224,7 @@ Before implementing or opening a PR that affects users or architecture:
 - [ ] Page HTML uses GOV.UK Frontend macros only for UI components (no hand-rolled component markup).
 - [ ] Used existing GOV.UK Frontend / Nunjucks patterns already in this codebase where possible.
 - [ ] Content is plain language; errors follow Design System error patterns.
-- [ ] Accessibility considered (semantics, focus, contrast via Design System defaults, keyboard use).
+- [ ] Accessibility considered per [ACCESSIBILITY.md](./ACCESSIBILITY.md) (WCAG 2.2 AA: semantics, focus, contrast via Design System defaults, keyboard use).
 - [ ] Security and privacy considered (auth, validation, data minimisation, no secrets).
 - [ ] Reused shared packages/patterns rather than introducing a parallel stack.
 - [ ] PR summary notes any Service Standard / TCoP impact when material.

@@ -124,7 +124,7 @@ Useful npm scripts from the repo root:
 
 Frontend testing (unit, GOV.UK fixtures, a11y, Playwright e2e, coverage gate, and optional visual regression) is documented in [`docs/frontend-testing.md`](./docs/frontend-testing.md). Install Chromium, Firefox, and WebKit once with `npm run playwright:install` before browser tests.
 
-For contribution workflow (branches, commits, PRs) see [CONTRIBUTING.md](./CONTRIBUTING.md). To report a security vulnerability see [SECURITY.md](./SECURITY.md). Agent / GDS guidance for this repo lives in [AGENTS.md](./AGENTS.md). Deeper onboarding material (architecture, routes, maps, testing, troubleshooting) lives in [`kt-docs/`](./kt-docs/README.md).
+For contribution workflow (branches, commits, PRs) see [CONTRIBUTING.md](./CONTRIBUTING.md). To report a security vulnerability see [SECURITY.md](./SECURITY.md). The accessibility policy (WCAG 2.2 AA, testing, statement duties) is in [ACCESSIBILITY.md](./ACCESSIBILITY.md). Agent / GDS guidance for this repo lives in [AGENTS.md](./AGENTS.md). Deeper onboarding material (architecture, routes, maps, testing, troubleshooting) lives in [`kt-docs/`](./kt-docs/README.md).
 
 ## Editor setup
 
