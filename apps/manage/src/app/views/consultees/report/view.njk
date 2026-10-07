@@ -1,0 +1,73 @@
+{% extends "views/layouts/main.njk" %}
+
+{% from "govuk/components/button/macro.njk" import govukButton %}
+{% from "govuk/components/summary-list/macro.njk" import govukSummaryList %}
+
+{% block pageTitle %}
+	{{ pageHeading }} - {{ config.headerTitle }}
+{% endblock %}
+
+{% block pageContent %}
+	{% if rulesetFailed %}
+		{% from "govuk/components/notification-banner/macro.njk" import govukNotificationBanner %}
+		{% set failureHtml %}
+			<h3 class="govuk-notification-banner__heading">The ruleset could not be run</h3>
+			<p class="govuk-body">No consultees are shown because the search did not finish. This is not the same as finding no consultees. <a class="govuk-notification-banner__link" href="{{ retryUrl }}">Try again</a>.</p>
+		{% endset %}
+		{{ govukNotificationBanner({ html: failureHtml }) }}
+	{% endif %}
+
+	<h2 class="govuk-heading-m">Report details</h2>
+	{{ govukSummaryList({
+		rows: [
+			{
+				key: { text: "Case" },
+				value: { text: caseName },
+				actions: {
+					items: [
+						{ href: caseChangeUrl, text: "Change", visuallyHiddenText: "case" }
+					]
+				}
+			},
+			{
+				key: { text: "Case ID" },
+				value: { text: reference }
+			},
+			{
+				key: { text: "Case stage" },
+				value: { text: stage or "Not provided" }
+			},
+			{
+				key: { text: "Ruleset" },
+				value: { text: rulesetName },
+				actions: {
+					items: [
+						{ href: rulesetChangeUrl, text: "Change", visuallyHiddenText: "ruleset" }
+					]
+				}
+			}
+		]
+	}) }}
+
+	{% if not rulesetFailed %}
+		<h2 class="govuk-heading-m">Identified consultees</h2>
+		{% set consulteeRows = [] %}
+		{% for consultee in consultees %}
+			{% set consulteeRows = (consulteeRows.push({
+				key: { text: consultee.name },
+				value: { text: consultee.count },
+				actions: {
+					items: [
+						{ href: consultee.changeUrl, text: "Change", visuallyHiddenText: consultee.name }
+					]
+				}
+			}), consulteeRows) %}
+		{% endfor %}
+		{{ govukSummaryList({ rows: consulteeRows }) }}
+	{% endif %}
+
+	{{ govukButton({
+		text: "Generate report",
+		href: generateReportUrl
+	}) }}
+{% endblock %}

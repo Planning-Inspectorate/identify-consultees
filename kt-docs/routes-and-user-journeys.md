@@ -9,8 +9,11 @@ Registered primarily from `apps/manage/src/app/router.ts`.
 | Method / path                                                                                    | Journey                                                      | Data                                       |
 | ------------------------------------------------------------------------------------------------ | ------------------------------------------------------------ | ------------------------------------------ |
 | `GET /`                                                                                          | Homepage: DB-backed search + paginated project list          | `case_boundary` via `searchCaseBoundaries` |
-| `GET /consultees/:caseId`                                                                        | Ruleset picker for the chosen project                        | Case summary + `RULESETS`                  |
-| `GET /consultees/:caseId/results?ruleset=…`                                                      | Runs the ruleset; matched consultees on a map and in a table | `runRuleset` spatial queries               |
+| `GET /consultees/:caseId?ruleset=…`                                                              | Project map page: shapefile/ruleset rows + map + report link | `runRuleset` spatial queries               |
+| `GET /consultees/:caseId/ruleset` · `POST /consultees/:caseId/ruleset`                           | Change-ruleset radios; posts back and returns to the map     | Case summary + `RULESETS`                  |
+| `GET /consultees/:caseId/shapefile` · `POST /consultees/:caseId/shapefile`                       | Change-shapefile radios; lands on the chosen boundary's map  | `listCaseBoundaryFiles`                    |
+| `GET /consultees/:caseId/report?ruleset=…`                                                       | Check page: report details + per-category consultee counts   | `runRuleset` match counts                  |
+| `GET /consultees/:caseId/results?ruleset=…`                                                      | Consultee tables (the future report) for the selection       | `runRuleset` spatial queries               |
 | `GET /consultees/:caseId/results/static-map`                                                     | Static map image — AVIF/WebP/PNG negotiated from `Accept`    | Same, server-rendered                      |
 | `GET /consultees/:caseId/results/static-map.svg`                                                 | Explicit SVG static map variant                              | Same                                       |
 | `GET /map-layers-demo`                                                                           | Layer toggles experiment                                     | Demo GeoJSON                               |
@@ -32,15 +35,15 @@ Registered primarily from `apps/manage/src/app/router.ts`.
 1. Open `/`
 2. Optionally search by case reference or project name (`q`)
 3. Adjust **results per page** (`pageSize`: 25 / 50 / 100)
-4. Follow a project link to `/consultees/:caseId`
-5. Choose a **ruleset** and continue to `/consultees/:caseId/results?ruleset=…`
-6. Review the matched consultees table and the interactive or static map
+4. Follow a project link to `/consultees/:caseId` — the map page, which runs the default ruleset
+5. Optionally **Change** the shapefile (`:caseId/shapefile`) or ruleset (`:caseId/ruleset`); each posts back and returns to the map page with the new selection in its URL
+6. _Preview report_ leads to `/consultees/:caseId/report?ruleset=…` — a check page listing the report details and per-category match counts; _Generate report_ is a placeholder. The full consultee tables for the selection live on `/consultees/:caseId/results?ruleset=…`
 
 This is the journey KT readers should treat as the “filter journey” even though paths are not named `/filter`.
 
 ## Interactive / static maps on results
 
-On `/consultees/:caseId/results`, the map shows the project boundary plus matched consultee areas:
+On `/consultees/:caseId` (and the `/results` report), the map shows the project boundary plus matched consultee areas:
 
 - Defra Interactive Map when JavaScript initialises successfully
 - Static map `<img>` via `<noscript>` and/or JS failure fallback (`data-static-map-src` / page config)

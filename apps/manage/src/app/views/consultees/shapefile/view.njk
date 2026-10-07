@@ -11,11 +11,12 @@
 {% block pageHeading %}{% endblock %}
 
 {% block pageContent %}
-	<form method="post" action="/consultees/{{ caseId | urlencode }}/ruleset" novalidate>
+	<form method="post" action="/consultees/{{ caseId | urlencode }}/shapefile" novalidate>
 		<input type="hidden" name="_csrf" value="{{ _csrf }}">
+		<input type="hidden" name="ruleset" value="{{ rulesetId }}">
 		{{ govukRadios({
-			idPrefix: "ruleset",
-			name: "ruleset",
+			idPrefix: "shapefile",
+			name: "shapefile",
 			fieldset: {
 				legend: {
 					text: pageHeading,
@@ -23,7 +24,10 @@
 					classes: "govuk-fieldset__legend--xl"
 				}
 			},
-			items: rulesets
+			hint: {
+				text: "Select a geojson file from the GIS Shapefiles project documentation folder"
+			},
+			items: files
 		}) }}
 
 		{{ govukButton({

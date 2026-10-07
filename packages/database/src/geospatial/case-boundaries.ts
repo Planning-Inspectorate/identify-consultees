@@ -260,6 +260,37 @@ export async function getCaseBoundarySummaryById(
 }
 
 /**
+ * One shapefile held for a case: the same project (one caseReference) can have several boundary
+ * submissions over time, each imported from its own file - see the comment in
+ * seed/geojson-import.ts's toCaseBoundary. The shapefile picker lists these so the user can run
+ * a different submission for the same project.
+ */
+export interface CaseBoundaryFile {
+	id: string;
+	fileName: string | null;
+	receivedDate: Date | null;
+}
+
+/**
+ * List every stored shapefile for one project - all case_boundary rows sharing `caseReference`,
+ * most recently received first (NULL dates sort last under DESC). Each row's id is the caseId a
+ * map/report page needs, so picking a file is just navigating to that id.
+ */
+export async function listCaseBoundaryFiles(
+	dbClient: PrismaClient,
+	caseReference: string
+): Promise<CaseBoundaryFile[]> {
+	return withDeadlockRetry(
+		() => dbClient.$queryRaw<CaseBoundaryFile[]>`
+			SELECT id, fileName, receivedDate
+			FROM case_boundary
+			WHERE caseReference = ${caseReference}
+			ORDER BY receivedDate DESC, id
+		`
+	);
+}
+
+/**
  * Pick one case at random - just enough to show a real "try searching for..." example on the
  * home page. `ORDER BY NEWID()` forces a full scan/sort, which is fine at this table's size
  * (hundreds of rows) but wouldn't be a sensible way to sample from a genuinely large table.

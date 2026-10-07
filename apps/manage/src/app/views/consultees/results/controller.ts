@@ -1,83 +1,14 @@
 import type { ManageService } from '#service';
 import { stringifyForInlineScript } from '#util/inline-json.ts';
-import type { CaseBoundaryFeature } from '@pins/identify-consultees-database/src/geospatial/case-boundaries.ts';
-import type {
-	ConsulteeAreaMatch,
-	ConsulteeAreaSummaryMatch
-} from '@pins/identify-consultees-database/src/geospatial/consultee-areas.ts';
-import {
-	bufferGeometryForDisplay,
-	getConsulteeAreaDisplayGeometries
-} from '@pins/identify-consultees-database/src/geospatial/consultee-areas.ts';
-import type { Ruleset, RunRulesetResult } from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
-import { getRuleset, runRuleset } from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
+import type { ConsulteeAreaSummaryMatch } from '@pins/identify-consultees-database/src/geospatial/consultee-areas.ts';
+import { getRuleset } from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
 import type { AsyncRequestHandler } from '@planning-inspectorate/core/util';
-import type { SearchAreaDisplay } from '../../../maps/case-geojson.ts';
 import { buildCaseMapConfig, MAX_SAMPLED_MAP_MATCHES } from '../../../maps/case-geojson.ts';
 import { MAP_VIEWPORT } from '../../../maps/sample-geojson.ts';
 import { buildConsulteeStaticMapResponse } from '../../../maps/serve-static-map.ts';
 import { resolveCase } from '../resolve-case.ts';
+import { buildSearchAreaSafely, firstQueryValue, projectPageUrl, runRulesetSafely } from '../run-ruleset.ts';
 import type { ConsulteeMatchRow, ConsulteesResultsViewModel } from './view-model.ts';
-
-function firstQueryValue(value: unknown): string {
-	if (Array.isArray(value)) {
-		return typeof value[0] === 'string' ? value[0] : '';
-	}
-	return typeof value === 'string' ? value : '';
-}
-
-interface RulesetRun extends RunRulesetResult {
-	// distinguishes "ran and matched nothing" from "couldn't run" - both have empty results
-	failed: boolean;
-}
-
-async function runRulesetSafely(
-	db: ManageService['db'],
-	project: CaseBoundaryFeature,
-	ruleset: Ruleset,
-	nearbyRadiusMetres: number,
-	logger: ManageService['logger']
-): Promise<RulesetRun> {
-	try {
-		return { ...(await runRuleset(db, project.geometry, ruleset, nearbyRadiusMetres)), failed: false };
-	} catch (error) {
-		logger.error({ error, caseId: project.id, rulesetId: ruleset.id }, 'Failed to run ruleset');
-		return { matches: [], allNearby: [], failed: true };
-	}
-}
-
-/**
- * The interactive map's search area - the site grown by the nearby radius - with every nearby
- * consultee and ruleset match clipped to it. The map is an extra: if this fails, the page still
- * lists every consultee in its tables.
- */
-async function buildSearchAreaSafely(
-	db: ManageService['db'],
-	project: CaseBoundaryFeature,
-	matches: ConsulteeAreaMatch[],
-	nearby: ConsulteeAreaSummaryMatch[],
-	nearbyRadiusMetres: number,
-	logger: ManageService['logger']
-): Promise<SearchAreaDisplay | undefined> {
-	if (nearby.length === 0 && matches.length === 0) {
-		return undefined;
-	}
-	try {
-		const area = await bufferGeometryForDisplay(db, project.geometry, nearbyRadiusMetres);
-		const ids = [...new Set([...nearby, ...matches].map((match) => match.feature.id))];
-		const radiusKm = nearbyRadiusMetres / 1000;
-		return {
-			area,
-			areaLabel: `Search area (${radiusKm}km)`,
-			nearbyLabel: `All consultees within ${radiusKm}km`,
-			nearby,
-			geometries: await getConsulteeAreaDisplayGeometries(db, ids, area)
-		};
-	} catch (error) {
-		logger.error({ error, caseId: project.id }, 'Failed to build the map search area');
-		return undefined;
-	}
-}
 
 function resultsUrl(caseId: string, rulesetId: string): string {
 	return `/consultees/${encodeURIComponent(caseId)}/results?ruleset=${encodeURIComponent(rulesetId)}`;
@@ -93,8 +24,8 @@ function toMatchRow(match: ConsulteeAreaSummaryMatch): ConsulteeMatchRow {
 }
 
 /**
- * Step 3 of the identify-consultees flow: run the chosen ruleset against the chosen project and
- * show the matching consultees, on a map and in a table.
+ * The consultee report for the map page's selection: the same ruleset run the map page drew, with
+ * every matching consultee listed in tables.
  */
 export function buildConsulteesResultsPage(service: ManageService): AsyncRequestHandler {
 	const { db, logger, nearbyConsulteeRadiusMetres } = service;
@@ -137,7 +68,7 @@ export function buildConsulteesResultsPage(service: ManageService): AsyncRequest
 
 		const viewModel: ConsulteesResultsViewModel = {
 			pageHeading: `Consultees identified for ${project.properties.caseName} (${project.properties.caseReference})`,
-			backLinkUrl: `/consultees/${project.id}`,
+			backLinkUrl: projectPageUrl(project.id, ruleset.id),
 			rulesetName: ruleset.name,
 			reference: project.properties.caseReference,
 			caseName: project.properties.caseName,

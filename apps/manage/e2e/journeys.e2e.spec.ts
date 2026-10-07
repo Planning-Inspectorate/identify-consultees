@@ -1,7 +1,13 @@
 import { newDatabaseClient } from '@pins/identify-consultees-database';
 import { expect, test } from '@playwright/test';
 import { loadCaseBoundaries } from '../../../packages/database/src/geospatial/case-boundaries.ts';
-import { SAMPLE_CASE_ID, SAMPLE_CASE_NAME, SAMPLE_CASE_REFERENCE, SAMPLE_RULESET_NAME } from './fixtures.ts';
+import {
+	SAMPLE_CASE_ID,
+	SAMPLE_CASE_NAME,
+	SAMPLE_CASE_REFERENCE,
+	SAMPLE_RULESET_ID,
+	SAMPLE_RULESET_NAME
+} from './fixtures.ts';
 
 // same fallback the e2e server resolves - see buildManageTestConfig's database.connectionString
 const connectionString =
@@ -70,25 +76,60 @@ test.describe('manage journeys', () => {
 		}
 	});
 
-	test('choosing a project then a ruleset runs it and shows the results', async ({ page }) => {
+	test('choosing a project shows its map page, and changing the ruleset returns to it', async ({ page }) => {
 		await page.goto(`/?q=${SAMPLE_CASE_REFERENCE}`);
 		// a caseReference isn't guaranteed unique (a project can have several boundary submissions),
 		// so follow the link by its href (a specific case id) rather than by its visible text
 		await page.locator(`a[href="/consultees/${SAMPLE_CASE_ID}"]`).click();
 
-		await expect(page.getByRole('heading', { level: 1 })).toContainText('Choose a ruleset');
-		await page.getByLabel('Ruleset').selectOption({ label: SAMPLE_RULESET_NAME });
-		await page.getByRole('button', { name: 'Run ruleset' }).click();
+		// the map page runs the default ruleset straight away
+		await expect(page.getByRole('heading', { level: 1 })).toContainText(SAMPLE_CASE_NAME);
+		await expect(page.getByRole('button', { name: 'Preview report' })).toBeVisible();
 
+		// "Change" (ruleset) -> radios page -> "Save and return" brings the choice back to the map
+		await page.getByRole('link', { name: 'Change ruleset' }).click();
+		await expect(page.getByRole('heading', { level: 1 })).toContainText('Ruleset');
+		await page.getByRole('radio', { name: SAMPLE_RULESET_NAME }).check();
+		await page.getByRole('button', { name: 'Save and return' }).click();
+
+		await expect(page).toHaveURL(new RegExp(`/consultees/${SAMPLE_CASE_ID}\\?ruleset=${SAMPLE_RULESET_ID}`));
+		await expect(page.getByRole('heading', { level: 1 })).toContainText(SAMPLE_CASE_NAME);
+
+		// "Preview report" leads to the check page for the same selection
+		await page.getByRole('button', { name: 'Preview report' }).click();
+		await expect(page).toHaveURL(new RegExp(`/consultees/${SAMPLE_CASE_ID}/report\\?ruleset=${SAMPLE_RULESET_ID}`));
+		await expect(page.getByRole('heading', { level: 1 })).toContainText('Check consultees before creating the report');
+
+		// "Generate report" leads to the confirmation page with the download link
+		await page.getByRole('button', { name: 'Generate report' }).click();
+		await expect(page).toHaveURL(
+			new RegExp(`/consultees/${SAMPLE_CASE_ID}/report/created\\?ruleset=${SAMPLE_RULESET_ID}`)
+		);
+		await expect(page.getByRole('heading', { level: 1 })).toContainText('Report created');
+		await expect(
+			page.getByRole('link', { name: new RegExp(`Download ${SAMPLE_CASE_NAME} scoping report`) })
+		).toBeVisible();
+
+		// the same selection's report page still lists the matched consultees
+		await page.goto(`/consultees/${SAMPLE_CASE_ID}/results?ruleset=${SAMPLE_RULESET_ID}`);
 		await expect(page.getByRole('heading', { level: 1 })).toContainText('Consultees identified for');
 		await expect(page.getByText(`Ruleset used: ${SAMPLE_RULESET_NAME}`)).toBeVisible();
 		await expect(page.getByRole('heading', { level: 2, name: 'Consultees identified' })).toBeVisible();
 	});
 
-	test('a direct link to the ruleset picker page works', async ({ page }) => {
+	test('the shapefile change page lists the project’s files and returns on save', async ({ page }) => {
+		await page.goto(`/consultees/${SAMPLE_CASE_ID}/shapefile?ruleset=${SAMPLE_RULESET_ID}`);
+		await expect(page.getByRole('heading', { level: 1 })).toContainText('Project shapefile');
+
+		await page.getByRole('radio').first().check();
+		await page.getByRole('button', { name: 'Save and return' }).click();
+		await expect(page).toHaveURL(/\/consultees\/[0-9a-f-]{36}\?ruleset=/);
+	});
+
+	test('a direct link to the project map page works', async ({ page }) => {
 		await page.goto(`/consultees/${SAMPLE_CASE_ID}`);
-		await expect(page.getByRole('heading', { level: 1 })).toContainText('Choose a ruleset');
-		await expect(page.getByText(SAMPLE_CASE_NAME)).toBeVisible();
+		await expect(page.getByRole('heading', { level: 1 })).toContainText(SAMPLE_CASE_NAME);
+		await expect(page.getByRole('link', { name: 'Back to projects' })).toBeVisible();
 	});
 
 	test('map layers demo page renders layer summaries', async ({ page }) => {

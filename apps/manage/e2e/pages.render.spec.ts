@@ -23,11 +23,33 @@ const pages = [
 	},
 	{
 		path: `/consultees/${SAMPLE_CASE_ID}`,
+		name: 'project map',
+		heading: new RegExp(SAMPLE_CASE_NAME, 'i'),
+		mustSee: [/Back to projects/i, /Shapefile/i, /Preview report/i]
+	},
+	{
+		path: `/consultees/${SAMPLE_CASE_ID}/ruleset`,
 		name: 'ruleset picker',
-		heading: /Choose a ruleset/i,
-		// the ruleset options themselves live inside a <select> - not "visible" text in the
-		// getByText sense - so check the visible label instead
-		mustSee: [/Ruleset/i]
+		heading: /Ruleset/i,
+		mustSee: [new RegExp(SAMPLE_RULESET_NAME, 'i'), /Save and return/i]
+	},
+	{
+		path: `/consultees/${SAMPLE_CASE_ID}/shapefile`,
+		name: 'shapefile picker',
+		heading: /Project shapefile/i,
+		mustSee: [/Select a geojson file/i, /Save and return/i]
+	},
+	{
+		path: `/consultees/${SAMPLE_CASE_ID}/report?ruleset=${SAMPLE_RULESET_ID}`,
+		name: 'report check',
+		heading: /Check consultees before creating the report/i,
+		mustSee: [/Report details/i, /Identified consultees/i, /Generate report/i]
+	},
+	{
+		path: `/consultees/${SAMPLE_CASE_ID}/report/created?ruleset=${SAMPLE_RULESET_ID}`,
+		name: 'report created',
+		heading: /Report created/i,
+		mustSee: [/scoping report/i]
 	},
 	{
 		path: `/consultees/${SAMPLE_CASE_ID}/results?ruleset=${SAMPLE_RULESET_ID}`,

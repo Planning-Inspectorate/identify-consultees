@@ -1,0 +1,21 @@
+{% extends "views/layouts/main.njk" %}
+
+{% from "govuk/components/panel/macro.njk" import govukPanel %}
+
+{% block pageTitle %}
+	{{ pageHeading }} - {{ config.headerTitle }}
+{% endblock %}
+
+{# the panel's own title is the page heading, so suppress the layout's h1 #}
+{% block pageHeading %}{% endblock %}
+
+{% block pageContent %}
+	{{ govukPanel({
+		titleText: pageHeading,
+		html: "Case: " ~ caseName ~ "<br>Reference: " ~ reference
+	}) }}
+
+	<p class="govuk-body govuk-!-margin-top-6">
+		<a class="govuk-link" href="{{ downloadUrl }}">{{ downloadText }}</a>
+	</p>
+{% endblock %}

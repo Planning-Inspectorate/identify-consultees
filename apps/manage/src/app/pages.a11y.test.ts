@@ -151,12 +151,140 @@ describe('manage page accessibility smoke', () => {
 	test('ruleset picker page has no serious a11y violations', async () => {
 		const html = nunjucks.render('views/consultees/ruleset/view.njk', {
 			...pageLocals,
-			pageHeading: 'Choose a ruleset for Example Project (EN01)',
-			backLinkUrl: '/',
+			pageHeading: 'Ruleset',
+			backLinkUrl: '/consultees/11111111-1111-1111-1111-111111111111?ruleset=example-ruleset',
 			caseId: '11111111-1111-1111-1111-111111111111',
-			reference: 'EN01',
-			caseName: 'Example Project',
-			rulesets: [{ value: 'example-ruleset', text: 'Example ruleset' }]
+			_csrf: 'test-csrf',
+			rulesets: [
+				{ value: 'example-ruleset', text: 'Example ruleset', checked: true },
+				{ value: 'other-ruleset', text: 'Other ruleset', checked: false }
+			]
+		});
+		await assertNoSeriousA11yViolations(html);
+	});
+
+	test('shapefile picker page has no serious a11y violations', async () => {
+		const html = nunjucks.render('views/consultees/shapefile/view.njk', {
+			...pageLocals,
+			pageHeading: 'Project shapefile',
+			backLinkUrl: '/consultees/11111111-1111-1111-1111-111111111111?ruleset=example-ruleset',
+			caseId: '11111111-1111-1111-1111-111111111111',
+			rulesetId: 'example-ruleset',
+			_csrf: 'test-csrf',
+			files: [
+				{
+					value: '11111111-1111-1111-1111-111111111111',
+					text: 'EN0110007.geojson',
+					hint: { text: 'Uploaded: 11:20, 19 Sept 2026' },
+					checked: true
+				},
+				{
+					value: '22222222-2222-2222-2222-222222222222',
+					text: 'Longfield solar farm shapefiles.geojson',
+					hint: { text: 'Uploaded: 12:16, 29 Jul 2026' },
+					checked: false
+				}
+			]
+		});
+		await assertNoSeriousA11yViolations(html);
+	});
+
+	test('consultee project map page has no serious a11y violations', async () => {
+		const html = nunjucks.render('views/consultees/project/view.njk', {
+			...pageLocals,
+			pageHeading: 'Longfield Solar Farm',
+			reference: 'EN0110007',
+			caseName: 'Longfield Solar Farm',
+			caseId: '11111111-1111-1111-1111-111111111111',
+			backLinkUrl: '/',
+			backLinkText: 'Back to projects',
+			sectorDescription: 'Energy, Generating Stations, Solar',
+			stage: 'Acceptance',
+			shapefileName: 'EN0110007.geojson',
+			shapefileChangeUrl: '/consultees/11111111-1111-1111-1111-111111111111/shapefile?ruleset=example-ruleset',
+			rulesetName: 'Example ruleset',
+			rulesetChangeUrl: '/consultees/11111111-1111-1111-1111-111111111111/ruleset?ruleset=example-ruleset',
+			previewReportUrl: '/consultees/11111111-1111-1111-1111-111111111111/report?ruleset=example-ruleset',
+			mapId: 'case-map',
+			mapRegionLabel: 'Map showing Example ruleset for Longfield Solar Farm',
+			staticMapSrc: '/consultees/11111111-1111-1111-1111-111111111111/results/static-map?ruleset=example-ruleset',
+			staticMapAlt: 'Static map showing Example ruleset for Longfield Solar Farm',
+			mapWidth: 960,
+			mapHeight: 516,
+			mapConfigJson: '{"center":[-1.78,50.62],"zoom":11}',
+			rulesetFailed: false,
+			retryUrl: '/consultees/11111111-1111-1111-1111-111111111111?ruleset=example-ruleset',
+			matchCount: 120,
+			mapIsSampled: true,
+			mapSampleSize: 30
+		});
+		await assertNoSeriousA11yViolations(html);
+	});
+
+	test('consultee project map page when the ruleset could not be run has no serious a11y violations', async () => {
+		const html = nunjucks.render('views/consultees/project/view.njk', {
+			...pageLocals,
+			pageHeading: 'Longfield Solar Farm',
+			reference: 'EN0110007',
+			caseName: 'Longfield Solar Farm',
+			caseId: '11111111-1111-1111-1111-111111111111',
+			backLinkUrl: '/',
+			backLinkText: 'Back to projects',
+			sectorDescription: null,
+			stage: null,
+			shapefileName: 'Not provided',
+			shapefileChangeUrl: '/consultees/11111111-1111-1111-1111-111111111111/shapefile?ruleset=example-ruleset',
+			rulesetName: 'Example ruleset',
+			rulesetChangeUrl: '/consultees/11111111-1111-1111-1111-111111111111/ruleset?ruleset=example-ruleset',
+			previewReportUrl: '/consultees/11111111-1111-1111-1111-111111111111/report?ruleset=example-ruleset',
+			mapId: 'case-map',
+			mapRegionLabel: 'Map showing Example ruleset for Longfield Solar Farm',
+			staticMapSrc: '/consultees/11111111-1111-1111-1111-111111111111/results/static-map?ruleset=example-ruleset',
+			staticMapAlt: 'Static map showing Example ruleset for Longfield Solar Farm',
+			mapWidth: 960,
+			mapHeight: 516,
+			mapConfigJson: '{"center":[-1.78,50.62],"zoom":11}',
+			rulesetFailed: true,
+			retryUrl: '/consultees/11111111-1111-1111-1111-111111111111?ruleset=example-ruleset',
+			matchCount: 0,
+			mapIsSampled: false,
+			mapSampleSize: 30
+		});
+		assert.match(html, /The ruleset could not be run/);
+		await assertNoSeriousA11yViolations(html);
+	});
+
+	test('consultee report check page has no serious a11y violations', async () => {
+		const html = nunjucks.render('views/consultees/report/view.njk', {
+			...pageLocals,
+			pageHeading: 'Check consultees before creating the report',
+			backLinkUrl: '/consultees/11111111-1111-1111-1111-111111111111?ruleset=example-ruleset',
+			caseName: 'Longfield Solar Farm',
+			reference: 'EN0110007',
+			stage: 'Acceptance',
+			caseChangeUrl: '/',
+			rulesetName: 'Example ruleset',
+			rulesetChangeUrl: '/consultees/11111111-1111-1111-1111-111111111111/ruleset?ruleset=example-ruleset',
+			consultees: [
+				{ name: 'Parish Council', count: '3', changeUrl: '#' },
+				{ name: 'Railway', count: '12', changeUrl: '#' }
+			],
+			generateReportUrl: '/consultees/11111111-1111-1111-1111-111111111111/report/created?ruleset=example-ruleset',
+			rulesetFailed: false,
+			retryUrl: '/consultees/11111111-1111-1111-1111-111111111111?ruleset=example-ruleset'
+		});
+		await assertNoSeriousA11yViolations(html);
+	});
+
+	test('report created page has no serious a11y violations', async () => {
+		const html = nunjucks.render('views/consultees/report/created.njk', {
+			...pageLocals,
+			pageHeading: 'Report created',
+			backLinkUrl: '/consultees/11111111-1111-1111-1111-111111111111?ruleset=example-ruleset',
+			caseName: 'Longfield Solar Farm',
+			reference: 'EN0110007',
+			downloadUrl: '#',
+			downloadText: 'Download Longfield Solar Farm scoping report (ZIP)'
 		});
 		await assertNoSeriousA11yViolations(html);
 	});
