@@ -24,7 +24,14 @@ const pageLocals = {
 		vendorMaplibreProviderJs: 'vendor/maplibre-provider/js/index.js',
 		interactiveMapExamplesJs: 'javascripts/interactive-map-examples.js',
 		headerTitle: 'Identify consultees',
-		footerLinks: []
+		// the same support links config-middleware puts on every page
+		footerLinks: [
+			{ text: 'Terms and conditions', link: '/terms-and-conditions' },
+			{ text: 'Accessibility statement', link: '/accessibility-statement' },
+			{ text: 'Privacy', link: '/privacy' },
+			{ text: 'Cookies', link: '/cookies' },
+			{ text: 'Contact', link: '/contact' }
+		]
 	},
 	cspNonce: 'test-nonce'
 };
@@ -394,6 +401,22 @@ describe('manage page accessibility smoke', () => {
 		});
 		await assertNoSeriousA11yViolations(html);
 	});
+
+	for (const [view, pageHeading] of [
+		['views/footer/terms-and-conditions.njk', 'Terms and conditions'],
+		['views/footer/accessibility-statement.njk', 'Accessibility statement for Identify consultees'],
+		['views/footer/privacy.njk', 'Privacy notice'],
+		['views/footer/cookies.njk', 'Cookies'],
+		['views/footer/contact.njk', 'Contact us']
+	] as const) {
+		test(`${pageHeading} footer page has no serious a11y violations`, async () => {
+			const html = nunjucks.render(view, {
+				...pageLocals,
+				pageHeading
+			});
+			await assertNoSeriousA11yViolations(html);
+		});
+	}
 
 	test('components index page has no serious a11y violations', async () => {
 		const html = nunjucks.render('views/components/view.njk', {

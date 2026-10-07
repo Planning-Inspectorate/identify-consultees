@@ -68,6 +68,34 @@ describe('manage router wiring', () => {
 		assert.equal(response.headers.location, '/signed-out');
 	});
 
+	test('the footer lists the support links on every page', async () => {
+		const response = await request(authDisabledApp).get('/');
+		assert.equal(response.status, 200);
+		for (const [text, href] of [
+			['Terms and conditions', '/terms-and-conditions'],
+			['Accessibility statement', '/accessibility-statement'],
+			['Privacy', '/privacy'],
+			['Cookies', '/cookies'],
+			['Contact', '/contact']
+		]) {
+			assert.match(response.text, new RegExp(`href="${href}"[^>]*>\\s*${text}`));
+		}
+	});
+
+	for (const [path, expected] of [
+		['/terms-and-conditions', /Terms and conditions/],
+		['/accessibility-statement', /Accessibility statement for Identify consultees/],
+		['/privacy', /Privacy notice/],
+		['/cookies', /Cookies/],
+		['/contact', /Contact us/]
+	] as const) {
+		test(`GET ${path} renders its footer page`, async () => {
+			const response = await request(authDisabledApp).get(path);
+			assert.equal(response.status, 200);
+			assert.match(response.text, expected);
+		});
+	}
+
 	test('GET /?pageSize=50 honours the requested page size', async () => {
 		const response = await request(authDisabledApp).get('/?q=Router+Test+Fixture&pageSize=50');
 		assert.equal(response.status, 200);

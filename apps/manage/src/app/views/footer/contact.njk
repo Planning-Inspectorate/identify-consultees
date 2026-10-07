@@ -1,0 +1,59 @@
+{% extends "views/layouts/main.njk" %}
+
+{% block pageTitle %}
+	{{ pageHeading }} - {{ config.headerTitle }}
+{% endblock %}
+
+{% block pageContent %}
+	<div class="govuk-grid-row">
+		<div class="govuk-grid-column-two-thirds">
+			<h2 class="govuk-heading-m">General enquiries</h2>
+			<p class="govuk-body">
+				You can contact us by filling out
+				<a class="govuk-link" href="https://contact-us.planninginspectorate.gov.uk/hc/en-gb/requests/new">our customer contact form</a>.
+			</p>
+
+			<h2 class="govuk-heading-m">Phone</h2>
+			<p class="govuk-body">Phone (customer services): 0303 444 5000</p>
+			<p class="govuk-body">Monday to Friday, 9am to 4pm (except public holidays)</p>
+			<p class="govuk-body">
+				<a class="govuk-link" href="https://www.gov.uk/call-charges">Find out about call charges</a>
+			</p>
+
+			<h2 class="govuk-heading-m">Email</h2>
+			<p class="govuk-body">
+				<a class="govuk-link" href="mailto:nienquiries@planninginspectorate.gov.uk">nienquiries@planninginspectorate.gov.uk</a>
+			</p>
+
+			<h2 class="govuk-heading-m">Address</h2>
+			<p class="govuk-body">
+				Planning Inspectorate<br>
+				c/o QUADIENT<br>
+				69 Buckingham Avenue<br>
+				Slough<br>
+				SL1 4PN
+			</p>
+
+			<h2 class="govuk-heading-m">Social media</h2>
+			<p class="govuk-body">
+				We cannot discuss specific cases or individual applications, so please do not give any personal details.
+			</p>
+			<p class="govuk-body">
+				Follow us on X: <a class="govuk-link" href="https://x.com/PINSgov">@PINSgov</a>
+			</p>
+			<p class="govuk-body">
+				<a class="govuk-link" href="https://www.gov.uk/government/organisations/planning-inspectorate">Visit our GOV.UK pages for more ways to contact us</a>.
+			</p>
+
+			<h2 class="govuk-heading-m">Feedback and complaints</h2>
+			<p class="govuk-body">
+				We aim to provide the best possible service for our customers and we treat all complaints seriously.
+				<a class="govuk-link" href="https://www.gov.uk/government/organisations/planning-inspectorate/about/complaints-procedure">Find out about our complaints procedure</a>.
+			</p>
+			<p class="govuk-body">
+				We are always looking to improve our service. Help us achieve this by sharing your experiences of using the service in
+				<a class="govuk-link" href="https://www.gov.uk/government/organisations/planning-inspectorate">our feedback form</a>.
+			</p>
+		</div>
+	</div>
+{% endblock %}

@@ -26,7 +26,14 @@ export function addLocalsConfiguration(): Handler {
 			vendorMapStylesPluginCss: 'vendor/map-styles-plugin/css/index-6c3e88dc.css',
 			interactiveMapExamplesJs: 'javascripts/interactive-map-examples-452121c5.js',
 			headerTitle: 'Identify consultees',
-			footerLinks: []
+			// the support links the site footer lists - generic Planning Inspectorate pages
+			footerLinks: [
+				{ text: 'Terms and conditions', link: '/terms-and-conditions' },
+				{ text: 'Accessibility statement', link: '/accessibility-statement' },
+				{ text: 'Privacy', link: '/privacy' },
+				{ text: 'Cookies', link: '/cookies' },
+				{ text: 'Contact', link: '/contact' }
+			]
 		};
 		// the "Components" nav item (component showcase) is only shown when ?components=true is in the URL
 		res.locals.showComponentsNav = req.query.components === 'true';

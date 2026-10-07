@@ -4,7 +4,7 @@
 {% from "govuk/components/error-summary/macro.njk" import govukErrorSummary %}
 {% from "govuk/components/phase-banner/macro.njk" import govukPhaseBanner %}
 {% from "views/layouts/components/header.njk" import pinsServiceHeader, pinsServiceNavigation %}
-{% from "ui/footer/pins-footer.njk" import pinsFooter %}
+{% from "views/layouts/components/footer.njk" import appFooter %}
 
 {% block head %}
 	{# setup the header tags, to link to the styles #}
@@ -95,10 +95,10 @@
 
 {% block footer %}
 	{#
-	  pinsFooter renders its own <footer>, so replace the whole footer block
+	  appFooter renders its own <footer>, so replace the whole footer block
 	  (do not nest inside govuk-template__footer).
 	#}
-	{{ pinsFooter(config.footerLinks) }}
+	{{ appFooter(config.footerLinks) }}
 
 	<script type="module" {% if cspNonce %}nonce={{ cspNonce }}{% endif %} src="/{{ config.govukFrontendJs }}"></script>
 	<script type="module" {% if cspNonce %}nonce={{ cspNonce }}{% endif %}>

@@ -13,6 +13,7 @@ import { createRoutes as createComponentRoutes } from './views/components/index.
 import { createRoutes as createConsulteeAreasDirectRoutes } from './views/consultee-areas-direct/index.ts';
 import { createRoutes as createConsulteeAreasPythonRoutes } from './views/consultee-areas-python/index.ts';
 import { createRoutes as createConsulteeRoutes } from './views/consultees/index.ts';
+import { createFooterRoutes } from './views/footer/index.ts';
 import { createRoutes as createHomeRoutes } from './views/home/index.ts';
 import { createRoutes as createItemRoutes } from './views/items/index.ts';
 import { createRoutes as createMapLayersDemoRoutes } from './views/map-layers-demo/index.ts';
@@ -74,6 +75,10 @@ export function buildRouter(service: ManageService, options: BuildRouterOptions 
 			signInHref: service.authDisabled ? '/' : '/auth/signin'
 		});
 	});
+
+	// the footer's content pages (terms, accessibility, privacy, cookies, contact) stay reachable
+	// without signing in - policy pages on a service shouldn't sit behind its login
+	router.use('/', createFooterRoutes());
 
 	if (!service.authDisabled) {
 		service.logger.info('registering auth routes');
