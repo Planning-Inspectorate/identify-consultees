@@ -276,6 +276,68 @@ describe('manage page accessibility smoke', () => {
 		await assertNoSeriousA11yViolations(html);
 	});
 
+	test('report consultees change page has no serious a11y violations', async () => {
+		const html = nunjucks.render('views/consultees/report/consultees/view.njk', {
+			...pageLocals,
+			pageHeading: 'Parish Council',
+			pageCaption: 'Longfield Solar Farm',
+			backLinkUrl: '/consultees/11111111-1111-1111-1111-111111111111/report?ruleset=example-ruleset',
+			rows: [
+				{
+					name: 'Little Snoring Parish Council',
+					identified: 'Intersects the site',
+					removeUrl:
+						'/consultees/11111111-1111-1111-1111-111111111111/report/consultees?ruleset=example-ruleset&category=Parish%20Council&exclude=55555555-5555-5555-5555-555555555555'
+				}
+			],
+			addConsulteeUrl: '#',
+			saveAndReturnUrl: '/consultees/11111111-1111-1111-1111-111111111111/report?ruleset=example-ruleset',
+			mapId: 'case-map',
+			mapRegionLabel: 'Map showing Parish Council consultees for Longfield Solar Farm',
+			staticMapSrc:
+				'/consultees/11111111-1111-1111-1111-111111111111/results/static-map?ruleset=example-ruleset&category=Parish%20Council',
+			staticMapAlt: 'Static map showing Parish Council consultees for Longfield Solar Farm',
+			mapWidth: 900,
+			mapHeight: 506,
+			mapConfigJson: '{"type":"FeatureCollection","features":[]}',
+			rulesetFailed: false,
+			retryUrl:
+				'/consultees/11111111-1111-1111-1111-111111111111/report/consultees?ruleset=example-ruleset&category=Parish%20Council',
+			matchCount: 1,
+			mapIsSampled: false,
+			mapSampleSize: 30
+		});
+		await assertNoSeriousA11yViolations(html);
+	});
+
+	test('report consultees change page with no remaining consultees has no serious a11y violations', async () => {
+		const html = nunjucks.render('views/consultees/report/consultees/view.njk', {
+			...pageLocals,
+			pageHeading: 'Parish Council',
+			pageCaption: 'Longfield Solar Farm',
+			backLinkUrl: '/consultees/11111111-1111-1111-1111-111111111111/report?ruleset=example-ruleset',
+			rows: [],
+			addConsulteeUrl: '#',
+			saveAndReturnUrl: '/consultees/11111111-1111-1111-1111-111111111111/report?ruleset=example-ruleset',
+			mapId: 'case-map',
+			mapRegionLabel: 'Map showing Parish Council consultees for Longfield Solar Farm',
+			staticMapSrc:
+				'/consultees/11111111-1111-1111-1111-111111111111/results/static-map?ruleset=example-ruleset&category=Parish%20Council',
+			staticMapAlt: 'Static map showing Parish Council consultees for Longfield Solar Farm',
+			mapWidth: 900,
+			mapHeight: 506,
+			mapConfigJson: '{"type":"FeatureCollection","features":[]}',
+			rulesetFailed: false,
+			retryUrl:
+				'/consultees/11111111-1111-1111-1111-111111111111/report/consultees?ruleset=example-ruleset&category=Parish%20Council',
+			matchCount: 0,
+			mapIsSampled: false,
+			mapSampleSize: 30
+		});
+		assert.match(html, /No consultees identified in this category/);
+		await assertNoSeriousA11yViolations(html);
+	});
+
 	test('report created page has no serious a11y violations', async () => {
 		const html = nunjucks.render('views/consultees/report/created.njk', {
 			...pageLocals,

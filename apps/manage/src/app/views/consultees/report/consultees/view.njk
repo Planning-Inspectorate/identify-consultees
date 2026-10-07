@@ -1,0 +1,95 @@
+{% extends "views/layouts/main.njk" %}
+
+{% from "govuk/components/button/macro.njk" import govukButton %}
+{% from "govuk/components/table/macro.njk" import govukTable %}
+
+{% block pageTitle %}
+	{{ pageHeading }} - {{ config.headerTitle }}
+{% endblock %}
+
+{% block head %}
+	{{ super() }}
+	<link rel="stylesheet" href="/{{ config.vendorInteractiveMapCss }}">
+	<link rel="stylesheet" href="/{{ config.vendorDatasetsPluginCss }}">
+	<link rel="stylesheet" href="/{{ config.vendorMapKeyPluginCss }}">
+{% endblock %}
+
+{% block pageContent %}
+	{% if rulesetFailed %}
+		{% from "govuk/components/notification-banner/macro.njk" import govukNotificationBanner %}
+		{% set failureHtml %}
+			<h3 class="govuk-notification-banner__heading">The ruleset could not be run</h3>
+			<p class="govuk-body">No consultees are shown because the search did not finish. This is not the same as finding no consultees. <a class="govuk-notification-banner__link" href="{{ retryUrl }}">Try again</a>.</p>
+		{% endset %}
+		{{ govukNotificationBanner({ html: failureHtml }) }}
+	{% endif %}
+
+	{% if mapIsSampled %}
+		{% from "govuk/components/inset-text/macro.njk" import govukInsetText %}
+		{{ govukInsetText({
+			text: "This ruleset matched " ~ matchCount ~ " consultees - showing a sample of " ~ mapSampleSize ~ " on the map below."
+		}) }}
+	{% endif %}
+
+	{% set mapRegionLabel = mapRegionLabel %}
+	{% set staticMapSrc = staticMapSrc %}
+	{% set staticMapAlt = staticMapAlt %}
+	{% set mapWidth = mapWidth %}
+	{% set mapHeight = mapHeight %}
+	{% set mapConfigJson = mapConfigJson %}
+	{% include "views/partials/consultee-map-region.njk" %}
+
+	{% if not rulesetFailed %}
+		<h2 class="govuk-heading-m govuk-!-margin-top-6">Consultees</h2>
+
+		{% if rows.length == 0 %}
+			<p class="govuk-body">No consultees identified in this category.</p>
+		{% else %}
+			{% set tableRows = [] %}
+			{% for row in rows %}
+				{% set removeLink %}
+					<a class="govuk-link" href="{{ row.removeUrl }}">Remove<span class="govuk-visually-hidden"> {{ row.name }}</span></a>
+				{% endset %}
+				{% set tableRows = (tableRows.push([
+					{ text: row.name, classes: "govuk-table__cell--no-wrap" },
+					{ text: row.identified },
+					{ html: removeLink }
+				]), tableRows) %}
+			{% endfor %}
+			{{ govukTable({
+				caption: "Consultees",
+				captionClasses: "govuk-visually-hidden",
+				firstCellIsHeader: true,
+				head: [
+					{ text: "Name" },
+					{ text: "Identified" },
+					{ text: "Actions" }
+				],
+				rows: tableRows
+			}) }}
+		{% endif %}
+	{% endif %}
+
+	<div class="govuk-!-margin-top-6">
+		{{ govukButton({
+			text: "Add consultee",
+			href: addConsulteeUrl,
+			classes: "govuk-button--secondary"
+		}) }}
+	</div>
+
+	<div>
+		{{ govukButton({
+			text: "Save and return",
+			href: saveAndReturnUrl
+		}) }}
+	</div>
+{% endblock %}
+
+{% block bodyEnd %}
+	<script defer src="/{{ config.vendorInteractiveMapJs }}"></script>
+	<script defer src="/{{ config.vendorMaplibreProviderJs }}"></script>
+	<script defer src="/{{ config.vendorDatasetsPluginJs }}"></script>
+	<script defer src="/{{ config.vendorMapKeyPluginJs }}"></script>
+	<script type="module" src="/{{ config.consulteesMapJs }}"></script>
+{% endblock %}
