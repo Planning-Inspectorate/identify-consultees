@@ -62,7 +62,10 @@ export function buildRouter(service: ManageService, options: BuildRouterOptions 
 	const authRateLimiter = options.authRateLimiter ?? buildAuthRateLimiter();
 
 	router.use('/', monitoringRoutes);
-	router.use(createDefraVendorRouter({ maxAge: service.cacheControl.maxAge }));
+	// vendor webpack lazy chunks keep stable filenames across package versions, so
+	// they revalidate (max-age=0) rather than risk a stale chunk booting against a
+	// new fingerprinted entry - a mismatch crashes the map on module-id lookup
+	router.use(createDefraVendorRouter());
 
 	// don't cache responses, note no-cache allows some caching, but with revalidation
 	// see https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Cache-Control#no-cache

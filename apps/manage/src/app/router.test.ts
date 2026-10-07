@@ -410,6 +410,24 @@ describe('manage router wiring', () => {
 		assert.equal(response.status, 404);
 	});
 
+	test('GET /vendor webpack lazy chunks revalidate rather than cache under a stable name', async () => {
+		// im-core.js keeps its name across package versions; a stale copy crashing against
+		// a new fingerprinted entry was the "o[e] is not a function" map outage. The br
+		// variant is the path browsers take - plain requests get no-store upstream.
+		const chunk = '/vendor/interactive-map/js/im-core.js';
+		const br = { 'Accept-Encoding': 'br' };
+		const response = await request(authDisabledApp).get(chunk).set(br);
+		assert.equal(response.status, 200);
+		assert.equal(response.headers['content-encoding'], 'br');
+		assert.match(response.headers['cache-control'] || '', /max-age=0/);
+		assert.ok(response.headers.etag);
+
+		const revalidated = await request(authDisabledApp)
+			.get(chunk)
+			.set({ ...br, 'If-None-Match': response.headers.etag });
+		assert.equal(revalidated.status, 304);
+	});
+
 	test('GET /components/interactive-map/:example/static-map negotiates and caches the image', async () => {
 		const originalFetch = globalThis.fetch;
 		globalThis.fetch = async () =>
