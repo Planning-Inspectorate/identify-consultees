@@ -9,7 +9,7 @@ export function addLocalsConfiguration(): Handler {
 		res.locals.config = {
 			styleFile: 'style-9836de53.css',
 			govukFrontendJs: 'assets/js/govuk-frontend.min-38b6270a.js',
-			consulteesMapJs: 'javascripts/consultees-map-88c80e80.js',
+			consulteesMapJs: 'javascripts/consultees-map-935d8985.js',
 			mapLayersDemoJs: 'javascripts/map-layers-demo-5c32a650.js',
 			accessibleAutocompleteJs: 'assets/js/accessible-autocomplete.min-5e8c6959.js',
 			accessibleAutocompleteCss: 'assets/css/accessible-autocomplete.min-08028661.css',

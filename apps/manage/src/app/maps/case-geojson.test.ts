@@ -1,13 +1,16 @@
 import type { CaseBoundaryFeature } from '@pins/identify-consultees-database/src/geospatial/case-boundaries.ts';
 import type { ConsulteeAreaMatch } from '@pins/identify-consultees-database/src/geospatial/consultee-areas.ts';
+import type { Geometry } from '@pins/identify-consultees-database/src/geospatial/wkt.ts';
 import assert from 'node:assert';
 import { describe, it } from 'node:test';
 import {
 	buildCaseMapConfig,
 	buildConsulteeMatchesGeojson,
 	buildNearbyConsulteesGeojson,
+	LOCAL_FILL_OPACITY,
 	MAP_SAMPLING_THRESHOLD,
-	MAX_SAMPLED_MAP_MATCHES
+	MAX_SAMPLED_MAP_MATCHES,
+	REGIONAL_FILL_OPACITY
 } from './case-geojson.ts';
 
 function project(): CaseBoundaryFeature {
@@ -78,12 +81,12 @@ describe('buildNearbyConsulteesGeojson', () => {
 		assert.deepStrictEqual(geojson.features[0], {
 			type: 'Feature',
 			id: 'a',
-			properties: { name: 'Mid Suffolk', consulteeCategory: 'Lower Tier Authority', distanceMetres: '1235' },
+			properties: { name: 'Mid Suffolk', consulteeCategory: 'Lower Tier Authority', colour: '#1d70b8' },
 			geometry: { type: 'Point', coordinates: [1.12346, 52.98765] }
 		});
 	});
 
-	it('rounds geometry collections and defaults missing names to empty strings', () => {
+	it('rounds geometry collections and defaults missing names and categories', () => {
 		const geojson = buildNearbyConsulteesGeojson(
 			[nearby('a', { consultee: null, consulteeCategory: null })],
 			new Map([
@@ -96,7 +99,7 @@ describe('buildNearbyConsulteesGeojson', () => {
 				]
 			])
 		);
-		assert.deepStrictEqual(geojson.features[0].properties, { name: '', consulteeCategory: '', distanceMetres: '1235' });
+		assert.deepStrictEqual(geojson.features[0].properties, { name: '', consulteeCategory: 'Other', colour: '#1d70b8' });
 		assert.deepStrictEqual(geojson.features[0].geometry, {
 			type: 'GeometryCollection',
 			geometries: [{ type: 'LineString', coordinates: [[0, 1.00001]] }]
@@ -139,6 +142,91 @@ describe('buildCaseMapConfig with a search area', () => {
 		assert.strictEqual(config.searchAreaGeojson?.features[0].properties.name, 'Search area (20km)');
 		assert.strictEqual(config.nearbyLayerLabel, 'All consultees within 20km');
 		assert.strictEqual(config.nearbyGeojson?.features.length, 1);
+	});
+
+	it('draws every match, coloured by category the same way on both layers', () => {
+		const matches = Array.from({ length: MAP_SAMPLING_THRESHOLD + 1 }, (_, i) => match(`${i}`));
+		const config = buildCaseMapConfig(project(), matches, 'Example ruleset', {
+			area,
+			areaLabel: 'Search area (20km)',
+			nearbyLabel: 'All consultees within 20km',
+			nearby: [
+				{
+					feature: { id: 'h', properties: { consultee: 'A hospital', consulteeCategory: 'Hospital' } },
+					distanceMetres: 0
+				},
+				{
+					feature: { id: '0', properties: { consultee: 'Network Rail', consulteeCategory: 'Railway' } },
+					distanceMetres: 0
+				}
+			],
+			geometries: new Map([...matches.map((m) => [m.feature.id, clipped] as const), ['h', clipped]])
+		});
+
+		assert.strictEqual(config.isSampled, false);
+		assert.strictEqual(config.consulteeGeojson.features.length, MAP_SAMPLING_THRESHOLD + 1);
+		// the matches' category gets the first colour, even though Hospital sorts before it
+		assert.strictEqual(config.consulteeGeojson.features[0].properties.colour, '#1d70b8');
+		assert.deepStrictEqual(
+			config.nearbyGeojson?.features.map((feature) => [
+				feature.properties.consulteeCategory,
+				feature.properties.colour
+			]),
+			[
+				['Hospital', '#f47738'],
+				['Railway', '#1d70b8']
+			]
+		);
+	});
+
+	it('tints categories with an area covering most of the search area, and draws them first', () => {
+		const regionalMatch: ConsulteeAreaMatch = {
+			feature: {
+				id: 'county',
+				type: 'Feature',
+				geometry: area,
+				properties: { consultee: 'Suffolk', consulteeCategory: 'Upper Tier Authority' }
+			},
+			distanceMetres: 0
+		};
+		const empty = { type: 'GeometryCollection' as const, geometries: [] };
+		const config = buildCaseMapConfig(project(), [match('parish'), regionalMatch, match('empty')], 'Example ruleset', {
+			area,
+			areaLabel: 'Search area (20km)',
+			nearbyLabel: 'All consultees within 20km',
+			nearby: [],
+			geometries: new Map<string, Geometry>([
+				['parish', clipped],
+				['county', area],
+				['empty', empty]
+			])
+		});
+
+		assert.deepStrictEqual(
+			config.consulteeGeojson.features.map((feature) => [feature.id, feature.properties.fillOpacity]),
+			[
+				['county', String(REGIONAL_FILL_OPACITY)],
+				['parish', String(LOCAL_FILL_OPACITY)],
+				['empty', String(LOCAL_FILL_OPACITY)]
+			]
+		);
+	});
+
+	it('fills every match as local without a search area', () => {
+		const config = buildCaseMapConfig(project(), [match('a')], 'Example ruleset');
+		assert.strictEqual(config.consulteeGeojson.features[0].properties.fillOpacity, String(LOCAL_FILL_OPACITY));
+	});
+
+	it('rounds the project boundary to ~1m', () => {
+		const detailed = {
+			...project(),
+			geometry: { type: 'Point' as const, coordinates: [-1.123456789, 52.987654321] as [number, number] }
+		};
+		const config = buildCaseMapConfig(detailed, [], 'Example ruleset');
+		assert.deepStrictEqual(config.projectGeojson.features[0].geometry, {
+			type: 'Point',
+			coordinates: [-1.12346, 52.98765]
+		});
 	});
 
 	it('leaves the search area out, and draws matches whole, without one', () => {

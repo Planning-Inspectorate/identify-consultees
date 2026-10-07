@@ -10,54 +10,10 @@ import type {
 	ConsulteeAreaSummaryMatch
 } from '@pins/identify-consultees-database/src/geospatial/consultee-areas.ts';
 import type { Geometry } from '@pins/identify-consultees-database/src/geospatial/wkt.ts';
-import { computeMapView } from './geometry-bounds.ts';
-import type { GeoJsonFeatureCollection } from './sample-geojson.ts';
+import { assignCategoryColours, colourFor, UNCATEGORISED } from './category-colours.ts';
+import { computeBounds, computeMapView } from './geometry-bounds.ts';
+import type { GeoJsonFeature, GeoJsonFeatureCollection } from './sample-geojson.ts';
 import { MAP_VIEWPORT } from './sample-geojson.ts';
-
-export function buildProjectGeojson(project: CaseBoundaryFeature): GeoJsonFeatureCollection {
-	return {
-		type: 'FeatureCollection',
-		features: [
-			{
-				type: 'Feature',
-				id: project.id,
-				properties: {
-					name: project.properties.caseName,
-					reference: project.properties.caseReference,
-					layer: 'project-site'
-				},
-				geometry: project.geometry
-			}
-		]
-	};
-}
-
-// A ruleset is now the union of every condition it's made of (see geospatial/rulesets.ts), so a
-// single run can realistically return thousands of matches (e.g. most parish councils near a
-// large site). Rendering that many complex polygons - in the client-side interactive map, and
-// especially in the server-side static-map SVG/PNG fallback - is slow enough to be a real
-// reliability risk, not just a cosmetic one. Above MAP_SAMPLING_THRESHOLD matches, the map shows
-// only a sample; the results table (built from the full, unsampled list) is unaffected.
-export const MAP_SAMPLING_THRESHOLD = 50;
-export const MAX_SAMPLED_MAP_MATCHES = 30;
-
-export function buildConsulteeMatchesGeojson(matches: ConsulteeAreaMatch[]): GeoJsonFeatureCollection {
-	const sample = matches.length > MAP_SAMPLING_THRESHOLD ? matches.slice(0, MAX_SAMPLED_MAP_MATCHES) : matches;
-	return {
-		type: 'FeatureCollection',
-		features: sample.map((match) => ({
-			type: 'Feature',
-			id: match.feature.id,
-			properties: {
-				name: match.feature.properties.consultee ?? '',
-				consulteeCategory: match.feature.properties.consulteeCategory ?? '',
-				region: match.feature.properties.region ?? '',
-				distanceMetres: String(Math.round(match.distanceMetres))
-			},
-			geometry: match.feature.geometry
-		}))
-	};
-}
 
 // ~1m - plenty for drawing, and coordinates are most of the layer's size
 const DISPLAY_COORDINATE_DECIMALS = 5;
@@ -75,6 +31,60 @@ function roundGeometry(geometry: Geometry): Geometry {
 	return { ...geometry, coordinates: roundCoordinates(geometry.coordinates as Coordinates) } as Geometry;
 }
 
+export function buildProjectGeojson(project: CaseBoundaryFeature): GeoJsonFeatureCollection {
+	return {
+		type: 'FeatureCollection',
+		features: [
+			{
+				type: 'Feature',
+				id: project.id,
+				properties: {
+					name: project.properties.caseName,
+					reference: project.properties.caseReference,
+					layer: 'project-site'
+				},
+				geometry: roundGeometry(project.geometry)
+			}
+		]
+	};
+}
+
+// A ruleset is now the union of every condition it's made of (see geospatial/rulesets.ts), so a
+// single run can realistically return thousands of matches (e.g. most parish councils near a
+// large site). Rendering that many complex polygons - in the client-side interactive map, and
+// especially in the server-side static-map SVG/PNG fallback - is slow enough to be a real
+// reliability risk, not just a cosmetic one. Above MAP_SAMPLING_THRESHOLD matches, the map shows
+// only a sample; the results table (built from the full, unsampled list) is unaffected.
+// Display geometry clipped to a search area is small enough to draw every match.
+export const MAP_SAMPLING_THRESHOLD = 50;
+export const MAX_SAMPLED_MAP_MATCHES = 30;
+
+function categoryOf(match: ConsulteeAreaSummaryMatch): string {
+	return match.feature.properties.consulteeCategory || UNCATEGORISED;
+}
+
+export function buildConsulteeMatchesGeojson(
+	matches: ConsulteeAreaMatch[],
+	colours: Map<string, string> = assignCategoryColours(matches.map(categoryOf)),
+	sample = true
+): GeoJsonFeatureCollection {
+	const drawn = sample && matches.length > MAP_SAMPLING_THRESHOLD ? matches.slice(0, MAX_SAMPLED_MAP_MATCHES) : matches;
+	return {
+		type: 'FeatureCollection',
+		features: drawn.map((match) => ({
+			type: 'Feature',
+			id: match.feature.id,
+			properties: {
+				name: match.feature.properties.consultee ?? '',
+				consulteeCategory: categoryOf(match),
+				region: match.feature.properties.region ?? '',
+				colour: colourFor(colours, categoryOf(match))
+			},
+			geometry: match.feature.geometry
+		}))
+	};
+}
+
 /**
  * Every consultee area near the site, for the map's "all consultees nearby" layer. `geometries` is
  * display geometry (already clipped to the map's surroundings and simplified - see
@@ -83,7 +93,8 @@ function roundGeometry(geometry: Geometry): Geometry {
  */
 export function buildNearbyConsulteesGeojson(
 	nearby: ConsulteeAreaSummaryMatch[],
-	geometries: Map<string, Geometry>
+	geometries: Map<string, Geometry>,
+	colours: Map<string, string> = assignCategoryColours(nearby.map(categoryOf))
 ): GeoJsonFeatureCollection {
 	return {
 		type: 'FeatureCollection',
@@ -98,8 +109,8 @@ export function buildNearbyConsulteesGeojson(
 					id: match.feature.id,
 					properties: {
 						name: match.feature.properties.consultee ?? '',
-						consulteeCategory: match.feature.properties.consulteeCategory ?? '',
-						distanceMetres: String(Math.round(match.distanceMetres))
+						consulteeCategory: categoryOf(match),
+						colour: colourFor(colours, categoryOf(match))
 					},
 					geometry: roundGeometry(geometry)
 				}
@@ -135,13 +146,56 @@ export interface CaseMapConfig {
 	consulteeGeojson: GeoJsonFeatureCollection;
 	/** Total matches the ruleset found - may be larger than consulteeGeojson.features.length. */
 	matchCount: number;
-	/** True when the map shows a sample rather than every match - see MAP_SAMPLING_THRESHOLD. */
+	/** True when the map shows a sample rather than every match - see MAP_SAMPLING_THRESHOLD. Never with a search area. */
 	isSampled: boolean;
 	/** The search area outline, and every consultee inside it - interactive map only. */
 	searchAreaLabel?: string;
 	searchAreaGeojson?: GeoJsonFeatureCollection;
 	nearbyLayerLabel?: string;
 	nearbyGeojson?: GeoJsonFeatureCollection;
+}
+
+// regional areas (police force, ambulance trust, county) cover most of the search area, and a dozen
+// of them stacked at a local area's opacity bury everything - they're only tinted, and drawn under
+// the local ones
+export const LOCAL_FILL_OPACITY = 0.35;
+export const REGIONAL_FILL_OPACITY = 0.06;
+const REGIONAL_COVERAGE = 0.5;
+
+function boundingBoxArea(features: GeoJsonFeature[]): number {
+	const bounds = computeBounds({ features });
+	return bounds ? (bounds.east - bounds.west) * (bounds.north - bounds.south) : 0;
+}
+
+/**
+ * Each match's fill opacity (`fillOpacity`), by category: regional if any area in the category
+ * covers most of the search area's bounding box, and regional ones first. Without a search area,
+ * every category is local.
+ */
+function withFillOpacity(
+	collection: GeoJsonFeatureCollection,
+	searchArea?: GeoJsonFeatureCollection
+): GeoJsonFeatureCollection {
+	const regionalArea = searchArea ? boundingBoxArea(searchArea.features) * REGIONAL_COVERAGE : Infinity;
+	const regional = new Set(
+		collection.features
+			.filter((feature) => boundingBoxArea([feature]) >= regionalArea)
+			.map((feature) => feature.properties.consulteeCategory)
+	);
+	const isRegional = (feature: GeoJsonFeature) => regional.has(feature.properties.consulteeCategory);
+	return {
+		...collection,
+		// the static map draws in feature order
+		features: [...collection.features.filter(isRegional), ...collection.features.filter((f) => !isRegional(f))].map(
+			(feature) => ({
+				...feature,
+				properties: {
+					...feature.properties,
+					fillOpacity: String(isRegional(feature) ? REGIONAL_FILL_OPACITY : LOCAL_FILL_OPACITY)
+				}
+			})
+		)
+	};
 }
 
 /** `matches` with their display geometry from `geometries`; any with none (outside the area) are left out. */
@@ -159,9 +213,8 @@ export function buildCaseMapConfig(
 	searchArea?: SearchAreaDisplay
 ): CaseMapConfig {
 	const projectGeojson = buildProjectGeojson(project);
-	const consulteeGeojson = buildConsulteeMatchesGeojson(
-		searchArea ? withDisplayGeometry(matches, searchArea.geometries) : matches
-	);
+	// one colour per category across both layers, the ruleset's matches first
+	const colours = assignCategoryColours(matches.map(categoryOf), searchArea?.nearby.map(categoryOf));
 	const searchAreaGeojson: GeoJsonFeatureCollection | undefined = searchArea && {
 		type: 'FeatureCollection',
 		features: [
@@ -173,6 +226,12 @@ export function buildCaseMapConfig(
 			}
 		]
 	};
+	const consulteeGeojson = withFillOpacity(
+		searchArea
+			? buildConsulteeMatchesGeojson(withDisplayGeometry(matches, searchArea.geometries), colours, false)
+			: buildConsulteeMatchesGeojson(matches, colours),
+		searchAreaGeojson
+	);
 	const view = computeMapView({
 		features: searchAreaGeojson?.features ?? [...projectGeojson.features, ...consulteeGeojson.features]
 	});
@@ -189,13 +248,13 @@ export function buildCaseMapConfig(
 		projectGeojson,
 		consulteeGeojson,
 		matchCount: matches.length,
-		isSampled: matches.length > MAP_SAMPLING_THRESHOLD,
+		isSampled: !searchArea && matches.length > MAP_SAMPLING_THRESHOLD,
 		...(searchArea
 			? {
 					searchAreaLabel: searchArea.areaLabel,
 					searchAreaGeojson,
 					nearbyLayerLabel: searchArea.nearbyLabel,
-					nearbyGeojson: buildNearbyConsulteesGeojson(searchArea.nearby, searchArea.geometries)
+					nearbyGeojson: buildNearbyConsulteesGeojson(searchArea.nearby, searchArea.geometries, colours)
 				}
 			: {})
 	};

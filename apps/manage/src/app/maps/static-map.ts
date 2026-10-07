@@ -44,8 +44,47 @@ const OSM_USER_AGENT = 'identify-consultees/0.1 (+https://github.com/Planning-In
 const OSM_TILE_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 const OSM_TILE_FETCH_CONCURRENCY = 2;
 
-const PROJECT_COLOUR = { stroke: '#C44E52', fill: '#C44E52', googleFill: '0xC44E5266', googleStroke: '0xC44E52FF' };
-const CONSULTEE_COLOUR = { stroke: '#55A868', fill: '#55A868', googleFill: '0x55A86866', googleStroke: '0x55A868FF' };
+type FeatureColours = { stroke: string; fill: string; fillOpacity: number; googleFill: string; googleStroke: string };
+
+const PROJECT_COLOUR: FeatureColours = {
+	stroke: '#C44E52',
+	fill: '#C44E52',
+	fillOpacity: 0.45,
+	googleFill: '0xC44E5266',
+	googleStroke: '0xC44E52FF'
+};
+const CONSULTEE_COLOUR: FeatureColours = {
+	stroke: '#55A868',
+	fill: '#55A868',
+	fillOpacity: 0.45,
+	googleFill: '0x55A86866',
+	googleStroke: '0x55A868FF'
+};
+
+/**
+ * A consultee's own category colour and fill opacity (its `colour` and `fillOpacity` properties),
+ * or the default consultee green.
+ */
+export function consulteeColours(feature: GeoJsonFeature): FeatureColours {
+	const colour = feature.properties.colour;
+	if (typeof colour !== 'string' || !/^#[0-9a-f]{6}$/i.test(colour)) {
+		return CONSULTEE_COLOUR;
+	}
+	const opacity = Number(feature.properties.fillOpacity);
+	const fillOpacity = opacity > 0 && opacity <= 1 ? opacity : CONSULTEE_COLOUR.fillOpacity;
+	const google = `0x${colour.slice(1).toUpperCase()}`;
+	const googleAlpha = Math.round(fillOpacity * 255)
+		.toString(16)
+		.padStart(2, '0')
+		.toUpperCase();
+	return {
+		stroke: colour,
+		fill: colour,
+		fillOpacity,
+		googleFill: `${google}${googleAlpha}`,
+		googleStroke: `${google}FF`
+	};
+}
 
 type CachedTile = { png: Buffer; expiresAt: number };
 const osmTileCache = new Map<string, CachedTile>();
@@ -285,7 +324,7 @@ export function buildGoogleStaticMapUrl(options: StaticMapBuildOptions): string 
 	params.append('zoom', String(Math.round(options.zoom)));
 
 	for (const feature of options.consulteeGeojson.features) {
-		appendGooglePath(params, feature, CONSULTEE_COLOUR);
+		appendGooglePath(params, feature, consulteeColours(feature));
 	}
 	for (const feature of options.projectGeojson.features) {
 		appendGooglePath(params, feature, PROJECT_COLOUR);
@@ -339,7 +378,7 @@ function svgPathCommandsForLine(line: Position[], project: (lng: number, lat: nu
 function pathForFeature(
 	feature: GeoJsonFeature,
 	project: (lng: number, lat: number) => [number, number],
-	colours: { fill: string; stroke: string }
+	colours: FeatureColours
 ): string {
 	const filled = isArealGeometryType(feature.geometry.type);
 	const subpaths = collectLines(feature.geometry)
@@ -348,7 +387,7 @@ function pathForFeature(
 	if (subpaths.length === 0) {
 		return '';
 	}
-	const fillAttributes = filled ? `fill="${colours.fill}" fill-opacity="0.45"` : 'fill="none"';
+	const fillAttributes = filled ? `fill="${colours.fill}" fill-opacity="${colours.fillOpacity}"` : 'fill="none"';
 	return `<path d="${subpaths.join(' ')}" ${fillAttributes} stroke="${colours.stroke}" stroke-width="2"/>`;
 }
 
@@ -394,7 +433,7 @@ export function renderStaticMapOverlaySvg(options: StaticMapBuildOptions): strin
 	};
 
 	const consulteePaths = options.consulteeGeojson.features
-		.map((feature) => pathForFeature(feature, project, CONSULTEE_COLOUR))
+		.map((feature) => pathForFeature(feature, project, consulteeColours(feature)))
 		.filter(Boolean)
 		.join('\n');
 	const projectPaths = options.projectGeojson.features

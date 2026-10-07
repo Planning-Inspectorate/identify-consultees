@@ -2,8 +2,8 @@ import { JSDOM } from 'jsdom';
 import assert from 'node:assert/strict';
 import { afterEach, describe, mock, test } from 'node:test';
 import {
+	buildCategorySublayers,
 	buildDatasets,
-	buildNearbySublayers,
 	initAllConsulteeMaps,
 	initConsulteeMap,
 	readMapConfig,
@@ -85,64 +85,105 @@ describe('consultees-map client helpers', () => {
 		});
 		assert.deepEqual(
 			datasets.map((dataset) => dataset.id),
-			['project-site', 'consultee-areas']
+			['consultee-areas', 'project-site']
 		);
 	});
 
-	test('buildDatasets puts the nearby consultees layer first, with a sublayer per category', () => {
-		const point = (category) => ({
+	test('buildDatasets fills the matches by category and hides the nearby outlines', () => {
+		const point = (category, colour) => ({
 			type: 'Feature',
-			properties: { consulteeCategory: category },
+			properties: { consulteeCategory: category, colour },
 			geometry: { type: 'Point', coordinates: [0, 0] }
 		});
-		const area = (category) => ({
+		const area = (category, colour) => ({
 			type: 'Feature',
-			properties: { consulteeCategory: category },
+			properties: { consulteeCategory: category, colour },
 			geometry: { type: 'Polygon', coordinates: [] }
 		});
 		const datasets = buildDatasets({
 			searchAreaLabel: 'Search area (20km)',
 			searchAreaGeojson: { features: [{}] },
 			nearbyLayerLabel: 'All consultees within 20km',
-			nearbyGeojson: { features: [area('Police'), point('Hospital'), point('Hospital'), area('Parish Council')] },
+			nearbyGeojson: {
+				features: [
+					area('Police', '#912b88'),
+					point('Hospital', '#f47738'),
+					point('Hospital', '#f47738'),
+					area('Parish Council', '#1d70b8')
+				]
+			},
 			projectGeojson: { features: [{}] },
-			consulteeGeojson: { features: [{}] }
+			consulteeGeojson: { features: [area('Parish Council', '#1d70b8'), point('Hospital', '#f47738')] }
 		});
 
 		assert.deepEqual(
 			datasets.map((dataset) => dataset.id),
-			['search-area', 'nearby-consultees', 'project-site', 'consultee-areas']
+			['search-area', 'nearby-consultees', 'consultee-areas', 'project-site']
 		);
-		const [searchArea, nearby, , matches] = datasets;
+		const [searchArea, nearby, matches] = datasets;
 		assert.equal(searchArea.label, 'Search area (20km)');
 		assert.deepEqual(searchArea.style.strokeDashArray, [4, 3]);
-		// translucent fills - the plugin has no fill-opacity option, so it's in the colour
-		assert.equal(matches.style.fill, 'rgba(85, 168, 104, 0.05)');
+
+		assert.equal(nearby.visible, false);
 		assert.equal(nearby.label, 'All consultees within 20km');
 		assert.deepEqual(
 			nearby.sublayers.map((sublayer) => sublayer.label),
 			['Hospital (2)', 'Parish Council (1)', 'Police (1)']
 		);
 		assert.deepEqual(nearby.sublayers[0].filter, ['==', ['get', 'consulteeCategory'], 'Hospital']);
-		// points as circles, areas as outlines
+		// points as circles, areas as outlines in the category's colour
 		assert.equal(nearby.sublayers[0].style.symbol, 'circle');
 		assert.match(nearby.sublayers[0].style.symbolSvgContent, /{{haloColor}}/);
-		assert.equal(nearby.sublayers[1].style.fill, 'transparent');
-		assert.ok(nearby.sublayers[1].style.stroke);
+		assert.equal(nearby.sublayers[0].style.symbolBackgroundColor, '#f47738');
+		assert.deepEqual(nearby.sublayers[1].style, { stroke: '#1d70b8', strokeWidth: 2, fill: 'transparent' });
+
+		assert.equal(matches.visible, undefined);
+		assert.deepEqual(
+			matches.sublayers.map((sublayer) => sublayer.label),
+			['Hospital (1)', 'Parish Council (1)']
+		);
+		// translucent fills - the plugin has no fill-opacity option, so it's in the colour
+		assert.deepEqual(matches.sublayers[1].style, {
+			stroke: '#1d70b8',
+			strokeWidth: 2,
+			fill: 'rgba(29, 112, 184, 0.35)'
+		});
+		assert.equal(matches.sublayers[0].style.symbolBackgroundColor, '#f47738');
 	});
 
-	test('buildNearbySublayers groups uncategorised areas and cycles colours past the palette', () => {
-		const features = Array.from({ length: 12 }, (_, i) => ({
-			properties: { consulteeCategory: `Category ${String(i).padStart(2, '0')}` },
-			geometry: { type: 'Polygon' }
-		}));
-		features.push({ properties: {}, geometry: { type: 'Polygon' } });
-		const sublayers = buildNearbySublayers(features);
+	test("buildCategorySublayers fills at each category's opacity, lightest first", () => {
+		const sublayers = buildCategorySublayers(
+			[
+				{ properties: { consulteeCategory: 'Ambulance Trust', colour: '#1d70b8', fillOpacity: '0.35' } },
+				{ properties: { consulteeCategory: 'Police', colour: '#912b88', fillOpacity: '0.06' } }
+			],
+			'identified',
+			true
+		);
+		assert.deepEqual(
+			sublayers.map((sublayer) => [sublayer.label, sublayer.style.fill]),
+			[
+				['Police (1)', 'rgba(145, 43, 136, 0.06)'],
+				['Ambulance Trust (1)', 'rgba(29, 112, 184, 0.35)']
+			]
+		);
+	});
 
-		assert.equal(sublayers.length, 13);
-		assert.equal(sublayers.at(-1).label, 'Other (1)');
-		assert.equal(sublayers[0].style.stroke, sublayers[10].style.stroke);
-		assert.notEqual(sublayers[0].style.stroke, sublayers[1].style.stroke);
+	test('buildCategorySublayers groups uncategorised features and defaults missing colours', () => {
+		const sublayers = buildCategorySublayers(
+			[{ properties: { consulteeCategory: 'Police' } }, { geometry: { type: 'Polygon' } }],
+			'identified',
+			true
+		);
+
+		assert.deepEqual(
+			sublayers.map((sublayer) => [sublayer.id, sublayer.label]),
+			[
+				['identified-0', 'Other (1)'],
+				['identified-1', 'Police (1)']
+			]
+		);
+		assert.equal(sublayers[1].style.stroke, '#55A868');
 	});
 
 	test('buildDatasets defaults the nearby and search area labels', () => {

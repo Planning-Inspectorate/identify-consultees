@@ -21,7 +21,7 @@ export interface ConsulteesResultsViewModel {
 	/** True when the map shows only a sample of matches, not all of them - see maps/case-geojson.ts. */
 	mapIsSampled: boolean;
 	mapSampleSize: number;
-	/** Every consultee within nearbyRadiusKm, any category - shown by default alongside the ruleset's own matches. */
+	/** Every consultee within nearbyRadiusKm, any category - a hidden-by-default layer on the map. */
 	nearbyMatches: ConsulteeMatchRow[];
 	nearbyMatchCount: number;
 	nearbyRadiusKm: number;
@@ -31,5 +31,4 @@ export interface ConsulteeMatchRow {
 	consultee: string | null;
 	consulteeCategory: string | null;
 	region: string | null;
-	distanceMetres: number;
 }
