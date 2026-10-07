@@ -65,7 +65,8 @@ describe('resolveCaseSummary', () => {
 					id: validId,
 					caseReference: 'EN010099',
 					caseName: 'Example',
-					receivedDate: null
+					receivedDate: null,
+					acceptance: null
 				}
 			])
 		};
@@ -74,7 +75,8 @@ describe('resolveCaseSummary', () => {
 			id: validId,
 			reference: 'EN010099',
 			caseName: 'Example',
-			receivedDate: null
+			receivedDate: null,
+			acceptance: null
 		});
 		assert.equal(db.$queryRaw.mock.callCount(), 1);
 	});

@@ -33,10 +33,7 @@ describe('home page', () => {
 		await assert.doesNotReject(() => homePage({ query: { q: 'EN01' } }, mockRes));
 		assert.strictEqual(mockRes.render.mock.callCount(), 1);
 		assert.strictEqual(mockRes.render.mock.calls[0].arguments[0], 'views/home/view.njk');
-		assert.strictEqual(
-			mockRes.render.mock.calls[0].arguments[1].pageHeading,
-			'Identify consultees for an infrastructure project'
-		);
+		assert.strictEqual(mockRes.render.mock.calls[0].arguments[1].pageHeading, 'Identify consultees for a NSIP project');
 		assert.strictEqual(mockRes.render.mock.calls[0].arguments[1].geometries.length, 1);
 	});
 
@@ -54,21 +51,21 @@ describe('home page', () => {
 		assert.strictEqual(viewModel.resultsTotal, 1);
 	});
 
-	it('should format a real receivedDate for display', async () => {
+	it('should map acceptance to the stage shown in the results table', async () => {
 		const mockRes = { render: mock.fn() };
-		const rows = [{ ...newRow(), receivedDate: new Date(Date.UTC(2026, 2, 3)) }];
+		const rows = [{ ...newRow(), acceptance: 'Acceptance' }];
 		const homePage = buildHomePage({ logger: mockLogger(), db: createMockDb(rows) });
 		await homePage({ query: {} }, mockRes);
 
-		assert.strictEqual(mockRes.render.mock.calls[0].arguments[1].geometries[0].received, '03/03/2026');
+		assert.strictEqual(mockRes.render.mock.calls[0].arguments[1].geometries[0].stage, 'Acceptance');
 	});
 
-	it('should show an empty received date when not set', async () => {
+	it('should leave the stage empty when the row has no acceptance value', async () => {
 		const mockRes = { render: mock.fn() };
 		const homePage = buildHomePage({ logger: mockLogger(), db: createMockDb([newRow()]) });
 		await homePage({ query: {} }, mockRes);
 
-		assert.strictEqual(mockRes.render.mock.calls[0].arguments[1].geometries[0].received, '');
+		assert.strictEqual(mockRes.render.mock.calls[0].arguments[1].geometries[0].stage, null);
 	});
 
 	it('should report the total match count from the query, not just the page length', async () => {

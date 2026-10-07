@@ -4,9 +4,7 @@ import { SAMPLE_CASE_ID, SAMPLE_CASE_NAME, SAMPLE_CASE_REFERENCE, SAMPLE_RULESET
 test.describe('manage journeys', () => {
 	test('home page shows identify consultees search', async ({ page }) => {
 		await page.goto(`/?q=${SAMPLE_CASE_REFERENCE}`);
-		await expect(page.getByRole('heading', { level: 1 })).toContainText(
-			'Identify consultees for an infrastructure project'
-		);
+		await expect(page.getByRole('heading', { level: 1 })).toContainText('Identify consultees for a NSIP project');
 		await expect(page.getByText(SAMPLE_CASE_NAME).first()).toBeVisible();
 	});
 

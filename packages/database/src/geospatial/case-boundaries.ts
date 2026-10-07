@@ -219,17 +219,26 @@ export interface CaseBoundarySummary {
 	reference: string;
 	caseName: string;
 	receivedDate: Date | null;
+	/** Project stage placeholder (e.g. Scoping / Acceptance) - no current data source populates it. */
+	acceptance: string | null;
 }
 
-const summaryColumns = Prisma.raw('id, caseReference, caseName, receivedDate');
+const summaryColumns = Prisma.raw('id, caseReference, caseName, receivedDate, acceptance');
 
 function rowToSummary(row: {
 	id: string;
 	caseReference: string;
 	caseName: string;
 	receivedDate: Date | null;
+	acceptance: string | null;
 }): CaseBoundarySummary {
-	return { id: row.id, reference: row.caseReference, caseName: row.caseName, receivedDate: row.receivedDate };
+	return {
+		id: row.id,
+		reference: row.caseReference,
+		caseName: row.caseName,
+		receivedDate: row.receivedDate,
+		acceptance: row.acceptance
+	};
 }
 
 /**
@@ -241,7 +250,9 @@ export async function getCaseBoundarySummaryById(
 	id: string
 ): Promise<CaseBoundarySummary | null> {
 	const rows = await withDeadlockRetry(
-		() => dbClient.$queryRaw<{ id: string; caseReference: string; caseName: string; receivedDate: Date | null }[]>`
+		() => dbClient.$queryRaw<
+			{ id: string; caseReference: string; caseName: string; receivedDate: Date | null; acceptance: string | null }[]
+		>`
 			SELECT ${summaryColumns} FROM case_boundary WHERE id = CAST(${id} AS UNIQUEIDENTIFIER)
 		`
 	);
@@ -255,7 +266,9 @@ export async function getCaseBoundarySummaryById(
  */
 export async function getRandomCaseSummary(dbClient: PrismaClient): Promise<CaseBoundarySummary | null> {
 	const rows = await withDeadlockRetry(
-		() => dbClient.$queryRaw<{ id: string; caseReference: string; caseName: string; receivedDate: Date | null }[]>`
+		() => dbClient.$queryRaw<
+			{ id: string; caseReference: string; caseName: string; receivedDate: Date | null; acceptance: string | null }[]
+		>`
 			SELECT TOP 1 ${summaryColumns} FROM case_boundary ORDER BY NEWID()
 		`
 	);
@@ -289,7 +302,14 @@ export async function searchCaseBoundaries(dbClient: PrismaClient, options: Sear
 
 	const rows = await withDeadlockRetry(
 		() => dbClient.$queryRaw<
-			{ id: string; caseReference: string; caseName: string; receivedDate: Date | null; totalCount: bigint }[]
+			{
+				id: string;
+				caseReference: string;
+				caseName: string;
+				receivedDate: Date | null;
+				acceptance: string | null;
+				totalCount: bigint;
+			}[]
 		>`
 			SELECT ${summaryColumns}, COUNT(*) OVER() AS totalCount
 			FROM case_boundary

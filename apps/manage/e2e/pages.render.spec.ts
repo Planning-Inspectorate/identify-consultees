@@ -18,7 +18,7 @@ const pages = [
 	{
 		path: `/?q=${SAMPLE_CASE_REFERENCE}`,
 		name: 'home',
-		heading: /Identify consultees for an infrastructure project/i,
+		heading: /Identify consultees for a NSIP project/i,
 		mustSee: [new RegExp(SAMPLE_CASE_NAME, 'i')]
 	},
 	{

@@ -27,7 +27,7 @@ function toProjectGeometry(summary: CaseBoundarySummary): ProjectGeometry {
 		id: summary.id,
 		reference: summary.reference,
 		caseName: summary.caseName,
-		received: summary.receivedDate ? summary.receivedDate.toLocaleDateString('en-GB') : ''
+		stage: summary.acceptance
 	};
 }
 
@@ -63,7 +63,7 @@ export function buildHomePage(service: ManageService): AsyncRequestHandler {
 		}
 
 		const viewModel: HomeViewModel = {
-			pageHeading: 'Identify consultees for an infrastructure project',
+			pageHeading: 'Identify consultees for a NSIP project',
 			searchQuery,
 			pageSize,
 			pageSizeOptions: PAGE_SIZE_OPTIONS,
