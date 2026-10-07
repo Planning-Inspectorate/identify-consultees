@@ -161,7 +161,7 @@ export function initMapLayersDemo(mapId) {
 }
 
 export function initAllMapLayersDemos() {
-	const containers = document.querySelectorAll('[data-map-layers-demo]');
+	const containers = document.querySelectorAll('.app-map-layers-demo');
 	for (const container of containers) {
 		if (container instanceof HTMLElement && container.id) {
 			initMapLayersDemo(container.id);

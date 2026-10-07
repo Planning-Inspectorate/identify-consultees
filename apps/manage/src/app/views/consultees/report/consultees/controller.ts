@@ -88,7 +88,9 @@ export function buildReportConsulteesPage(service: ManageService): AsyncRequestH
 			(match) => match.feature.properties.consulteeCategory === category && !excluded.has(match.feature.id)
 		);
 		const searchArea = await buildSearchAreaSafely(db, project, visible, [], nearbyConsulteeRadiusMetres, logger);
-		const map = buildCaseMapConfig(project, visible, category, searchArea);
+		const staticMapSrc = categoryStaticMapUrl(project.id, ruleset.id, category, selection);
+		const staticMapAlt = `Static map showing ${category} consultees for ${project.properties.caseName}`;
+		const map = buildCaseMapConfig(project, visible, category, searchArea, { src: staticMapSrc, alt: staticMapAlt });
 
 		// ruleset matches first, then hand-added consultees (each removable by dropping its add
 		// param - removal by index so duplicate entries each get their own link)
@@ -127,8 +129,8 @@ export function buildReportConsulteesPage(service: ManageService): AsyncRequestH
 			saveAndReturnUrl: reportUrl(project.id, ruleset.id, selection),
 			mapId: 'case-map',
 			mapRegionLabel: `Map showing ${category} consultees for ${project.properties.caseName}`,
-			staticMapSrc: categoryStaticMapUrl(project.id, ruleset.id, category, selection),
-			staticMapAlt: `Static map showing ${category} consultees for ${project.properties.caseName}`,
+			staticMapSrc,
+			staticMapAlt,
 			mapWidth: MAP_VIEWPORT.width,
 			mapHeight: MAP_VIEWPORT.height,
 			mapConfigJson: stringifyForInlineScript(map),

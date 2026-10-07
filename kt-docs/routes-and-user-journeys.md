@@ -52,7 +52,7 @@ This is the journey KT readers should treat as the “filter journey” even tho
 On `/consultees/:caseId` (and the `/results` report), the map shows the project boundary plus matched consultee areas:
 
 - Defra Interactive Map when JavaScript initialises successfully
-- Static map `<img>` via `<noscript>` and/or JS failure fallback (`data-static-map-src` / page config)
+- Static map `<img>` via `<noscript>` and/or JS failure fallback (`config.fallback` in the page config)
 
 Details: [Maps](./maps.md).
 

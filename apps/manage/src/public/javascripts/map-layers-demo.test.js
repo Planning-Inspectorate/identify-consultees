@@ -122,7 +122,7 @@ describe('map-layers-demo client helpers', () => {
 	test('initMapLayersDemo falls back without Defra and constructs a map when available', () => {
 		const dom = installDom(
 			`<!DOCTYPE html><html><body>
-				<div id="demo-1" data-map-layers-demo></div>
+				<div id="demo-1" class="app-map-layers-demo"></div>
 				<script id="demo-1-data" type="application/json">{"center":[0,0],"zoom":8,"projectGeojson":{"features":[{"type":"Feature"}]}}</script>
 			</body></html>`
 		);
@@ -132,7 +132,7 @@ describe('map-layers-demo client helpers', () => {
 
 		installDom(
 			`<!DOCTYPE html><html><body>
-				<div id="demo-2" data-map-layers-demo></div>
+				<div id="demo-2" class="app-map-layers-demo"></div>
 				<script id="demo-2-data" type="application/json">{"center":[0,0],"zoom":8,"height":400,"mapLabel":"Demo","projectGeojson":{"features":[{"type":"Feature"}]},"railwayGeojson":{"features":[{"type":"Feature"}]},"roadGeojson":{"features":[{"type":"Feature"}]},"constraintGeojson":{"features":[{"type":"Feature"}]}}</script>
 			</body></html>`
 		);
@@ -150,7 +150,7 @@ describe('map-layers-demo client helpers', () => {
 
 		installDom(
 			`<!DOCTYPE html><html><body>
-				<div id="demo-3" data-map-layers-demo></div>
+				<div id="demo-3" class="app-map-layers-demo"></div>
 				<script id="demo-3-data" type="application/json">{"center":[0,0],"zoom":8,"projectGeojson":{"features":[{"type":"Feature"}]}}</script>
 			</body></html>`
 		);
@@ -170,7 +170,7 @@ describe('map-layers-demo client helpers', () => {
 
 	test('registerMapLayersDemo handles readyState and missing document', () => {
 		const dom = installDom(
-			'<!DOCTYPE html><html><body><div id="demo-4" data-map-layers-demo></div><script id="demo-4-data" type="application/json">{"center":[0,0],"zoom":8}</script></body></html>'
+			'<!DOCTYPE html><html><body><div id="demo-4" class="app-map-layers-demo"></div><script id="demo-4-data" type="application/json">{"center":[0,0],"zoom":8}</script></body></html>'
 		);
 		Object.defineProperty(dom.window.document, 'readyState', { configurable: true, get: () => 'complete' });
 		registerMapLayersDemo(dom.window.document);

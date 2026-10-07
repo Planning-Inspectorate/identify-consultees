@@ -24,7 +24,7 @@
 | Symptom                        | Likely cause                   | Fix                                                                          |
 | ------------------------------ | ------------------------------ | ---------------------------------------------------------------------------- |
 | Interactive map blank          | Vendor assets / JS / CSP       | Check browser console, CSP nonce, Defra vendor routes                        |
-| Only static map shows          | JS disabled or init failure    | Confirm `data-static-map-src` returns 200                                    |
+| Only static map shows          | JS disabled or init failure    | Confirm the `config.fallback.src` URL in the page's JSON block returns 200   |
 | Static map slow / flaky        | Upstream tiles uncached        | Confirm cache / ETag path; avoid prefetch storms                             |
 | Interactive vs static disagree | Divergent viewports or GeoJSON | Both must derive from the same `buildCaseMapConfig` output / shared viewport |
 | Static map looks wrong format  | `Accept` negotiation           | Raster route negotiates AVIF→WebP→PNG; use the `.svg` route for markup       |

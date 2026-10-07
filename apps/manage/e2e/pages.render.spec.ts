@@ -202,13 +202,18 @@ test.describe('cross-browser render completeness', () => {
 		});
 		await expect(page.getByRole('heading', { level: 2, name: /Consultees identified/i })).toBeVisible();
 
-		const mapRegion = page.locator('[data-consultee-map].app-case-map').first();
+		const mapRegion = page.locator('.app-consultee-map.app-case-map').first();
 		await expect(mapRegion).toBeAttached();
 		await expect(mapRegion).toHaveAttribute('role', 'region');
-		await expect(mapRegion).toHaveAttribute('data-map-width', '960');
-		await expect(mapRegion).toHaveAttribute('data-map-height', '516');
-		await expect(mapRegion).toHaveAttribute('data-static-map-src', /\/static-map/);
 		await expect(mapRegion).toHaveAttribute('aria-label', new RegExp(SAMPLE_RULESET_NAME, 'i'));
+
+		// the static-map fallback travels in the page config - data-* attributes on the map
+		// container are JSON.parsed by the InteractiveMap constructor and must stay off it
+		expect(await mapRegion.evaluate((el) => Object.keys(el.dataset))).toEqual([]);
+		const config = JSON.parse((await page.locator('#case-map-data').textContent()) ?? '{}');
+		expect(config.fallback.src).toMatch(/\/static-map/);
+		expect(config.fallback.width).toBe(960);
+		expect(config.fallback.height).toBe(516);
 	});
 
 	test('interactive map example host is present for progressive enhancement', async ({ page }) => {
@@ -229,12 +234,11 @@ test.describe('cross-browser render completeness', () => {
 
 	test('map layers demo host is present for progressive enhancement', async ({ page }) => {
 		await page.goto('/map-layers-demo', { waitUntil: 'domcontentloaded' });
-		const host = page.locator('[data-map-layers-demo].app-case-map');
+		const host = page.locator('.app-map-layers-demo.app-case-map');
 		await expect(host).toBeAttached();
 		await expect(host).toHaveAttribute('role', 'region');
-		await expect(host).toHaveAttribute('data-map-width', '960');
-		await expect(host).toHaveAttribute('data-map-height', '516');
 		await expect(host).toHaveAttribute('aria-label', /overlay layers/i);
+		expect(await host.evaluate((el) => Object.keys(el.dataset))).toEqual([]);
 		await expect(page.locator('#map-layers-demo-data')).toBeAttached();
 	});
 });

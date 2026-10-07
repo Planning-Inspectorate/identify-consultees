@@ -12,6 +12,7 @@ import {
 	MAX_SAMPLED_MAP_MATCHES,
 	REGIONAL_FILL_OPACITY
 } from './case-geojson.ts';
+import { MAP_VIEWPORT } from './sample-geojson.ts';
 
 function project(): CaseBoundaryFeature {
 	return {
@@ -63,6 +64,22 @@ describe('buildCaseMapConfig', () => {
 		assert.strictEqual(config.matchCount, MAP_SAMPLING_THRESHOLD + 1);
 		assert.strictEqual(config.isSampled, true);
 		assert.strictEqual(config.consulteeGeojson.features.length, MAX_SAMPLED_MAP_MATCHES);
+	});
+
+	it('carries the static-map fallback in the page config when given one', () => {
+		const withFallback = buildCaseMapConfig(project(), [], 'Example ruleset', undefined, {
+			src: '/consultees/x/results/static-map',
+			alt: 'Static map'
+		});
+		assert.deepEqual(withFallback.fallback, {
+			src: '/consultees/x/results/static-map',
+			alt: 'Static map',
+			width: MAP_VIEWPORT.width,
+			height: MAP_VIEWPORT.height
+		});
+
+		const without = buildCaseMapConfig(project(), [], 'Example ruleset');
+		assert.strictEqual(without.fallback, undefined);
 	});
 });
 

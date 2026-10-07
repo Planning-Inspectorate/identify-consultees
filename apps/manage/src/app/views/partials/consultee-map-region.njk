@@ -2,16 +2,14 @@
   Progressive-enhancement map region (ported from PINS-data-spike case-map-region).
   Requires: mapId, mapRegionLabel, staticMapSrc, staticMapAlt, mapWidth, mapHeight, mapConfigJson
 #}
+{# the InteractiveMap constructor JSON.parses every data-* attribute on its container -
+   the fallback details travel in the JSON config block instead, and the container is
+   discovered by class, not data-* #}
 <div
 	id="{{ mapId }}"
-	class="app-case-map"
+	class="app-case-map app-consultee-map"
 	role="region"
 	aria-label="{{ mapRegionLabel }}"
-	data-consultee-map
-	data-static-map-src="{{ staticMapSrc }}"
-	data-static-map-alt="{{ staticMapAlt }}"
-	data-map-width="{{ mapWidth }}"
-	data-map-height="{{ mapHeight }}"
 >
 	<noscript>
 		<img
