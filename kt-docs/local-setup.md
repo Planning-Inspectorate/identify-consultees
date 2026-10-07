@@ -73,7 +73,6 @@ Key manage variables:
 | `SESSION_SECRET`                           | Local placeholder only                                                         |
 | `LOG_LEVEL`                                | Often `debug` locally (includes Prisma query logs)                             |
 | `MANAGED_REDIS_URL`                        | Optional; unset means in-memory sessions locally                               |
-| `CACHE_CONTROL_MAX_AGE`                    | Optional; defaults to `1d`                                                     |
 
 Never commit `.env` files or production secrets.
 
