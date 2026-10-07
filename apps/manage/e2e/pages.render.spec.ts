@@ -106,6 +106,36 @@ const pages = [
 		mustSee: [/Sign in again/i]
 	},
 	{
+		path: '/terms-and-conditions',
+		name: 'terms and conditions',
+		heading: /Terms and conditions/i,
+		mustSee: [/Who we are/i, /Governing law/i]
+	},
+	{
+		path: '/accessibility-statement',
+		name: 'accessibility statement',
+		heading: /Accessibility statement for Identify consultees/i,
+		mustSee: [/How accessible this website is/i, /Enforcement procedure/i]
+	},
+	{
+		path: '/privacy',
+		name: 'privacy',
+		heading: /Privacy notice/i,
+		mustSee: [/data controller/i, /Your rights/i]
+	},
+	{
+		path: '/cookies',
+		name: 'cookies',
+		heading: /Cookies/i,
+		mustSee: [/Strictly necessary cookies/i]
+	},
+	{
+		path: '/contact',
+		name: 'contact',
+		heading: /Contact us/i,
+		mustSee: [/General enquiries/i, /0303 444 5000/i, /Planning Inspectorate/i]
+	},
+	{
 		path: '/items',
 		name: 'items list',
 		heading: null,

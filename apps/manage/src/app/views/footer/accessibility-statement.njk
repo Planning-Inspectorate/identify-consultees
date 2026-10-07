@@ -1,0 +1,130 @@
+{% extends "views/layouts/main.njk" %}
+
+{% block pageTitle %}
+	{{ pageHeading }} - {{ config.headerTitle }}
+{% endblock %}
+
+{% block pageContent %}
+	<div class="govuk-grid-row">
+		<div class="govuk-grid-column-two-thirds">
+			<p class="govuk-body">
+				This accessibility statement applies to the Identify consultees service.
+			</p>
+
+			<h2 class="govuk-heading-m">Using this service</h2>
+			<p class="govuk-body">
+				This website is run by the Planning Inspectorate. We want as many people as possible to be
+				able to use this website. For example, that means you should be able to:
+			</p>
+			<ul class="govuk-list govuk-list--bullet">
+				<li>change colours, contrast levels and fonts</li>
+				<li>zoom in up to 300% without the text spilling off the screen</li>
+				<li>navigate most of the website using just a keyboard</li>
+				<li>navigate most of the website using speech recognition software</li>
+				<li>
+					listen to most of the website using a screen reader (including the most recent
+					versions of JAWS, NVDA and VoiceOver)
+				</li>
+			</ul>
+			<p class="govuk-body">We've also made the text as simple as possible to understand.</p>
+			<p class="govuk-body">
+				<a class="govuk-link" href="https://mcmw.abilitynet.org.uk/">AbilityNet</a> has advice on
+				making your device easier to use if you have a disability.
+			</p>
+
+			<h2 class="govuk-heading-m">How accessible this website is</h2>
+			<p class="govuk-body">
+				This service is partially compliant with the
+				<a class="govuk-link" href="https://www.w3.org/TR/WCAG22/">Web Content Accessibility Guidelines (WCAG) 2.2</a>
+				AA standard.
+			</p>
+			<p class="govuk-body">We know some parts of this website are not fully accessible:</p>
+			<ul class="govuk-list govuk-list--bullet">
+				<li>
+					the interactive map cannot be fully operated with a keyboard or used meaningfully
+					with a screen reader - the consultees it shows are also listed in tables on the same
+					pages
+				</li>
+				<li>some technical terms may not be written in plain English</li>
+			</ul>
+			<p class="govuk-body">
+				The compliance status section below gives more detail on the areas of the site that are
+				not fully accessible.
+			</p>
+
+			<h2 class="govuk-heading-m">Feedback and contact information</h2>
+			<p class="govuk-body">
+				If you need information on this website in a different format like accessible PDF, large
+				print, easy read, audio recording or braille:
+			</p>
+			<ul class="govuk-list govuk-list--bullet">
+				<li>
+					email:
+					<a class="govuk-link" href="mailto:nienquiries@planninginspectorate.gov.uk">nienquiries@planninginspectorate.gov.uk</a>
+				</li>
+				<li>call: 0303 444 5000</li>
+			</ul>
+			<p class="govuk-body">We'll consider your request and get back to you in 10 working days.</p>
+
+			<h2 class="govuk-heading-m">Reporting accessibility problems with this service</h2>
+			<p class="govuk-body">
+				We're always looking to improve the accessibility of this website. Email us at:
+				<a class="govuk-link" href="mailto:nienquiries@planninginspectorate.gov.uk">nienquiries@planninginspectorate.gov.uk</a>
+				if you find any problems not listed on this page or think we're not meeting accessibility
+				requirements.
+			</p>
+
+			<h2 class="govuk-heading-m">Enforcement procedure</h2>
+			<p class="govuk-body">
+				If you contact us with a complaint and you're not happy with our response
+				<a class="govuk-link" href="https://www.equalityadvisoryservice.com/">contact the Equality Advisory and Support Service (EASS)</a>.
+			</p>
+			<p class="govuk-body">
+				The Equality and Human Rights Commission (EHRC) is responsible for enforcing the Public
+				Sector Bodies (Websites and Mobile Applications) (No. 2) Accessibility Regulations 2018
+				(the 'accessibility regulations').
+			</p>
+
+			<h2 class="govuk-heading-m">Technical information about this website's accessibility</h2>
+			<p class="govuk-body">
+				The Planning Inspectorate is committed to making its websites accessible, in accordance
+				with the Public Sector Bodies (Websites and Mobile Applications) (No. 2) Accessibility
+				Regulations 2018.
+			</p>
+
+			<h3 class="govuk-heading-s">Compliance status</h3>
+			<p class="govuk-body">
+				This website is partially compliant with the Web Content Accessibility Guidelines
+				version 2.2 AA standard due to the non-compliances listed below.
+			</p>
+
+			<h2 class="govuk-heading-m">Non-accessible content</h2>
+			<p class="govuk-body">The content listed below is non-accessible for the following reasons.</p>
+
+			<h3 class="govuk-heading-s">Non-compliance with the accessibility regulations</h3>
+			<ul class="govuk-list govuk-list--bullet">
+				<li>
+					The interactive map used on the consultee pages cannot be fully operated with a
+					keyboard alone. This does not comply with WCAG 2.2 success criterion 2.1.1
+					(Keyboard). The consultees shown on the map are also listed in tables on the same
+					pages, and a static map is provided where the interactive map cannot run.
+				</li>
+			</ul>
+
+			<h2 class="govuk-heading-m">What we're doing to improve accessibility</h2>
+			<p class="govuk-body">
+				We are committed to working on the issues listed as non-compliant and we will update this
+				accessibility statement when these issues are fixed. Whenever we release new features, we
+				ensure they meet WCAG 2.2 AA standard - every page is checked with automated accessibility
+				testing as part of our build process.
+			</p>
+
+			<h2 class="govuk-heading-m">Preparation of this accessibility statement</h2>
+			<p class="govuk-body">This accessibility statement was prepared on 7 October 2026.</p>
+			<p class="govuk-body">
+				Pages of this service are tested against the WCAG 2.2 AA standard using automated
+				accessibility testing as part of the service's build process.
+			</p>
+		</div>
+	</div>
+{% endblock %}

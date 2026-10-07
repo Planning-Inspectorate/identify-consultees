@@ -62,6 +62,11 @@ const pages = [
 		mask: MAP_MASK
 	},
 	{ path: '/signed-out', name: 'signed-out' },
+	{ path: '/terms-and-conditions', name: 'terms-and-conditions' },
+	{ path: '/accessibility-statement', name: 'accessibility-statement' },
+	{ path: '/privacy', name: 'privacy' },
+	{ path: '/cookies', name: 'cookies' },
+	{ path: '/contact', name: 'contact' },
 	{ path: '/items', name: 'items-list' },
 	{ path: '/consultee-areas-python', name: 'consultee-areas-python' },
 	{ path: '/consultee-areas-direct', name: 'consultee-areas-direct' },
