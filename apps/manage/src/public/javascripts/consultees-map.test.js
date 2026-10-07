@@ -205,30 +205,31 @@ describe('consultees-map client helpers', () => {
 
 	test('showStaticMapFallback inserts an image when a static src is available', () => {
 		const dom = installDom(
-			'<!DOCTYPE html><html><body><div id="map" data-static-map-src="/static.png" data-static-map-alt="Alt" data-map-width="320" data-map-height="200" class="app-case-map-interactive"></div></body></html>'
+			'<!DOCTYPE html><html><body><div id="map" class="app-case-map-interactive"></div></body></html>'
 		);
 		const container = dom.window.document.getElementById('map');
-		showStaticMapFallback(container);
+		const fallback = { src: '/static.png', alt: 'Alt', width: 320, height: 200 };
+		showStaticMapFallback(container, fallback);
 		assert.ok(container.querySelector('img.app-case-map-static'));
 		assert.equal(container.classList.contains('app-case-map-interactive'), false);
 		assert.match(container.nextElementSibling?.textContent || '', /static map/i);
 
-		showStaticMapFallback(container);
+		showStaticMapFallback(container, fallback);
 		assert.equal(container.querySelectorAll('img.app-case-map-static').length, 1);
 	});
 
 	test('showStaticMapFallback shows text when no static src is available', () => {
 		const dom = installDom('<!DOCTYPE html><html><body><div id="map"></div></body></html>');
 		const container = dom.window.document.getElementById('map');
-		showStaticMapFallback(container);
+		showStaticMapFallback(container, undefined);
 		assert.match(container.textContent || '', /could not load/i);
 	});
 
 	test('initConsulteeMap falls back when Defra is unavailable', () => {
 		const dom = installDom(
 			`<!DOCTYPE html><html><body>
-				<div id="map-1" data-consultee-map data-static-map-src="/s.png"></div>
-				<script id="map-1-data" type="application/json">{"center":[0,0],"zoom":8,"height":400,"mapLabel":"Map","projectGeojson":{"features":[{"type":"Feature"}]},"consulteeGeojson":{"features":[]}}</script>
+				<div id="map-1" class="app-consultee-map"></div>
+				<script id="map-1-data" type="application/json">{"center":[0,0],"zoom":8,"height":400,"mapLabel":"Map","projectGeojson":{"features":[{"type":"Feature"}]},"consulteeGeojson":{"features":[]},"fallback":{"src":"/s.png"}}</script>
 			</body></html>`
 		);
 		initConsulteeMap('missing');
@@ -239,7 +240,7 @@ describe('consultees-map client helpers', () => {
 	test('initConsulteeMap constructs an InteractiveMap when Defra is present', () => {
 		installDom(
 			`<!DOCTYPE html><html><body>
-				<div id="map-2" data-consultee-map></div>
+				<div id="map-2" class="app-consultee-map"></div>
 				<script id="map-2-data" type="application/json">{"center":[0,0],"zoom":8,"projectGeojson":{"features":[{"type":"Feature"}]},"consulteeGeojson":{"features":[{"type":"Feature"}]}}</script>
 			</body></html>`
 		);
@@ -261,8 +262,8 @@ describe('consultees-map client helpers', () => {
 	test('initConsulteeMap falls back when InteractiveMap throws', () => {
 		const dom = installDom(
 			`<!DOCTYPE html><html><body>
-				<div id="map-3" data-consultee-map data-static-map-src="/fallback.png"></div>
-				<script id="map-3-data" type="application/json">{"center":[0,0],"zoom":8,"projectGeojson":{"features":[{"type":"Feature"}]}}</script>
+				<div id="map-3" class="app-consultee-map"></div>
+				<script id="map-3-data" type="application/json">{"center":[0,0],"zoom":8,"projectGeojson":{"features":[{"type":"Feature"}]},"fallback":{"src":"/fallback.png"}}</script>
 			</body></html>`
 		);
 
@@ -282,7 +283,7 @@ describe('consultees-map client helpers', () => {
 
 	test('registerConsulteeMaps runs immediately or on DOMContentLoaded', () => {
 		const dom = installDom(
-			'<!DOCTYPE html><html><body><div id="map-4" data-consultee-map></div><script id="map-4-data" type="application/json">{"center":[0,0],"zoom":8}</script></body></html>'
+			'<!DOCTYPE html><html><body><div id="map-4" class="app-consultee-map"></div><script id="map-4-data" type="application/json">{"center":[0,0],"zoom":8}</script></body></html>'
 		);
 		Object.defineProperty(dom.window.document, 'readyState', { configurable: true, get: () => 'complete' });
 		registerConsulteeMaps(dom.window.document);

@@ -64,7 +64,12 @@ export function buildConsulteesResultsPage(service: ManageService): AsyncRequest
 			nearbyConsulteeRadiusMetres,
 			logger
 		);
-		const map = buildCaseMapConfig(project, matches, ruleset.name, searchArea);
+		const staticMapSrc = `/consultees/${encodeURIComponent(project.id)}/results/static-map?ruleset=${encodeURIComponent(ruleset.id)}`;
+		const staticMapAlt = `Static map showing ${ruleset.name} for ${project.properties.caseName}`;
+		const map = buildCaseMapConfig(project, matches, ruleset.name, searchArea, {
+			src: staticMapSrc,
+			alt: staticMapAlt
+		});
 
 		const viewModel: ConsulteesResultsViewModel = {
 			pageHeading: `Consultees identified for ${project.properties.caseName} (${project.properties.caseReference})`,
@@ -75,10 +80,10 @@ export function buildConsulteesResultsPage(service: ManageService): AsyncRequest
 			caseId: project.id,
 			mapId: 'case-map',
 			mapRegionLabel: `Map showing ${ruleset.name} for ${project.properties.caseName}`,
-			staticMapSrc: `/consultees/${encodeURIComponent(project.id)}/results/static-map?ruleset=${encodeURIComponent(ruleset.id)}`,
+			staticMapSrc,
 			rulesetFailed: failed,
 			retryUrl: resultsUrl(project.id, ruleset.id),
-			staticMapAlt: `Static map showing ${ruleset.name} for ${project.properties.caseName}`,
+			staticMapAlt,
 			mapWidth: MAP_VIEWPORT.width,
 			mapHeight: MAP_VIEWPORT.height,
 			mapConfigJson: stringifyForInlineScript(map),

@@ -112,7 +112,7 @@ describe('manage router wiring', () => {
 		assert.match(response.text, /Example ruleset/);
 		assert.match(response.text, /Preview report/);
 		assert.match(response.text, /Run Intersection logic/);
-		assert.match(response.text, /data-consultee-map/);
+		assert.match(response.text, /app-consultee-map/);
 	});
 
 	test('GET /consultees/:id/ruleset renders the ruleset radios', async () => {
@@ -316,7 +316,7 @@ describe('manage router wiring', () => {
 		assert.match(response.text, /Road network/);
 		assert.match(response.text, /Flood risk area/);
 		assert.match(response.text, /map-layers-demo(?:-[0-9a-f]{8})?\.js/);
-		assert.match(response.text, /data-map-layers-demo/);
+		assert.match(response.text, /app-map-layers-demo/);
 	});
 
 	test('GET /admin/upload-to-blob renders the upload form', async () => {

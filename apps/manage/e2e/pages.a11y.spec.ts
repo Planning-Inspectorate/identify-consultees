@@ -99,8 +99,8 @@ test.describe('browser accessibility landmarks and skip link', () => {
 	test('consultees results page keeps its map region labelled', async ({ page }) => {
 		await page.goto(`/consultees/${SAMPLE_CASE_ID}/results?ruleset=${SAMPLE_RULESET_ID}`);
 
-		await expect(page.locator('[data-consultee-map][role="region"]').first()).toBeAttached();
-		await expect(page.locator('[data-consultee-map]').first()).toHaveAttribute('aria-label', /.+/);
+		await expect(page.locator('.app-consultee-map[role="region"]').first()).toBeAttached();
+		await expect(page.locator('.app-consultee-map').first()).toHaveAttribute('aria-label', /.+/);
 
 		await expectNoSeriousAxeViolations(page);
 	});
@@ -118,7 +118,7 @@ test.describe('browser accessibility landmarks and skip link', () => {
 	test('map layers demo map host remains an accessible region', async ({ page }) => {
 		await page.goto('/map-layers-demo');
 
-		const host = page.locator('[data-map-layers-demo][role="region"]');
+		const host = page.locator('.app-map-layers-demo[role="region"]');
 		await expect(host).toBeAttached();
 		await expect(host).toHaveAttribute('aria-label', /.+/);
 

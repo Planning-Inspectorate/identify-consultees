@@ -4,7 +4,9 @@
  * Pattern ported from PINS-data-spike `uploads-map.js` / `case-map.js`:
  * - datasetsPlugin + mapKeyPlugin for layers and legend
  * - OpenFreeMap Liberty basemap
- * - Static map fallback (PNG or SVG) via data-static-map-src when interactive init fails
+ * - Static map fallback (PNG or SVG) via `config.fallback` when interactive init fails.
+ *   Fallback details travel in the page's JSON config, not data-* attributes - the
+ *   InteractiveMap constructor JSON.parses every data-* attribute on its container.
  */
 
 // consultee features carry their category colour (`colour`), assigned server-side so the static map
@@ -108,22 +110,23 @@ export function readMapConfig(mapId) {
 
 /**
  * @param {HTMLElement} container
+ * @param {object | undefined} fallback - `config.fallback` from the JSON block
  */
-export function showStaticMapFallback(container) {
+export function showStaticMapFallback(container, fallback) {
 	if (container.querySelector('.app-case-map-static')) {
 		return;
 	}
 
-	const src = container.dataset.staticMapSrc;
-	const alt = container.dataset.staticMapAlt ?? '';
-	if (!src) {
+	if (!fallback?.src) {
 		container.textContent =
 			'The interactive map could not load. See the consultee list below for the identified organisations.';
 		return;
 	}
 
-	const width = Number(container.dataset.mapWidth) || 960;
-	const height = Number(container.dataset.mapHeight) || 516;
+	const src = fallback.src;
+	const alt = fallback.alt ?? '';
+	const width = fallback.width || 960;
+	const height = fallback.height || 516;
 
 	const img = document.createElement('img');
 	img.className = 'app-case-map-static';
@@ -229,7 +232,7 @@ export function initConsulteeMap(mapId) {
 
 	const defra = window.defra;
 	if (!config || !defra?.InteractiveMap || !defra.maplibreProvider) {
-		showStaticMapFallback(container);
+		showStaticMapFallback(container, config?.fallback);
 		return;
 	}
 
@@ -255,12 +258,12 @@ export function initConsulteeMap(mapId) {
 			plugins: [datasetsPlugin, mapKeyPlugin]
 		});
 	} catch {
-		showStaticMapFallback(container);
+		showStaticMapFallback(container, config.fallback);
 	}
 }
 
 export function initAllConsulteeMaps() {
-	const containers = document.querySelectorAll('[data-consultee-map]');
+	const containers = document.querySelectorAll('.app-consultee-map');
 	for (const container of containers) {
 		if (container instanceof HTMLElement && container.id) {
 			initConsulteeMap(container.id);

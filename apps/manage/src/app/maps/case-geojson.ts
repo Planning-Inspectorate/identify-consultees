@@ -134,6 +134,14 @@ export interface SearchAreaDisplay {
 	geometries: Map<string, Geometry>;
 }
 
+/** Where the JS fallback's static-map image lives when the interactive map can't start. */
+export interface StaticMapFallbackConfig {
+	src: string;
+	alt: string;
+	width: number;
+	height: number;
+}
+
 export interface CaseMapConfig {
 	center: readonly [number, number];
 	zoom: number;
@@ -148,6 +156,11 @@ export interface CaseMapConfig {
 	matchCount: number;
 	/** True when the map shows a sample rather than every match - see MAP_SAMPLING_THRESHOLD. Never with a search area. */
 	isSampled: boolean;
+	/**
+	 * The JS init-failure fallback's static-map image - carried in the page config because
+	 * data-* attributes on the map container are JSON.parsed by the InteractiveMap constructor.
+	 */
+	fallback?: StaticMapFallbackConfig;
 	/** The search area outline, and every consultee inside it - interactive map only. */
 	searchAreaLabel?: string;
 	searchAreaGeojson?: GeoJsonFeatureCollection;
@@ -210,7 +223,8 @@ export function buildCaseMapConfig(
 	project: CaseBoundaryFeature,
 	matches: ConsulteeAreaMatch[],
 	rulesetName: string,
-	searchArea?: SearchAreaDisplay
+	searchArea?: SearchAreaDisplay,
+	fallback?: { src: string; alt: string }
 ): CaseMapConfig {
 	const projectGeojson = buildProjectGeojson(project);
 	// one colour per category across both layers, the ruleset's matches first
@@ -249,6 +263,7 @@ export function buildCaseMapConfig(
 		consulteeGeojson,
 		matchCount: matches.length,
 		isSampled: !searchArea && matches.length > MAP_SAMPLING_THRESHOLD,
+		...(fallback ? { fallback: { ...fallback, width: MAP_VIEWPORT.width, height: MAP_VIEWPORT.height } } : {}),
 		...(searchArea
 			? {
 					searchAreaLabel: searchArea.areaLabel,

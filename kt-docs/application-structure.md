@@ -95,7 +95,7 @@ Notable features:
 2. `createApp` attaches static middleware, security headers, Nunjucks, router
 3. `buildRouter` registers monitoring, the Defra vendor router, auth (optional), then feature routes
 4. Controllers query `packages/database` via `service.db`, build view models, and `res.render(...)` Nunjucks templates
-5. Client JS enhances maps from `<script type="application/json">` page config (and legacy `data-consultee-map` regions)
+5. Client JS enhances maps from `<script type="application/json">` page config (containers found by class - `.app-consultee-map`, `.app-map-layers-demo`, `.app-interactive-map-example`)
 
 ## Related pages
 

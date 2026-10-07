@@ -74,7 +74,7 @@ Prefer Design System patterns:
 | -------------- | ----------------------------------------------------------------------- |
 | No JS          | HTML forms, tables, and `<noscript>` static maps work                   |
 | JS enabled     | `js-enabled` / `govuk-frontend-supported` classes; interactive map init |
-| Map JS failure | Inject / show static map from `data-static-map-src`                     |
+| Map JS failure | Inject / show static map from `config.fallback` in the JSON block       |
 
 Map partial: `views/partials/consultee-map-region.njk`.
 

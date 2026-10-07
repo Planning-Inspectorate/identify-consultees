@@ -32,20 +32,15 @@
 	</p>
 
 	{% set mapRegionLabel = mapRegionLabel %}
-	{% set staticMapSrc = "" %}
-	{% set staticMapAlt = "" %}
-	{% set mapWidth = mapWidth %}
-	{% set mapHeight = mapHeight %}
 	{% set mapConfigJson = mapConfigJson %}
 
+	{# the InteractiveMap constructor JSON.parses every data-* attribute on its container -
+	   so the demo map is discovered by class, not data-* #}
 	<div
 		id="{{ mapId }}"
-		class="app-case-map"
+		class="app-case-map app-map-layers-demo"
 		role="region"
 		aria-label="{{ mapRegionLabel }}"
-		data-map-layers-demo
-		data-map-width="{{ mapWidth }}"
-		data-map-height="{{ mapHeight }}"
 	>
 		<noscript>
 			<p class="govuk-body">

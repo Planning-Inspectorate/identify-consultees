@@ -208,7 +208,7 @@ test.describe('manage journeys', () => {
 		await expect(page.getByRole('heading', { level: 1 })).toHaveText('Map layers demo');
 		await expect(page.getByRole('rowheader', { name: 'Railway lines' })).toBeVisible();
 		await expect(page.getByRole('rowheader', { name: 'Road network' })).toBeVisible();
-		await expect(page.locator('[data-map-layers-demo]')).toBeVisible();
+		await expect(page.locator('.app-map-layers-demo')).toBeVisible();
 	});
 
 	test('signed-out page offers sign in again', async ({ page }) => {

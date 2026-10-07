@@ -23,7 +23,7 @@ import { SAMPLE_CASE_ID, SAMPLE_CASE_REFERENCE, SAMPLE_RULESET_ID } from './fixt
 
 // every interactive map host class/attribute in the app: the map canvas itself is
 // masked, everything around it (chrome, tables, keys/legends) is still compared
-const MAP_MASK = '.app-case-map, [data-consultee-map], [data-map-layers-demo], .app-interactive-map-example';
+const MAP_MASK = '.app-case-map, .app-consultee-map, .app-map-layers-demo, .app-interactive-map-example';
 
 const pages = [
 	{ path: '/', name: 'home' },
