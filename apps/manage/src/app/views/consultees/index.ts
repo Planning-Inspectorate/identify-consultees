@@ -2,7 +2,7 @@ import type { ManageService } from '#service';
 import { asyncHandler } from '@planning-inspectorate/core/util';
 import type { IRouter } from 'express';
 import { Router as createRouter } from 'express';
-import { buildConsulteeProjectPage } from './project/controller.ts';
+import { buildConsulteeProjectPage, buildRunIntersectionSubmit } from './project/controller.ts';
 import { buildReportConsulteeAddPage, buildReportConsulteeAddSubmit } from './report/consultees/add/controller.ts';
 import { buildReportConsulteesPage } from './report/consultees/controller.ts';
 import { buildReportCheckPage, buildReportCreatedPage } from './report/controller.ts';
@@ -13,6 +13,7 @@ import { buildShapefilePickerPage, buildShapefilePickerSubmit } from './shapefil
 export function createRoutes(service: ManageService): IRouter {
 	const router = createRouter({ mergeParams: true });
 	const projectPage = buildConsulteeProjectPage(service);
+	const runIntersectionSubmit = buildRunIntersectionSubmit();
 	const rulesetPickerPage = buildRulesetPickerPage(service);
 	const rulesetPickerSubmit = buildRulesetPickerSubmit();
 	const shapefilePickerPage = buildShapefilePickerPage(service);
@@ -28,6 +29,8 @@ export function createRoutes(service: ManageService): IRouter {
 
 	// the project's map page - where the home page's project links land
 	router.get('/:caseId', asyncHandler(projectPage));
+	// "Run Intersection logic": post back and redirect to the map page, which re-runs and re-renders
+	router.post('/:caseId/run-intersection', asyncHandler(runIntersectionSubmit));
 	// its two "Change" pages, which post back and return to the map page
 	router.get('/:caseId/ruleset', asyncHandler(rulesetPickerPage));
 	router.post('/:caseId/ruleset', asyncHandler(rulesetPickerSubmit));

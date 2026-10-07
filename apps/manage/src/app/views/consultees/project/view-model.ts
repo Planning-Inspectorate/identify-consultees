@@ -17,6 +17,10 @@ export interface ConsulteeProjectViewModel {
 	rulesetName: string;
 	rulesetChangeUrl: string;
 	previewReportUrl: string;
+	/** POST target for "Run Intersection logic" - re-runs the ruleset and redraws the map. */
+	runIntersectionUrl: string;
+	/** The selected ruleset's id - posted back by the "Run Intersection logic" form. */
+	rulesetId: string;
 	mapId: string;
 	mapRegionLabel: string;
 	staticMapSrc: string;
