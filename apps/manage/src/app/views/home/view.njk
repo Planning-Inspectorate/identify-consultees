@@ -4,6 +4,7 @@
 {% from "govuk/components/input/macro.njk" import govukInput %}
 {% from "govuk/components/inset-text/macro.njk" import govukInsetText %}
 {% from "govuk/components/table/macro.njk" import govukTable %}
+{% from "govuk/components/tag/macro.njk" import govukTag %}
 
 {% block pageTitle %}
 	{{ pageHeading }} - {{ config.headerTitle }}
@@ -24,11 +25,11 @@
 				name: "q",
 				value: searchQuery,
 				label: {
-					text: "Search for a project",
+					text: "Find a project",
 					classes: "govuk-label--m"
 				},
 				hint: {
-					text: "Search by case reference or project name"
+					text: "Enter keyword, case reference or case title"
 				},
 				classes: "pins-inline-search__input",
 				formGroup: {
@@ -66,22 +67,25 @@
 
 		{% set tableRows = [] %}
 		{% for geometry in geometries %}
-			{% set referenceLink %}<a class="govuk-link" href="/consultees/{{ geometry.id | urlencode }}">{{ geometry.reference }}</a>{% endset %}
+			{% set nameLink %}<a class="govuk-link" href="/consultees/{{ geometry.id | urlencode }}">{{ geometry.reference }} - {{ geometry.caseName }}</a>{% endset %}
+			{% if geometry.stage %}
+				{% set stageCell = govukTag({ text: geometry.stage }) %}
+			{% else %}
+				{% set stageCell = "" %}
+			{% endif %}
 			{% set tableRows = (tableRows.push([
-				{ html: referenceLink },
-				{ text: geometry.caseName },
-				{ text: geometry.received }
+				{ html: nameLink },
+				{ html: stageCell }
 			]), tableRows) %}
 		{% endfor %}
 
 		{{ govukTable({
-			caption: "Project geometries",
-			captionClasses: "govuk-visually-hidden",
+			caption: "All cases",
+			captionClasses: "govuk-table__caption--m",
 			firstCellIsHeader: false,
 			head: [
-				{ text: "Reference" },
-				{ text: "Case name" },
-				{ text: "Received", attributes: { "aria-sort": "descending" } }
+				{ text: "Name" },
+				{ text: "Stage" }
 			],
 			rows: tableRows
 		}) }}

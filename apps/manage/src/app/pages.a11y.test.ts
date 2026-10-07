@@ -96,7 +96,7 @@ describe('manage page accessibility smoke', () => {
 	test('home page has no serious a11y violations', async () => {
 		const html = nunjucks.render('views/home/view.njk', {
 			...pageLocals,
-			pageHeading: 'Identify consultees for an infrastructure project',
+			pageHeading: 'Identify consultees for a NSIP project',
 			searchQuery: 'EN01',
 			pageSize: 25,
 			pageSizeOptions: [25, 50, 100],
@@ -109,13 +109,13 @@ describe('manage page accessibility smoke', () => {
 					id: '11111111-1111-1111-1111-111111111111',
 					reference: 'EN010025',
 					caseName: 'East Anglia ONE Offshore Windfarm',
-					received: '03/03/2026'
+					stage: 'Acceptance'
 				},
 				{
 					id: '22222222-2222-2222-2222-222222222222',
 					reference: 'EN010013',
 					caseName: 'Clocaenog Forest Wind Farm',
-					received: '15/01/2026'
+					stage: null
 				}
 			]
 		});
@@ -125,7 +125,7 @@ describe('manage page accessibility smoke', () => {
 	test('home page with no search results has no serious a11y violations', async () => {
 		const html = nunjucks.render('views/home/view.njk', {
 			...pageLocals,
-			pageHeading: 'Identify consultees for an infrastructure project',
+			pageHeading: 'Identify consultees for a NSIP project',
 			searchQuery: 'ZZZ-NOMATCH-XXX',
 			pageSize: 25,
 			pageSizeOptions: [25, 50, 100],

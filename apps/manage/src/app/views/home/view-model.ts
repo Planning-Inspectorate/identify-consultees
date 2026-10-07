@@ -20,7 +20,6 @@ export interface ProjectGeometry {
 	id: string;
 	reference: string;
 	caseName: string;
-	// formatted from case_boundary.receivedDate - empty string when not set, real seed data
-	// doesn't populate this for every row
-	received: string;
+	/** Project stage shown as a tag - sourced from case_boundary.acceptance (unpopulated today). */
+	stage: string | null;
 }

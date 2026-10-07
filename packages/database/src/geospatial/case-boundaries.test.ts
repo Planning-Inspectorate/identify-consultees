@@ -180,7 +180,8 @@ describe('case boundaries (requires a local SQL Server - see docker-compose.yml)
 				id: testBoundaryId,
 				reference: 'EN010001',
 				caseName: 'Findable by id',
-				receivedDate: new Date(Date.UTC(2026, 2, 3))
+				receivedDate: new Date(Date.UTC(2026, 2, 3)),
+				acceptance: null
 			});
 			assert.ok(!('geometry' in (found as object)), 'summary should not carry geometry');
 
