@@ -1,7 +1,56 @@
 {% extends "./main.njk" %}
 
+{#
+  Generic full-page error page, following the GOV.UK Design System "there is a problem with the
+  service" pattern (offline support variant). Every status-specific template under views/errors/
+  extends this, and @planning-inspectorate/core's catch-all handlers render it directly for
+  unmatched routes and unhandled errors - so there is one consistent error page for 404s, 500s
+  and anything in between.
+
+  Render inputs:
+    - pageTitle / pageHeading: the h1 and browser tab title
+    - messages: paragraphs explaining the situation
+    - error + isDevelopment (optional): render the stack for local debugging only
+#}
 {% block pageContent %}
-	{% for message in messages %}
-		<p class="govuk-body">{{ message }}</p>
-	{% endfor %}
+	<div class="govuk-grid-row">
+		<div class="govuk-grid-column-two-thirds">
+			{% for message in messages %}
+				<p class="govuk-body">{{ message }}</p>
+			{% endfor %}
+
+			<h2 class="govuk-heading-m">Contact the Planning Inspectorate</h2>
+			<p class="govuk-body">
+				<a href="https://contact-us.planninginspectorate.gov.uk/hc/en-gb/requests/new" class="govuk-link">Fill out our contact form</a>
+			</p>
+			<p class="govuk-body">
+				Telephone: <a href="tel:03034445000" class="govuk-link">0303 444 5000</a><br>
+				Open Monday to Friday: 9am to 4pm.<br>
+				Closed on weekends and bank holidays.
+			</p>
+		</div>
+	</div>
+
+	{% if error and isDevelopment %}
+		<hr>
+		<h2 class="govuk-heading-m" style="color: #d4351c;">Error (only seen in dev mode):</h2>
+
+		<div class="govuk-grid-row">
+			<div class="govuk-grid-column-full">
+				<div>{{ error }}</div>
+
+				{% if error.errors %}
+					{% for err in error.errors %}
+						<pre style="border: 1px solid #ddd; overflow: scroll">
+							{{ err.stack }}
+						</pre>
+					{% endfor %}
+				{% else %}
+					<pre style="border: 1px solid #ddd; overflow: scroll">
+						{{ error.stack }}
+					</pre>
+				{% endif %}
+			</div>
+		</div>
+	{% endif %}
 {% endblock %}
