@@ -141,6 +141,22 @@ describe('manage router wiring', () => {
 		assert.match(response.text, /Generate report/);
 	});
 
+	test('GET /consultees/:id/report/consultees renders a category’s change page', async () => {
+		const response = await request(authDisabledApp).get(
+			`/consultees/${homePageTestCaseId}/report/consultees?ruleset=example-ruleset&category=Parish%20Council`
+		);
+		assert.equal(response.status, 200);
+		assert.match(response.text, /Parish Council/);
+		assert.match(response.text, /Save and return/);
+	});
+
+	test('GET /consultees/:id/report/consultees 404s for a category the ruleset doesn’t cover', async () => {
+		const response = await request(authDisabledApp).get(
+			`/consultees/${homePageTestCaseId}/report/consultees?ruleset=example-ruleset&category=Not%20A%20Category`
+		);
+		assert.equal(response.status, 404);
+	});
+
 	test('GET /consultees/:id/report/created renders the report created page', async () => {
 		const response = await request(authDisabledApp).get(
 			`/consultees/${homePageTestCaseId}/report/created?ruleset=example-ruleset`

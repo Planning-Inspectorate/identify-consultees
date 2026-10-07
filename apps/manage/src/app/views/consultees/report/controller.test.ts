@@ -84,11 +84,35 @@ describe('consultee report check page', () => {
 		assert.strictEqual(parishRow.count, '1');
 		assert.ok(viewModel.consultees.every((row: { count: string }) => typeof row.count === 'string'));
 		assert.ok(viewModel.consultees.length > 1);
+		// every category's Change link opens its shared consultees page for the same ruleset
+		assert.ok(
+			viewModel.consultees.every((row: { changeUrl: string }) =>
+				row.changeUrl.startsWith(`/consultees/${realProjectId}/report/consultees?ruleset=example-ruleset&category=`)
+			)
+		);
+		assert.match(parishRow.changeUrl, /category=Parish%20Council/);
 
 		const html = mockRes.render.mock.calls[0].result;
 		assert.match(html, /Report details/);
 		assert.match(html, /Identified consultees/);
 		assert.match(html, /Generate report/);
+	});
+
+	it('should subtract excluded consultees from the counts and carry exclusions through the links', async () => {
+		const mockRes = { status: mock.fn(() => mockRes), render: mock.fn() };
+		const excludedId = '55555555-5555-5555-5555-555555555555';
+		const db = dbReturning([[realProjectRow()], [parishMatchRow()]]);
+		await handlerFor(db)(
+			{ params: { caseId: realProjectId }, query: { ruleset: 'example-ruleset', exclude: excludedId } },
+			mockRes
+		);
+
+		const viewModel = mockRes.render.mock.calls[0].arguments[1];
+		// the only match was excluded - the count is the number of rows its Change page would list
+		const parishRow = viewModel.consultees.find((row: { name: string }) => row.name === 'Parish Council');
+		assert.strictEqual(parishRow.count, '0');
+		assert.ok(parishRow.changeUrl.includes(`&exclude=${excludedId}`));
+		assert.ok(viewModel.generateReportUrl.includes(`&exclude=${excludedId}`));
 	});
 
 	it('should run the default (first) ruleset when none is selected', async () => {

@@ -3,6 +3,7 @@ import { asyncHandler } from '@planning-inspectorate/core/util';
 import type { IRouter } from 'express';
 import { Router as createRouter } from 'express';
 import { buildConsulteeProjectPage } from './project/controller.ts';
+import { buildReportConsulteesPage } from './report/consultees/controller.ts';
 import { buildReportCheckPage, buildReportCreatedPage } from './report/controller.ts';
 import { buildConsulteesResultsPage, buildResultsStaticMap } from './results/controller.ts';
 import { buildRulesetPickerPage, buildRulesetPickerSubmit } from './ruleset/controller.ts';
@@ -16,6 +17,7 @@ export function createRoutes(service: ManageService): IRouter {
 	const shapefilePickerPage = buildShapefilePickerPage(service);
 	const shapefilePickerSubmit = buildShapefilePickerSubmit(service);
 	const reportCheckPage = buildReportCheckPage(service);
+	const reportConsulteesPage = buildReportConsulteesPage(service);
 	const reportCreatedPage = buildReportCreatedPage(service);
 	const resultsPage = buildConsulteesResultsPage(service);
 	const resultsStaticMap = buildResultsStaticMap(service);
@@ -30,6 +32,8 @@ export function createRoutes(service: ManageService): IRouter {
 	router.post('/:caseId/shapefile', asyncHandler(shapefilePickerSubmit));
 	// "Preview report": check the identified consultees before generating the report
 	router.get('/:caseId/report', asyncHandler(reportCheckPage));
+	// each identified category's "Change" page - remove consultees, save and return to the check page
+	router.get('/:caseId/report/consultees', asyncHandler(reportConsulteesPage));
 	// "Generate report": confirmation page with the report download link (a placeholder for now)
 	router.get('/:caseId/report/created', asyncHandler(reportCreatedPage));
 	// the consultee report (tables) for the current shapefile/ruleset selection

@@ -100,6 +100,37 @@ test.describe('manage journeys', () => {
 		await expect(page).toHaveURL(new RegExp(`/consultees/${SAMPLE_CASE_ID}/report\\?ruleset=${SAMPLE_RULESET_ID}`));
 		await expect(page.getByRole('heading', { level: 1 })).toContainText('Check consultees before creating the report');
 
+		// a category's "Change" opens its shared consultees page: the map above its rows, each with
+		// a Remove link - and the check page's count is exactly the number of rows listed
+		const parishChange = page.getByRole('link', { name: 'Change Parish Council' });
+		const parishCount = Number(
+			(
+				await page
+					.locator('.govuk-summary-list__row', { has: parishChange })
+					.locator('.govuk-summary-list__value')
+					.innerText()
+			).trim()
+		);
+		await parishChange.click();
+
+		await expect(page).toHaveURL(/\/report\/consultees\?.*category=Parish/);
+		await expect(page.getByRole('heading', { level: 1 })).toContainText('Parish Council');
+		await expect(page.getByRole('heading', { level: 2, name: 'Consultees' })).toBeVisible();
+		const removeLinks = page.getByRole('link', { name: /Remove/ });
+		await expect(removeLinks).toHaveCount(parishCount);
+
+		// removing a consultee reloads the page with it excluded, so the table drops a row
+		if (parishCount > 0) {
+			await removeLinks.first().click();
+			await expect(page).toHaveURL(/exclude=/);
+			await expect(page.getByRole('link', { name: /Remove/ })).toHaveCount(parishCount - 1);
+		}
+
+		// "Save and return" lands back on the check page
+		await page.getByRole('button', { name: 'Save and return' }).click();
+		await expect(page).toHaveURL(new RegExp(`/consultees/${SAMPLE_CASE_ID}/report\\?ruleset=${SAMPLE_RULESET_ID}`));
+		await expect(page.getByRole('heading', { level: 1 })).toContainText('Check consultees before creating the report');
+
 		// "Generate report" leads to the confirmation page with the download link
 		await page.getByRole('button', { name: 'Generate report' }).click();
 		await expect(page).toHaveURL(

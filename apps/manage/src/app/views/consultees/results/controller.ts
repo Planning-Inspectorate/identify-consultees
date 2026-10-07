@@ -6,6 +6,7 @@ import type { AsyncRequestHandler } from '@planning-inspectorate/core/util';
 import { buildCaseMapConfig, MAX_SAMPLED_MAP_MATCHES } from '../../../maps/case-geojson.ts';
 import { MAP_VIEWPORT } from '../../../maps/sample-geojson.ts';
 import { buildConsulteeStaticMapResponse } from '../../../maps/serve-static-map.ts';
+import { excludedIds } from '../report/urls.ts';
 import { resolveCase } from '../resolve-case.ts';
 import { buildSearchAreaSafely, firstQueryValue, projectPageUrl, runRulesetSafely } from '../run-ruleset.ts';
 import type { ConsulteeMatchRow, ConsulteesResultsViewModel } from './view-model.ts';
@@ -120,17 +121,28 @@ export function buildResultsStaticMap(service: ManageService, forceSvg = false):
 			res.status(503).type('text/plain').send('The ruleset could not be run');
 			return;
 		}
+		// a category page's static map draws only that category's non-excluded matches; with no
+		// category this stays the whole ruleset's matches, same as the interactive map
+		const category = firstQueryValue(req.query.category);
+		const excluded = excludedIds(req.query.exclude);
+		const displayMatches =
+			category || excluded.size > 0
+				? matches.filter(
+						(match) =>
+							(!category || match.feature.properties.consulteeCategory === category) && !excluded.has(match.feature.id)
+					)
+				: matches;
 		// same search area as the interactive map, so both open on the same view - the static renderer
 		// draws the project and matches only, not the nearby layer
 		const searchArea = await buildSearchAreaSafely(
 			db,
 			project,
-			matches,
-			allNearby,
+			displayMatches,
+			category ? [] : allNearby,
 			nearbyConsulteeRadiusMetres,
 			logger
 		);
-		const map = buildCaseMapConfig(project, matches, ruleset.name, searchArea);
+		const map = buildCaseMapConfig(project, displayMatches, category || ruleset.name, searchArea);
 		const ifNoneMatch = typeof req.headers['if-none-match'] === 'string' ? req.headers['if-none-match'] : undefined;
 		const accept = typeof req.headers.accept === 'string' ? req.headers.accept : undefined;
 

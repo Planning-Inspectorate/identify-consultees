@@ -6,29 +6,31 @@
 
 Registered primarily from `apps/manage/src/app/router.ts`.
 
-| Method / path                                                                                    | Journey                                                      | Data                                       |
-| ------------------------------------------------------------------------------------------------ | ------------------------------------------------------------ | ------------------------------------------ |
-| `GET /`                                                                                          | Homepage: DB-backed search + paginated project list          | `case_boundary` via `searchCaseBoundaries` |
-| `GET /consultees/:caseId?ruleset=…`                                                              | Project map page: shapefile/ruleset rows + map + report link | `runRuleset` spatial queries               |
-| `GET /consultees/:caseId/ruleset` · `POST /consultees/:caseId/ruleset`                           | Change-ruleset radios; posts back and returns to the map     | Case summary + `RULESETS`                  |
-| `GET /consultees/:caseId/shapefile` · `POST /consultees/:caseId/shapefile`                       | Change-shapefile radios; lands on the chosen boundary's map  | `listCaseBoundaryFiles`                    |
-| `GET /consultees/:caseId/report?ruleset=…`                                                       | Check page: report details + per-category consultee counts   | `runRuleset` match counts                  |
-| `GET /consultees/:caseId/results?ruleset=…`                                                      | Consultee tables (the future report) for the selection       | `runRuleset` spatial queries               |
-| `GET /consultees/:caseId/results/static-map`                                                     | Static map image — AVIF/WebP/PNG negotiated from `Accept`    | Same, server-rendered                      |
-| `GET /consultees/:caseId/results/static-map.svg`                                                 | Explicit SVG static map variant                              | Same                                       |
-| `GET /map-layers-demo`                                                                           | Layer toggles experiment                                     | Demo GeoJSON                               |
-| `GET /components` · `GET /components/:component`                                                 | Component showcase index + GOV.UK macro detail pages         | Static examples                            |
-| `GET /components/interactive-map` · `/:example`                                                  | Worked Defra Interactive Map examples                        | Sample GeoJSON                             |
-| `GET /components/interactive-map/:example/static-map(.svg)`                                      | Static fallback for each example                             | Same                                       |
-| `GET /consultee-areas-python` · `POST /consultee-areas-python/run`                               | Call the Python function and show rows                       | Python → SQL (`x-api-key`)                 |
-| `GET /consultee-areas-direct` · `POST /consultee-areas-direct/run`                               | Same query straight from Node                                | SQL `consultee_area`                       |
-| `GET /admin/upload-to-blob` · `POST /admin/upload-to-blob/run`                                   | Upload a file to the app's blob container                    | Managed identity → blob storage            |
-| `GET /admin/import-reference-data` · `POST …/run-consultee-areas` · `POST …/run-case-boundaries` | Import the known reference-data blobs into SQL               | Blob → `geojson-import`                    |
-| `GET /items`                                                                                     | Placeholder list + DB ping                                   | SQL `SELECT 1`                             |
-| `/vendor/*`                                                                                      | Defra map plugin bundles (rate-limited, lazy Brotli)         | `src/.static/vendor`                       |
-| `GET /signed-out`, `/unauthenticated`, `/error/…`                                                | Auth / error chrome                                          | —                                          |
-| `/auth/*`                                                                                        | Entra sign-in / out (when auth enabled)                      | MSAL                                       |
-| Monitoring routes from `@planning-inspectorate/core`                                             | Health / monitoring                                          | —                                          |
+| Method / path                                                                                    | Journey                                                         | Data                                                  |
+| ------------------------------------------------------------------------------------------------ | --------------------------------------------------------------- | ----------------------------------------------------- |
+| `GET /`                                                                                          | Homepage: DB-backed search + paginated project list             | `case_boundary` via `searchCaseBoundaries`            |
+| `GET /consultees/:caseId?ruleset=…`                                                              | Project map page: shapefile/ruleset rows + map + report link    | `runRuleset` spatial queries                          |
+| `GET /consultees/:caseId/ruleset` · `POST /consultees/:caseId/ruleset`                           | Change-ruleset radios; posts back and returns to the map        | Case summary + `RULESETS`                             |
+| `GET /consultees/:caseId/shapefile` · `POST /consultees/:caseId/shapefile`                       | Change-shapefile radios; lands on the chosen boundary's map     | `listCaseBoundaryFiles`                               |
+| `GET /consultees/:caseId/report?ruleset=…&exclude=…`                                             | Check page: report details + per-category consultee counts      | `runRuleset` match counts                             |
+| `GET /consultees/:caseId/report/consultees?ruleset=…&category=…&exclude=…`                       | Shared per-category Change page: map + removable consultee rows | `runRuleset` spatial queries                          |
+| `GET /consultees/:caseId/report/created?ruleset=…`                                               | Report created confirmation + download link (placeholder)       | Case summary                                          |
+| `GET /consultees/:caseId/results?ruleset=…`                                                      | Consultee tables (the future report) for the selection          | `runRuleset` spatial queries                          |
+| `GET /consultees/:caseId/results/static-map`                                                     | Static map image — AVIF/WebP/PNG negotiated from `Accept`       | Same, server-rendered; `category`/`exclude` filter it |
+| `GET /consultees/:caseId/results/static-map.svg`                                                 | Explicit SVG static map variant                                 | Same                                                  |
+| `GET /map-layers-demo`                                                                           | Layer toggles experiment                                        | Demo GeoJSON                                          |
+| `GET /components` · `GET /components/:component`                                                 | Component showcase index + GOV.UK macro detail pages            | Static examples                                       |
+| `GET /components/interactive-map` · `/:example`                                                  | Worked Defra Interactive Map examples                           | Sample GeoJSON                                        |
+| `GET /components/interactive-map/:example/static-map(.svg)`                                      | Static fallback for each example                                | Same                                                  |
+| `GET /consultee-areas-python` · `POST /consultee-areas-python/run`                               | Call the Python function and show rows                          | Python → SQL (`x-api-key`)                            |
+| `GET /consultee-areas-direct` · `POST /consultee-areas-direct/run`                               | Same query straight from Node                                   | SQL `consultee_area`                                  |
+| `GET /admin/upload-to-blob` · `POST /admin/upload-to-blob/run`                                   | Upload a file to the app's blob container                       | Managed identity → blob storage                       |
+| `GET /admin/import-reference-data` · `POST …/run-consultee-areas` · `POST …/run-case-boundaries` | Import the known reference-data blobs into SQL                  | Blob → `geojson-import`                               |
+| `GET /items`                                                                                     | Placeholder list + DB ping                                      | SQL `SELECT 1`                                        |
+| `/vendor/*`                                                                                      | Defra map plugin bundles (rate-limited, lazy Brotli)            | `src/.static/vendor`                                  |
+| `GET /signed-out`, `/unauthenticated`, `/error/…`                                                | Auth / error chrome                                             | —                                                     |
+| `/auth/*`                                                                                        | Entra sign-in / out (when auth enabled)                         | MSAL                                                  |
+| Monitoring routes from `@planning-inspectorate/core`                                             | Health / monitoring                                             | —                                                     |
 
 ## Primary user journey
 
@@ -37,7 +39,8 @@ Registered primarily from `apps/manage/src/app/router.ts`.
 3. Adjust **results per page** (`pageSize`: 25 / 50 / 100)
 4. Follow a project link to `/consultees/:caseId` — the map page, which runs the default ruleset
 5. Optionally **Change** the shapefile (`:caseId/shapefile`) or ruleset (`:caseId/ruleset`); each posts back and returns to the map page with the new selection in its URL
-6. _Preview report_ leads to `/consultees/:caseId/report?ruleset=…` — a check page listing the report details and per-category match counts; _Generate report_ is a placeholder. The full consultee tables for the selection live on `/consultees/:caseId/results?ruleset=…`
+6. _Preview report_ leads to `/consultees/:caseId/report?ruleset=…` — a check page listing the report details and per-category match counts. The full consultee tables for the selection live on `/consultees/:caseId/results?ruleset=…`
+7. Each category's **Change** link opens the shared page at `/consultees/:caseId/report/consultees?ruleset=…&category=…` — the map plus that category's rows, each with a _Remove_ link. Removals are carried as repeated `exclude=<consulteeAreaId>` query params (no server-side state), so the check page's counts and the category page's rows always agree. _Save and return_ goes back to the check page; the excluded ids also follow the _Generate report_ link to `/report/created`
 
 This is the journey KT readers should treat as the “filter journey” even though paths are not named `/filter`.
 

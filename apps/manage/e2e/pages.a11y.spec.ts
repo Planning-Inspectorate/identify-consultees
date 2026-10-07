@@ -18,6 +18,10 @@ const pages = [
 	{ path: `/consultees/${SAMPLE_CASE_ID}/ruleset`, name: 'ruleset picker' },
 	{ path: `/consultees/${SAMPLE_CASE_ID}/shapefile`, name: 'shapefile picker' },
 	{ path: `/consultees/${SAMPLE_CASE_ID}/report?ruleset=${SAMPLE_RULESET_ID}`, name: 'report check' },
+	{
+		path: `/consultees/${SAMPLE_CASE_ID}/report/consultees?ruleset=${SAMPLE_RULESET_ID}&category=Parish%20Council`,
+		name: 'report consultees'
+	},
 	{ path: `/consultees/${SAMPLE_CASE_ID}/report/created?ruleset=${SAMPLE_RULESET_ID}`, name: 'report created' },
 	{
 		path: `/consultees/${SAMPLE_CASE_ID}/results?ruleset=${SAMPLE_RULESET_ID}`,

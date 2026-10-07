@@ -359,6 +359,74 @@ describe('consultees results static map', () => {
 		assert.ok(db.$queryRaw.mock.calls.some((call) => call.arguments[0].join('').includes('STIntersection')));
 	});
 
+	it('should draw only the requested category’s non-excluded matches', async () => {
+		// report category pages get their static map from this endpoint, filtered by
+		// ?category=…&exclude=… - the display-geometry query's id list is where that filtering shows
+		const excludedParishId = '66666666-6666-6666-6666-666666666666';
+		const keptParishId = '77777777-7777-7777-7777-777777777777';
+		const railwayId = '55555555-5555-5555-5555-555555555555';
+		const parishRow = (id: string, consultee: string) => ({
+			...railwayMatchRow(),
+			id,
+			consulteeCategory: 'Parish Council',
+			consultee
+		});
+		const db = dbReturning([
+			[realProjectRow()],
+			[railwayMatchRow(), parishRow(excludedParishId, 'Excluded Parish'), parishRow(keptParishId, 'Kept Parish')]
+		]);
+		const handler = buildResultsStaticMap({ db, logger: mockLogger(), nearbyConsulteeRadiusMetres: 20_000 }, true);
+
+		const displayGeometryIds = async (query: Record<string, unknown>) => {
+			const mockRes = {
+				status: mock.fn(() => mockRes),
+				type: mock.fn(() => mockRes),
+				set: mock.fn(() => mockRes),
+				send: mock.fn()
+			};
+			const callsBefore = db.$queryRaw.mock.callCount();
+			await handler({ params: { caseId: realProjectId }, query, headers: {} }, mockRes);
+			assert.strictEqual(mockRes.status.mock.calls[0].arguments[0], 200);
+			// Prisma.join nests the id list inside a Sql param, so stringify the args
+			const displayCall = db.$queryRaw.mock.calls
+				.slice(callsBefore)
+				.find((call) => String(call.arguments[0].join('')).includes('STIntersection'));
+			return displayCall ? JSON.stringify(displayCall.arguments.slice(1)) : '[]';
+		};
+
+		// a category page's map: the kept parish is drawn, the excluded parish and the
+		// out-of-category railway are not
+		const withCategory = await displayGeometryIds({
+			ruleset: 'example-ruleset',
+			category: 'Parish Council',
+			exclude: excludedParishId
+		});
+		assert.ok(withCategory.includes(keptParishId));
+		assert.ok(!withCategory.includes(excludedParishId));
+		assert.ok(!withCategory.includes(railwayId));
+
+		// no category: exclusions still apply to the matches layer (the "all nearby" context layer
+		// is unaffected) - an exclusion that removes a match changes the map's fingerprint
+		const etag = async (query: Record<string, unknown>) => {
+			const mockRes = {
+				status: mock.fn(() => mockRes),
+				type: mock.fn(() => mockRes),
+				set: mock.fn(() => mockRes),
+				send: mock.fn()
+			};
+			await handler({ params: { caseId: realProjectId }, query, headers: {} }, mockRes);
+			return mockRes.set.mock.calls[0].arguments[0].ETag;
+		};
+		const unfiltered = await etag({ ruleset: 'example-ruleset' });
+		const excludingAMatch = await etag({ ruleset: 'example-ruleset', exclude: excludedParishId });
+		const excludingNothing = await etag({
+			ruleset: 'example-ruleset',
+			exclude: '88888888-8888-8888-8888-888888888888'
+		});
+		assert.notStrictEqual(unfiltered, excludingAMatch);
+		assert.strictEqual(unfiltered, excludingNothing);
+	});
+
 	it('should 503 rather than serve a cacheable empty map if the ruleset query fails', async () => {
 		const mockRes = {
 			status: mock.fn(() => mockRes),

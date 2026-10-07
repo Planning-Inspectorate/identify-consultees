@@ -5,24 +5,34 @@ import { getRuleset, RULESETS } from '@pins/identify-consultees-database/src/geo
 import type { AsyncRequestHandler } from '@planning-inspectorate/core/util';
 import { resolveCase, resolveCaseSummary } from '../resolve-case.ts';
 import { firstQueryValue, projectPageUrl, runRulesetSafely } from '../run-ruleset.ts';
+import { rulesetCategories } from './categories.ts';
+import { consulteesUrl, excludedIds, reportCreatedUrl, reportUrl } from './urls.ts';
 import type { IdentifiedConsultee, ReportCheckViewModel } from './view-model.ts';
 
 /**
- * Every category the ruleset covers, in the order its rules name them, with each one's match
- * count - including categories that matched nothing, so the list reads as the ruleset's full
- * coverage rather than just what happened to hit.
+ * Every category the ruleset covers, in the order its rules name them, with each one's visible
+ * match count - including categories that matched nothing, so the list reads as the ruleset's
+ * full coverage rather than just what happened to hit. Excluded consultees (removed on a
+ * category's Change page) don't count - the number here is the number of rows that page lists.
  */
-function identifiedConsultees(ruleset: Ruleset, matches: ConsulteeAreaMatch[]): IdentifiedConsultee[] {
-	const categories = [...new Set(ruleset.rules.flatMap((rule) => rule.categories))];
+function identifiedConsultees(
+	ruleset: Ruleset,
+	caseId: string,
+	matches: ConsulteeAreaMatch[],
+	excluded: ReadonlySet<string>
+): IdentifiedConsultee[] {
 	const counts = new Map<string, number>();
 	for (const match of matches) {
 		const category = match.feature.properties.consulteeCategory;
-		if (category) {
+		if (category && !excluded.has(match.feature.id)) {
 			counts.set(category, (counts.get(category) ?? 0) + 1);
 		}
 	}
-	// per-category Change links are placeholders until consultee selection exists
-	return categories.map((name) => ({ name, count: String(counts.get(name) ?? 0), changeUrl: '#' }));
+	return rulesetCategories(ruleset).map((name) => ({
+		name,
+		count: String(counts.get(name) ?? 0),
+		changeUrl: consulteesUrl(caseId, ruleset.id, name, excluded)
+	}));
 }
 
 /**
@@ -56,6 +66,7 @@ export function buildReportCheckPage(service: ManageService): AsyncRequestHandle
 		);
 
 		const { matches, failed } = await runRulesetSafely(db, project, ruleset, nearbyConsulteeRadiusMetres, logger);
+		const excluded = excludedIds(req.query.exclude);
 
 		const viewModel: ReportCheckViewModel = {
 			pageHeading: 'Check consultees before creating the report',
@@ -67,10 +78,10 @@ export function buildReportCheckPage(service: ManageService): AsyncRequestHandle
 			caseChangeUrl: '/',
 			rulesetName: ruleset.name,
 			rulesetChangeUrl: `/consultees/${encodeURIComponent(project.id)}/ruleset?ruleset=${encodeURIComponent(ruleset.id)}`,
-			consultees: identifiedConsultees(ruleset, matches),
-			generateReportUrl: `/consultees/${encodeURIComponent(project.id)}/report/created?ruleset=${encodeURIComponent(ruleset.id)}`,
+			consultees: identifiedConsultees(ruleset, project.id, matches, excluded),
+			generateReportUrl: reportCreatedUrl(project.id, ruleset.id, excluded),
 			rulesetFailed: failed,
-			retryUrl: projectPageUrl(project.id, ruleset.id)
+			retryUrl: reportUrl(project.id, ruleset.id, excluded)
 		};
 
 		return res.render('views/consultees/report/view.njk', viewModel);
