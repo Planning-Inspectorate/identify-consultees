@@ -6,32 +6,37 @@ import type { AsyncRequestHandler } from '@planning-inspectorate/core/util';
 import { resolveCase, resolveCaseSummary } from '../resolve-case.ts';
 import { firstQueryValue, projectPageUrl, runRulesetSafely } from '../run-ruleset.ts';
 import { rulesetCategories } from './categories.ts';
-import { consulteesUrl, excludedIds, reportCreatedUrl, reportUrl } from './urls.ts';
+import type { ConsulteeSelection } from './urls.ts';
+import { addedConsultees, consulteesUrl, excludedIds, reportCreatedUrl, reportUrl } from './urls.ts';
 import type { IdentifiedConsultee, ReportCheckViewModel } from './view-model.ts';
 
 /**
  * Every category the ruleset covers, in the order its rules name them, with each one's visible
- * match count - including categories that matched nothing, so the list reads as the ruleset's
+ * consultee count - including categories that matched nothing, so the list reads as the ruleset's
  * full coverage rather than just what happened to hit. Excluded consultees (removed on a
- * category's Change page) don't count - the number here is the number of rows that page lists.
+ * category's Change page) don't count and hand-added ones do - the number here is the number of
+ * rows that page lists.
  */
 function identifiedConsultees(
 	ruleset: Ruleset,
 	caseId: string,
 	matches: ConsulteeAreaMatch[],
-	excluded: ReadonlySet<string>
+	selection: ConsulteeSelection
 ): IdentifiedConsultee[] {
 	const counts = new Map<string, number>();
 	for (const match of matches) {
 		const category = match.feature.properties.consulteeCategory;
-		if (category && !excluded.has(match.feature.id)) {
+		if (category && !selection.excluded.has(match.feature.id)) {
 			counts.set(category, (counts.get(category) ?? 0) + 1);
 		}
+	}
+	for (const add of selection.adds) {
+		counts.set(add.category, (counts.get(add.category) ?? 0) + 1);
 	}
 	return rulesetCategories(ruleset).map((name) => ({
 		name,
 		count: String(counts.get(name) ?? 0),
-		changeUrl: consulteesUrl(caseId, ruleset.id, name, excluded)
+		changeUrl: consulteesUrl(caseId, ruleset.id, name, selection)
 	}));
 }
 
@@ -66,7 +71,10 @@ export function buildReportCheckPage(service: ManageService): AsyncRequestHandle
 		);
 
 		const { matches, failed } = await runRulesetSafely(db, project, ruleset, nearbyConsulteeRadiusMetres, logger);
-		const excluded = excludedIds(req.query.exclude);
+		const selection: ConsulteeSelection = {
+			excluded: excludedIds(req.query.exclude),
+			adds: addedConsultees(req.query.add)
+		};
 
 		const viewModel: ReportCheckViewModel = {
 			pageHeading: 'Check consultees before creating the report',
@@ -78,10 +86,10 @@ export function buildReportCheckPage(service: ManageService): AsyncRequestHandle
 			caseChangeUrl: '/',
 			rulesetName: ruleset.name,
 			rulesetChangeUrl: `/consultees/${encodeURIComponent(project.id)}/ruleset?ruleset=${encodeURIComponent(ruleset.id)}`,
-			consultees: identifiedConsultees(ruleset, project.id, matches, excluded),
-			generateReportUrl: reportCreatedUrl(project.id, ruleset.id, excluded),
+			consultees: identifiedConsultees(ruleset, project.id, matches, selection),
+			generateReportUrl: reportCreatedUrl(project.id, ruleset.id, selection),
 			rulesetFailed: failed,
-			retryUrl: reportUrl(project.id, ruleset.id, excluded)
+			retryUrl: reportUrl(project.id, ruleset.id, selection)
 		};
 
 		return res.render('views/consultees/report/view.njk', viewModel);

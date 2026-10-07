@@ -41,6 +41,13 @@ function parishMatchRow(id = matchId, consultee = 'Little Snoring Parish Council
 	};
 }
 
+// `query.add` holds the raw JSON param value (Express has already decoded it); expected URLs
+// hold the encoded form
+const addJson = (name: string, reason = '', category = 'Parish Council') =>
+	JSON.stringify({ c: category, n: name, r: reason });
+const addParam = (name: string, reason = '', category = 'Parish Council') =>
+	encodeURIComponent(addJson(name, reason, category));
+
 function dbReturning(rows: unknown[][]) {
 	let call = 0;
 	return {
@@ -84,7 +91,10 @@ describe('report consultees change page', () => {
 			viewModel.rows[0].removeUrl,
 			`/consultees/${realProjectId}/report/consultees?ruleset=example-ruleset&category=Parish%20Council&exclude=${matchId}`
 		);
-		assert.strictEqual(viewModel.addConsulteeUrl, '#');
+		assert.strictEqual(
+			viewModel.addConsulteeUrl,
+			`/consultees/${realProjectId}/report/consultees/add?ruleset=example-ruleset&category=Parish%20Council`
+		);
 		assert.ok(viewModel.mapConfigJson.includes('FeatureCollection'));
 
 		const html = mockRes.render.mock.calls[0].result;
@@ -206,6 +216,73 @@ describe('report consultees change page', () => {
 			viewModel.saveAndReturnUrl,
 			`/consultees/${realProjectId}/report?ruleset=example-ruleset&exclude=${matchId}`
 		);
+	});
+
+	it('should list hand-added consultees for the category after the ruleset matches', async () => {
+		const mockRes = { status: mock.fn(() => mockRes), render: mock.fn() };
+		const firstAdd = addJson('First Test Consultee', 'Bordering landowner');
+		const secondAdd = addJson('Second Test Consultee');
+		// an add recorded under a different category doesn't appear here
+		const otherCategoryAdd = addJson('Hospital Test Consultee', 'r', 'Hospital');
+		const db = dbReturning([[realProjectRow()], [parishMatchRow()]]);
+		await handlerFor(db)(
+			{
+				params: { caseId: realProjectId },
+				query: { category: 'Parish Council', add: [firstAdd, secondAdd, otherCategoryAdd] }
+			},
+			mockRes
+		);
+
+		const viewModel = mockRes.render.mock.calls[0].arguments[1];
+		assert.strictEqual(viewModel.rows.length, 3);
+		assert.strictEqual(viewModel.rows[1].name, 'First Test Consultee');
+		assert.strictEqual(viewModel.rows[1].identified, 'Bordering landowner');
+		assert.strictEqual(viewModel.rows[2].name, 'Second Test Consultee');
+		assert.strictEqual(viewModel.rows[2].identified, 'Manually added');
+
+		// removing the first added row drops only its add param - the second stays
+		assert.strictEqual(
+			viewModel.rows[1].removeUrl,
+			`/consultees/${realProjectId}/report/consultees?ruleset=example-ruleset&category=Parish%20Council&add=${encodeURIComponent(secondAdd)}&add=${encodeURIComponent(otherCategoryAdd)}`
+		);
+		assert.strictEqual(
+			viewModel.rows[2].removeUrl,
+			`/consultees/${realProjectId}/report/consultees?ruleset=example-ruleset&category=Parish%20Council&add=${encodeURIComponent(firstAdd)}&add=${encodeURIComponent(otherCategoryAdd)}`
+		);
+		// the adds ride along to the check page and the next add
+		assert.ok(viewModel.saveAndReturnUrl.includes(`add=${encodeURIComponent(firstAdd)}`));
+		assert.ok(viewModel.addConsulteeUrl.includes(`add=${encodeURIComponent(firstAdd)}`));
+		// a ruleset match's remove link keeps the adds while excluding the match
+		assert.match(viewModel.rows[0].removeUrl, /exclude=55555555/);
+		assert.ok(viewModel.rows[0].removeUrl.includes(`add=${encodeURIComponent(firstAdd)}`));
+	});
+
+	it('should ignore malformed add params rather than fail the page', async () => {
+		const mockRes = { status: mock.fn(() => mockRes), render: mock.fn() };
+		const db = dbReturning([[realProjectRow()], [parishMatchRow()]]);
+		await handlerFor(db)(
+			{
+				params: { caseId: realProjectId },
+				query: {
+					category: 'Parish Council',
+					add: [
+						'not-json',
+						'{}',
+						JSON.stringify({ c: '', n: 'empty category' }),
+						addJson('', 'no name'),
+						JSON.stringify({ c: 'Parish Council', n: 'Kept Consultee' }),
+						42
+					]
+				}
+			},
+			mockRes
+		);
+
+		const viewModel = mockRes.render.mock.calls[0].arguments[1];
+		assert.strictEqual(viewModel.rows.length, 2);
+		assert.strictEqual(viewModel.rows[1].name, 'Kept Consultee');
+		// the dropped params aren't carried forward either
+		assert.strictEqual((viewModel.saveAndReturnUrl.match(/add=/g) ?? []).length, 1);
 	});
 
 	it('should 404 for a category the ruleset does not cover', async () => {

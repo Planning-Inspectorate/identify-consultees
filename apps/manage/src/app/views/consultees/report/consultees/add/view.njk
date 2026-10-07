@@ -1,0 +1,38 @@
+{% extends "views/layouts/main.njk" %}
+
+{% from "govuk/components/button/macro.njk" import govukButton %}
+{% from "govuk/components/input/macro.njk" import govukInput %}
+{% from "govuk/components/textarea/macro.njk" import govukTextarea %}
+
+{% block pageTitle %}
+	{% if errorSummary %}Error: {% endif %}{{ pageHeading }} - {{ config.headerTitle }}
+{% endblock %}
+
+{% block pageContent %}
+	<form method="post" action="{{ formAction }}" novalidate>
+		<input type="hidden" name="_csrf" value="{{ _csrf }}">
+		{{ govukInput({
+			label: {
+				text: "Name of consultee"
+			},
+			id: "consultee-name",
+			name: "name",
+			value: nameValue,
+			errorMessage: nameError
+		}) }}
+
+		{{ govukTextarea({
+			label: {
+				text: "Reason for identification"
+			},
+			id: "consultee-reason",
+			name: "reason",
+			value: reasonValue,
+			rows: 5
+		}) }}
+
+		{{ govukButton({
+			text: "Add consultee"
+		}) }}
+	</form>
+{% endblock %}

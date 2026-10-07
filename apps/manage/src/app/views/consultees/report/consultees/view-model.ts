@@ -1,9 +1,16 @@
 export interface ConsulteeRow {
-	/** The consultee area's name (e.g. the council or authority), fallback "Unnamed consultee". */
+	/** The consultee's name (e.g. the council or authority), fallback "Unnamed consultee". */
 	name: string;
-	/** How the ruleset identified it - "Within 1km buffer", "Intersects the site", bordering text. */
+	/**
+	 * How the consultee was identified - "Within 1km buffer", "Intersects the site", a bordering
+	 * condition's description, or the reason given when it was added by hand ("Manually added"
+	 * when none was given).
+	 */
 	identified: string;
-	/** Reloads this page with the consultee added to the exclusion set. */
+	/**
+	 * Reloads this page with the consultee removed: a match joins the exclusion set, a
+	 * hand-added consultee loses its `add` param.
+	 */
 	removeUrl: string;
 }
 
@@ -13,7 +20,7 @@ export interface ReportConsulteesViewModel {
 	pageCaption: string;
 	backLinkUrl: string;
 	rows: ConsulteeRow[];
-	/** Placeholder until "add a consultee" exists. */
+	/** The "Select a consultee" form for adding a consultee to this category by hand. */
 	addConsulteeUrl: string;
 	/** Back to the check page, carrying the current exclusions. */
 	saveAndReturnUrl: string;

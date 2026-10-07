@@ -40,6 +40,10 @@ const pages = [
 		mask: MAP_MASK
 	},
 	{
+		path: `/consultees/${SAMPLE_CASE_ID}/report/consultees/add?ruleset=${SAMPLE_RULESET_ID}&category=Parish%20Council`,
+		name: 'report-consultee-add'
+	},
+	{
 		path: `/consultees/${SAMPLE_CASE_ID}/report/created?ruleset=${SAMPLE_RULESET_ID}`,
 		name: 'report-created'
 	},

@@ -290,7 +290,8 @@ describe('manage page accessibility smoke', () => {
 						'/consultees/11111111-1111-1111-1111-111111111111/report/consultees?ruleset=example-ruleset&category=Parish%20Council&exclude=55555555-5555-5555-5555-555555555555'
 				}
 			],
-			addConsulteeUrl: '#',
+			addConsulteeUrl:
+				'/consultees/11111111-1111-1111-1111-111111111111/report/consultees/add?ruleset=example-ruleset&category=Parish%20Council',
 			saveAndReturnUrl: '/consultees/11111111-1111-1111-1111-111111111111/report?ruleset=example-ruleset',
 			mapId: 'case-map',
 			mapRegionLabel: 'Map showing Parish Council consultees for Longfield Solar Farm',
@@ -317,7 +318,8 @@ describe('manage page accessibility smoke', () => {
 			pageCaption: 'Longfield Solar Farm',
 			backLinkUrl: '/consultees/11111111-1111-1111-1111-111111111111/report?ruleset=example-ruleset',
 			rows: [],
-			addConsulteeUrl: '#',
+			addConsulteeUrl:
+				'/consultees/11111111-1111-1111-1111-111111111111/report/consultees/add?ruleset=example-ruleset&category=Parish%20Council',
 			saveAndReturnUrl: '/consultees/11111111-1111-1111-1111-111111111111/report?ruleset=example-ruleset',
 			mapId: 'case-map',
 			mapRegionLabel: 'Map showing Parish Council consultees for Longfield Solar Farm',
@@ -335,6 +337,39 @@ describe('manage page accessibility smoke', () => {
 			mapSampleSize: 30
 		});
 		assert.match(html, /No consultees identified in this category/);
+		await assertNoSeriousA11yViolations(html);
+	});
+
+	test('select a consultee page has no serious a11y violations', async () => {
+		const html = nunjucks.render('views/consultees/report/consultees/add/view.njk', {
+			...pageLocals,
+			pageHeading: 'Select a consultee',
+			pageCaption: 'Parish Council',
+			backLinkUrl:
+				'/consultees/11111111-1111-1111-1111-111111111111/report/consultees?ruleset=example-ruleset&category=Parish%20Council',
+			formAction:
+				'/consultees/11111111-1111-1111-1111-111111111111/report/consultees/add?ruleset=example-ruleset&category=Parish%20Council',
+			nameValue: '',
+			reasonValue: ''
+		});
+		await assertNoSeriousA11yViolations(html);
+	});
+
+	test('select a consultee page in its error state has no serious a11y violations', async () => {
+		const html = nunjucks.render('views/consultees/report/consultees/add/view.njk', {
+			...pageLocals,
+			pageHeading: 'Select a consultee',
+			pageCaption: 'Parish Council',
+			backLinkUrl:
+				'/consultees/11111111-1111-1111-1111-111111111111/report/consultees?ruleset=example-ruleset&category=Parish%20Council',
+			formAction:
+				'/consultees/11111111-1111-1111-1111-111111111111/report/consultees/add?ruleset=example-ruleset&category=Parish%20Council',
+			nameValue: '',
+			reasonValue: 'Adjacent landowner',
+			nameError: { text: 'Enter the consultee name' },
+			errorSummary: [{ text: 'Enter the consultee name', href: '#consultee-name' }]
+		});
+		assert.match(html, /There is a problem/);
 		await assertNoSeriousA11yViolations(html);
 	});
 
