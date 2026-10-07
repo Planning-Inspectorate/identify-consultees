@@ -7,3 +7,5 @@ README.md
 # GeoJSON data files - pretty-printing minified coordinate data serves no purpose and would
 # massively bloat file size
 *.geojson
+# Devin's per-machine config (gitignored); committed .devin/ content is still checked
+.devin/config.local.json
