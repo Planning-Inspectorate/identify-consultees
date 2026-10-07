@@ -49,6 +49,7 @@ Used at the top of each page:
 | --- | ------- |
 | [`README.md`](../README.md) | Clone, bootstrap, and day-one runbook |
 | [`AGENTS.md`](../AGENTS.md) | GDS, maps, toolchain, PR practices |
+| [`ACCESSIBILITY.md`](../ACCESSIBILITY.md) | Accessibility policy (WCAG 2.2 AA, testing, audit and statement duties) |
 | [`docs/frontend-testing.md`](../docs/frontend-testing.md) | Frontend test matrix |
 | [`docs/gis-shapefile-upload-and-report.md`](../docs/gis-shapefile-upload-and-report.md) | External GIS shapefile / report process |
 | [`apps/function-python/README.md`](../apps/function-python/README.md) | Python Azure Function local setup |

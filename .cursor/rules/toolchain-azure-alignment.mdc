@@ -5,10 +5,10 @@ alwaysApply: true
 
 # Toolchain and lockfile (Azure alignment)
 
-- Use the latest **Node 24.x** (current LTS) with its bundled **npm 11.x** (see `.nvmrc`, `engines`). Only the major is pinned — minor/patch float automatically, so don't set exact versions like `24.x.y` in `.nvmrc`, `engines`, the Dockerfile, or a `packageManager` field.
-- Do not regenerate `package-lock.json` under a different Node/npm major (e.g. Node 26 / npm 12) — that can drop lockfile entries.
-- Prefer `npm ci` after a clean clone (same as CI). Use `npm install` only when intentionally changing dependencies, still on the Node 24 / npm 11+ line.
-- After any lockfile change, run `npm run check-toolchain` and ensure `package-lock.json` still contains `node_modules/react`, `node_modules/react-dom`, and `node_modules/scheduler` (Prisma Studio peers). Losing them breaks Azure `npm ci` (see PR #53 / commit `2e4f99d`).
-- Keep those packages listed under root `optionalDependencies` so regenerating the lockfile does not drop them.
-- Keep `overrides.preact` (`^10.29.8`) and `.npmrc` `legacy-peer-deps=false`. Do not enable legacy peer deps — it masks the accessible-autocomplete vs Defra map `preact` conflict that breaks Azure `npm ci`.
-- Do not set `SKIP_TOOLCHAIN_CHECK=1` in normal PR work.
+The authoritative rules live in [AGENTS.md](../../AGENTS.md) → "Node and npm toolchain (match Azure
+Pipelines)". They are not duplicated here — follow that section for Node/npm versions, `npm ci` vs
+`npm install`, lockfile guards (`optionalDependencies`, `overrides.preact`, `legacy-peer-deps`),
+and `check-toolchain`.
+
+Before merging dependency changes, run the `dependency-update-check` skill in
+`.devin/skills/` to confirm the pipeline is green.

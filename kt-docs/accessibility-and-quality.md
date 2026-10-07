@@ -43,5 +43,6 @@ Minimum engineer habit before merging UI changes:
 
 ## Related pages
 
+- [ACCESSIBILITY.md](../ACCESSIBILITY.md) — the repo accessibility policy this checklist supports
 - [GOV.UK Frontend conventions](./govuk-frontend-conventions.md)
 - [Testing](./testing.md)
