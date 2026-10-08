@@ -51,7 +51,7 @@ describe('buildConsulteeMatchesGeojson', () => {
 describe('buildCaseMapConfig', () => {
 	it('reports the full match count and isSampled false when under the threshold', () => {
 		const matches = [match('1')];
-		const config = buildCaseMapConfig(project(), matches, 'Example ruleset');
+		const config = buildCaseMapConfig(project(), matches, 'England Wales post 30 April 2024');
 		assert.strictEqual(config.matchCount, 1);
 		assert.strictEqual(config.isSampled, false);
 		assert.strictEqual(config.consulteeGeojson.features.length, 1);
@@ -59,14 +59,14 @@ describe('buildCaseMapConfig', () => {
 
 	it('reports the full match count and isSampled true, with a sampled map, once over the threshold', () => {
 		const matches = Array.from({ length: MAP_SAMPLING_THRESHOLD + 1 }, (_, i) => match(`${i}`));
-		const config = buildCaseMapConfig(project(), matches, 'Example ruleset');
+		const config = buildCaseMapConfig(project(), matches, 'England Wales post 30 April 2024');
 		assert.strictEqual(config.matchCount, MAP_SAMPLING_THRESHOLD + 1);
 		assert.strictEqual(config.isSampled, true);
 		assert.strictEqual(config.consulteeGeojson.features.length, MAX_SAMPLED_MAP_MATCHES);
 	});
 
 	it('carries the static-map fallback in the page config when given one', () => {
-		const withFallback = buildCaseMapConfig(project(), [], 'Example ruleset', undefined, {
+		const withFallback = buildCaseMapConfig(project(), [], 'England Wales post 30 April 2024', undefined, {
 			src: '/consultees/x/results/static-map',
 			alt: 'Static map'
 		});
@@ -77,7 +77,7 @@ describe('buildCaseMapConfig', () => {
 			height: MAP_VIEWPORT.height
 		});
 
-		const without = buildCaseMapConfig(project(), [], 'Example ruleset');
+		const without = buildCaseMapConfig(project(), [], 'England Wales post 30 April 2024');
 		assert.strictEqual(without.fallback, undefined);
 	});
 });
@@ -98,10 +98,15 @@ describe('buildCaseMapConfig with a search area', () => {
 	const display = { type: 'Point' as const, coordinates: [1.1234567, 52.1234567] as [number, number] };
 
 	it('opens on the search area without drawing it, with matches in their display geometry', () => {
-		const config = buildCaseMapConfig(project(), [match('inside'), match('outside')], 'Example ruleset', {
-			area,
-			geometries: new Map([['inside', display]])
-		});
+		const config = buildCaseMapConfig(
+			project(),
+			[match('inside'), match('outside')],
+			'England Wales post 30 April 2024',
+			{
+				area,
+				geometries: new Map([['inside', display]])
+			}
+		);
 
 		assert.deepStrictEqual(config.center, [1.15, 52.1]);
 		// only the match touching the area is drawn, in its display geometry - but the count is every match
@@ -116,7 +121,7 @@ describe('buildCaseMapConfig with a search area', () => {
 
 	it('draws every match, coloured by category', () => {
 		const matches = Array.from({ length: MAP_SAMPLING_THRESHOLD + 1 }, (_, i) => match(`${i}`));
-		const config = buildCaseMapConfig(project(), matches, 'Example ruleset', {
+		const config = buildCaseMapConfig(project(), matches, 'England Wales post 30 April 2024', {
 			area,
 			geometries: new Map(matches.map((m) => [m.feature.id, display] as const))
 		});
@@ -137,14 +142,19 @@ describe('buildCaseMapConfig with a search area', () => {
 			distanceMetres: 0
 		};
 		const empty = { type: 'GeometryCollection' as const, geometries: [] };
-		const config = buildCaseMapConfig(project(), [match('parish'), regionalMatch, match('empty')], 'Example ruleset', {
-			area,
-			geometries: new Map<string, Geometry>([
-				['parish', display],
-				['county', area],
-				['empty', empty]
-			])
-		});
+		const config = buildCaseMapConfig(
+			project(),
+			[match('parish'), regionalMatch, match('empty')],
+			'England Wales post 30 April 2024',
+			{
+				area,
+				geometries: new Map<string, Geometry>([
+					['parish', display],
+					['county', area],
+					['empty', empty]
+				])
+			}
+		);
 
 		assert.deepStrictEqual(
 			config.consulteeGeojson.features.map((feature) => [feature.id, feature.properties.fillOpacity]),
@@ -157,7 +167,7 @@ describe('buildCaseMapConfig with a search area', () => {
 	});
 
 	it('fills every match as local without a search area', () => {
-		const config = buildCaseMapConfig(project(), [match('a')], 'Example ruleset');
+		const config = buildCaseMapConfig(project(), [match('a')], 'England Wales post 30 April 2024');
 		assert.strictEqual(config.consulteeGeojson.features[0].properties.fillOpacity, String(LOCAL_FILL_OPACITY));
 	});
 
@@ -166,7 +176,7 @@ describe('buildCaseMapConfig with a search area', () => {
 			...project(),
 			geometry: { type: 'Point' as const, coordinates: [-1.123456789, 52.987654321] as [number, number] }
 		};
-		const config = buildCaseMapConfig(detailed, [], 'Example ruleset');
+		const config = buildCaseMapConfig(detailed, [], 'England Wales post 30 April 2024');
 		assert.deepStrictEqual(config.projectGeojson.features[0].geometry, {
 			type: 'Point',
 			coordinates: [-1.12346, 52.98765]
@@ -174,7 +184,7 @@ describe('buildCaseMapConfig with a search area', () => {
 	});
 
 	it('draws matches in their stored geometry, with no nearby layer, without a search area', () => {
-		const config = buildCaseMapConfig(project(), [match('a')], 'Example ruleset');
+		const config = buildCaseMapConfig(project(), [match('a')], 'England Wales post 30 April 2024');
 		assert.strictEqual('nearbyGeojson' in config, false);
 		assert.deepStrictEqual(config.consulteeGeojson.features[0].geometry, match('a').feature.geometry);
 	});

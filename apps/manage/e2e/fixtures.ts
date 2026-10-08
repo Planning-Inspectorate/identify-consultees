@@ -11,5 +11,5 @@ export const SAMPLE_CASE_REFERENCE = 'EN010025';
 export const SAMPLE_CASE_NAME = 'East Anglia ONE Offshore Windfarm';
 
 // the one ruleset built from packages/database/src/geospatial/england_wales_post_20240430_ruleset.csv
-export const SAMPLE_RULESET_ID = 'example-ruleset';
-export const SAMPLE_RULESET_NAME = 'Example ruleset';
+export const SAMPLE_RULESET_ID = 'england-wales-post-20240430';
+export const SAMPLE_RULESET_NAME = 'England Wales post 30 April 2024';

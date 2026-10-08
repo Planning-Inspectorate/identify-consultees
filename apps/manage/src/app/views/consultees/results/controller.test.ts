@@ -74,13 +74,13 @@ describe('consultees results page', () => {
 			nearbyConsulteeRadiusMetres: 20_000,
 			rulesetRunner: rulesetRunnerFor(db)
 		});
-		await handler({ params: { caseId: realProjectId }, query: { ruleset: 'example-ruleset' } }, mockRes);
+		await handler({ params: { caseId: realProjectId }, query: { ruleset: 'england-wales-post-20240430' } }, mockRes);
 
 		assert.strictEqual(mockRes.render.mock.callCount(), 1);
 		assert.strictEqual(mockRes.render.mock.calls[0].arguments[0], 'views/consultees/results/view.njk');
 		const viewModel = mockRes.render.mock.calls[0].arguments[1];
 		assert.match(viewModel.pageHeading, /Real Test Project/);
-		assert.strictEqual(viewModel.rulesetName, 'Example ruleset');
+		assert.strictEqual(viewModel.rulesetName, 'England Wales post 30 April 2024');
 		// this mock returns the same single row for every one of the ruleset's ~27 conditions
 		// (unlike real data, where a row's category only ever matches a subset of them), so which
 		// exact distance survives deduplication isn't meaningful here - just that the row shows up
@@ -116,7 +116,7 @@ describe('consultees results page', () => {
 			nearbyConsulteeRadiusMetres: 20_000,
 			rulesetRunner: rulesetRunnerReturning([railwayMatchRow()])
 		});
-		await handler({ params: { caseId: realProjectId }, query: { ruleset: 'example-ruleset' } }, mockRes);
+		await handler({ params: { caseId: realProjectId }, query: { ruleset: 'england-wales-post-20240430' } }, mockRes);
 
 		const viewModel = mockRes.render.mock.calls[0].arguments[1];
 		assert.strictEqual(viewModel.rulesetFailed, false);
@@ -137,7 +137,7 @@ describe('consultees results page', () => {
 			nearbyConsulteeRadiusMetres: 50_000,
 			rulesetRunner: rulesetRunnerFor(db)
 		});
-		await handler({ params: { caseId: realProjectId }, query: { ruleset: 'example-ruleset' } }, mockRes);
+		await handler({ params: { caseId: realProjectId }, query: { ruleset: 'england-wales-post-20240430' } }, mockRes);
 
 		const viewModel = mockRes.render.mock.calls[0].arguments[1];
 		assert.strictEqual(viewModel.nearbyRadiusKm, 50);
@@ -155,7 +155,7 @@ describe('consultees results page', () => {
 			nearbyConsulteeRadiusMetres: 20_000,
 			rulesetRunner: rulesetRunnerFor(db)
 		});
-		await handler({ params: { caseId: realProjectId }, query: { ruleset: 'example-ruleset' } }, mockRes);
+		await handler({ params: { caseId: realProjectId }, query: { ruleset: 'england-wales-post-20240430' } }, mockRes);
 
 		const viewModel = mockRes.render.mock.calls[0].arguments[1];
 		assert.strictEqual(viewModel.matches[0].consultee, null);
@@ -177,7 +177,7 @@ describe('consultees results page', () => {
 			nearbyConsulteeRadiusMetres: 20_000,
 			rulesetRunner: rulesetRunnerFor(db)
 		});
-		await handler({ params: { caseId: realProjectId }, query: { ruleset: 'example-ruleset' } }, mockRes);
+		await handler({ params: { caseId: realProjectId }, query: { ruleset: 'england-wales-post-20240430' } }, mockRes);
 
 		const viewModel = mockRes.render.mock.calls[0].arguments[1];
 		assert.equal(viewModel.mapConfigJson.includes('</'), false);
@@ -194,7 +194,7 @@ describe('consultees results page', () => {
 			logger: mockLogger(),
 			nearbyConsulteeRadiusMetres: 20_000
 		});
-		await handler({ params: {}, query: { ruleset: 'example-ruleset' } }, mockRes);
+		await handler({ params: {}, query: { ruleset: 'england-wales-post-20240430' } }, mockRes);
 		assert.strictEqual(mockRes.status.mock.calls[0].arguments[0], 404);
 	});
 
@@ -232,18 +232,18 @@ describe('consultees results page', () => {
 			nearbyConsulteeRadiusMetres: 20_000,
 			rulesetRunner: failingRulesetRunner()
 		});
-		await handler({ params: { caseId: realProjectId }, query: { ruleset: 'example-ruleset' } }, mockRes);
+		await handler({ params: { caseId: realProjectId }, query: { ruleset: 'england-wales-post-20240430' } }, mockRes);
 
 		const viewModel = mockRes.render.mock.calls[0].arguments[1];
 		assert.match(viewModel.pageHeading, /Real Test Project/);
 		assert.strictEqual(viewModel.rulesetFailed, true);
-		assert.strictEqual(viewModel.retryUrl, `/consultees/${realProjectId}/results?ruleset=example-ruleset`);
+		assert.strictEqual(viewModel.retryUrl, `/consultees/${realProjectId}/results?ruleset=england-wales-post-20240430`);
 		assert.deepStrictEqual(viewModel.matches, []);
 		assert.strictEqual(logger.error.mock.callCount(), 1);
 
 		const html = mockRes.render.mock.calls[0].result;
 		assert.match(html, /The ruleset could not be run/);
-		assert.match(html, new RegExp(`href="/consultees/${realProjectId}/results\\?ruleset=example-ruleset"`));
+		assert.match(html, new RegExp(`href="/consultees/${realProjectId}/results\\?ruleset=england-wales-post-20240430"`));
 		assert.doesNotMatch(html, /No consultees matched this ruleset/);
 		assert.doesNotMatch(html, /No consultees found within/);
 	});
@@ -257,7 +257,7 @@ describe('consultees results page', () => {
 			nearbyConsulteeRadiusMetres: 20_000,
 			rulesetRunner: rulesetRunnerFor(db)
 		});
-		await handler({ params: { caseId: realProjectId }, query: { ruleset: 'example-ruleset' } }, mockRes);
+		await handler({ params: { caseId: realProjectId }, query: { ruleset: 'england-wales-post-20240430' } }, mockRes);
 
 		assert.strictEqual(mockRes.render.mock.calls[0].arguments[1].rulesetFailed, false);
 	});
@@ -271,7 +271,7 @@ describe('consultees results page', () => {
 			nearbyConsulteeRadiusMetres: 20_000,
 			rulesetRunner: rulesetRunnerFor(db)
 		});
-		await handler({ params: { caseId: realProjectId }, query: { ruleset: 'example-ruleset' } }, mockRes);
+		await handler({ params: { caseId: realProjectId }, query: { ruleset: 'england-wales-post-20240430' } }, mockRes);
 		assert.strictEqual(mockRes.status.mock.calls[0].arguments[0], 404);
 	});
 
@@ -282,7 +282,7 @@ describe('consultees results page', () => {
 			logger: mockLogger(),
 			nearbyConsulteeRadiusMetres: 20_000
 		});
-		await handler({ params: { caseId: 'not-a-uuid' }, query: { ruleset: 'example-ruleset' } }, mockRes);
+		await handler({ params: { caseId: 'not-a-uuid' }, query: { ruleset: 'england-wales-post-20240430' } }, mockRes);
 		assert.strictEqual(mockRes.status.mock.calls[0].arguments[0], 404);
 	});
 
@@ -334,8 +334,8 @@ describe('consultees results page', () => {
 			nearbyConsulteeRadiusMetres: 20_000,
 			rulesetRunner: rulesetRunnerFor(db)
 		});
-		await handler({ params: { caseId: realProjectId }, query: { ruleset: ['example-ruleset'] } }, mockRes);
-		assert.strictEqual(mockRes.render.mock.calls[0].arguments[1].rulesetName, 'Example ruleset');
+		await handler({ params: { caseId: realProjectId }, query: { ruleset: ['england-wales-post-20240430'] } }, mockRes);
+		assert.strictEqual(mockRes.render.mock.calls[0].arguments[1].rulesetName, 'England Wales post 30 April 2024');
 	});
 });
 
@@ -365,7 +365,10 @@ describe('consultees results static map', () => {
 				{ db, logger: mockLogger(), nearbyConsulteeRadiusMetres: 20_000, rulesetRunner: rulesetRunnerFor(db) },
 				true
 			);
-			await handler({ params: { caseId: realProjectId }, query: { ruleset: 'example-ruleset' }, headers: {} }, mockRes);
+			await handler(
+				{ params: { caseId: realProjectId }, query: { ruleset: 'england-wales-post-20240430' }, headers: {} },
+				mockRes
+			);
 			assert.strictEqual(mockRes.status.mock.calls[0].arguments[0], 200);
 			assert.match(String(mockRes.type.mock.calls[0].arguments[0]), /image\/svg\+xml/);
 			assert.match(String(mockRes.set.mock.calls[0].arguments[0]['Cache-Control']), /max-age=/);
@@ -406,7 +409,7 @@ describe('consultees results static map', () => {
 			await handler(
 				{
 					params: { caseId: realProjectId },
-					query: { ruleset: 'example-ruleset' },
+					query: { ruleset: 'england-wales-post-20240430' },
 					headers: { accept: 'image/avif' }
 				},
 				mockRes
@@ -431,7 +434,10 @@ describe('consultees results static map', () => {
 			{ db, logger: mockLogger(), nearbyConsulteeRadiusMetres: 20_000, rulesetRunner: rulesetRunnerFor(db) },
 			true
 		);
-		await handler({ params: { caseId: realProjectId }, query: { ruleset: 'example-ruleset' }, headers: {} }, mockRes);
+		await handler(
+			{ params: { caseId: realProjectId }, query: { ruleset: 'england-wales-post-20240430' }, headers: {} },
+			mockRes
+		);
 
 		assert.strictEqual(mockRes.status.mock.calls[0].arguments[0], 200);
 		// the display geometry query ran for the static map too
@@ -479,7 +485,7 @@ describe('consultees results static map', () => {
 		// a category page's map: the kept parish is drawn, the excluded parish and the
 		// out-of-category railway are not
 		const withCategory = await displayGeometryIds({
-			ruleset: 'example-ruleset',
+			ruleset: 'england-wales-post-20240430',
 			category: 'Parish Council',
 			exclude: excludedParishId
 		});
@@ -499,10 +505,10 @@ describe('consultees results static map', () => {
 			await handler({ params: { caseId: realProjectId }, query, headers: {} }, mockRes);
 			return mockRes.set.mock.calls[0].arguments[0].ETag;
 		};
-		const unfiltered = await etag({ ruleset: 'example-ruleset' });
-		const excludingAMatch = await etag({ ruleset: 'example-ruleset', exclude: excludedParishId });
+		const unfiltered = await etag({ ruleset: 'england-wales-post-20240430' });
+		const excludingAMatch = await etag({ ruleset: 'england-wales-post-20240430', exclude: excludedParishId });
 		const excludingNothing = await etag({
-			ruleset: 'example-ruleset',
+			ruleset: 'england-wales-post-20240430',
 			exclude: '88888888-8888-8888-8888-888888888888'
 		});
 		assert.notStrictEqual(unfiltered, excludingAMatch);
@@ -528,7 +534,10 @@ describe('consultees results static map', () => {
 			{ db, logger: mockLogger(), nearbyConsulteeRadiusMetres: 20_000, rulesetRunner: failingRulesetRunner() },
 			true
 		);
-		await handler({ params: { caseId: realProjectId }, query: { ruleset: 'example-ruleset' }, headers: {} }, mockRes);
+		await handler(
+			{ params: { caseId: realProjectId }, query: { ruleset: 'england-wales-post-20240430' }, headers: {} },
+			mockRes
+		);
 
 		assert.strictEqual(mockRes.status.mock.calls[0].arguments[0], 503);
 		assert.strictEqual(mockRes.set.mock.callCount(), 0);
@@ -545,7 +554,7 @@ describe('consultees results static map', () => {
 			logger: mockLogger(),
 			nearbyConsulteeRadiusMetres: 20_000
 		});
-		await handler({ params: {}, query: { ruleset: 'example-ruleset' }, headers: {} }, mockRes);
+		await handler({ params: {}, query: { ruleset: 'england-wales-post-20240430' }, headers: {} }, mockRes);
 		assert.strictEqual(mockRes.status.mock.calls[0].arguments[0], 404);
 	});
 
@@ -561,7 +570,10 @@ describe('consultees results static map', () => {
 			{ db, logger: mockLogger(), nearbyConsulteeRadiusMetres: 20_000, rulesetRunner: rulesetRunnerFor(db) },
 			true
 		);
-		await handler({ params: { caseId: realProjectId }, query: { ruleset: ['example-ruleset'] }, headers: {} }, mockRes);
+		await handler(
+			{ params: { caseId: realProjectId }, query: { ruleset: ['england-wales-post-20240430'] }, headers: {} },
+			mockRes
+		);
 		assert.strictEqual(mockRes.status.mock.calls[0].arguments[0], 200);
 	});
 
@@ -576,7 +588,10 @@ describe('consultees results static map', () => {
 			logger: mockLogger(),
 			nearbyConsulteeRadiusMetres: 20_000
 		});
-		await handler({ params: { caseId: realProjectId }, query: { ruleset: 'example-ruleset' }, headers: {} }, mockRes);
+		await handler(
+			{ params: { caseId: realProjectId }, query: { ruleset: 'england-wales-post-20240430' }, headers: {} },
+			mockRes
+		);
 		assert.strictEqual(mockRes.status.mock.calls[0].arguments[0], 404);
 
 		const handlerBadRuleset = buildResultsStaticMap({
@@ -616,7 +631,10 @@ describe('consultees results static map', () => {
 				{ db, logger: mockLogger(), nearbyConsulteeRadiusMetres: 20_000, rulesetRunner: rulesetRunnerFor(db) },
 				true
 			);
-			await handler({ params: { caseId: realProjectId }, query: { ruleset: 'example-ruleset' }, headers: {} }, mockRes);
+			await handler(
+				{ params: { caseId: realProjectId }, query: { ruleset: 'england-wales-post-20240430' }, headers: {} },
+				mockRes
+			);
 			const etag = mockRes.set.mock.calls[0].arguments[0].ETag;
 
 			mockRes.status.mock.resetCalls();
@@ -631,7 +649,7 @@ describe('consultees results static map', () => {
 			await handler2(
 				{
 					params: { caseId: realProjectId },
-					query: { ruleset: 'example-ruleset' },
+					query: { ruleset: 'england-wales-post-20240430' },
 					headers: { 'if-none-match': etag }
 				},
 				mockRes

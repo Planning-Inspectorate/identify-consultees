@@ -31,16 +31,16 @@ describe('ruleset picker page', () => {
 			render: mock.fn((view, data) => nunjucks.render(view, data))
 		};
 		const handler = buildRulesetPickerPage({ db: summaryDb() });
-		await handler({ params: { caseId: realProjectId }, query: { ruleset: 'example-ruleset' } }, mockRes);
+		await handler({ params: { caseId: realProjectId }, query: { ruleset: 'england-wales-post-20240430' } }, mockRes);
 
 		assert.strictEqual(mockRes.render.mock.callCount(), 1);
 		assert.strictEqual(mockRes.render.mock.calls[0].arguments[0], 'views/consultees/ruleset/view.njk');
 		const viewModel = mockRes.render.mock.calls[0].arguments[1];
 		assert.strictEqual(viewModel.pageHeading, 'Ruleset');
 		assert.strictEqual(viewModel.caseId, realProjectId);
-		assert.strictEqual(viewModel.backLinkUrl, `/consultees/${realProjectId}?ruleset=example-ruleset`);
+		assert.strictEqual(viewModel.backLinkUrl, `/consultees/${realProjectId}?ruleset=england-wales-post-20240430`);
 		assert.ok(viewModel.rulesets.length >= 1);
-		const current = viewModel.rulesets.find((ruleset) => ruleset.value === 'example-ruleset');
+		const current = viewModel.rulesets.find((ruleset) => ruleset.value === 'england-wales-post-20240430');
 		assert.strictEqual(current.checked, true);
 	});
 
@@ -108,10 +108,10 @@ describe('ruleset picker submit', () => {
 			redirect: mock.fn()
 		};
 		const handler = buildRulesetPickerSubmit();
-		await handler({ params: { caseId: realProjectId }, body: { ruleset: 'example-ruleset' } }, mockRes);
+		await handler({ params: { caseId: realProjectId }, body: { ruleset: 'england-wales-post-20240430' } }, mockRes);
 		assert.strictEqual(
 			mockRes.redirect.mock.calls[0].arguments[0],
-			`/consultees/${realProjectId}?ruleset=example-ruleset`
+			`/consultees/${realProjectId}?ruleset=england-wales-post-20240430`
 		);
 	});
 
@@ -125,14 +125,14 @@ describe('ruleset picker submit', () => {
 		await handler({ params: { caseId: realProjectId }, body: { ruleset: 'not-a-real-ruleset' } }, mockRes);
 		assert.strictEqual(
 			mockRes.redirect.mock.calls[0].arguments[0],
-			`/consultees/${realProjectId}/ruleset?ruleset=example-ruleset`
+			`/consultees/${realProjectId}/ruleset?ruleset=england-wales-post-20240430`
 		);
 
 		// and a missing body entirely (no parser on a bare handler call)
 		await handler({ params: { caseId: realProjectId } }, mockRes);
 		assert.strictEqual(
 			mockRes.redirect.mock.calls[1].arguments[0],
-			`/consultees/${realProjectId}/ruleset?ruleset=example-ruleset`
+			`/consultees/${realProjectId}/ruleset?ruleset=england-wales-post-20240430`
 		);
 	});
 

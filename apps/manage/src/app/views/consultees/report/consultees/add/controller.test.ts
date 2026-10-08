@@ -33,7 +33,7 @@ const addJson = (name: string, reason = '', category = 'Parish Council') =>
 const addParam = (name: string, reason = '', category = 'Parish Council') =>
 	encodeURIComponent(addJson(name, reason, category));
 
-const parishQuery = { ruleset: 'example-ruleset', category: 'Parish Council' };
+const parishQuery = { ruleset: 'england-wales-post-20240430', category: 'Parish Council' };
 
 describe('report consultee add page', () => {
 	it('should render the select-a-consultee form for a valid case/ruleset/category', async () => {
@@ -53,7 +53,7 @@ describe('report consultee add page', () => {
 		assert.strictEqual(viewModel.pageCaption, 'Parish Council');
 		assert.strictEqual(
 			viewModel.backLinkUrl,
-			`/consultees/${realProjectId}/report/consultees?ruleset=example-ruleset&category=Parish%20Council`
+			`/consultees/${realProjectId}/report/consultees?ruleset=england-wales-post-20240430&category=Parish%20Council`
 		);
 		assert.strictEqual(viewModel.formAction, viewModel.backLinkUrl.replace('?', '/add?'));
 		assert.strictEqual(viewModel.nameValue, '');
@@ -80,7 +80,7 @@ describe('report consultee add page', () => {
 		);
 
 		const viewModel = mockRes.render.mock.calls[0].arguments[1];
-		assert.match(viewModel.formAction, /ruleset=example-ruleset/);
+		assert.match(viewModel.formAction, /ruleset=england-wales-post-20240430/);
 	});
 
 	it('should carry the current selection through the form action and back link', async () => {
@@ -103,7 +103,7 @@ describe('report consultee add page', () => {
 
 	for (const [title, query] of [
 		['an unknown category', { ...parishQuery, category: 'Not A Category' }],
-		['a missing category', { ruleset: 'example-ruleset' }],
+		['a missing category', { ruleset: 'england-wales-post-20240430' }],
 		['an unknown ruleset', { ...parishQuery, ruleset: 'not-a-real-ruleset' }]
 	] as const) {
 		it(`should 404 for ${title}`, async () => {
@@ -146,7 +146,7 @@ describe('report consultee add submit', () => {
 		const location = mockRes.redirect.mock.calls[0].arguments[0];
 		assert.strictEqual(
 			location,
-			`/consultees/${realProjectId}/report/consultees?ruleset=example-ruleset&category=Parish%20Council&add=${addParam('Test Consultee', 'Adjacent landowner')}`
+			`/consultees/${realProjectId}/report/consultees?ruleset=england-wales-post-20240430&category=Parish%20Council&add=${addParam('Test Consultee', 'Adjacent landowner')}`
 		);
 	});
 

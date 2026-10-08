@@ -30,10 +30,10 @@ On the homepage:
 
 Continuing the journey:
 
-| Param / segment | Purpose                                              |
-| --------------- | ---------------------------------------------------- |
-| `caseId`        | `case_boundary` row id (a UNIQUEIDENTIFIER)          |
-| `ruleset`       | Ruleset id from `RULESETS` (`example-ruleset` today) |
+| Param / segment | Purpose                                                          |
+| --------------- | ---------------------------------------------------------------- |
+| `caseId`        | `case_boundary` row id (a UNIQUEIDENTIFIER)                      |
+| `ruleset`       | Ruleset id from `RULESETS` (`england-wales-post-20240430` today) |
 
 ## Search behaviour
 

@@ -109,7 +109,7 @@ describe('manage router wiring', () => {
 		assert.match(response.text, /Router Test Fixture Wind Farm/);
 		assert.match(response.text, /Back to projects/);
 		assert.match(response.text, /Shapefile/);
-		assert.match(response.text, /Example ruleset/);
+		assert.match(response.text, /England Wales post 30 April 2024/);
 		assert.match(response.text, /Preview report/);
 		assert.doesNotMatch(response.text, /Run Intersection logic/);
 		assert.match(response.text, /app-consultee-map/);
@@ -119,7 +119,7 @@ describe('manage router wiring', () => {
 		const response = await request(authDisabledApp).get(`/consultees/${homePageTestCaseId}/ruleset`);
 		assert.equal(response.status, 200);
 		assert.match(response.text, /<h1[^>]*>\s*Ruleset|Ruleset\s*<\/h1>/);
-		assert.match(response.text, /type="radio"[^>]*value="example-ruleset"/);
+		assert.match(response.text, /type="radio"[^>]*value="england-wales-post-20240430"/);
 		assert.match(response.text, /Save and return/);
 	});
 
@@ -140,9 +140,9 @@ describe('manage router wiring', () => {
 		const response = await agent
 			.post(`/consultees/${homePageTestCaseId}/ruleset`)
 			.type('form')
-			.send({ _csrf: csrf, ruleset: 'example-ruleset' });
+			.send({ _csrf: csrf, ruleset: 'england-wales-post-20240430' });
 		assert.equal(response.status, 302);
-		assert.equal(response.headers.location, `/consultees/${homePageTestCaseId}?ruleset=example-ruleset`);
+		assert.equal(response.headers.location, `/consultees/${homePageTestCaseId}?ruleset=england-wales-post-20240430`);
 	});
 
 	test('POST /consultees/:id/shapefile redirects to the chosen boundary’s map page', async () => {
@@ -154,14 +154,14 @@ describe('manage router wiring', () => {
 		const response = await agent
 			.post(`/consultees/${homePageTestCaseId}/shapefile`)
 			.type('form')
-			.send({ _csrf: csrf, shapefile: homePageTestCaseId, ruleset: 'example-ruleset' });
+			.send({ _csrf: csrf, shapefile: homePageTestCaseId, ruleset: 'england-wales-post-20240430' });
 		assert.equal(response.status, 302);
-		assert.equal(response.headers.location, `/consultees/${homePageTestCaseId}?ruleset=example-ruleset`);
+		assert.equal(response.headers.location, `/consultees/${homePageTestCaseId}?ruleset=england-wales-post-20240430`);
 	});
 
 	test('GET /consultees/:id/report renders the report check page', async () => {
 		const response = await request(authDisabledApp).get(
-			`/consultees/${homePageTestCaseId}/report?ruleset=example-ruleset`
+			`/consultees/${homePageTestCaseId}/report?ruleset=england-wales-post-20240430`
 		);
 		assert.equal(response.status, 200);
 		assert.match(response.text, /Check consultees before creating the report/);
@@ -172,7 +172,7 @@ describe('manage router wiring', () => {
 
 	test('GET /consultees/:id/report/consultees renders a category’s change page', async () => {
 		const response = await request(authDisabledApp).get(
-			`/consultees/${homePageTestCaseId}/report/consultees?ruleset=example-ruleset&category=Parish%20Council`
+			`/consultees/${homePageTestCaseId}/report/consultees?ruleset=england-wales-post-20240430&category=Parish%20Council`
 		);
 		assert.equal(response.status, 200);
 		assert.match(response.text, /Parish Council/);
@@ -181,14 +181,14 @@ describe('manage router wiring', () => {
 
 	test('GET /consultees/:id/report/consultees 404s for a category the ruleset doesn’t cover', async () => {
 		const response = await request(authDisabledApp).get(
-			`/consultees/${homePageTestCaseId}/report/consultees?ruleset=example-ruleset&category=Not%20A%20Category`
+			`/consultees/${homePageTestCaseId}/report/consultees?ruleset=england-wales-post-20240430&category=Not%20A%20Category`
 		);
 		assert.equal(response.status, 404);
 	});
 
 	test('GET /consultees/:id/report/consultees/add renders the select-a-consultee form', async () => {
 		const response = await request(authDisabledApp).get(
-			`/consultees/${homePageTestCaseId}/report/consultees/add?ruleset=example-ruleset&category=Parish%20Council`
+			`/consultees/${homePageTestCaseId}/report/consultees/add?ruleset=england-wales-post-20240430&category=Parish%20Council`
 		);
 		assert.equal(response.status, 200);
 		assert.match(response.text, /Select a consultee/);
@@ -199,18 +199,20 @@ describe('manage router wiring', () => {
 	test('POST /consultees/:id/report/consultees/add adds the consultee and lists it on the category page', async () => {
 		const agent = request.agent(authDisabledApp);
 		const page = await agent.get(
-			`/consultees/${homePageTestCaseId}/report/consultees/add?ruleset=example-ruleset&category=Parish%20Council`
+			`/consultees/${homePageTestCaseId}/report/consultees/add?ruleset=england-wales-post-20240430&category=Parish%20Council`
 		);
 		const csrf = /name="_csrf" value="([^"]+)"/.exec(page.text)?.[1];
 		assert.ok(csrf, 'expected the add form to carry a CSRF token');
 
 		const response = await agent
-			.post(`/consultees/${homePageTestCaseId}/report/consultees/add?ruleset=example-ruleset&category=Parish%20Council`)
+			.post(
+				`/consultees/${homePageTestCaseId}/report/consultees/add?ruleset=england-wales-post-20240430&category=Parish%20Council`
+			)
 			.type('form')
 			.send({ _csrf: csrf, name: 'Router Test Consultee', reason: 'Adjacent landowner' });
 		assert.equal(response.status, 302);
 		const location = response.headers.location;
-		assert.match(location, /\/report\/consultees\?ruleset=example-ruleset&category=Parish%20Council&add=/);
+		assert.match(location, /\/report\/consultees\?ruleset=england-wales-post-20240430&category=Parish%20Council&add=/);
 
 		const categoryPage = await agent.get(location);
 		assert.equal(categoryPage.status, 200);
@@ -221,13 +223,15 @@ describe('manage router wiring', () => {
 	test('POST /consultees/:id/report/consultees/add re-renders with an error when the name is blank', async () => {
 		const agent = request.agent(authDisabledApp);
 		const page = await agent.get(
-			`/consultees/${homePageTestCaseId}/report/consultees/add?ruleset=example-ruleset&category=Parish%20Council`
+			`/consultees/${homePageTestCaseId}/report/consultees/add?ruleset=england-wales-post-20240430&category=Parish%20Council`
 		);
 		const csrf = /name="_csrf" value="([^"]+)"/.exec(page.text)?.[1];
 		assert.ok(csrf, 'expected the add form to carry a CSRF token');
 
 		const response = await agent
-			.post(`/consultees/${homePageTestCaseId}/report/consultees/add?ruleset=example-ruleset&category=Parish%20Council`)
+			.post(
+				`/consultees/${homePageTestCaseId}/report/consultees/add?ruleset=england-wales-post-20240430&category=Parish%20Council`
+			)
 			.type('form')
 			.send({ _csrf: csrf, name: '', reason: 'no name' });
 		assert.equal(response.status, 200);
@@ -237,7 +241,7 @@ describe('manage router wiring', () => {
 
 	test('GET /consultees/:id/report/created renders the report created page', async () => {
 		const response = await request(authDisabledApp).get(
-			`/consultees/${homePageTestCaseId}/report/created?ruleset=example-ruleset`
+			`/consultees/${homePageTestCaseId}/report/created?ruleset=england-wales-post-20240430`
 		);
 		assert.equal(response.status, 200);
 		assert.match(response.text, /Report created/);
@@ -246,11 +250,11 @@ describe('manage router wiring', () => {
 
 	test('GET /consultees/:id/results runs the ruleset and renders the results page', async () => {
 		const response = await request(authDisabledApp).get(
-			`/consultees/${homePageTestCaseId}/results?ruleset=example-ruleset`
+			`/consultees/${homePageTestCaseId}/results?ruleset=england-wales-post-20240430`
 		);
 		assert.equal(response.status, 200);
 		assert.match(response.text, /Consultees identified for/);
-		assert.match(response.text, /Ruleset used: Example ruleset/);
+		assert.match(response.text, /Ruleset used: England Wales post 30 April 2024/);
 	});
 
 	test('GET /consultees/:id/results 404s for an unknown ruleset', async () => {
@@ -474,7 +478,7 @@ describe('manage router wiring', () => {
 
 		try {
 			const response = await request(authDisabledApp).get(
-				`/consultees/${homePageTestCaseId}/results/static-map?ruleset=example-ruleset`
+				`/consultees/${homePageTestCaseId}/results/static-map?ruleset=england-wales-post-20240430`
 			);
 			assert.equal(response.status, 200);
 			assert.match(response.headers['content-type'] || '', /image\/(svg\+xml|png)/);
@@ -482,7 +486,7 @@ describe('manage router wiring', () => {
 			assert.ok(response.headers.etag);
 
 			const cached = await request(authDisabledApp)
-				.get(`/consultees/${homePageTestCaseId}/results/static-map?ruleset=example-ruleset`)
+				.get(`/consultees/${homePageTestCaseId}/results/static-map?ruleset=england-wales-post-20240430`)
 				.set('If-None-Match', response.headers.etag);
 			assert.equal(cached.status, 304);
 		} finally {
@@ -506,7 +510,7 @@ describe('manage router wiring', () => {
 
 		try {
 			const response = await request(authDisabledApp).get(
-				`/consultees/${homePageTestCaseId}/results/static-map.svg?ruleset=example-ruleset`
+				`/consultees/${homePageTestCaseId}/results/static-map.svg?ruleset=england-wales-post-20240430`
 			);
 			assert.equal(response.status, 200);
 			assert.match(response.headers['content-type'] || '', /image\/svg\+xml/);

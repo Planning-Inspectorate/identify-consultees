@@ -1,5 +1,5 @@
 {
-	"_about": "Expected example-ruleset results for five real projects against the full reference dataset (combined_reference_data_v1.geojson), computed independently of the app (Python/shapely over the raw GeoJSON, EPSG:27700). mustInclude: the exact calculation. mayAlsoInclude: extra consultees a deliberately generous calculation finds (cut-offs widened by 60m + 0.1%, hosts within 60m, neighbours within 80m) - borderline cases the app may include when in doubt. See rulesets.golden.test.ts.",
+	"_about": "Expected results for the England Wales post 30 April 2024 ruleset for five real projects against the full reference dataset (combined_reference_data_v1.geojson), computed independently of the app (Python/shapely over the raw GeoJSON, EPSG:27700). mustInclude: the exact calculation. mayAlsoInclude: extra consultees a deliberately generous calculation finds (cut-offs widened by 60m + 0.1%, hosts within 60m, neighbours within 80m) - borderline cases the app may include when in doubt. See ruleset-runner.golden.test.ts.",
 	"cases": [
 		{
 			"caseReference": "TR010021",

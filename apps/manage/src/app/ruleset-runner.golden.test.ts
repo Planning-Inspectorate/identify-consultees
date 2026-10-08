@@ -21,7 +21,7 @@ interface GoldenCase {
 	mayAlsoInclude: GoldenConsultee[];
 }
 
-// Expected example-ruleset results for five real projects (London, Somerset coast/nuclear,
+// Expected England Wales post 30 April 2024 ruleset results for five real projects (London, Somerset coast/nuclear,
 // Wales/national park, offshore wind, and a unitary bordering a two-tier county), computed
 // independently of the app - Python/shapely over the raw reference GeoJSON - so this checks its
 // answers rather than restating them. The ruleset runs on simplified geometries and includes
@@ -71,7 +71,7 @@ after(async () => {
 	await dbClient?.$disconnect();
 });
 
-describe('example ruleset against real projects (full reference dataset, via the Python function)', () => {
+describe('England Wales post 30 April 2024 ruleset against real projects (full reference dataset, via the Python function)', () => {
 	for (const golden of cases) {
 		test(`${golden.caseReference} ${golden.caseName}`, { timeout: 120_000 }, async (t) => {
 			if (skipReason) return t.skip(skipReason);

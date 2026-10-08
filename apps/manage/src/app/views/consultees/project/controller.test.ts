@@ -76,22 +76,34 @@ describe('consultee project map page', () => {
 			render: mock.fn((view, data) => nunjucks.render(view, data))
 		};
 		const db = dbReturning([[realProjectRow()], [railwayMatchRow()]]);
-		await handlerFor(db)({ params: { caseId: realProjectId }, query: { ruleset: 'example-ruleset' } }, mockRes);
+		await handlerFor(db)(
+			{ params: { caseId: realProjectId }, query: { ruleset: 'england-wales-post-20240430' } },
+			mockRes
+		);
 
 		assert.strictEqual(mockRes.render.mock.calls[0].arguments[0], 'views/consultees/project/view.njk');
 		const viewModel = mockRes.render.mock.calls[0].arguments[1];
 		assert.strictEqual(viewModel.pageHeading, 'Real Test Project');
 		assert.strictEqual(viewModel.reference, 'EN010099');
 		assert.strictEqual(viewModel.backLinkUrl, '/');
-		assert.strictEqual(viewModel.rulesetName, 'Example ruleset');
-		assert.strictEqual(viewModel.rulesetChangeUrl, `/consultees/${realProjectId}/ruleset?ruleset=example-ruleset`);
-		assert.strictEqual(viewModel.shapefileChangeUrl, `/consultees/${realProjectId}/shapefile?ruleset=example-ruleset`);
+		assert.strictEqual(viewModel.rulesetName, 'England Wales post 30 April 2024');
+		assert.strictEqual(
+			viewModel.rulesetChangeUrl,
+			`/consultees/${realProjectId}/ruleset?ruleset=england-wales-post-20240430`
+		);
+		assert.strictEqual(
+			viewModel.shapefileChangeUrl,
+			`/consultees/${realProjectId}/shapefile?ruleset=england-wales-post-20240430`
+		);
 		// no fileName on the row
 		assert.strictEqual(viewModel.shapefileName, 'Not provided');
 		// EN01 = Energy, Generating Stations; "Real Test Project" has no energy sub-type keyword
 		assert.strictEqual(viewModel.sectorDescription, 'Energy, Generating Stations');
 		assert.strictEqual(viewModel.stage, null);
-		assert.strictEqual(viewModel.previewReportUrl, `/consultees/${realProjectId}/report?ruleset=example-ruleset`);
+		assert.strictEqual(
+			viewModel.previewReportUrl,
+			`/consultees/${realProjectId}/report?ruleset=england-wales-post-20240430`
+		);
 		assert.ok(viewModel.mapConfigJson.includes('FeatureCollection'));
 
 		const html = mockRes.render.mock.calls[0].result;
@@ -124,8 +136,11 @@ describe('consultee project map page', () => {
 		await handlerFor(db)({ params: { caseId: realProjectId }, query: {} }, mockRes);
 
 		const viewModel = mockRes.render.mock.calls[0].arguments[1];
-		assert.strictEqual(viewModel.rulesetName, 'Example ruleset');
-		assert.strictEqual(viewModel.rulesetChangeUrl, `/consultees/${realProjectId}/ruleset?ruleset=example-ruleset`);
+		assert.strictEqual(viewModel.rulesetName, 'England Wales post 30 April 2024');
+		assert.strictEqual(
+			viewModel.rulesetChangeUrl,
+			`/consultees/${realProjectId}/ruleset?ruleset=england-wales-post-20240430`
+		);
 	});
 
 	it('should 404 for a present-but-unknown ruleset', async () => {
@@ -175,7 +190,7 @@ describe('consultee project map page', () => {
 
 		const viewModel = mockRes.render.mock.calls[0].arguments[1];
 		assert.strictEqual(viewModel.rulesetFailed, true);
-		assert.strictEqual(viewModel.retryUrl, `/consultees/${realProjectId}?ruleset=example-ruleset`);
+		assert.strictEqual(viewModel.retryUrl, `/consultees/${realProjectId}?ruleset=england-wales-post-20240430`);
 		assert.strictEqual(logger.error.mock.callCount(), 1);
 	});
 });

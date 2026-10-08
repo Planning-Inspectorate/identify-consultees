@@ -159,11 +159,11 @@ describe('manage page accessibility smoke', () => {
 		const html = nunjucks.render('views/consultees/ruleset/view.njk', {
 			...pageLocals,
 			pageHeading: 'Ruleset',
-			backLinkUrl: '/consultees/11111111-1111-1111-1111-111111111111?ruleset=example-ruleset',
+			backLinkUrl: '/consultees/11111111-1111-1111-1111-111111111111?ruleset=england-wales-post-20240430',
 			caseId: '11111111-1111-1111-1111-111111111111',
 			_csrf: 'test-csrf',
 			rulesets: [
-				{ value: 'example-ruleset', text: 'Example ruleset', checked: true },
+				{ value: 'england-wales-post-20240430', text: 'England Wales post 30 April 2024', checked: true },
 				{ value: 'other-ruleset', text: 'Other ruleset', checked: false }
 			]
 		});
@@ -174,9 +174,9 @@ describe('manage page accessibility smoke', () => {
 		const html = nunjucks.render('views/consultees/shapefile/view.njk', {
 			...pageLocals,
 			pageHeading: 'Project shapefile',
-			backLinkUrl: '/consultees/11111111-1111-1111-1111-111111111111?ruleset=example-ruleset',
+			backLinkUrl: '/consultees/11111111-1111-1111-1111-111111111111?ruleset=england-wales-post-20240430',
 			caseId: '11111111-1111-1111-1111-111111111111',
-			rulesetId: 'example-ruleset',
+			rulesetId: 'england-wales-post-20240430',
 			_csrf: 'test-csrf',
 			files: [
 				{
@@ -208,19 +208,21 @@ describe('manage page accessibility smoke', () => {
 			sectorDescription: 'Energy, Generating Stations, Solar',
 			stage: 'Acceptance',
 			shapefileName: 'EN0110007.geojson',
-			shapefileChangeUrl: '/consultees/11111111-1111-1111-1111-111111111111/shapefile?ruleset=example-ruleset',
-			rulesetName: 'Example ruleset',
-			rulesetChangeUrl: '/consultees/11111111-1111-1111-1111-111111111111/ruleset?ruleset=example-ruleset',
-			previewReportUrl: '/consultees/11111111-1111-1111-1111-111111111111/report?ruleset=example-ruleset',
+			shapefileChangeUrl:
+				'/consultees/11111111-1111-1111-1111-111111111111/shapefile?ruleset=england-wales-post-20240430',
+			rulesetName: 'England Wales post 30 April 2024',
+			rulesetChangeUrl: '/consultees/11111111-1111-1111-1111-111111111111/ruleset?ruleset=england-wales-post-20240430',
+			previewReportUrl: '/consultees/11111111-1111-1111-1111-111111111111/report?ruleset=england-wales-post-20240430',
 			mapId: 'case-map',
-			mapRegionLabel: 'Map showing Example ruleset for Longfield Solar Farm',
-			staticMapSrc: '/consultees/11111111-1111-1111-1111-111111111111/results/static-map?ruleset=example-ruleset',
-			staticMapAlt: 'Static map showing Example ruleset for Longfield Solar Farm',
+			mapRegionLabel: 'Map showing England Wales post 30 April 2024 for Longfield Solar Farm',
+			staticMapSrc:
+				'/consultees/11111111-1111-1111-1111-111111111111/results/static-map?ruleset=england-wales-post-20240430',
+			staticMapAlt: 'Static map showing England Wales post 30 April 2024 for Longfield Solar Farm',
 			mapWidth: 960,
 			mapHeight: 516,
 			mapConfigJson: '{"center":[-1.78,50.62],"zoom":11}',
 			rulesetFailed: false,
-			retryUrl: '/consultees/11111111-1111-1111-1111-111111111111?ruleset=example-ruleset',
+			retryUrl: '/consultees/11111111-1111-1111-1111-111111111111?ruleset=england-wales-post-20240430',
 			matchCount: 120,
 			mapIsSampled: true,
 			mapSampleSize: 30
@@ -240,19 +242,21 @@ describe('manage page accessibility smoke', () => {
 			sectorDescription: null,
 			stage: null,
 			shapefileName: 'Not provided',
-			shapefileChangeUrl: '/consultees/11111111-1111-1111-1111-111111111111/shapefile?ruleset=example-ruleset',
-			rulesetName: 'Example ruleset',
-			rulesetChangeUrl: '/consultees/11111111-1111-1111-1111-111111111111/ruleset?ruleset=example-ruleset',
-			previewReportUrl: '/consultees/11111111-1111-1111-1111-111111111111/report?ruleset=example-ruleset',
+			shapefileChangeUrl:
+				'/consultees/11111111-1111-1111-1111-111111111111/shapefile?ruleset=england-wales-post-20240430',
+			rulesetName: 'England Wales post 30 April 2024',
+			rulesetChangeUrl: '/consultees/11111111-1111-1111-1111-111111111111/ruleset?ruleset=england-wales-post-20240430',
+			previewReportUrl: '/consultees/11111111-1111-1111-1111-111111111111/report?ruleset=england-wales-post-20240430',
 			mapId: 'case-map',
-			mapRegionLabel: 'Map showing Example ruleset for Longfield Solar Farm',
-			staticMapSrc: '/consultees/11111111-1111-1111-1111-111111111111/results/static-map?ruleset=example-ruleset',
-			staticMapAlt: 'Static map showing Example ruleset for Longfield Solar Farm',
+			mapRegionLabel: 'Map showing England Wales post 30 April 2024 for Longfield Solar Farm',
+			staticMapSrc:
+				'/consultees/11111111-1111-1111-1111-111111111111/results/static-map?ruleset=england-wales-post-20240430',
+			staticMapAlt: 'Static map showing England Wales post 30 April 2024 for Longfield Solar Farm',
 			mapWidth: 960,
 			mapHeight: 516,
 			mapConfigJson: '{"center":[-1.78,50.62],"zoom":11}',
 			rulesetFailed: true,
-			retryUrl: '/consultees/11111111-1111-1111-1111-111111111111?ruleset=example-ruleset',
+			retryUrl: '/consultees/11111111-1111-1111-1111-111111111111?ruleset=england-wales-post-20240430',
 			matchCount: 0,
 			mapIsSampled: false,
 			mapSampleSize: 30
@@ -265,20 +269,21 @@ describe('manage page accessibility smoke', () => {
 		const html = nunjucks.render('views/consultees/report/view.njk', {
 			...pageLocals,
 			pageHeading: 'Check consultees before creating the report',
-			backLinkUrl: '/consultees/11111111-1111-1111-1111-111111111111?ruleset=example-ruleset',
+			backLinkUrl: '/consultees/11111111-1111-1111-1111-111111111111?ruleset=england-wales-post-20240430',
 			caseName: 'Longfield Solar Farm',
 			reference: 'EN0110007',
 			stage: 'Acceptance',
 			caseChangeUrl: '/',
-			rulesetName: 'Example ruleset',
-			rulesetChangeUrl: '/consultees/11111111-1111-1111-1111-111111111111/ruleset?ruleset=example-ruleset',
+			rulesetName: 'England Wales post 30 April 2024',
+			rulesetChangeUrl: '/consultees/11111111-1111-1111-1111-111111111111/ruleset?ruleset=england-wales-post-20240430',
 			consultees: [
 				{ name: 'Parish Council', count: '3', changeUrl: '#' },
 				{ name: 'Railway', count: '12', changeUrl: '#' }
 			],
-			generateReportUrl: '/consultees/11111111-1111-1111-1111-111111111111/report/created?ruleset=example-ruleset',
+			generateReportUrl:
+				'/consultees/11111111-1111-1111-1111-111111111111/report/created?ruleset=england-wales-post-20240430',
 			rulesetFailed: false,
-			retryUrl: '/consultees/11111111-1111-1111-1111-111111111111?ruleset=example-ruleset'
+			retryUrl: '/consultees/11111111-1111-1111-1111-111111111111?ruleset=england-wales-post-20240430'
 		});
 		await assertNoSeriousA11yViolations(html);
 	});
@@ -288,29 +293,29 @@ describe('manage page accessibility smoke', () => {
 			...pageLocals,
 			pageHeading: 'Parish Council',
 			pageCaption: 'Longfield Solar Farm',
-			backLinkUrl: '/consultees/11111111-1111-1111-1111-111111111111/report?ruleset=example-ruleset',
+			backLinkUrl: '/consultees/11111111-1111-1111-1111-111111111111/report?ruleset=england-wales-post-20240430',
 			rows: [
 				{
 					name: 'Little Snoring Parish Council',
 					identified: 'Intersects the site',
 					removeUrl:
-						'/consultees/11111111-1111-1111-1111-111111111111/report/consultees?ruleset=example-ruleset&category=Parish%20Council&exclude=55555555-5555-5555-5555-555555555555'
+						'/consultees/11111111-1111-1111-1111-111111111111/report/consultees?ruleset=england-wales-post-20240430&category=Parish%20Council&exclude=55555555-5555-5555-5555-555555555555'
 				}
 			],
 			addConsulteeUrl:
-				'/consultees/11111111-1111-1111-1111-111111111111/report/consultees/add?ruleset=example-ruleset&category=Parish%20Council',
-			saveAndReturnUrl: '/consultees/11111111-1111-1111-1111-111111111111/report?ruleset=example-ruleset',
+				'/consultees/11111111-1111-1111-1111-111111111111/report/consultees/add?ruleset=england-wales-post-20240430&category=Parish%20Council',
+			saveAndReturnUrl: '/consultees/11111111-1111-1111-1111-111111111111/report?ruleset=england-wales-post-20240430',
 			mapId: 'case-map',
 			mapRegionLabel: 'Map showing Parish Council consultees for Longfield Solar Farm',
 			staticMapSrc:
-				'/consultees/11111111-1111-1111-1111-111111111111/results/static-map?ruleset=example-ruleset&category=Parish%20Council',
+				'/consultees/11111111-1111-1111-1111-111111111111/results/static-map?ruleset=england-wales-post-20240430&category=Parish%20Council',
 			staticMapAlt: 'Static map showing Parish Council consultees for Longfield Solar Farm',
 			mapWidth: 900,
 			mapHeight: 506,
 			mapConfigJson: '{"type":"FeatureCollection","features":[]}',
 			rulesetFailed: false,
 			retryUrl:
-				'/consultees/11111111-1111-1111-1111-111111111111/report/consultees?ruleset=example-ruleset&category=Parish%20Council',
+				'/consultees/11111111-1111-1111-1111-111111111111/report/consultees?ruleset=england-wales-post-20240430&category=Parish%20Council',
 			matchCount: 1,
 			mapIsSampled: false,
 			mapSampleSize: 30
@@ -323,22 +328,22 @@ describe('manage page accessibility smoke', () => {
 			...pageLocals,
 			pageHeading: 'Parish Council',
 			pageCaption: 'Longfield Solar Farm',
-			backLinkUrl: '/consultees/11111111-1111-1111-1111-111111111111/report?ruleset=example-ruleset',
+			backLinkUrl: '/consultees/11111111-1111-1111-1111-111111111111/report?ruleset=england-wales-post-20240430',
 			rows: [],
 			addConsulteeUrl:
-				'/consultees/11111111-1111-1111-1111-111111111111/report/consultees/add?ruleset=example-ruleset&category=Parish%20Council',
-			saveAndReturnUrl: '/consultees/11111111-1111-1111-1111-111111111111/report?ruleset=example-ruleset',
+				'/consultees/11111111-1111-1111-1111-111111111111/report/consultees/add?ruleset=england-wales-post-20240430&category=Parish%20Council',
+			saveAndReturnUrl: '/consultees/11111111-1111-1111-1111-111111111111/report?ruleset=england-wales-post-20240430',
 			mapId: 'case-map',
 			mapRegionLabel: 'Map showing Parish Council consultees for Longfield Solar Farm',
 			staticMapSrc:
-				'/consultees/11111111-1111-1111-1111-111111111111/results/static-map?ruleset=example-ruleset&category=Parish%20Council',
+				'/consultees/11111111-1111-1111-1111-111111111111/results/static-map?ruleset=england-wales-post-20240430&category=Parish%20Council',
 			staticMapAlt: 'Static map showing Parish Council consultees for Longfield Solar Farm',
 			mapWidth: 900,
 			mapHeight: 506,
 			mapConfigJson: '{"type":"FeatureCollection","features":[]}',
 			rulesetFailed: false,
 			retryUrl:
-				'/consultees/11111111-1111-1111-1111-111111111111/report/consultees?ruleset=example-ruleset&category=Parish%20Council',
+				'/consultees/11111111-1111-1111-1111-111111111111/report/consultees?ruleset=england-wales-post-20240430&category=Parish%20Council',
 			matchCount: 0,
 			mapIsSampled: false,
 			mapSampleSize: 30
@@ -353,9 +358,9 @@ describe('manage page accessibility smoke', () => {
 			pageHeading: 'Select a consultee',
 			pageCaption: 'Parish Council',
 			backLinkUrl:
-				'/consultees/11111111-1111-1111-1111-111111111111/report/consultees?ruleset=example-ruleset&category=Parish%20Council',
+				'/consultees/11111111-1111-1111-1111-111111111111/report/consultees?ruleset=england-wales-post-20240430&category=Parish%20Council',
 			formAction:
-				'/consultees/11111111-1111-1111-1111-111111111111/report/consultees/add?ruleset=example-ruleset&category=Parish%20Council',
+				'/consultees/11111111-1111-1111-1111-111111111111/report/consultees/add?ruleset=england-wales-post-20240430&category=Parish%20Council',
 			nameValue: '',
 			reasonValue: ''
 		});
@@ -368,9 +373,9 @@ describe('manage page accessibility smoke', () => {
 			pageHeading: 'Select a consultee',
 			pageCaption: 'Parish Council',
 			backLinkUrl:
-				'/consultees/11111111-1111-1111-1111-111111111111/report/consultees?ruleset=example-ruleset&category=Parish%20Council',
+				'/consultees/11111111-1111-1111-1111-111111111111/report/consultees?ruleset=england-wales-post-20240430&category=Parish%20Council',
 			formAction:
-				'/consultees/11111111-1111-1111-1111-111111111111/report/consultees/add?ruleset=example-ruleset&category=Parish%20Council',
+				'/consultees/11111111-1111-1111-1111-111111111111/report/consultees/add?ruleset=england-wales-post-20240430&category=Parish%20Council',
 			nameValue: '',
 			reasonValue: 'Adjacent landowner',
 			nameError: { text: 'Enter the consultee name' },
@@ -384,7 +389,7 @@ describe('manage page accessibility smoke', () => {
 		const html = nunjucks.render('views/consultees/report/created.njk', {
 			...pageLocals,
 			pageHeading: 'Report created',
-			backLinkUrl: '/consultees/11111111-1111-1111-1111-111111111111?ruleset=example-ruleset',
+			backLinkUrl: '/consultees/11111111-1111-1111-1111-111111111111?ruleset=england-wales-post-20240430',
 			caseName: 'Longfield Solar Farm',
 			reference: 'EN0110007',
 			downloadUrl: '#',
@@ -520,14 +525,15 @@ describe('manage page accessibility smoke', () => {
 			...pageLocals,
 			pageHeading: 'Consultees identified for Example Project (EN01)',
 			backLinkUrl: '/consultees/11111111-1111-1111-1111-111111111111',
-			rulesetName: 'Example ruleset',
+			rulesetName: 'England Wales post 30 April 2024',
 			reference: 'EN01',
 			caseName: 'Example Project',
 			caseId: '11111111-1111-1111-1111-111111111111',
 			mapId: 'case-map',
-			mapRegionLabel: 'Map showing Example ruleset for Example Project',
-			staticMapSrc: '/consultees/11111111-1111-1111-1111-111111111111/results/static-map?ruleset=example-ruleset',
-			staticMapAlt: 'Static map showing Example ruleset for Example Project',
+			mapRegionLabel: 'Map showing England Wales post 30 April 2024 for Example Project',
+			staticMapSrc:
+				'/consultees/11111111-1111-1111-1111-111111111111/results/static-map?ruleset=england-wales-post-20240430',
+			staticMapAlt: 'Static map showing England Wales post 30 April 2024 for Example Project',
 			mapWidth: 960,
 			mapHeight: 516,
 			mapConfigJson: '{"center":[-1.78,50.62],"zoom":11}',
@@ -547,14 +553,15 @@ describe('manage page accessibility smoke', () => {
 			...pageLocals,
 			pageHeading: 'Consultees identified for Example Project (EN01)',
 			backLinkUrl: '/consultees/11111111-1111-1111-1111-111111111111',
-			rulesetName: 'Example ruleset',
+			rulesetName: 'England Wales post 30 April 2024',
 			reference: 'EN01',
 			caseName: 'Example Project',
 			caseId: '11111111-1111-1111-1111-111111111111',
 			mapId: 'case-map',
-			mapRegionLabel: 'Map showing Example ruleset for Example Project',
-			staticMapSrc: '/consultees/11111111-1111-1111-1111-111111111111/results/static-map?ruleset=example-ruleset',
-			staticMapAlt: 'Static map showing Example ruleset for Example Project',
+			mapRegionLabel: 'Map showing England Wales post 30 April 2024 for Example Project',
+			staticMapSrc:
+				'/consultees/11111111-1111-1111-1111-111111111111/results/static-map?ruleset=england-wales-post-20240430',
+			staticMapAlt: 'Static map showing England Wales post 30 April 2024 for Example Project',
 			mapWidth: 960,
 			mapHeight: 516,
 			mapConfigJson: '{"center":[-1.78,50.62],"zoom":11}',
@@ -577,16 +584,17 @@ describe('manage page accessibility smoke', () => {
 			...pageLocals,
 			pageHeading: 'Consultees identified for Example Project (EN01)',
 			backLinkUrl: '/consultees/11111111-1111-1111-1111-111111111111',
-			rulesetName: 'Example ruleset',
+			rulesetName: 'England Wales post 30 April 2024',
 			reference: 'EN01',
 			caseName: 'Example Project',
 			caseId: '11111111-1111-1111-1111-111111111111',
 			mapId: 'case-map',
-			mapRegionLabel: 'Map showing Example ruleset for Example Project',
-			staticMapSrc: '/consultees/11111111-1111-1111-1111-111111111111/results/static-map?ruleset=example-ruleset',
+			mapRegionLabel: 'Map showing England Wales post 30 April 2024 for Example Project',
+			staticMapSrc:
+				'/consultees/11111111-1111-1111-1111-111111111111/results/static-map?ruleset=england-wales-post-20240430',
 			rulesetFailed: true,
-			retryUrl: '/consultees/11111111-1111-1111-1111-111111111111/results?ruleset=example-ruleset',
-			staticMapAlt: 'Static map showing Example ruleset for Example Project',
+			retryUrl: '/consultees/11111111-1111-1111-1111-111111111111/results?ruleset=england-wales-post-20240430',
+			staticMapAlt: 'Static map showing England Wales post 30 April 2024 for Example Project',
 			mapWidth: 960,
 			mapHeight: 516,
 			mapConfigJson: '{"center":[-1.78,50.62],"zoom":11}',

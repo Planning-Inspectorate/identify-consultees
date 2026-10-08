@@ -4,7 +4,7 @@
 
 ## Consultee categories
 
-"Points" is the number of vertices per shape, median and maximum — a rough measure of how expensive a category is to screen. "Ruleset" lists the [example ruleset](./spatial-screening-engine.md) conditions that use the category.
+"Points" is the number of vertices per shape, median and maximum — a rough measure of how expensive a category is to screen. "Ruleset" lists the [England Wales post 30 April 2024 ruleset](./spatial-screening-engine.md) conditions that use the category.
 
 | Category                       |   Rows | Shape                        | Points (median / max) | Ruleset                                                        |
 | ------------------------------ | -----: | ---------------------------- | --------------------: | -------------------------------------------------------------- |
