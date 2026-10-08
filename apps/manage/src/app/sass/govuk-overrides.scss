@@ -15,6 +15,11 @@
 	background: brand.$pins-grey-100;
 	border-bottom: 0.5rem solid brand.$pins-green-200;
 
+	.govuk-generic-header__logo {
+		padding-top: 0;
+		padding-bottom: 1rem;
+	}
+
 	.govuk-generic-header__homepage-link {
 		display: inline-block;
 		text-decoration: none;
