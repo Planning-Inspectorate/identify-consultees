@@ -70,7 +70,7 @@
 	{% endif %}
 
 	<h2 class="govuk-heading-m govuk-!-margin-top-6">All consultees within {{ nearbyRadiusKm }}km ({{ nearbyMatchCount }})</h2>
-	<p class="govuk-body">Every consultee near the site, in any category. To see them on the map, turn on "All consultees within {{ nearbyRadiusKm }}km" in the map's layers.</p>
+	<p class="govuk-body">Every consultee near the site, in any category, including those the ruleset didn't identify. The map shows only the consultees identified.</p>
 
 	{% if nearbyMatches.length == 0 %}
 		<p class="govuk-body">No consultees found within {{ nearbyRadiusKm }}km.</p>
