@@ -193,7 +193,9 @@ test.describe('cross-browser render completeness', () => {
 			}
 
 			for (const text of pageCase.mustSee) {
-				await expect(page.getByText(text).first()).toBeVisible();
+				// filter to visible matches - hidden metadata (e.g. the header logo's
+				// SVG <title>) can share the same text and is never visible
+				await expect(page.getByText(text).filter({ visible: true }).first()).toBeVisible();
 			}
 
 			// Main content should occupy space (guards against blank/collapsed renders)
