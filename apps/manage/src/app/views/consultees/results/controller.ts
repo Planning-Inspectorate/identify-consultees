@@ -28,7 +28,7 @@ function toMatchRow(match: ConsulteeAreaSummaryMatch): ConsulteeMatchRow {
  * every matching consultee listed in tables.
  */
 export function buildConsulteesResultsPage(service: ManageService): AsyncRequestHandler {
-	const { db, logger, nearbyConsulteeRadiusMetres } = service;
+	const { db, logger, nearbyConsulteeRadiusMetres, rulesetRunner } = service;
 
 	return async (req, res) => {
 		const caseId = String(req.params.caseId ?? '');
@@ -50,7 +50,7 @@ export function buildConsulteesResultsPage(service: ManageService): AsyncRequest
 		);
 
 		const { matches, allNearby, failed } = await runRulesetSafely(
-			db,
+			rulesetRunner,
 			project,
 			ruleset,
 			nearbyConsulteeRadiusMetres,
@@ -94,7 +94,7 @@ export function buildConsulteesResultsPage(service: ManageService): AsyncRequest
 }
 
 export function buildResultsStaticMap(service: ManageService, forceSvg = false): AsyncRequestHandler {
-	const { db, logger, nearbyConsulteeRadiusMetres } = service;
+	const { db, logger, nearbyConsulteeRadiusMetres, rulesetRunner } = service;
 
 	return async (req, res) => {
 		const caseId = String(req.params.caseId ?? '');
@@ -106,7 +106,13 @@ export function buildResultsStaticMap(service: ManageService, forceSvg = false):
 			return;
 		}
 
-		const { matches, failed } = await runRulesetSafely(db, project, ruleset, nearbyConsulteeRadiusMetres, logger);
+		const { matches, failed } = await runRulesetSafely(
+			rulesetRunner,
+			project,
+			ruleset,
+			nearbyConsulteeRadiusMetres,
+			logger
+		);
 		if (failed) {
 			// not an empty map: that would be cached (see Cache-Control below) as if it were a real
 			// "no matches" result

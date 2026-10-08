@@ -5,8 +5,6 @@ import { loadConfig } from '../configuration/config.ts';
 import { newDatabaseClient } from '../index.ts';
 import type { CaseBoundaryFeatureCollection } from './case-boundaries.ts';
 import {
-	findCaseBoundariesIntersecting,
-	findCaseBoundariesNear,
 	getCaseBoundaryById,
 	getCaseBoundarySummaryById,
 	getRandomCaseSummary,
@@ -84,19 +82,6 @@ describe('case boundaries (requires a local SQL Server - see docker-compose.yml)
 			assert.equal(stored.properties.caseReference, 'EN010001');
 			assert.deepEqual(stored.geometry, featureCollection.features[0].geometry);
 			assert.deepEqual(stored.properties.metadata, { source: 'test' });
-
-			// a point inside the stored polygon
-			const insidePoint = { type: 'Point' as const, coordinates: [-0.1276, 51.5072] as [number, number] };
-			const nearMatches = await findCaseBoundariesNear(dbClient, insidePoint, 5000);
-			assert.ok(nearMatches.some((match) => match.feature.id === testBoundaryId));
-
-			const intersecting = await findCaseBoundariesIntersecting(dbClient, insidePoint);
-			assert.ok(intersecting.features.some((feature) => feature.id === testBoundaryId));
-
-			// Paris is a long way from the stored London polygon - shouldn't match a 1km radius
-			const farPoint = { type: 'Point' as const, coordinates: [2.3522, 48.8566] as [number, number] };
-			const farMatches = await findCaseBoundariesNear(dbClient, farPoint, 1000);
-			assert.ok(!farMatches.some((match) => match.feature.id === testBoundaryId));
 		} finally {
 			await cleanup();
 		}

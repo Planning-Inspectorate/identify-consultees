@@ -18,7 +18,7 @@ import type { ConsulteeProjectViewModel } from './view-model.ts';
  * tables that back the report live on /consultees/:caseId/results.
  */
 export function buildConsulteeProjectPage(service: ManageService): AsyncRequestHandler {
-	const { db, logger, nearbyConsulteeRadiusMetres } = service;
+	const { db, logger, nearbyConsulteeRadiusMetres, rulesetRunner } = service;
 
 	return async (req, res) => {
 		const caseId = String(req.params.caseId ?? '');
@@ -42,7 +42,13 @@ export function buildConsulteeProjectPage(service: ManageService): AsyncRequestH
 			'consultee project map page'
 		);
 
-		const { matches, failed } = await runRulesetSafely(db, project, ruleset, nearbyConsulteeRadiusMetres, logger);
+		const { matches, failed } = await runRulesetSafely(
+			rulesetRunner,
+			project,
+			ruleset,
+			nearbyConsulteeRadiusMetres,
+			logger
+		);
 		const searchArea = await buildSearchAreaSafely(db, project, matches, nearbyConsulteeRadiusMetres, logger);
 		const staticMapSrc = `/consultees/${encodeURIComponent(project.id)}/results/static-map?ruleset=${encodeURIComponent(ruleset.id)}`;
 		const staticMapAlt = `Static map showing ${ruleset.name} for ${project.properties.caseName}`;

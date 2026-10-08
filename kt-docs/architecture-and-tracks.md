@@ -21,7 +21,7 @@
 
 - Homepage search + paginated list over `case_boundary` via `searchCaseBoundaries` (`packages/database/src/geospatial`)
 - Ruleset picker at `/consultees/:caseId`, results at `/consultees/:caseId/results?ruleset=…`
-- Results run the ruleset's conditions as SQL `GEOGRAPHY` queries (`runRuleset`) and render matches on an interactive map with a static-image fallback
+- Results run the ruleset's conditions as SQL `GEOGRAPHY` queries (in the Python function, `run-ruleset`) and render matches on an interactive map with a static-image fallback
 - Component showcase at `/components` (GOV.UK macros + `/components/interactive-map` worked Defra examples)
 - Admin data-loading routes under `/admin/` (upload file to blob, import reference data into SQL)
 
@@ -51,7 +51,7 @@ See [Node–Python integration](./node-python-integration.md).
 
 - Local Docker SQL Server (host port **1434**) via `docker compose`
 - Prisma + raw geospatial helpers under `packages/database/src/geospatial` (`case-boundaries`, `consultee-areas`, `rulesets`, `wkt`)
-- Ruleset definitions built from a CSV export (`example_ruleset.csv`); conditions run as `STIntersects` / `STDistance` / bordering queries
+- Ruleset definitions built from a CSV export (`england_wales_post_20240430_ruleset.csv`); conditions run in `apps/function-python` as `STIntersects` / `STDistance` / bordering queries
 - Dev seed loads a real sample of UK boundaries (`npm run db-seed`); full datasets land via `npm run db-import`, `npm run db-import-from-blob`, the DB Seed pipeline's `loadFullReferenceData` option, or `/admin/import-reference-data`
 - `/items` pings the DB with `SELECT 1` as a connectivity smoke page
 
@@ -64,7 +64,7 @@ Browser
   └─ Azure Front Door (deployed) / localhost (local)
        └─ apps/manage (Track A UI)
             ├─ packages/database → SQL Server (Track C; seeded sample data locally)
-            └─ optional HTTP: PYTHON_FUNCTION_URL → apps/function-python (Track B)
+            └─ HTTP: PYTHON_FUNCTION_URL → apps/function-python (runs rulesets)
                                     └─ same SQL (Track C)
 ```
 
@@ -74,7 +74,7 @@ Browser
 | ---------------------------- | -------- | ---------------------------------------------------------- |
 | Home search / select project | C        | `case_boundary` via `searchCaseBoundaries`                 |
 | Ruleset picker               | C        | Case summary + `RULESETS` (CSV-built, `packages/database`) |
-| Consultees results + maps    | C        | `runRuleset` spatial matches + case geometry               |
+| Consultees results + maps    | C        | Python `run-ruleset` matches + case geometry               |
 | Map layers demo              | A        | Demo GeoJSON (`map-layers-demo-geojson.ts`)                |
 | Component showcase           | A        | Static examples (Defra map uses sample GeoJSON)            |
 | Consultee areas (Python)     | B (+ C)  | Python function → SQL                                      |

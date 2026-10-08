@@ -2,6 +2,8 @@ import { mockLogger } from '@planning-inspectorate/core/testing';
 import assert from 'node:assert';
 import { describe, it, mock } from 'node:test';
 import { configureNunjucks } from '../../../../nunjucks.ts';
+import type { ConsulteeAreaMatchRow } from '../../../../testing/ruleset-runner-stub.ts';
+import { failingRulesetRunner, rulesetRunnerReturning } from '../../../../testing/ruleset-runner-stub.ts';
 import { buildReportConsulteesPage } from './controller.ts';
 
 const realProjectId = '44444444-4444-4444-4444-444444444444';
@@ -48,20 +50,31 @@ const addJson = (name: string, reason = '', category = 'Parish Council') =>
 const addParam = (name: string, reason = '', category = 'Parish Council') =>
 	encodeURIComponent(addJson(name, reason, category));
 
+// rows[0] answers the project lookup; rows[1], if given, is what the ruleset matched - returned by
+// the stand-in Python function (see rulesetRunnerFor), and by the database as the map's display geometry
 function dbReturning(rows: unknown[][]) {
 	let call = 0;
 	return {
+		matchRows: (rows[1] ?? []) as ConsulteeAreaMatchRow[],
 		$queryRaw: mock.fn(async (sql: TemplateStringsArray) => {
-			// runRuleset simplifies the site, and grows it for bordering checks, with queries on the
-			// site alone (no table) - answer those with the site unchanged
+			// the map's search area is a query on the site alone (no table) - answer it with the site
 			if (!/\bFROM\b/.test(sql.join(''))) return [{ wkt: realProjectRow().geometryWkt }];
 			return rows[Math.min(call++, rows.length - 1)] ?? [];
 		})
 	};
 }
 
+function rulesetRunnerFor(db: unknown) {
+	return rulesetRunnerReturning((db as { matchRows?: ConsulteeAreaMatchRow[] }).matchRows ?? []);
+}
+
 function handlerFor(db: unknown) {
-	return buildReportConsulteesPage({ db, logger: mockLogger(), nearbyConsulteeRadiusMetres: 20_000 });
+	return buildReportConsulteesPage({
+		db,
+		logger: mockLogger(),
+		nearbyConsulteeRadiusMetres: 20_000,
+		rulesetRunner: rulesetRunnerFor(db)
+	});
 }
 
 describe('report consultees change page', () => {
@@ -340,7 +353,12 @@ describe('report consultees change page', () => {
 			})
 		};
 		const logger = mockLogger();
-		const handler = buildReportConsulteesPage({ db, logger, nearbyConsulteeRadiusMetres: 20_000 });
+		const handler = buildReportConsulteesPage({
+			db,
+			logger,
+			nearbyConsulteeRadiusMetres: 20_000,
+			rulesetRunner: failingRulesetRunner()
+		});
 		await handler({ params: { caseId: realProjectId }, query: { category: 'Parish Council' } }, mockRes);
 
 		const viewModel = mockRes.render.mock.calls[0].arguments[1];

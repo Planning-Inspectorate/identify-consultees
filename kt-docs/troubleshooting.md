@@ -31,11 +31,12 @@
 
 ## Python bridge
 
-| Symptom                                | Likely cause                           | Fix                                                                |
-| -------------------------------------- | -------------------------------------- | ------------------------------------------------------------------ |
-| “Could not reach the Python function.” | Function not running or bad URL        | Start `func start`; verify `PYTHON_FUNCTION_URL`                   |
-| Function runs but errors               | SQL not up / bad `local.settings.json` | `docker compose up -d`; match connection string to database `.env` |
-| UI still works otherwise               | Expected                               | Track A is independent                                             |
+| Symptom                                         | Likely cause                                         | Fix                                                                                                             |
+| ----------------------------------------------- | ---------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| “The ruleset could not be run” on every project | Function not running, bad URL, or mismatched API key | Run `npm start` (it starts the function); check the log for `run-ruleset` 401/500; verify `PYTHON_FUNCTION_URL` |
+| “Could not reach the Python function.”          | Function not running or bad URL                      | Start `func start`; verify `PYTHON_FUNCTION_URL`                                                                |
+| Function runs but errors                        | SQL not up / bad `local.settings.json`               | `docker compose up -d`; match connection string to database `.env`                                              |
+| `npm start` warns `func` not found              | Azure Functions Core Tools not installed             | `npm install -g azure-functions-core-tools@4`                                                                   |
 
 ## Database connectivity
 

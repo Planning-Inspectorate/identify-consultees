@@ -2,6 +2,8 @@ import { mockLogger } from '@planning-inspectorate/core/testing';
 import assert from 'node:assert';
 import { describe, it, mock } from 'node:test';
 import { configureNunjucks } from '../../../nunjucks.ts';
+import type { ConsulteeAreaMatchRow } from '../../../testing/ruleset-runner-stub.ts';
+import { failingRulesetRunner, rulesetRunnerReturning } from '../../../testing/ruleset-runner-stub.ts';
 import { buildConsulteesResultsPage, buildResultsStaticMap } from './controller.ts';
 
 const realProjectId = '44444444-4444-4444-4444-444444444444';
@@ -40,16 +42,22 @@ function railwayMatchRow(
 	};
 }
 
+// rows[0] answers the project lookup; rows[1], if given, is what the ruleset matched - returned by
+// the stand-in Python function (see rulesetRunnerFor), and by the database as the map's display geometry
 function dbReturning(rows: unknown[][]) {
 	let call = 0;
 	return {
+		matchRows: (rows[1] ?? []) as ConsulteeAreaMatchRow[],
 		$queryRaw: mock.fn(async (sql: TemplateStringsArray) => {
-			// runRuleset simplifies the site, and grows it for bordering checks, with queries on the
-			// site alone (no table) - answer those with the site unchanged
+			// the map's search area is a query on the site alone (no table) - answer it with the site
 			if (!/\bFROM\b/.test(sql.join(''))) return [{ wkt: realProjectRow().geometryWkt }];
 			return rows[Math.min(call++, rows.length - 1)] ?? [];
 		})
 	};
+}
+
+function rulesetRunnerFor(db: unknown) {
+	return rulesetRunnerReturning((db as { matchRows?: ConsulteeAreaMatchRow[] }).matchRows ?? []);
 }
 
 describe('consultees results page', () => {
@@ -60,7 +68,12 @@ describe('consultees results page', () => {
 			render: mock.fn((view, data) => nunjucks.render(view, data))
 		};
 		const db = dbReturning([[realProjectRow()], [railwayMatchRow()]]);
-		const handler = buildConsulteesResultsPage({ db, logger: mockLogger(), nearbyConsulteeRadiusMetres: 20_000 });
+		const handler = buildConsulteesResultsPage({
+			db,
+			logger: mockLogger(),
+			nearbyConsulteeRadiusMetres: 20_000,
+			rulesetRunner: rulesetRunnerFor(db)
+		});
 		await handler({ params: { caseId: realProjectId }, query: { ruleset: 'example-ruleset' } }, mockRes);
 
 		assert.strictEqual(mockRes.render.mock.callCount(), 1);
@@ -97,7 +110,12 @@ describe('consultees results page', () => {
 			})
 		};
 		const logger = mockLogger();
-		const handler = buildConsulteesResultsPage({ db, logger, nearbyConsulteeRadiusMetres: 20_000 });
+		const handler = buildConsulteesResultsPage({
+			db,
+			logger,
+			nearbyConsulteeRadiusMetres: 20_000,
+			rulesetRunner: rulesetRunnerReturning([railwayMatchRow()])
+		});
 		await handler({ params: { caseId: realProjectId }, query: { ruleset: 'example-ruleset' } }, mockRes);
 
 		const viewModel = mockRes.render.mock.calls[0].arguments[1];
@@ -113,7 +131,12 @@ describe('consultees results page', () => {
 			render: mock.fn((view, data) => nunjucks.render(view, data))
 		};
 		const db = dbReturning([[realProjectRow()], []]);
-		const handler = buildConsulteesResultsPage({ db, logger: mockLogger(), nearbyConsulteeRadiusMetres: 50_000 });
+		const handler = buildConsulteesResultsPage({
+			db,
+			logger: mockLogger(),
+			nearbyConsulteeRadiusMetres: 50_000,
+			rulesetRunner: rulesetRunnerFor(db)
+		});
 		await handler({ params: { caseId: realProjectId }, query: { ruleset: 'example-ruleset' } }, mockRes);
 
 		const viewModel = mockRes.render.mock.calls[0].arguments[1];
@@ -126,7 +149,12 @@ describe('consultees results page', () => {
 			[realProjectRow()],
 			[railwayMatchRow({ consultee: null, region: null, consulteeCategory: null })]
 		]);
-		const handler = buildConsulteesResultsPage({ db, logger: mockLogger(), nearbyConsulteeRadiusMetres: 20_000 });
+		const handler = buildConsulteesResultsPage({
+			db,
+			logger: mockLogger(),
+			nearbyConsulteeRadiusMetres: 20_000,
+			rulesetRunner: rulesetRunnerFor(db)
+		});
 		await handler({ params: { caseId: realProjectId }, query: { ruleset: 'example-ruleset' } }, mockRes);
 
 		const viewModel = mockRes.render.mock.calls[0].arguments[1];
@@ -143,7 +171,12 @@ describe('consultees results page', () => {
 		const hostileRow = { ...realProjectRow(), caseName: '</script><img src=x onerror=alert(1)>' };
 		const hostileMatch = railwayMatchRow({ consultee: '</script><script>alert(1)</script>' });
 		const db = dbReturning([[hostileRow], [hostileMatch]]);
-		const handler = buildConsulteesResultsPage({ db, logger: mockLogger(), nearbyConsulteeRadiusMetres: 20_000 });
+		const handler = buildConsulteesResultsPage({
+			db,
+			logger: mockLogger(),
+			nearbyConsulteeRadiusMetres: 20_000,
+			rulesetRunner: rulesetRunnerFor(db)
+		});
 		await handler({ params: { caseId: realProjectId }, query: { ruleset: 'example-ruleset' } }, mockRes);
 
 		const viewModel = mockRes.render.mock.calls[0].arguments[1];
@@ -168,7 +201,12 @@ describe('consultees results page', () => {
 	it('should ignore non-string array ruleset values', async () => {
 		const mockRes = { status: mock.fn(() => mockRes), render: mock.fn() };
 		const db = dbReturning([[realProjectRow()]]);
-		const handler = buildConsulteesResultsPage({ db, logger: mockLogger(), nearbyConsulteeRadiusMetres: 20_000 });
+		const handler = buildConsulteesResultsPage({
+			db,
+			logger: mockLogger(),
+			nearbyConsulteeRadiusMetres: 20_000,
+			rulesetRunner: rulesetRunnerFor(db)
+		});
 		await handler({ params: { caseId: realProjectId }, query: { ruleset: [1] } }, mockRes);
 		assert.strictEqual(mockRes.status.mock.calls[0].arguments[0], 404);
 	});
@@ -188,7 +226,12 @@ describe('consultees results page', () => {
 			})
 		};
 		const logger = mockLogger();
-		const handler = buildConsulteesResultsPage({ db, logger, nearbyConsulteeRadiusMetres: 20_000 });
+		const handler = buildConsulteesResultsPage({
+			db,
+			logger,
+			nearbyConsulteeRadiusMetres: 20_000,
+			rulesetRunner: failingRulesetRunner()
+		});
 		await handler({ params: { caseId: realProjectId }, query: { ruleset: 'example-ruleset' } }, mockRes);
 
 		const viewModel = mockRes.render.mock.calls[0].arguments[1];
@@ -208,7 +251,12 @@ describe('consultees results page', () => {
 	it('should not flag a successful run as failed', async () => {
 		const mockRes = { status: mock.fn(() => mockRes), render: mock.fn() };
 		const db = dbReturning([[realProjectRow()], []]);
-		const handler = buildConsulteesResultsPage({ db, logger: mockLogger(), nearbyConsulteeRadiusMetres: 20_000 });
+		const handler = buildConsulteesResultsPage({
+			db,
+			logger: mockLogger(),
+			nearbyConsulteeRadiusMetres: 20_000,
+			rulesetRunner: rulesetRunnerFor(db)
+		});
 		await handler({ params: { caseId: realProjectId }, query: { ruleset: 'example-ruleset' } }, mockRes);
 
 		assert.strictEqual(mockRes.render.mock.calls[0].arguments[1].rulesetFailed, false);
@@ -217,7 +265,12 @@ describe('consultees results page', () => {
 	it('should 404 for an unknown project', async () => {
 		const mockRes = { status: mock.fn(() => mockRes), render: mock.fn() };
 		const db = dbReturning([[]]);
-		const handler = buildConsulteesResultsPage({ db, logger: mockLogger(), nearbyConsulteeRadiusMetres: 20_000 });
+		const handler = buildConsulteesResultsPage({
+			db,
+			logger: mockLogger(),
+			nearbyConsulteeRadiusMetres: 20_000,
+			rulesetRunner: rulesetRunnerFor(db)
+		});
 		await handler({ params: { caseId: realProjectId }, query: { ruleset: 'example-ruleset' } }, mockRes);
 		assert.strictEqual(mockRes.status.mock.calls[0].arguments[0], 404);
 	});
@@ -236,7 +289,12 @@ describe('consultees results page', () => {
 	it('should 404 when the ruleset query param is missing', async () => {
 		const mockRes = { status: mock.fn(() => mockRes), render: mock.fn() };
 		const db = dbReturning([[realProjectRow()]]);
-		const handler = buildConsulteesResultsPage({ db, logger: mockLogger(), nearbyConsulteeRadiusMetres: 20_000 });
+		const handler = buildConsulteesResultsPage({
+			db,
+			logger: mockLogger(),
+			nearbyConsulteeRadiusMetres: 20_000,
+			rulesetRunner: rulesetRunnerFor(db)
+		});
 		await handler({ params: { caseId: realProjectId }, query: {} }, mockRes);
 		assert.strictEqual(mockRes.status.mock.calls[0].arguments[0], 404);
 	});
@@ -244,7 +302,12 @@ describe('consultees results page', () => {
 	it('should 404 for an unknown ruleset', async () => {
 		const mockRes = { status: mock.fn(() => mockRes), render: mock.fn() };
 		const db = dbReturning([[realProjectRow()]]);
-		const handler = buildConsulteesResultsPage({ db, logger: mockLogger(), nearbyConsulteeRadiusMetres: 20_000 });
+		const handler = buildConsulteesResultsPage({
+			db,
+			logger: mockLogger(),
+			nearbyConsulteeRadiusMetres: 20_000,
+			rulesetRunner: rulesetRunnerFor(db)
+		});
 		await handler({ params: { caseId: realProjectId }, query: { ruleset: 'not-a-real-ruleset' } }, mockRes);
 		assert.strictEqual(mockRes.status.mock.calls[0].arguments[0], 404);
 	});
@@ -252,7 +315,12 @@ describe('consultees results page', () => {
 	it('should 404 for a condition id, since only whole rulesets are selectable, not one condition', async () => {
 		const mockRes = { status: mock.fn(() => mockRes), render: mock.fn() };
 		const db = dbReturning([[realProjectRow()]]);
-		const handler = buildConsulteesResultsPage({ db, logger: mockLogger(), nearbyConsulteeRadiusMetres: 20_000 });
+		const handler = buildConsulteesResultsPage({
+			db,
+			logger: mockLogger(),
+			nearbyConsulteeRadiusMetres: 20_000,
+			rulesetRunner: rulesetRunnerFor(db)
+		});
 		await handler({ params: { caseId: realProjectId }, query: { ruleset: 'railway' } }, mockRes);
 		assert.strictEqual(mockRes.status.mock.calls[0].arguments[0], 404);
 	});
@@ -260,7 +328,12 @@ describe('consultees results page', () => {
 	it('should accept array ruleset query values', async () => {
 		const mockRes = { status: mock.fn(() => mockRes), render: mock.fn() };
 		const db = dbReturning([[realProjectRow()], []]);
-		const handler = buildConsulteesResultsPage({ db, logger: mockLogger(), nearbyConsulteeRadiusMetres: 20_000 });
+		const handler = buildConsulteesResultsPage({
+			db,
+			logger: mockLogger(),
+			nearbyConsulteeRadiusMetres: 20_000,
+			rulesetRunner: rulesetRunnerFor(db)
+		});
 		await handler({ params: { caseId: realProjectId }, query: { ruleset: ['example-ruleset'] } }, mockRes);
 		assert.strictEqual(mockRes.render.mock.calls[0].arguments[1].rulesetName, 'Example ruleset');
 	});
@@ -288,7 +361,10 @@ describe('consultees results static map', () => {
 
 		try {
 			const db = dbReturning([[realProjectRow()], []]);
-			const handler = buildResultsStaticMap({ db, logger: mockLogger(), nearbyConsulteeRadiusMetres: 20_000 }, true);
+			const handler = buildResultsStaticMap(
+				{ db, logger: mockLogger(), nearbyConsulteeRadiusMetres: 20_000, rulesetRunner: rulesetRunnerFor(db) },
+				true
+			);
 			await handler({ params: { caseId: realProjectId }, query: { ruleset: 'example-ruleset' }, headers: {} }, mockRes);
 			assert.strictEqual(mockRes.status.mock.calls[0].arguments[0], 200);
 			assert.match(String(mockRes.type.mock.calls[0].arguments[0]), /image\/svg\+xml/);
@@ -321,7 +397,12 @@ describe('consultees results static map', () => {
 
 		try {
 			const db = dbReturning([[realProjectRow()], []]);
-			const handler = buildResultsStaticMap({ db, logger: mockLogger(), nearbyConsulteeRadiusMetres: 20_000 });
+			const handler = buildResultsStaticMap({
+				db,
+				logger: mockLogger(),
+				nearbyConsulteeRadiusMetres: 20_000,
+				rulesetRunner: rulesetRunnerFor(db)
+			});
 			await handler(
 				{
 					params: { caseId: realProjectId },
@@ -346,7 +427,10 @@ describe('consultees results static map', () => {
 			send: mock.fn()
 		};
 		const db = dbReturning([[realProjectRow()], [railwayMatchRow()]]);
-		const handler = buildResultsStaticMap({ db, logger: mockLogger(), nearbyConsulteeRadiusMetres: 20_000 }, true);
+		const handler = buildResultsStaticMap(
+			{ db, logger: mockLogger(), nearbyConsulteeRadiusMetres: 20_000, rulesetRunner: rulesetRunnerFor(db) },
+			true
+		);
 		await handler({ params: { caseId: realProjectId }, query: { ruleset: 'example-ruleset' }, headers: {} }, mockRes);
 
 		assert.strictEqual(mockRes.status.mock.calls[0].arguments[0], 200);
@@ -370,7 +454,10 @@ describe('consultees results static map', () => {
 			[realProjectRow()],
 			[railwayMatchRow(), parishRow(excludedParishId, 'Excluded Parish'), parishRow(keptParishId, 'Kept Parish')]
 		]);
-		const handler = buildResultsStaticMap({ db, logger: mockLogger(), nearbyConsulteeRadiusMetres: 20_000 }, true);
+		const handler = buildResultsStaticMap(
+			{ db, logger: mockLogger(), nearbyConsulteeRadiusMetres: 20_000, rulesetRunner: rulesetRunnerFor(db) },
+			true
+		);
 
 		const displayGeometryIds = async (query: Record<string, unknown>) => {
 			const mockRes = {
@@ -437,7 +524,10 @@ describe('consultees results static map', () => {
 				throw new Error('query failed');
 			})
 		};
-		const handler = buildResultsStaticMap({ db, logger: mockLogger(), nearbyConsulteeRadiusMetres: 20_000 }, true);
+		const handler = buildResultsStaticMap(
+			{ db, logger: mockLogger(), nearbyConsulteeRadiusMetres: 20_000, rulesetRunner: failingRulesetRunner() },
+			true
+		);
 		await handler({ params: { caseId: realProjectId }, query: { ruleset: 'example-ruleset' }, headers: {} }, mockRes);
 
 		assert.strictEqual(mockRes.status.mock.calls[0].arguments[0], 503);
@@ -467,7 +557,10 @@ describe('consultees results static map', () => {
 			send: mock.fn()
 		};
 		const db = dbReturning([[realProjectRow()], []]);
-		const handler = buildResultsStaticMap({ db, logger: mockLogger(), nearbyConsulteeRadiusMetres: 20_000 }, true);
+		const handler = buildResultsStaticMap(
+			{ db, logger: mockLogger(), nearbyConsulteeRadiusMetres: 20_000, rulesetRunner: rulesetRunnerFor(db) },
+			true
+		);
 		await handler({ params: { caseId: realProjectId }, query: { ruleset: ['example-ruleset'] }, headers: {} }, mockRes);
 		assert.strictEqual(mockRes.status.mock.calls[0].arguments[0], 200);
 	});
@@ -519,7 +612,10 @@ describe('consultees results static map', () => {
 
 		try {
 			const db = dbReturning([[realProjectRow()], []]);
-			const handler = buildResultsStaticMap({ db, logger: mockLogger(), nearbyConsulteeRadiusMetres: 20_000 }, true);
+			const handler = buildResultsStaticMap(
+				{ db, logger: mockLogger(), nearbyConsulteeRadiusMetres: 20_000, rulesetRunner: rulesetRunnerFor(db) },
+				true
+			);
 			await handler({ params: { caseId: realProjectId }, query: { ruleset: 'example-ruleset' }, headers: {} }, mockRes);
 			const etag = mockRes.set.mock.calls[0].arguments[0].ETag;
 
@@ -529,7 +625,7 @@ describe('consultees results static map', () => {
 
 			const db2 = dbReturning([[realProjectRow()], []]);
 			const handler2 = buildResultsStaticMap(
-				{ db: db2, logger: mockLogger(), nearbyConsulteeRadiusMetres: 20_000 },
+				{ db: db2, logger: mockLogger(), nearbyConsulteeRadiusMetres: 20_000, rulesetRunner: rulesetRunnerFor(db2) },
 				true
 			);
 			await handler2(

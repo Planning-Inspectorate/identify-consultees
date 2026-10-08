@@ -48,9 +48,10 @@ Open **http://localhost:8090**.
 3. Start SQL (`docker compose up -d`) and wait on **localhost:1434**
 4. Run Prisma migrations
 5. Seed the database with the bundled sample of UK case boundaries and consultee areas (`npm run db-seed` — re-runnable; rows merge rather than duplicate)
-6. Start the manage app in watch mode
+6. Start the Python function on **localhost:7071** — it runs the consultee intersection logic. Creates `apps/function-python/.venv` (Python 3.12) if missing, installs `requirements.txt`, and gives the function and the manage app the same local API key. Needs Azure Functions Core Tools (`npm install -g azure-functions-core-tools@4`); without them it warns and carries on
+7. Start the manage app in watch mode
 
-Stop the app with `Ctrl+C`. Stop SQL with `docker compose down` when finished.
+Stop the app and the function with `Ctrl+C`. Stop SQL with `docker compose down` when finished.
 
 The seed data is what the homepage search, the `/consultees/:caseId` journey, and the Playwright e2e tests run against — an empty database means empty search results and failing e2e specs.
 
@@ -63,22 +64,22 @@ Templates:
 
 Key manage variables:
 
-| Variable                                   | Local note                                                                     |
-| ------------------------------------------ | ------------------------------------------------------------------------------ |
-| `AUTH_DISABLED`                            | `true` for day-one UI work                                                     |
-| `SQL_CONNECTION_STRING`                    | Docker SA user; host port **1434**                                             |
-| `PYTHON_FUNCTION_URL`                      | Default `http://localhost:7071/api/consultee-areas`                            |
-| `PYTHON_FUNCTION_API_KEY`                  | Optional locally; in Azure the shared `x-api-key` secret the function requires |
-| `BLOB_STORE_HOST` / `BLOB_STORE_CONTAINER` | Optional; enables `/admin/upload-to-blob` + `/admin/import-reference-data`     |
-| `SESSION_SECRET`                           | Local placeholder only                                                         |
-| `LOG_LEVEL`                                | Often `debug` locally (includes Prisma query logs)                             |
-| `MANAGED_REDIS_URL`                        | Optional; unset means in-memory sessions locally                               |
+| Variable                                   | Local note                                                                             |
+| ------------------------------------------ | -------------------------------------------------------------------------------------- |
+| `AUTH_DISABLED`                            | `true` for day-one UI work                                                             |
+| `SQL_CONNECTION_STRING`                    | Docker SA user; host port **1434**                                                     |
+| `PYTHON_FUNCTION_URL`                      | Default `http://localhost:7071/api/consultee-areas`; `run-ruleset` resolves next to it |
+| `PYTHON_FUNCTION_API_KEY`                  | Set by `npm start` to match the function's key; in Azure the Key Vault secret          |
+| `BLOB_STORE_HOST` / `BLOB_STORE_CONTAINER` | Optional; enables `/admin/upload-to-blob` + `/admin/import-reference-data`             |
+| `SESSION_SECRET`                           | Local placeholder only                                                                 |
+| `LOG_LEVEL`                                | Often `debug` locally (includes Prisma query logs)                                     |
+| `MANAGED_REDIS_URL`                        | Optional; unset means in-memory sessions locally                                       |
 
 Never commit `.env` files or production secrets.
 
-## Optional: Python function
+## Python function
 
-Only needed for `/consultee-areas-python` and similar bridge pages.
+Runs the ruleset for every consultee results page, and `/consultee-areas-python`. `npm start` handles all of this; to run it by hand:
 
 See `apps/function-python/README.md`. Short version:
 

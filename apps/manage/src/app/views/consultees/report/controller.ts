@@ -47,7 +47,7 @@ function identifiedConsultees(
  * doesn't exist yet.
  */
 export function buildReportCheckPage(service: ManageService): AsyncRequestHandler {
-	const { db, logger, nearbyConsulteeRadiusMetres } = service;
+	const { db, logger, nearbyConsulteeRadiusMetres, rulesetRunner } = service;
 
 	return async (req, res) => {
 		const caseId = String(req.params.caseId ?? '');
@@ -70,7 +70,13 @@ export function buildReportCheckPage(service: ManageService): AsyncRequestHandle
 			'consultee report check page'
 		);
 
-		const { matches, failed } = await runRulesetSafely(db, project, ruleset, nearbyConsulteeRadiusMetres, logger);
+		const { matches, failed } = await runRulesetSafely(
+			rulesetRunner,
+			project,
+			ruleset,
+			nearbyConsulteeRadiusMetres,
+			logger
+		);
 		const selection: ConsulteeSelection = {
 			excluded: excludedIds(req.query.exclude),
 			adds: addedConsultees(req.query.add)

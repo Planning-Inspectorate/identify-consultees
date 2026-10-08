@@ -22,9 +22,9 @@ Client behaviour: fingerprinted `javascripts/consultees-map.js` (built into `.st
 For `/consultees/:caseId/results?ruleset=…`:
 
 1. Load the case boundary from `case_boundary` (`resolveCase` / `getCaseBoundaryById`)
-2. Run the ruleset — `runRuleset` returns the ruleset's matches, plus every consultee area within the nearby radius (`allNearby`, 20km by default)
-3. Build the **search area** — the site grown by the nearby radius (`bufferGeometryForDisplay`) — and fetch **display geometry** for every nearby area and match that touches it (`getConsulteeAreaDisplayGeometries`). Areas are drawn whole, not cut at the search area, and simplified more the larger they are: the larger of 25m and 1/200th of the area's width (`DISPLAY_SIMPLIFY_WIDTH_RATIO`). A parish stays at 25m; a 3,000km² county is simplified to ~270m. That keeps whole regional areas about the size the old clipped ones were (Norwich to Tilbury: 1.5MB, against 3.8MB at a flat 25m). The search area itself isn't drawn; the map opens on it
-4. `buildCaseMapConfig` (`app/maps/case-geojson.ts`) turns the project, matches, nearby areas and search area into the map config. It gives every consultee its category's colour (`colour`) and fill opacity (`fillOpacity`), so the interactive and static maps colour them the same way. It draws every match; only the fallback without a search area, which uses original geometry, caps drawn matches at `MAX_SAMPLED_MAP_MATCHES`
+2. Run the ruleset in the Python function (`service.rulesetRunner` — see [Node–Python integration](./node-python-integration.md)), which returns the ruleset's matches, plus every consultee area within the nearby radius (`allNearby`, 20km by default) for the results table
+3. Build the **search area** — the site grown by the nearby radius (`bufferGeometryForDisplay`) — and fetch **display geometry** for every match that touches it (`getConsulteeAreaDisplayGeometries`). Areas are drawn whole, not cut at the search area, and simplified more the larger they are: the larger of 25m and 1/200th of the area's width (`DISPLAY_SIMPLIFY_WIDTH_RATIO`). A parish stays at 25m; a 3,000km² county is simplified to ~270m. That keeps whole regional areas about the size the old clipped ones were (Norwich to Tilbury: 1.5MB, against 3.8MB at a flat 25m). The search area itself isn't drawn; the map opens on it
+4. `buildCaseMapConfig` (`app/maps/case-geojson.ts`) turns the project, matches and search area into the map config. It gives every consultee its category's colour (`colour`) and fill opacity (`fillOpacity`), so the interactive and static maps colour them the same way. It draws every match; only the fallback without a search area, which uses original geometry, caps drawn matches at `MAX_SAMPLED_MAP_MATCHES`
 5. Embed map config JSON in the page; point the static fallback at `/consultees/:caseId/results/static-map?ruleset=…`
 
 If step 3 fails, the page still renders: the map falls back to the project and matches, and the tables list every consultee.
@@ -35,17 +35,16 @@ Everything on that map comes from SQL — there is no fixture layer.
 
 Drawn bottom to top (`buildDatasets` in `javascripts/consultees-map.js`):
 
-| Layer                      | What it shows                                                                                                          | Style                                                                                                                  |
-| -------------------------- | ---------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| All consultees within 20km | Every nearby consultee area, one sublayer per category with a count. **Hidden until switched on** from the Layers menu | Outlines in the category's colour; point categories as small dots                                                      |
-| The ruleset's name         | The consultees the ruleset identified, one sublayer per category with a count                                          | Areas filled in the category's colour; point categories (hospitals, harbours, generators, nuclear sites) as small dots |
-| Project site               | The case boundary                                                                                                      | Red, translucent fill                                                                                                  |
+| Layer              | What it shows                                                                 | Style                                                                                                                  |
+| ------------------ | ----------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| The ruleset's name | The consultees the ruleset identified, one sublayer per category with a count | Areas filled in the category's colour; point categories (hospitals, harbours, generators, nuclear sites) as small dots |
+| Project site       | The case boundary                                                             | Red, translucent fill                                                                                                  |
 
 **Regional categories are only tinted.** Police forces, ambulance trusts, ICBs and counties each cover the whole search area. A dozen of them stacked at a normal fill hide everything else. So a category with any area covering half or more of the search area's bounding box is filled at `REGIONAL_FILL_OPACITY` (6%) and drawn first. Local areas such as parishes and districts are filled at `LOCAL_FILL_OPACITY` (35%).
 
-The static fallback opens on the same view and uses the same colours and opacities. It draws only the project and the ruleset's matches.
+The static fallback opens on the same view, and draws the same project and matches in the same colours and opacities. Consultees nearby that the ruleset didn't match aren't drawn; the results page lists them in its table.
 
-> **Category colours are interim.** They're a placeholder palette of 14 (`CONSULTEE_CATEGORY_COLOURS` in `app/maps/category-colours.ts`). On each map, the ruleset's match categories are coloured first in alphabetical order, then any other nearby categories, so a category's colour can differ between projects. Consultee categories aren't in the GIS Tool Styling tables, so per [`AGENTS.md`](../AGENTS.md) they need product/design sign-off.
+> **Category colours are interim.** They're a placeholder palette of 14 (`CONSULTEE_CATEGORY_COLOURS` in `app/maps/category-colours.ts`). On each map, the ruleset's match categories are coloured in alphabetical order, so a category's colour can differ between projects. Consultee categories aren't in the GIS Tool Styling tables, so per [`AGENTS.md`](../AGENTS.md) they need product/design sign-off.
 
 ### Selecting a consultee
 
@@ -87,7 +86,7 @@ Every new input that changes the rendered image (markers, badges, overlays, form
 
 ## GIS styling
 
-Overlay colours / hatches for recognised layer types must follow the GIS Tool Styling tables in `AGENTS.md` (geometry stage, sector, energy subtype, MOD areas, label buffers). Prefer shared constants over one-off hex values. The results map's nearby consultee categories aren't in those tables yet, so their colours are interim — see [Results map layers](#results-map-layers).
+Overlay colours / hatches for recognised layer types must follow the GIS Tool Styling tables in `AGENTS.md` (geometry stage, sector, energy subtype, MOD areas, label buffers). Prefer shared constants over one-off hex values. The results map's consultee categories aren't in those tables yet, so their colours are interim — see [Results map layers](#results-map-layers).
 
 ## Component showcase
 
@@ -99,14 +98,14 @@ Overlay colours / hatches for recognised layer types must follow the GIS Tool St
 
 ## Where map data comes from
 
-| Context                     | Source                                                                                                                           |
-| --------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
-| Consultees results maps     | `case_boundary` geometry + `runRuleset` matches and nearby areas touching the search area, drawn whole, via `buildCaseMapConfig` |
-| Home list                   | `case_boundary` rows (no map)                                                                                                    |
-| Interactive-map showcase    | Sample GeoJSON in `interactive-map-examples-data.ts` / `sample-geojson.ts`                                                       |
-| Map layers demo             | Demo GeoJSON in `map-layers-demo-geojson.ts`                                                                                     |
-| Python consultee areas page | SQL via Python (no map UI focus yet)                                                                                             |
-| Future uploads map          | Expected to use DB geometries + `geometry-bounds` (not wired as a route yet)                                                     |
+| Context                     | Source                                                                                                                                      |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| Consultees results maps     | `case_boundary` geometry + the ruleset's matches (from the Python function) touching the search area, drawn whole, via `buildCaseMapConfig` |
+| Home list                   | `case_boundary` rows (no map)                                                                                                               |
+| Interactive-map showcase    | Sample GeoJSON in `interactive-map-examples-data.ts` / `sample-geojson.ts`                                                                  |
+| Map layers demo             | Demo GeoJSON in `map-layers-demo-geojson.ts`                                                                                                |
+| Python consultee areas page | SQL via Python (no map UI focus yet)                                                                                                        |
+| Future uploads map          | Expected to use DB geometries + `geometry-bounds` (not wired as a route yet)                                                                |
 
 ## Related pages
 

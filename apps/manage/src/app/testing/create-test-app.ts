@@ -12,6 +12,7 @@ import type { Config } from '../config.ts';
 import { loadBuildConfig } from '../config.ts';
 import { configureNunjucks } from '../nunjucks.ts';
 import { buildAuthRateLimiter, buildRouter } from '../router.ts';
+import { buildDatabaseRulesetRunner } from './ruleset-runner-stub.ts';
 
 export type CreateManageTestAppOptions = {
 	authDisabled?: boolean;
@@ -74,6 +75,14 @@ export function createManageTestApp(service: ManageService, options: CreateManag
 	});
 }
 
+/**
+ * The ruleset runs against the seeded data through a simple database-backed stand-in, since the
+ * Python function that really runs it isn't part of these tests - see buildDatabaseRulesetRunner.
+ */
 export function createManageTestService(authDisabled = true): ManageService {
-	return new ManageService(buildManageTestConfig(authDisabled));
+	const service: ManageService = new ManageService(
+		buildManageTestConfig(authDisabled),
+		buildDatabaseRulesetRunner(() => service.db)
+	);
+	return service;
 }

@@ -6,14 +6,9 @@ import { newDatabaseClient } from '../index.ts';
 import type { ConsulteeAreaFeatureCollection } from './consultee-areas.ts';
 import {
 	bufferGeometryForDisplay,
-	findConsulteeAreaSummariesNear,
-	findConsulteeAreasIntersecting,
-	findConsulteeAreasNear,
 	getConsulteeAreaById,
 	getConsulteeAreaDisplayGeometries,
-	getConsulteeAreaGeometries,
-	loadConsulteeAreas,
-	simplifyGeometry
+	loadConsulteeAreas
 } from './consultee-areas.ts';
 
 // a fixed id, rather than a wholesale table truncate, so this suite can't wipe out other data in
@@ -43,7 +38,7 @@ async function cleanup() {
 }
 
 describe('consultee areas (requires a local SQL Server - see docker-compose.yml)', () => {
-	test('load, list, findNear and findIntersecting round-trip a stored area', async (t) => {
+	test('load, get and findIntersecting round-trip a stored area', async (t) => {
 		if (!dbAvailable) return t.skip('SQL Server database not available');
 
 		await cleanup();
@@ -87,48 +82,13 @@ describe('consultee areas (requires a local SQL Server - see docker-compose.yml)
 			assert.deepEqual(stored.geometry, featureCollection.features[0].geometry);
 			assert.deepEqual(stored.properties.metadata, { source: 'test' });
 
-			// a point inside the stored polygon
-			const insidePoint = { type: 'Point' as const, coordinates: [-0.1276, 51.5072] as [number, number] };
-			const nearMatches = await findConsulteeAreasNear(dbClient, insidePoint, 5000);
-			assert.ok(nearMatches.some((match) => match.feature.id === testAreaId));
-
-			const intersecting = await findConsulteeAreasIntersecting(dbClient, insidePoint);
-			assert.ok(intersecting.features.some((feature) => feature.id === testAreaId));
-
-			// Paris is a long way from the stored London polygon - shouldn't match a 1km radius
-			const farPoint = { type: 'Point' as const, coordinates: [2.3522, 48.8566] as [number, number] };
-			const farMatches = await findConsulteeAreasNear(dbClient, farPoint, 1000);
-			assert.ok(!farMatches.some((match) => match.feature.id === testAreaId));
-
-			// consulteeCategories filters to those categories only
-			const rightCategory = await findConsulteeAreasNear(dbClient, insidePoint, 5000, ['Environment Agency']);
-			assert.ok(rightCategory.some((match) => match.feature.id === testAreaId));
-
-			const wrongCategory = await findConsulteeAreasNear(dbClient, insidePoint, 5000, ['railway']);
-			assert.ok(!wrongCategory.some((match) => match.feature.id === testAreaId));
-
-			// excludeCategories drops a category even with no consulteeCategories filter at all -
-			// the "any category" query runRuleset's allNearby uses (see rulesets.ts)
-			const excluded = await findConsulteeAreasNear(dbClient, insidePoint, 5000, undefined, ['Environment Agency']);
-			assert.ok(!excluded.some((match) => match.feature.id === testAreaId));
-
-			const notExcluded = await findConsulteeAreasNear(dbClient, insidePoint, 5000, undefined, ['railway']);
-			assert.ok(notExcluded.some((match) => match.feature.id === testAreaId));
-
-			// summaries: same rows and distances, no geometry
-			const summaries = await findConsulteeAreaSummariesNear(dbClient, insidePoint, 5000, ['Environment Agency']);
-			const summary = summaries.find((match) => match.feature.id === testAreaId);
-			assert.ok(summary, 'expected the loaded area in the summary results');
-			assert.equal(summary.feature.properties.consultee, 'Environment Agency');
-			assert.equal('geometry' in summary.feature, false);
-
-			const geometries = await getConsulteeAreaGeometries(dbClient, [
-				testAreaId,
-				'00000000-0000-0000-0000-000000000000'
-			]);
-			assert.deepEqual(geometries.get(testAreaId), featureCollection.features[0].geometry);
-			assert.equal(geometries.has('00000000-0000-0000-0000-000000000000'), false);
-			assert.equal((await getConsulteeAreaGeometries(dbClient, [])).size, 0);
+			// the ruleset's distance and bordering queries (now in apps/function-python) run against
+			// the simplified copy the loader stores alongside the original
+			const [simplifiedRow] = await dbClient.$queryRaw<{ simplified: number }[]>`
+				SELECT CASE WHEN geometrySimplified IS NULL THEN 0 ELSE 1 END AS simplified
+				FROM consultee_area WHERE id = ${testAreaId}
+			`;
+			assert.equal(simplifiedRow.simplified, 1);
 
 			// an area touching the window is drawn whole, not clipped to it
 			const window = {
@@ -200,31 +160,5 @@ describe('consultee areas (requires a local SQL Server - see docker-compose.yml)
 		} finally {
 			await cleanup();
 		}
-	});
-
-	test('simplifies an over-digitised boundary down to its corners', async (t) => {
-		if (!dbAvailable) return t.skip('SQL Server database not available');
-
-		// a ~110m square near London with a point every ~0.1m along each side - like real site
-		// boundaries, most of whose points are under a metre apart
-		const side = 0.001;
-		const steps = 1000;
-		const edge = (from: [number, number], to: [number, number]) =>
-			Array.from({ length: steps }, (_, i): [number, number] => [
-				from[0] + ((to[0] - from[0]) * i) / steps,
-				from[1] + ((to[1] - from[1]) * i) / steps
-			]);
-		const [x, y] = [-0.1, 51.5];
-		const ring = [
-			...edge([x, y], [x + side, y]),
-			...edge([x + side, y], [x + side, y + side]),
-			...edge([x + side, y + side], [x, y + side]),
-			...edge([x, y + side], [x, y]),
-			[x, y] as [number, number]
-		];
-
-		const simplified = await simplifyGeometry(dbClient, { type: 'Polygon', coordinates: [ring] });
-		assert.equal(simplified.type, 'Polygon');
-		assert.ok(simplified.type === 'Polygon' && simplified.coordinates[0].length <= 6, 'expected just the corners');
 	});
 });
