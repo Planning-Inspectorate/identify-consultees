@@ -3,6 +3,8 @@ import { cpus } from 'node:os';
 
 const e2ePort = process.env.E2E_PORT || '8091';
 const baseURL = process.env.E2E_BASE_URL || `http://127.0.0.1:${e2ePort}`;
+// Azure Pipelines sets TF_BUILD, not CI
+const isCi = Boolean(process.env.CI || process.env.TF_BUILD);
 
 /**
  * Frontend browser tests for the manage app.
@@ -17,12 +19,12 @@ const baseURL = process.env.E2E_BASE_URL || `http://127.0.0.1:${e2ePort}`;
 export default defineConfig({
 	testDir: './e2e',
 	fullyParallel: true,
-	forbidOnly: Boolean(process.env.CI),
-	retries: process.env.CI ? 1 : 0,
+	forbidOnly: isCi,
+	retries: isCi ? 1 : 0,
 	// half the agent's cores, floor of 2 - a hardcoded 2 left a 4+-core CI
 	// agent mostly idle during the 51-test run
-	workers: process.env.CI ? Math.max(2, Math.ceil(cpus().length / 2)) : undefined,
-	reporter: process.env.CI ? [['list'], ['html', { open: 'never' }]] : 'list',
+	workers: isCi ? Math.max(2, Math.ceil(cpus().length / 2)) : undefined,
+	reporter: isCi ? [['list'], ['html', { open: 'never' }]] : 'list',
 	use: {
 		baseURL,
 		trace: 'on-first-retry',
@@ -31,7 +33,7 @@ export default defineConfig({
 	webServer: {
 		command: 'node --experimental-strip-types scripts/e2e-server.mjs',
 		url: baseURL,
-		reuseExistingServer: !process.env.CI,
+		reuseExistingServer: !isCi,
 		timeout: 120_000,
 		env: {
 			...process.env,
