@@ -181,8 +181,8 @@ test.describe('cross-browser render completeness', () => {
 			const main = page.locator('#main-content, main').first();
 			await expect(main).toBeVisible();
 
-			// PINS chrome: generic header + service navigation + footer
-			await expect(page.locator('.govuk-generic-header, .pins-header').first()).toBeVisible();
+			// PINS chrome: header + service navigation + footer
+			await expect(page.locator('.pins-header').first()).toBeVisible();
 			await expect(page.locator('.govuk-service-navigation, .pins-service-navigation').first()).toBeVisible();
 			await expect(page.locator('footer').first()).toBeVisible();
 

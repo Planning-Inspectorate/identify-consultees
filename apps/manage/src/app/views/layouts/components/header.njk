@@ -1,28 +1,17 @@
-{% from "govuk/components/generic-header/macro.njk" import govukGenericHeader %}
+{% from "ui/header/pins-header.njk" import pinsHeader %}
 {% from "govuk/components/service-navigation/macro.njk" import govukServiceNavigation %}
 
 {#
   PINS branded chrome shared by all manage pages.
 
-  Header: GOV.UK Frontend `govukGenericHeader` + PINS landscape logo + govuk-overrides styles.
-  (Do not use `govukHeader` — GOV.UK Frontend 6 reserves that for services on GOV.UK.)
+  Header: `pinsHeader` from @planning-inspectorate/core (internal variant).
+  Styles come from core's ui/header/pins-header.scss via govuk-overrides.scss.
 
   Navigation: GOV.UK Frontend `govukServiceNavigation`.
 #}
 
 {% macro pinsServiceHeader() %}
-	{% set pinsLogo %}
-		<span class="govuk-visually-hidden">Planning Inspectorate</span>
-		<span aria-hidden="true">
-			{% include "ui/header/pins-landscape-logo.njk" %}
-		</span>
-	{% endset %}
-
-	{{ govukGenericHeader({
-		url: "/",
-		classes: "pins-header",
-		logoHtml: pinsLogo
-	}) }}
+	{{ pinsHeader({ isExternal: false }) }}
 {% endmacro %}
 
 {% macro pinsServiceNavigation(serviceName, hideSignOut = false, showComponents = false) %}

@@ -25,7 +25,7 @@ Reassess only with an explicit product/architecture decision — not for conveni
 
 `views/layouts/main.njk` extends `govuk/template.njk` and provides:
 
-- PINS header via `govukGenericHeader` wrapper (`pinsServiceHeader`) — not `govukHeader`
+- PINS header via `pinsHeader` from `@planning-inspectorate/core` (`pinsServiceHeader` wrapper) — not `govukHeader`
 - Service navigation via `govukServiceNavigation`
 - Phase banner (Beta)
 - Optional back link and error summary blocks
