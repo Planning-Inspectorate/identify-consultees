@@ -1,12 +1,10 @@
 import type { ManageService } from '#service';
 import { stringifyForInlineScript } from '#util/inline-json.ts';
-import type { ConsulteeAreaMatch } from '@pins/identify-consultees-database/src/geospatial/consultee-areas.ts';
-import { DISTANCE_MARGIN_METRES } from '@pins/identify-consultees-database/src/geospatial/consultee-areas.ts';
-import type { RuleCondition, Ruleset } from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
 import { getRuleset, RULESETS } from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
 import type { AsyncRequestHandler } from '@planning-inspectorate/core/util';
 import { buildCaseMapConfig, MAX_SAMPLED_MAP_MATCHES } from '../../../../maps/case-geojson.ts';
 import { MAP_VIEWPORT } from '../../../../maps/sample-geojson.ts';
+import { describeReasons } from '../../reasons.ts';
 import { resolveCase } from '../../resolve-case.ts';
 import { buildSearchAreaSafely, firstQueryValue, runRulesetSafely } from '../../run-ruleset.ts';
 import { rulesetCategories } from '../categories.ts';
@@ -20,32 +18,6 @@ import {
 	reportUrl
 } from '../urls.ts';
 import type { ConsulteeRow, ReportConsulteesViewModel } from './view-model.ts';
-
-/**
- * RuleCondition declares `bufferMetres` optional because only intersection conditions carry one -
- * narrowing on logicType reflects that, rather than sprinkling `?? 0` where it can never fall back.
- */
-function isIntersectionRule(rule: RuleCondition): rule is RuleCondition & { bufferMetres: number } {
-	return rule.logicType === 'intersection';
-}
-
-/**
- * How the ruleset identified this match: the smallest intersection buffer it sits inside ("Within
- * 1km buffer"), "Intersects the site" for a zero-buffer rule, or - when no intersection rule's
- * reach covers it, meaning a bordering condition found it - that condition's own description.
- */
-function identifiedBy(match: ConsulteeAreaMatch, ruleset: Ruleset, category: string): string {
-	const rules = ruleset.rules.filter((rule) => rule.categories.includes(category));
-	const intersecting = rules
-		.filter(isIntersectionRule)
-		.filter((rule) => match.distanceMetres <= rule.bufferMetres + DISTANCE_MARGIN_METRES)
-		.sort((a, b) => a.bufferMetres - b.bufferMetres);
-	if (intersecting.length > 0) {
-		const bufferMetres = intersecting[0].bufferMetres;
-		return bufferMetres > 0 ? `Within ${bufferMetres / 1000}km buffer` : 'Intersects the site';
-	}
-	return rules.find((rule) => rule.logicType === 'bordering')?.name ?? '';
-}
 
 /**
  * A check-page category's Change page: the consultees the ruleset identified in that category,
@@ -73,24 +45,28 @@ export function buildReportConsulteesPage(service: ManageService): AsyncRequestH
 			return;
 		}
 
-		// a category the ruleset doesn't cover isn't a page - there'd be nothing to change
 		const category = firstQueryValue(req.query.category);
-		if (!rulesetCategories(ruleset).includes(category)) {
-			res.status(404).render('views/errors/404.njk', { pageHeading: 'Page not found' });
-			return;
-		}
-
 		const excluded = excludedIds(req.query.exclude);
 		const adds = addedConsultees(req.query.add);
 		const selection: ConsulteeSelection = { excluded, adds };
-		const { matches, failed } = await runRulesetSafely(
+		const { consultees, failed } = await runRulesetSafely(
 			rulesetRunner,
 			project,
 			ruleset,
 			nearbyConsulteeRadiusMetres,
 			logger
 		);
-		const visible = matches.filter(
+
+		// a category is a page if the ruleset covers it or the run found consultees in it (the
+		// nearby search finds categories no condition names) - anything else has nothing to change.
+		// A failed run can't tell, so it shows its error rather than a 404
+		const found = consultees.some((consultee) => consultee.feature.properties.consulteeCategory === category);
+		if (!failed && !found && !rulesetCategories(ruleset).includes(category)) {
+			res.status(404).render('views/errors/404.njk', { pageHeading: 'Page not found' });
+			return;
+		}
+
+		const visible = consultees.filter(
 			(match) => match.feature.properties.consulteeCategory === category && !excluded.has(match.feature.id)
 		);
 		const searchArea = await buildSearchAreaSafely(db, project, visible, nearbyConsulteeRadiusMetres, logger);
@@ -103,7 +79,7 @@ export function buildReportConsulteesPage(service: ManageService): AsyncRequestH
 		const rows: ConsulteeRow[] = [
 			...visible.map((match) => ({
 				name: match.feature.properties.consultee ?? 'Unnamed consultee',
-				identified: identifiedBy(match, ruleset, category),
+				identified: describeReasons(match, ruleset),
 				removeUrl: consulteesUrl(project.id, ruleset.id, category, {
 					excluded: new Set([...excluded, match.feature.id]),
 					adds
@@ -116,7 +92,7 @@ export function buildReportConsulteesPage(service: ManageService): AsyncRequestH
 				return [
 					{
 						name: add.name,
-						identified: add.reason || 'Manually added',
+						identified: [add.reason || 'Manually added'],
 						removeUrl: consulteesUrl(project.id, ruleset.id, category, {
 							excluded,
 							adds: adds.filter((_, i) => i !== index)

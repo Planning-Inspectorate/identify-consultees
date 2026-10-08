@@ -1,26 +1,25 @@
 import type { ManageService } from '#service';
-import type { ConsulteeAreaMatch } from '@pins/identify-consultees-database/src/geospatial/consultee-areas.ts';
-import type { Ruleset } from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
+import type { ConsulteeMatch, Ruleset } from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
 import { getRuleset, RULESETS } from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
 import type { AsyncRequestHandler } from '@planning-inspectorate/core/util';
 import { resolveCase, resolveCaseSummary } from '../resolve-case.ts';
 import { firstQueryValue, projectPageUrl, runRulesetSafely } from '../run-ruleset.ts';
-import { rulesetCategories } from './categories.ts';
+import { reportCategories } from './categories.ts';
 import type { ConsulteeSelection } from './urls.ts';
 import { addedConsultees, consulteesUrl, excludedIds, reportCreatedUrl, reportUrl } from './urls.ts';
 import type { IdentifiedConsultee, ReportCheckViewModel } from './view-model.ts';
 
 /**
- * Every category the ruleset covers, in the order its rules name them, with each one's visible
- * consultee count - including categories that matched nothing, so the list reads as the ruleset's
- * full coverage rather than just what happened to hit. Excluded consultees (removed on a
+ * Every category the ruleset covers, in the order its rules name them, then any other category the
+ * run found (see reportCategories), with each one's visible consultee count - including covered
+ * categories that matched nothing, so the list reads as the ruleset's full coverage. Excluded consultees (removed on a
  * category's Change page) don't count and hand-added ones do - the number here is the number of
  * rows that page lists.
  */
 function identifiedConsultees(
 	ruleset: Ruleset,
 	caseId: string,
-	matches: ConsulteeAreaMatch[],
+	matches: ConsulteeMatch[],
 	selection: ConsulteeSelection
 ): IdentifiedConsultee[] {
 	const counts = new Map<string, number>();
@@ -33,7 +32,7 @@ function identifiedConsultees(
 	for (const add of selection.adds) {
 		counts.set(add.category, (counts.get(add.category) ?? 0) + 1);
 	}
-	return rulesetCategories(ruleset).map((name) => ({
+	return reportCategories(ruleset, matches).map((name) => ({
 		name,
 		count: String(counts.get(name) ?? 0),
 		changeUrl: consulteesUrl(caseId, ruleset.id, name, selection)
@@ -70,7 +69,7 @@ export function buildReportCheckPage(service: ManageService): AsyncRequestHandle
 			'consultee report check page'
 		);
 
-		const { matches, failed } = await runRulesetSafely(
+		const { consultees, failed } = await runRulesetSafely(
 			rulesetRunner,
 			project,
 			ruleset,
@@ -92,7 +91,7 @@ export function buildReportCheckPage(service: ManageService): AsyncRequestHandle
 			caseChangeUrl: '/',
 			rulesetName: ruleset.name,
 			rulesetChangeUrl: `/consultees/${encodeURIComponent(project.id)}/ruleset?ruleset=${encodeURIComponent(ruleset.id)}`,
-			consultees: identifiedConsultees(ruleset, project.id, matches, selection),
+			consultees: identifiedConsultees(ruleset, project.id, consultees, selection),
 			generateReportUrl: reportCreatedUrl(project.id, ruleset.id, selection),
 			rulesetFailed: failed,
 			retryUrl: reportUrl(project.id, ruleset.id, selection)

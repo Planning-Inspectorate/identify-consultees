@@ -1,11 +1,14 @@
 import type { ManageService } from '#service';
 import type { CaseBoundaryFeature } from '@pins/identify-consultees-database/src/geospatial/case-boundaries.ts';
-import type { ConsulteeAreaMatch } from '@pins/identify-consultees-database/src/geospatial/consultee-areas.ts';
 import {
 	bufferGeometryForDisplay,
 	getConsulteeAreaDisplayGeometries
 } from '@pins/identify-consultees-database/src/geospatial/consultee-areas.ts';
-import type { Ruleset, RunRulesetResult } from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
+import type {
+	ConsulteeMatch,
+	Ruleset,
+	RunRulesetResult
+} from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
 import { getRuleset, RULESETS } from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
 import type { SearchAreaDisplay } from '../../maps/case-geojson.ts';
 import type { RulesetRunner } from '../../ruleset-runner.ts';
@@ -45,19 +48,19 @@ export async function runRulesetSafely(
 		return { ...(await runRuleset(project.geometry, ruleset, nearbyRadiusMetres)), failed: false };
 	} catch (error) {
 		logger.error({ error, caseId: project.id, rulesetId: ruleset.id }, 'Failed to run ruleset');
-		return { matches: [], allNearby: [], failed: true };
+		return { consultees: [], failed: true };
 	}
 }
 
 /**
- * The interactive map's search area - the site grown by the nearby radius - with every ruleset
- * match clipped to it. The map is an extra: if this fails, the page still lists every consultee
+ * The interactive map's search area - the site grown by the nearby radius - and the display
+ * geometry of every consultee touching it. The map is an extra: if this fails, the page still lists every consultee
  * in its tables.
  */
 export async function buildSearchAreaSafely(
 	db: ManageService['db'],
 	project: CaseBoundaryFeature,
-	matches: ConsulteeAreaMatch[],
+	matches: ConsulteeMatch[],
 	nearbyRadiusMetres: number,
 	logger: ManageService['logger']
 ): Promise<SearchAreaDisplay | undefined> {

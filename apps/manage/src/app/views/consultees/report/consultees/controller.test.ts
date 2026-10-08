@@ -27,6 +27,7 @@ function realProjectRow(overrides: Record<string, unknown> = {}) {
 
 function parishMatchRow(id = matchId, consultee = 'Little Snoring Parish Council', distanceMetres = 0) {
 	return {
+		reasons: [{ type: 'condition' as const, conditionId: 'b_host_parish_comm_council' }],
 		id,
 		geometryType: 'MultiLineString',
 		consulteeCategory: 'Parish Council',
@@ -107,8 +108,10 @@ describe('report consultees change page', () => {
 		);
 		assert.strictEqual(viewModel.rows.length, 1);
 		assert.strictEqual(viewModel.rows[0].name, 'Little Snoring Parish Council');
-		// the parish rules intersect the site - a zero-buffer identification
-		assert.strictEqual(viewModel.rows[0].identified, 'Intersects the site');
+		// the reason the function gave, as the ruleset condition's own description
+		assert.deepStrictEqual(viewModel.rows[0].identified, [
+			'"B" host Parishes or Community Councils: intersects the site'
+		]);
 		assert.strictEqual(
 			viewModel.rows[0].removeUrl,
 			`/consultees/${realProjectId}/report/consultees?ruleset=england-wales-post-20240430&category=Parish%20Council&exclude=${matchId}`
@@ -125,67 +128,69 @@ describe('report consultees change page', () => {
 		assert.match(html, /Save and return/);
 	});
 
-	it('should report a buffered identification when the match sits inside a rule’s buffer', async () => {
+	it('should list every reason a consultee was identified - its conditions, then the nearby search', async () => {
 		const mockRes = { status: mock.fn(() => mockRes), render: mock.fn() };
 		const hospitalRow = {
 			...parishMatchRow(),
 			consulteeCategory: 'Hospital',
 			consultee: 'Norfolk Hospital',
-			distanceMetres: 123.456
+			distanceMetres: 123.456,
+			reasons: [
+				{ type: 'condition' as const, conditionId: 'hospital' },
+				{ type: 'nearby' as const, radiusMetres: 20_000 }
+			]
 		};
 		const db = dbReturning([[realProjectRow()], [hospitalRow]]);
 		await handlerFor(db)({ params: { caseId: realProjectId }, query: { category: 'Hospital' } }, mockRes);
 
 		const viewModel = mockRes.render.mock.calls[0].arguments[1];
-		assert.strictEqual(viewModel.rows[0].identified, 'Within 10km buffer');
+		assert.deepStrictEqual(viewModel.rows[0].identified, [
+			'Hospitals: within 10km of the site',
+			'Within 20km of the site'
+		]);
 	});
 
-	it('should report the smallest buffer when several rules cover the category', async () => {
+	it('should give a bordering condition its own description', async () => {
 		const mockRes = { status: mock.fn(() => mockRes), render: mock.fn() };
-		// Ambulance Trust has both a 1km and a 10km rule - a match at 500m sits inside both, so the
-		// honest label is the tighter one
-		const ambulanceRow = {
-			...parishMatchRow(),
-			consulteeCategory: 'Ambulance Trust',
-			consultee: 'East of England Ambulance Service',
-			distanceMetres: 500
+		const borderingRow = {
+			...parishMatchRow(matchId, 'Little Snoring Parish Council', 500),
+			reasons: [{ type: 'condition' as const, conditionId: 'a_bordering_b_host_parish_comm_council' }]
 		};
-		const db = dbReturning([[realProjectRow()], [ambulanceRow]]);
-		await handlerFor(db)({ params: { caseId: realProjectId }, query: { category: 'Ambulance Trust' } }, mockRes);
-
-		const viewModel = mockRes.render.mock.calls[0].arguments[1];
-		assert.strictEqual(viewModel.rows[0].identified, 'Within 1km buffer');
-	});
-
-	it('should report the bordering condition’s description when no buffer rule reached the match', async () => {
-		const mockRes = { status: mock.fn(() => mockRes), render: mock.fn() };
-		// 500m is beyond the parish intersection rule's 0 buffer, so only the bordering condition
-		// can have identified it - its own description is the honest label
-		const db = dbReturning([[realProjectRow()], [parishMatchRow(matchId, 'Little Snoring Parish Council', 500)]]);
+		const db = dbReturning([[realProjectRow()], [borderingRow]]);
 		await handlerFor(db)({ params: { caseId: realProjectId }, query: { category: 'Parish Council' } }, mockRes);
 
 		const viewModel = mockRes.render.mock.calls[0].arguments[1];
-		assert.strictEqual(viewModel.rows[0].identified, '"A" Community Councils bordering "B" host Community Councils');
+		assert.deepStrictEqual(viewModel.rows[0].identified, [
+			'"A" Community Councils bordering "B" host Community Councils'
+		]);
 	});
 
-	it('should leave the identification blank when no covering rule can explain the match', async () => {
+	it('should be a page for a category only the nearby search found, though the ruleset does not cover it', async () => {
 		const mockRes = { status: mock.fn(() => mockRes), render: mock.fn() };
-		// a quirk of this mock: the same row comes back for every condition's own query, so it lands
-		// in matches at 50km - outside Hospital's only (10km intersection) rule's reach and with no
-		// bordering rule covering the category. Real data can't produce this, but the column must
-		// still render something sane rather than crash
-		const hospitalRow = {
+		const { geometryWkt: _noGeometry, ...interconnector } = {
 			...parishMatchRow(),
-			consulteeCategory: 'Hospital',
-			consultee: 'Norfolk Hospital',
-			distanceMetres: 50_000
+			consulteeCategory: 'Interconnector',
+			consultee: 'NeuConnect Interconnector',
+			distanceMetres: 4_000,
+			reasons: [{ type: 'nearby' as const, radiusMetres: 20_000 }]
 		};
-		const db = dbReturning([[realProjectRow()], [hospitalRow]]);
-		await handlerFor(db)({ params: { caseId: realProjectId }, query: { category: 'Hospital' } }, mockRes);
+		const db = dbReturning([[realProjectRow()], [interconnector]]);
+		await handlerFor(db)({ params: { caseId: realProjectId }, query: { category: 'Interconnector' } }, mockRes);
+
+		assert.strictEqual(mockRes.status.mock.callCount(), 0);
+		const viewModel = mockRes.render.mock.calls[0].arguments[1];
+		assert.strictEqual(viewModel.rows[0].name, 'NeuConnect Interconnector');
+		assert.deepStrictEqual(viewModel.rows[0].identified, ['Within 20km of the site']);
+	});
+
+	it('should fall back to a condition id the ruleset does not have, rather than drop the reason', async () => {
+		const mockRes = { status: mock.fn(() => mockRes), render: mock.fn() };
+		const row = { ...parishMatchRow(), reasons: [{ type: 'condition' as const, conditionId: 'retired_condition' }] };
+		const db = dbReturning([[realProjectRow()], [row]]);
+		await handlerFor(db)({ params: { caseId: realProjectId }, query: { category: 'Parish Council' } }, mockRes);
 
 		const viewModel = mockRes.render.mock.calls[0].arguments[1];
-		assert.strictEqual(viewModel.rows.length, 1);
-		assert.strictEqual(viewModel.rows[0].identified, '');
+		assert.deepStrictEqual(viewModel.rows[0].identified, ['retired_condition']);
 	});
 
 	it('should hide excluded consultees from the rows and the remove links keep the rest', async () => {
@@ -258,9 +263,9 @@ describe('report consultees change page', () => {
 		const viewModel = mockRes.render.mock.calls[0].arguments[1];
 		assert.strictEqual(viewModel.rows.length, 3);
 		assert.strictEqual(viewModel.rows[1].name, 'First Test Consultee');
-		assert.strictEqual(viewModel.rows[1].identified, 'Bordering landowner');
+		assert.deepStrictEqual(viewModel.rows[1].identified, ['Bordering landowner']);
 		assert.strictEqual(viewModel.rows[2].name, 'Second Test Consultee');
-		assert.strictEqual(viewModel.rows[2].identified, 'Manually added');
+		assert.deepStrictEqual(viewModel.rows[2].identified, ['Manually added']);
 
 		// removing the first added row drops only its add param - the second stays
 		assert.strictEqual(
@@ -307,7 +312,7 @@ describe('report consultees change page', () => {
 		assert.strictEqual((viewModel.saveAndReturnUrl.match(/add=/g) ?? []).length, 1);
 	});
 
-	it('should 404 for a category the ruleset does not cover', async () => {
+	it('should 404 for a category neither the ruleset covers nor the run found', async () => {
 		const mockRes = { status: mock.fn(() => mockRes), render: mock.fn() };
 		const db = dbReturning([[realProjectRow()]]);
 		await handlerFor(db)({ params: { caseId: realProjectId }, query: { category: 'Not A Category' } }, mockRes);

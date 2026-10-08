@@ -1,11 +1,12 @@
 import type { ManageService } from '#service';
 import { stringifyForInlineScript } from '#util/inline-json.ts';
-import type { ConsulteeAreaSummaryMatch } from '@pins/identify-consultees-database/src/geospatial/consultee-areas.ts';
+import type { ConsulteeMatch, Ruleset } from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
 import { getRuleset } from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
 import type { AsyncRequestHandler } from '@planning-inspectorate/core/util';
 import { buildCaseMapConfig, MAX_SAMPLED_MAP_MATCHES } from '../../../maps/case-geojson.ts';
 import { MAP_VIEWPORT } from '../../../maps/sample-geojson.ts';
 import { buildConsulteeStaticMapResponse } from '../../../maps/serve-static-map.ts';
+import { describeReasons } from '../reasons.ts';
 import { excludedIds } from '../report/urls.ts';
 import { resolveCase } from '../resolve-case.ts';
 import { buildSearchAreaSafely, firstQueryValue, projectPageUrl, runRulesetSafely } from '../run-ruleset.ts';
@@ -15,17 +16,18 @@ function resultsUrl(caseId: string, rulesetId: string): string {
 	return `/consultees/${encodeURIComponent(caseId)}/results?ruleset=${encodeURIComponent(rulesetId)}`;
 }
 
-function toMatchRow(match: ConsulteeAreaSummaryMatch): ConsulteeMatchRow {
+function toMatchRow(match: ConsulteeMatch, ruleset: Ruleset): ConsulteeMatchRow {
 	return {
 		consultee: match.feature.properties.consultee ?? null,
 		consulteeCategory: match.feature.properties.consulteeCategory ?? null,
-		region: match.feature.properties.region ?? null
+		region: match.feature.properties.region ?? null,
+		reasons: describeReasons(match, ruleset)
 	};
 }
 
 /**
  * The consultee report for the map page's selection: the same ruleset run the map page drew, with
- * every matching consultee listed in tables.
+ * every consultee it found listed with the reasons it was identified.
  */
 export function buildConsulteesResultsPage(service: ManageService): AsyncRequestHandler {
 	const { db, logger, nearbyConsulteeRadiusMetres, rulesetRunner } = service;
@@ -49,17 +51,17 @@ export function buildConsulteesResultsPage(service: ManageService): AsyncRequest
 			'consultees results page'
 		);
 
-		const { matches, allNearby, failed } = await runRulesetSafely(
+		const { consultees, failed } = await runRulesetSafely(
 			rulesetRunner,
 			project,
 			ruleset,
 			nearbyConsulteeRadiusMetres,
 			logger
 		);
-		const searchArea = await buildSearchAreaSafely(db, project, matches, nearbyConsulteeRadiusMetres, logger);
+		const searchArea = await buildSearchAreaSafely(db, project, consultees, nearbyConsulteeRadiusMetres, logger);
 		const staticMapSrc = `/consultees/${encodeURIComponent(project.id)}/results/static-map?ruleset=${encodeURIComponent(ruleset.id)}`;
 		const staticMapAlt = `Static map showing ${ruleset.name} for ${project.properties.caseName}`;
-		const map = buildCaseMapConfig(project, matches, ruleset.name, searchArea, {
+		const map = buildCaseMapConfig(project, consultees, ruleset.name, searchArea, {
 			src: staticMapSrc,
 			alt: staticMapAlt
 		});
@@ -80,12 +82,10 @@ export function buildConsulteesResultsPage(service: ManageService): AsyncRequest
 			mapWidth: MAP_VIEWPORT.width,
 			mapHeight: MAP_VIEWPORT.height,
 			mapConfigJson: stringifyForInlineScript(map),
-			matches: matches.map(toMatchRow),
+			matches: consultees.map((match) => toMatchRow(match, ruleset)),
 			matchCount: map.matchCount,
 			mapIsSampled: map.isSampled,
 			mapSampleSize: MAX_SAMPLED_MAP_MATCHES,
-			nearbyMatches: allNearby.map(toMatchRow),
-			nearbyMatchCount: allNearby.length,
 			nearbyRadiusKm: nearbyConsulteeRadiusMetres / 1000
 		};
 
@@ -106,7 +106,7 @@ export function buildResultsStaticMap(service: ManageService, forceSvg = false):
 			return;
 		}
 
-		const { matches, failed } = await runRulesetSafely(
+		const { consultees, failed } = await runRulesetSafely(
 			rulesetRunner,
 			project,
 			ruleset,
@@ -119,17 +119,17 @@ export function buildResultsStaticMap(service: ManageService, forceSvg = false):
 			res.status(503).type('text/plain').send('The ruleset could not be run');
 			return;
 		}
-		// a category page's static map draws only that category's non-excluded matches; with no
-		// category this stays the whole ruleset's matches, same as the interactive map
+		// a category page's static map draws only that category's non-excluded consultees; with no
+		// category it's every consultee the run found, same as the interactive map
 		const category = firstQueryValue(req.query.category);
 		const excluded = excludedIds(req.query.exclude);
 		const displayMatches =
 			category || excluded.size > 0
-				? matches.filter(
+				? consultees.filter(
 						(match) =>
 							(!category || match.feature.properties.consulteeCategory === category) && !excluded.has(match.feature.id)
 					)
-				: matches;
+				: consultees;
 		// same search area as the interactive map, so both open on the same view
 		const searchArea = await buildSearchAreaSafely(db, project, displayMatches, nearbyConsulteeRadiusMetres, logger);
 		const map = buildCaseMapConfig(project, displayMatches, category || ruleset.name, searchArea);

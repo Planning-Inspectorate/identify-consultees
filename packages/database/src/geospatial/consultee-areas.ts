@@ -13,15 +13,6 @@ import { geometryToWkt, wktToGeometry } from './wkt.ts';
  */
 export const SIMPLIFY_TOLERANCE_METRES = 10;
 
-/**
- * Simplifying both shapes can move a distance by up to twice the tolerance, so the ruleset's
- * distance thresholds are widened by more than that: simplification can only *add* a borderline
- * consultee, never drop one. The ruleset runs in apps/function-python (querying/rulesets.py, which
- * defines the same margin - keep the two equal); the report pages use this copy to say which
- * condition's buffer a match fell within.
- */
-export const DISTANCE_MARGIN_METRES = 2 * SIMPLIFY_TOLERANCE_METRES + 10;
-
 export interface ConsulteeAreaProperties {
 	consulteeCategory?: string | null;
 	consultee?: string | null;
@@ -344,4 +335,16 @@ export async function getConsulteeAreaDisplayGeometries(
 		}
 	}
 	return geometries;
+}
+
+/** Every consultee category in the reference data, alphabetically. */
+export async function listConsulteeCategories(dbClient: PrismaClient): Promise<string[]> {
+	const rows = await withDeadlockRetry(
+		() => dbClient.$queryRaw<{ consulteeCategory: string }[]>`
+			SELECT DISTINCT consulteeCategory FROM consultee_area
+			WHERE consulteeCategory IS NOT NULL
+			ORDER BY consulteeCategory
+		`
+	);
+	return rows.map((row) => row.consulteeCategory);
 }

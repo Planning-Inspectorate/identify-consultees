@@ -164,14 +164,24 @@ def _ids(matches: list[AreaMatch]) -> list[str]:
     return [match.area["id"] for match in matches]
 
 
+def _matched(result) -> list[AreaMatch]:
+    """The consultees at least one condition matched."""
+    return [match for match in result.consultees if any(r["type"] == "condition" for r in match.reasons)]
+
+
+def _nearby(result) -> list[AreaMatch]:
+    """The consultees the general nearby search found."""
+    return [match for match in result.consultees if any(r["type"] == "nearby" for r in match.reasons)]
+
+
 def test_only_matches_areas_in_a_conditions_categories_within_its_buffer(connection_params, areas):
     areas((TEST_AREA_ID, "POINT(0 0)", "Railway", "Test Railway"))
     railway = [_rule(categories=("Railway",), buffer_metres=10_000)]
 
-    assert TEST_AREA_ID in _ids(run_ruleset(connection_params, "POINT(0.001 0.001)", railway, 20_000).matches)
+    assert TEST_AREA_ID in _ids(_matched(run_ruleset(connection_params, "POINT(0.001 0.001)", railway, 20_000)))
     hospital = [_rule(categories=("Hospital",), buffer_metres=10_000)]
-    assert TEST_AREA_ID not in _ids(run_ruleset(connection_params, "POINT(0.001 0.001)", hospital, 20_000).matches)
-    assert TEST_AREA_ID not in _ids(run_ruleset(connection_params, "POINT(10 10)", railway, 20_000).matches)
+    assert TEST_AREA_ID not in _ids(_matched(run_ruleset(connection_params, "POINT(0.001 0.001)", hospital, 20_000)))
+    assert TEST_AREA_ID not in _ids(_matched(run_ruleset(connection_params, "POINT(10 10)", railway, 20_000)))
 
 
 def test_combines_every_conditions_matches_deduplicated_with_geometry(connection_params, areas):
@@ -185,7 +195,7 @@ def test_combines_every_conditions_matches_deduplicated_with_geometry(connection
         _rule(id="railway-again", categories=("Railway",), buffer_metres=20_000),
     ]
 
-    matches = run_ruleset(connection_params, "POINT(0.001 0.001)", rules, 20_000).matches
+    matches = _matched(run_ruleset(connection_params, "POINT(0.001 0.001)", rules, 20_000))
 
     assert sorted(_ids(matches)) == sorted([TEST_AREA_ID, SECOND_AREA_ID])
     assert all(match.area["geometryWkt"].startswith("POINT") for match in matches)
@@ -199,7 +209,7 @@ def test_orders_matches_tied_at_the_same_distance_by_id(connection_params, areas
     )
     rules = [_rule(categories=("Railway",), buffer_metres=0)]
 
-    orderings = {tuple(_ids(run_ruleset(connection_params, "POINT(0 0)", rules, 20_000).matches)) for _ in range(3)}
+    orderings = {tuple(_ids(_matched(run_ruleset(connection_params, "POINT(0 0)", rules, 20_000)))) for _ in range(3)}
 
     assert orderings == {(TEST_AREA_ID, SECOND_AREA_ID)}
 
@@ -211,7 +221,7 @@ def test_finds_an_area_bordering_the_host_but_not_the_host_itself(connection_par
     )
     rules = [_rule(logic_type="bordering", categories=("Parish Council",), host_category="Parish Council")]
 
-    matches = run_ruleset(connection_params, "POINT(0.5 0.5)", rules, 20_000).matches
+    matches = _matched(run_ruleset(connection_params, "POINT(0.5 0.5)", rules, 20_000))
 
     assert HOST_AREA_ID not in _ids(matches)
     [neighbour] = [match for match in matches if match.area["id"] == NEIGHBOUR_AREA_ID]
@@ -229,7 +239,7 @@ def test_counts_a_small_gap_in_the_data_as_bordering_but_not_a_clear_one(connect
     )
     rules = [_rule(logic_type="bordering", categories=("Parish Council",), host_category="Parish Council")]
 
-    ids = _ids(run_ruleset(connection_params, "POINT(0.5 0.5)", rules, 20_000).matches)
+    ids = _ids(_matched(run_ruleset(connection_params, "POINT(0.5 0.5)", rules, 20_000)))
 
     assert NEIGHBOUR_AREA_ID in ids
     assert TEST_AREA_ID not in ids
@@ -241,15 +251,58 @@ def test_includes_an_area_just_past_a_cut_off_but_not_one_well_past_it(connectio
         (SECOND_AREA_ID, _point_at(1_200), "Hospital", "Well Past 1km"),
     )
 
-    ids = _ids(run_ruleset(connection_params, _point_at(0), [_rule(buffer_metres=1_000)], 20_000).matches)
+    ids = _ids(_matched(run_ruleset(connection_params, _point_at(0), [_rule(buffer_metres=1_000)], 20_000)))
 
     assert TEST_AREA_ID in ids
     assert SECOND_AREA_ID not in ids
 
 
+def test_each_consultee_carries_every_reason_it_qualified_in_ruleset_order(connection_params, areas):
+    areas(
+        (TEST_AREA_ID, _point_at(500), "Hospital", "Near Hospital"),
+        (SECOND_AREA_ID, _point_at(5_000), "Electricity Generator", "Nearby Generator"),
+    )
+    rules = [
+        _rule(id="hospital_10km", buffer_metres=10_000),
+        _rule(id="hospital_1km", buffer_metres=1_000),
+    ]
+
+    result = run_ruleset(connection_params, _point_at(0), rules, 20_000)
+    by_id = {match.area["id"]: match for match in result.consultees}
+
+    # met both conditions, and is within the general search too - each reason once, ruleset order
+    assert by_id[TEST_AREA_ID].reasons == [
+        {"type": "condition", "conditionId": "hospital_10km"},
+        {"type": "condition", "conditionId": "hospital_1km"},
+        {"type": "nearby", "radiusMetres": 20_000},
+    ]
+    assert "geometryWkt" in by_id[TEST_AREA_ID].area
+    # no condition asks for its category - it's only a consultee through the general search, and
+    # it's listed, not drawn from original geometry
+    assert by_id[SECOND_AREA_ID].reasons == [{"type": "nearby", "radiusMetres": 20_000}]
+    assert "geometryWkt" not in by_id[SECOND_AREA_ID].area
+    assert 4_900 < by_id[SECOND_AREA_ID].distance_metres < 5_100
+
+
+def test_a_bordering_match_beyond_the_nearby_search_has_only_its_condition_reason(connection_params, areas):
+    areas(
+        (HOST_AREA_ID, _square(0, 1), "Parish Council", "Host Parish"),
+        (NEIGHBOUR_AREA_ID, _square(1, 2), "Parish Council", "Neighbour Parish"),
+    )
+    rules = [_rule(id="bordering", logic_type="bordering", categories=("Parish Council",), host_category="Parish Council")]
+
+    result = run_ruleset(connection_params, "POINT(0.5 0.5)", rules, 1_000)
+    [neighbour] = [match for match in result.consultees if match.area["id"] == NEIGHBOUR_AREA_ID]
+
+    # ~55km away, so outside the 1km search - measured on its own
+    assert neighbour.reasons == [{"type": "condition", "conditionId": "bordering"}]
+    assert 55_000 < neighbour.distance_metres < 56_000
+    assert "geometryWkt" in neighbour.area
+
+
 def test_a_bordering_condition_without_a_host_category_matches_nothing(connection_params):
     rules = [_rule(logic_type="bordering", categories=("Parish Council",))]
-    assert run_ruleset(connection_params, "POINT(0 0)", rules, 20_000).matches == []
+    assert _matched(run_ruleset(connection_params, "POINT(0 0)", rules, 20_000)) == []
 
 
 def test_all_nearby_lists_every_category_within_the_radius_except_railway(connection_params, areas):
@@ -258,14 +311,14 @@ def test_all_nearby_lists_every_category_within_the_radius_except_railway(connec
         (SECOND_AREA_ID, "POINT(0 0)", "Railway", "Test Railway"),
     )
 
-    nearby = run_ruleset(connection_params, "POINT(0.001 0.001)", [], 1_000).all_nearby
+    nearby = _nearby(run_ruleset(connection_params, "POINT(0.001 0.001)", [], 1_000))
 
     # a category no condition asks for still shows up; Railway's nationwide geometry never does
     assert TEST_AREA_ID in _ids(nearby)
     assert SECOND_AREA_ID not in _ids(nearby)
     # listed, never drawn - no geometry
     assert all("geometryWkt" not in match.area for match in nearby)
-    assert run_ruleset(connection_params, "POINT(10 10)", [], 1_000).all_nearby == []
+    assert _nearby(run_ruleset(connection_params, "POINT(10 10)", [], 1_000)) == []
 
 
 def _polygon_wkt(geometry: dict) -> str:
@@ -299,13 +352,13 @@ def test_finds_consultees_across_several_categories_for_a_real_project(connectio
 
     result = run_ruleset(connection_params, site_wkt, rules, 20_000)
 
-    ids = _ids(result.matches)
+    ids = _ids(_matched(result))
     for fixture in (TEST_AREA_ID, SECOND_AREA_ID, HOST_AREA_ID):
         assert fixture in ids
-        assert fixture in _ids(result.all_nearby)
-    [hospital] = [match for match in result.matches if match.area["id"] == HOST_AREA_ID]
+        assert fixture in _ids(_nearby(result))
+    [hospital] = [match for match in _matched(result) if match.area["id"] == HOST_AREA_ID]
     # the stored geometry, to SQL Server's own float formatting
     assert hospital.area["geometryWkt"].startswith("POINT (1.18287142949087")
     # ids come back lowercase, as the manage app's own (Prisma) queries see them
-    assert all(match.area["id"] == match.area["id"].lower() for match in result.matches)
+    assert all(match.area["id"] == match.area["id"].lower() for match in result.consultees)
     uuid.UUID(ids[0])

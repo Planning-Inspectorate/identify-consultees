@@ -1,5 +1,6 @@
 import type { ManageService } from '#service';
 import type { CaseBoundarySummary } from '@pins/identify-consultees-database/src/geospatial/case-boundaries.ts';
+import { listConsulteeCategories } from '@pins/identify-consultees-database/src/geospatial/consultee-areas.ts';
 import type { Ruleset } from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
 import { getRuleset, RULESETS } from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
 import type { AsyncRequestHandler, AsyncRequestHandlerWithBody } from '@planning-inspectorate/core/util';
@@ -19,9 +20,9 @@ interface AddConsulteeContext {
 }
 
 /**
- * The case/ruleset/category a "Select a consultee" request targets - resolved exactly as the
- * category page does, since this form lives under it: a case that isn't found, a ruleset that
- * isn't known or a category the ruleset doesn't cover 404s. `undefined` means a response has
+ * The case/ruleset/category a "Select a consultee" request targets, since this form lives under a
+ * category page: a case that isn't found, a ruleset that isn't known, or a category that's neither
+ * one the ruleset covers nor one in the reference data (the nearby search finds those) 404s. `undefined` means a response has
  * already been sent.
  */
 async function addConsulteeContext(
@@ -38,7 +39,10 @@ async function addConsulteeContext(
 	const requestedRuleset = firstQueryValue(query.ruleset);
 	const ruleset = requestedRuleset ? getRuleset(requestedRuleset) : RULESETS[0];
 	const category = firstQueryValue(query.category);
-	if (!ruleset || !rulesetCategories(ruleset).includes(category)) {
+	const knownCategory =
+		ruleset !== undefined &&
+		(rulesetCategories(ruleset).includes(category) || (await listConsulteeCategories(service.db)).includes(category));
+	if (!ruleset || !knownCategory) {
 		res.status(404).render('views/errors/404.njk', { pageHeading: 'Page not found' });
 		return undefined;
 	}

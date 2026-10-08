@@ -81,23 +81,18 @@ describe('consultees results page', () => {
 		const viewModel = mockRes.render.mock.calls[0].arguments[1];
 		assert.match(viewModel.pageHeading, /Real Test Project/);
 		assert.strictEqual(viewModel.rulesetName, 'England Wales post 30 April 2024');
-		// this mock returns the same single row for every one of the ruleset's ~27 conditions
-		// (unlike real data, where a row's category only ever matches a subset of them), so which
-		// exact distance survives deduplication isn't meaningful here - just that the row shows up
-		// exactly once, not once per condition that happened to "match" it
 		assert.strictEqual(viewModel.matches.length, 1);
 		assert.strictEqual(viewModel.matches[0].consultee, 'Network Rail');
+		// one list, each consultee with why it was identified (the stub's default condition id,
+		// which this ruleset doesn't have, so it's shown as the id)
+		assert.deepStrictEqual(viewModel.matches[0].reasons, ['test-condition']);
 		assert.ok(viewModel.mapConfigJson.includes('FeatureCollection'));
-		// allNearby comes from the same mocked row, by default (within nearbyConsulteeRadiusMetres)
-		assert.strictEqual(viewModel.nearbyMatches.length, 1);
-		assert.strictEqual(viewModel.nearbyMatches[0].consultee, 'Network Rail');
-		assert.strictEqual(viewModel.nearbyMatchCount, 1);
 		assert.strictEqual(viewModel.nearbyRadiusKm, 20);
-		// but not on the interactive map, which shows only the project and the ruleset's matches
 		assert.strictEqual('nearbyGeojson' in JSON.parse(viewModel.mapConfigJson), false);
+		assert.match(mockRes.render.mock.calls[0].result, /Why identified/);
 	});
 
-	it('still renders every nearby consultee in the table if their map geometry fails to load', async () => {
+	it('still lists every consultee if their map geometry fails to load', async () => {
 		const mockRes = { status: mock.fn(() => mockRes), render: mock.fn() };
 		const rows = [[realProjectRow()], [railwayMatchRow()]];
 		let call = 0;
@@ -120,7 +115,7 @@ describe('consultees results page', () => {
 
 		const viewModel = mockRes.render.mock.calls[0].arguments[1];
 		assert.strictEqual(viewModel.rulesetFailed, false);
-		assert.strictEqual(viewModel.nearbyMatches.length, 1);
+		assert.strictEqual(viewModel.matches.length, 1);
 		assert.strictEqual(logger.error.mock.callCount(), 1);
 	});
 

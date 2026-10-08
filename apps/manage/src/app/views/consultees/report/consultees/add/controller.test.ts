@@ -113,6 +113,24 @@ describe('report consultee add page', () => {
 		});
 	}
 
+	it('should accept a category the ruleset does not cover but the reference data has', async () => {
+		// the nearby search finds consultees in categories no condition names - their category page
+		// links here, so the form has to accept them
+		const mockRes = { status: mock.fn(() => mockRes), render: mock.fn() };
+		const db = {
+			$queryRaw: mock.fn(async (sql: TemplateStringsArray) =>
+				sql.join('').includes('DISTINCT consulteeCategory') ? [{ consulteeCategory: 'Interconnector' }] : [summaryRow()]
+			)
+		};
+		await buildReportConsulteeAddPage(service(db))(
+			{ params: { caseId: realProjectId }, query: { ...parishQuery, category: 'Interconnector' } },
+			mockRes
+		);
+
+		assert.strictEqual(mockRes.status.mock.callCount(), 0);
+		assert.strictEqual(mockRes.render.mock.calls[0].arguments[1].pageCaption, 'Interconnector');
+	});
+
 	it('should 404 when caseId is missing or malformed', async () => {
 		const mockRes = { status: mock.fn(() => mockRes), render: mock.fn() };
 		const handler = buildReportConsulteeAddPage(service({ $queryRaw: mock.fn() }));

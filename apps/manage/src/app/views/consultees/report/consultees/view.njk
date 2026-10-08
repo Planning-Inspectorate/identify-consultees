@@ -50,9 +50,11 @@
 				{% set removeLink %}
 					<a class="govuk-link" href="{{ row.removeUrl }}">Remove<span class="govuk-visually-hidden"> {{ row.name }}</span></a>
 				{% endset %}
+				{# one reason per line - each item is autoescaped #}
+				{% set identifiedHtml %}{% for reason in row.identified %}{{ reason }}{% if not loop.last %}<br>{% endif %}{% endfor %}{% endset %}
 				{% set tableRows = (tableRows.push([
 					{ text: row.name, classes: "govuk-table__cell--no-wrap" },
-					{ text: row.identified },
+					{ html: identifiedHtml },
 					{ html: removeLink }
 				]), tableRows) %}
 			{% endfor %}

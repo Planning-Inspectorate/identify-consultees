@@ -157,19 +157,20 @@ def _parse_run_ruleset_request(req: func.HttpRequest) -> tuple[str, list[RuleCon
     )
 
 
-def _match_json(match, with_geometry: bool) -> dict:
+def _consultee_json(match) -> dict:
     area = match.area
     feature = {"id": area["id"], "properties": area["properties"]}
-    if with_geometry:
+    if "geometryWkt" in area:
         feature["geometryWkt"] = area["geometryWkt"]
-    return {"feature": feature, "distanceMetres": match.distance_metres}
+    return {"feature": feature, "distanceMetres": match.distance_metres, "reasons": match.reasons}
 
 
 @app.route(route="run-ruleset", methods=["POST"])
 def run_ruleset_route(req: func.HttpRequest) -> func.HttpResponse:
     """Run a ruleset's conditions against a project site - the manage app's consultee intersection
     logic. Body: `{siteWkt, rules: [{id, logicType, categories, bufferMetres?, hostCategory?}],
-    nearbyRadiusMetres}`. Returns `{matches, allNearby}` - see kt-docs/api-and-data-contracts.md.
+    nearbyRadiusMetres}`. Returns `{consultees}`, each with its reasons - see
+    kt-docs/api-and-data-contracts.md.
     """
     auth_error = _check_api_key(req)
     if auth_error is not None:
@@ -192,11 +193,6 @@ def run_ruleset_route(req: func.HttpRequest) -> func.HttpResponse:
         )
 
     return func.HttpResponse(
-        json.dumps(
-            {
-                "matches": [_match_json(match, with_geometry=True) for match in result.matches],
-                "allNearby": [_match_json(match, with_geometry=False) for match in result.all_nearby],
-            }
-        ),
+        json.dumps({"consultees": [_consultee_json(match) for match in result.consultees]}),
         mimetype="application/json",
     )

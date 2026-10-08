@@ -98,11 +98,15 @@ def test_run_ruleset_shares_the_consultee_areas_api_key_check():
         assert run_ruleset_route(_ruleset_request(VALID_BODY, {"x-api-key": "wrong"})).status_code == 401
 
 
-def test_run_ruleset_runs_the_posted_conditions_and_returns_matches_and_nearby():
+def test_run_ruleset_runs_the_posted_conditions_and_returns_each_consultee_with_its_reasons():
     area = {"id": "a", "properties": {"consulteeCategory": "Hospital", "consultee": "Example"}}
+    nearby_only = {"id": "b", "properties": {"consulteeCategory": "Interconnector", "consultee": "Other"}}
+    reasons = [{"type": "condition", "conditionId": "hospital"}, {"type": "nearby", "radiusMetres": 20_000}]
     result = RunRulesetResult(
-        matches=[AreaMatch({**area, "geometryWkt": "POINT (0 0)"}, 12.5)],
-        all_nearby=[AreaMatch(area, 12.5)],
+        consultees=[
+            AreaMatch({**area, "geometryWkt": "POINT (0 0)"}, 12.5, reasons),
+            AreaMatch(nearby_only, 900.0, [{"type": "nearby", "radiusMetres": 20_000}]),
+        ]
     )
     params = object()
     with (
@@ -114,8 +118,14 @@ def test_run_ruleset_runs_the_posted_conditions_and_returns_matches_and_nearby()
 
     assert response.status_code == 200
     assert json.loads(response.get_body()) == {
-        "matches": [{"feature": {**area, "geometryWkt": "POINT (0 0)"}, "distanceMetres": 12.5}],
-        "allNearby": [{"feature": area, "distanceMetres": 12.5}],
+        "consultees": [
+            {"feature": {**area, "geometryWkt": "POINT (0 0)"}, "distanceMetres": 12.5, "reasons": reasons},
+            {
+                "feature": nearby_only,
+                "distanceMetres": 900.0,
+                "reasons": [{"type": "nearby", "radiusMetres": 20_000}],
+            },
+        ]
     }
     run.assert_called_once_with(
         params,

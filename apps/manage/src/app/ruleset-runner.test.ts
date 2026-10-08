@@ -36,7 +36,7 @@ describe('runRulesetUrl', () => {
 
 describe('buildPythonRulesetRunner', () => {
 	it("posts the site, radius and ruleset's conditions with the API key", async () => {
-		const fetchImpl = respondWith({ matches: [], allNearby: [] });
+		const fetchImpl = respondWith({ consultees: [] });
 		const run = buildPythonRulesetRunner({
 			pythonFunctionUrl: 'http://localhost:7071/api/consultee-areas',
 			apiKey: 'shared-key',
@@ -61,29 +61,40 @@ describe('buildPythonRulesetRunner', () => {
 		});
 	});
 
-	it('maps the response into matches with geometry and nearby summaries without', async () => {
+	it('maps each consultee with its reasons, with geometry only when the function sent it', async () => {
+		const conditionAndNearby = [
+			{ type: 'condition', conditionId: 'hospital' },
+			{ type: 'nearby', radiusMetres: 20_000 }
+		];
 		const run = buildPythonRulesetRunner({
 			pythonFunctionUrl: 'http://localhost:7071/api/consultee-areas',
 			apiKey: undefined,
 			fetchImpl: respondWith({
-				matches: [{ feature: { id: 'a', properties, geometryWkt: 'POINT (-1.4 52.6)' }, distanceMetres: 12.5 }],
-				allNearby: [{ feature: { id: 'a', properties }, distanceMetres: 12.5 }]
+				consultees: [
+					{
+						feature: { id: 'a', properties, geometryWkt: 'POINT (-1.4 52.6)' },
+						distanceMetres: 12.5,
+						reasons: conditionAndNearby
+					},
+					{ feature: { id: 'b', properties }, distanceMetres: 900, reasons: [conditionAndNearby[1]] }
+				]
 			})
 		});
 
-		const { matches, allNearby } = await run(site, ruleset, 20_000);
+		const { consultees } = await run(site, ruleset, 20_000);
 
-		assert.deepEqual(matches, [
+		assert.deepEqual(consultees, [
 			{
 				distanceMetres: 12.5,
-				feature: { id: 'a', type: 'Feature', properties, geometry: { type: 'Point', coordinates: [-1.4, 52.6] } }
-			}
+				reasons: conditionAndNearby,
+				feature: { id: 'a', properties, geometry: { type: 'Point', coordinates: [-1.4, 52.6] } }
+			},
+			{ distanceMetres: 900, reasons: [conditionAndNearby[1]], feature: { id: 'b', properties } }
 		]);
-		assert.deepEqual(allNearby, [{ distanceMetres: 12.5, feature: { id: 'a', properties } }]);
 	});
 
 	it('sends no API key header when none is configured', async () => {
-		const fetchImpl = respondWith({ matches: [], allNearby: [] });
+		const fetchImpl = respondWith({ consultees: [] });
 		await buildPythonRulesetRunner({ pythonFunctionUrl: 'http://f/api/x', apiKey: undefined, fetchImpl })(
 			site,
 			ruleset,
@@ -104,7 +115,7 @@ describe('buildPythonRulesetRunner', () => {
 			buildPythonRulesetRunner({ pythonFunctionUrl: 'http://f/api/x', apiKey: 'k', fetchImpl })(site, ruleset, 1);
 
 		await assert.rejects(() => runWith(respondWith({ error: 'Unauthorised' }, 401)), /status 401/);
-		await assert.rejects(() => runWith(respondWith({ rows: [] })), /unexpected run-ruleset response/);
+		await assert.rejects(() => runWith(respondWith({ matches: [] })), /unexpected run-ruleset response/);
 		await assert.rejects(
 			() =>
 				runWith(async () => {

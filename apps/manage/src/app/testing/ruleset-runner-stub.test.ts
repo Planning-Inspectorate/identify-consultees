@@ -11,10 +11,10 @@ function row(id: string, consulteeCategory: string | null, distanceMetres: numbe
 }
 
 describe('rulesetRunnerReturning', () => {
-	it('fills in the optional columns a fixture row leaves out', async () => {
-		const { matches, allNearby } = await rulesetRunnerReturning([row('a', 'Hospital', 5)])(site, emptyRuleset, 1);
+	it('fills in the optional columns and reasons a fixture row leaves out', async () => {
+		const { consultees } = await rulesetRunnerReturning([row('a', 'Hospital', 5)])(site, emptyRuleset, 1);
 
-		assert.deepEqual(matches[0].feature.properties, {
+		assert.deepEqual(consultees[0].feature.properties, {
 			consulteeCategory: 'Hospital',
 			consultee: 'a',
 			region: null,
@@ -25,7 +25,13 @@ describe('rulesetRunnerReturning', () => {
 			currentVersion: 1,
 			metadata: {}
 		});
-		assert.equal('geometry' in allNearby[0].feature, false);
+		assert.deepEqual(consultees[0].reasons, [{ type: 'condition', conditionId: 'test-condition' }]);
+	});
+
+	it('leaves out geometry for a row without any, as the function does for nearby-only consultees', async () => {
+		const { geometryWkt: _unused, ...nearbyOnly } = row('b', 'Interconnector', 5);
+		const { consultees } = await rulesetRunnerReturning([nearbyOnly])(site, emptyRuleset, 1);
+		assert.equal('geometry' in consultees[0].feature, false);
 	});
 });
 
@@ -36,7 +42,7 @@ describe('failingRulesetRunner', () => {
 });
 
 describe('buildDatabaseRulesetRunner', () => {
-	it('matches intersection conditions by category and buffer, and lists everything in the radius', async () => {
+	it('gives each consultee its condition and nearby reasons, and leaves out anything with neither', async () => {
 		const rows = [
 			row('police', 'Police', 0),
 			row('hospital', 'Hospital', 900),
@@ -62,15 +68,27 @@ describe('buildDatabaseRulesetRunner', () => {
 		};
 
 		const run = buildDatabaseRulesetRunner(() => db as never);
-		const { matches, allNearby } = await run(site, ruleset, 1_200);
+		const { consultees } = await run(site, ruleset, 1_200);
 
 		assert.deepEqual(
-			matches.map((match) => match.feature.id),
-			['police', 'hospital']
-		);
-		assert.deepEqual(
-			allNearby.map((match) => match.feature.id),
-			['police', 'hospital', 'none']
+			consultees.map((consultee) => [consultee.feature.id, consultee.reasons]),
+			[
+				[
+					'police',
+					[
+						{ type: 'condition', conditionId: 'touching' },
+						{ type: 'nearby', radiusMetres: 1_200 }
+					]
+				],
+				[
+					'hospital',
+					[
+						{ type: 'condition', conditionId: 'h' },
+						{ type: 'nearby', radiusMetres: 1_200 }
+					]
+				],
+				['none', [{ type: 'nearby', radiusMetres: 1_200 }]]
+			]
 		);
 	});
 });

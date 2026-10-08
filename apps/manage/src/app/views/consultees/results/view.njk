@@ -44,16 +44,20 @@
 
 	{% if not rulesetFailed %}
 	<h2 class="govuk-heading-m govuk-!-margin-top-6">Consultees identified ({{ matchCount }})</h2>
+	<p class="govuk-body">Consultees the ruleset's conditions identified, and every consultee within {{ nearbyRadiusKm }}km of the site in any category. Each is listed once, with every reason it was identified.</p>
 
 	{% if matches.length == 0 %}
-		<p class="govuk-body">No consultees matched this ruleset.</p>
+		<p class="govuk-body">No consultees were identified.</p>
 	{% else %}
 		{% set tableRows = [] %}
 		{% for match in matches %}
+			{# one reason per line - each item is autoescaped #}
+			{% set reasonsHtml %}{% for reason in match.reasons %}{{ reason }}{% if not loop.last %}<br>{% endif %}{% endfor %}{% endset %}
 			{% set tableRows = (tableRows.push([
 				{ text: match.consultee | default("") },
 				{ text: match.consulteeCategory | default("") },
-				{ text: match.region | default("") }
+				{ text: match.region | default("") },
+				{ html: reasonsHtml }
 			]), tableRows) %}
 		{% endfor %}
 		{{ govukTable({
@@ -63,36 +67,10 @@
 			head: [
 				{ text: "Consultee" },
 				{ text: "Category" },
-				{ text: "Region" }
+				{ text: "Region" },
+				{ text: "Why identified" }
 			],
 			rows: tableRows
-		}) }}
-	{% endif %}
-
-	<h2 class="govuk-heading-m govuk-!-margin-top-6">All consultees within {{ nearbyRadiusKm }}km ({{ nearbyMatchCount }})</h2>
-	<p class="govuk-body">Every consultee near the site, in any category, including those the ruleset didn't identify. The map shows only the consultees identified.</p>
-
-	{% if nearbyMatches.length == 0 %}
-		<p class="govuk-body">No consultees found within {{ nearbyRadiusKm }}km.</p>
-	{% else %}
-		{% set nearbyTableRows = [] %}
-		{% for match in nearbyMatches %}
-			{% set nearbyTableRows = (nearbyTableRows.push([
-				{ text: match.consultee | default("") },
-				{ text: match.consulteeCategory | default("") },
-				{ text: match.region | default("") }
-			]), nearbyTableRows) %}
-		{% endfor %}
-		{{ govukTable({
-			caption: "All consultees within " ~ nearbyRadiusKm ~ "km",
-			captionClasses: "govuk-visually-hidden",
-			firstCellIsHeader: false,
-			head: [
-				{ text: "Consultee" },
-				{ text: "Category" },
-				{ text: "Region" }
-			],
-			rows: nearbyTableRows
 		}) }}
 	{% endif %}
 	{% endif %}

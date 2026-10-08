@@ -29,7 +29,7 @@ import threading
 import time
 from collections.abc import Callable, Iterable
 from concurrent.futures import ThreadPoolExecutor
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import TypeVar
 
 import pymssql
@@ -50,7 +50,7 @@ DISTANCE_MARGIN_METRES = 2 * SIMPLIFY_TOLERANCE_METRES + 10
 # Luton's boundary in the reference data, which really do border).
 BORDERING_TOLERANCE_METRES = 50
 
-# Left out of the "any category" nearby fetch regardless of distance: Railway's rows are merged
+# Left out of the "any category" nearby search regardless of distance: Railway's rows are merged
 # nationwide by type/status (one feature is a single MultiLineString covering the whole GB network),
 # so its bounding box defeats the spatial index for every location - roughly doubling that query's
 # cost - and "near the national rail network" is true for almost every project anyway. Conditions
@@ -99,15 +99,15 @@ class AreaMatch:
     area: dict
     """The consultee area as returned to the caller: id, properties, and (once known) geometryWkt."""
     distance_metres: float
+    reasons: list[dict] = field(default_factory=list)
+    """Why it's a consultee - see run_ruleset."""
 
 
 @dataclass
 class RunRulesetResult:
-    matches: list[AreaMatch]
-    """The ruleset's own matches - the union of every condition, deduplicated, nearest first."""
-    all_nearby: list[AreaMatch]
-    """Every area within the nearby radius, any category except CATEGORIES_EXCLUDED_FROM_NEARBY -
-    listed, never drawn, so without geometry."""
+    consultees: list[AreaMatch]
+    """Every consultee, nearest first: the union of what each condition matched and every area within
+    the nearby radius, each once, with every reason it qualified."""
 
 
 T = TypeVar("T")
@@ -363,16 +363,20 @@ def _sort_matches(matches: list[AreaMatch]) -> list[AreaMatch]:
 def run_ruleset(
     params: ConnectionParams, site_wkt: str, rules: list[RuleCondition], nearby_radius_metres: float
 ) -> RunRulesetResult:
-    """Run every condition of a ruleset against a project site and combine the results.
+    """Run every condition of a ruleset against a project site, plus the general nearby search.
 
-    One query fetches everything within `nearby_radius_metres` up front (which doubles as the
-    "all nearby consultees" list) and every `intersection` condition at or under that radius is
-    filtered from it in memory. Only conditions needing a wider radius, or `bordering` logic, run
-    their own query - CONDITION_CONCURRENCY at a time. Duplicates (an area matching more than one
-    condition) are removed, nearest first.
+    Returns every consultee once, nearest first, with every reason it qualified, in the ruleset's
+    order: `{"type": "condition", "conditionId": ...}` for each condition it met, then
+    `{"type": "nearby", "radiusMetres": ...}` if it's within `nearby_radius_metres` (any category
+    but Railway). A consultee can have several reasons, or a single one of either kind.
+
+    One query fetches everything within `nearby_radius_metres` up front - the nearby reasons - and
+    every `intersection` condition at or under that radius is filtered from it in memory. Only
+    conditions needing a wider radius, or `bordering` logic, run their own query -
+    CONDITION_CONCURRENCY at a time.
 
     The shared fetch skips geometry (some rows are whole county or National Park boundaries) -
-    geometry is fetched by id for just the final matches, the only rows the map draws.
+    original geometry is fetched by id for condition matches only.
     """
     db = _Database(params)
     try:
@@ -393,11 +397,12 @@ def _run_ruleset(
         with_geometry=False,
     )
 
-    results_by_rule: list[list[AreaMatch]] = []
+    # each condition's matches, by condition id - in memory where the shared fetch answers it
+    matched_by_rule: dict[str, list[AreaMatch]] = {}
     remaining_rules: list[RuleCondition] = []
     for rule in rules:
         if _is_satisfiable_from_nearby(rule, nearby_radius_metres):
-            results_by_rule.append([match for match in all_nearby if _matches_condition(match, rule)])
+            matched_by_rule[rule.id] = [match for match in all_nearby if _matches_condition(match, rule)]
         else:
             remaining_rules.append(rule)
 
@@ -405,45 +410,65 @@ def _run_ruleset(
     needs_margin = any(rule.logic_type == "bordering" and rule.host_category for rule in remaining_rules)
     site_within_margin = grow_geometry(db, site, DISTANCE_MARGIN_METRES) if needs_margin else None
 
-    def run_condition(rule: RuleCondition) -> tuple[list[AreaMatch], list[dict]]:
+    def run_condition(rule: RuleCondition) -> list[AreaMatch]:
         if rule.logic_type == "bordering":
             if not rule.host_category:
-                return [], []
-            return [], find_areas_bordering(db, site_within_margin, rule.host_category, rule.categories)
-        return find_areas_near(db, site, rule.buffer_metres, rule.categories), []
+                return []
+            # no distance yet - measured below, once, for those no other query has measured
+            return [
+                AreaMatch(area, -1)
+                for area in find_areas_bordering(db, site_within_margin, rule.host_category, rule.categories)
+            ]
+        return find_areas_near(db, site, rule.buffer_metres, rule.categories)
 
-    known_geometries: dict[str, str] = {}
-    bordering_areas: dict[str, dict] = {}
     with ThreadPoolExecutor(max_workers=CONDITION_CONCURRENCY) as pool:
-        for near, bordering in pool.map(run_condition, remaining_rules):
-            results_by_rule.append(near)
-            for match in near:
-                known_geometries[match.area["id"]] = match.area["geometryWkt"]
-            for area in bordering:
-                bordering_areas[area["id"]] = area
-                known_geometries[area["id"]] = area["geometryWkt"]
+        for rule, matches in zip(remaining_rules, pool.map(run_condition, remaining_rules), strict=True):
+            matched_by_rule[rule.id] = matches
 
-    matches_by_id: dict[str, AreaMatch] = {}
-    for matches in results_by_rule:
-        for match in matches:
-            existing = matches_by_id.get(match.area["id"])
-            if existing is None or match.distance_metres < existing.distance_metres:
-                matches_by_id[match.area["id"]] = match
+    consultees: dict[str, AreaMatch] = {}
+
+    def add(match: AreaMatch, reason: dict) -> None:
+        area_id = match.area["id"]
+        existing = consultees.get(area_id)
+        if existing is None:
+            existing = consultees[area_id] = AreaMatch(dict(match.area), match.distance_metres)
+        elif match.distance_metres >= 0 and (
+            existing.distance_metres < 0 or match.distance_metres < existing.distance_metres
+        ):
+            existing.distance_metres = match.distance_metres
+        # condition matches carry geometry (they're drawn); nearby rows don't
+        if "geometryWkt" in match.area:
+            existing.area["geometryWkt"] = match.area["geometryWkt"]
+        if reason not in existing.reasons:
+            existing.reasons.append(reason)
+
+    # reasons in the ruleset's own order, then the general nearby search
+    for rule in rules:
+        for match in matched_by_rule.get(rule.id, []):
+            add(match, {"type": "condition", "conditionId": rule.id})
+    for match in all_nearby:
+        add(match, {"type": "nearby", "radiusMetres": nearby_radius_metres})
 
     # bordering matches come back without a distance - most already have one from another
-    # condition; measure the rest once here, rather than once per host inside the bordering query
-    unmeasured_ids = [area_id for area_id in bordering_areas if area_id not in matches_by_id]
-    for area_id, distance in get_area_distances(db, site, unmeasured_ids).items():
-        matches_by_id[area_id] = AreaMatch(bordering_areas[area_id], distance)
+    # condition or the nearby search; measure the rest once here, rather than once per host
+    unmeasured_ids = [area_id for area_id, match in consultees.items() if match.distance_metres < 0]
+    distances = get_area_distances(db, site, unmeasured_ids)
+    for area_id in unmeasured_ids:
+        if area_id in distances:
+            consultees[area_id].distance_metres = distances[area_id]
+        else:
+            # deleted between queries (a reference data reload mid-request) - nothing left to notify
+            del consultees[area_id]
 
-    missing_ids = [area_id for area_id in matches_by_id if area_id not in known_geometries]
-    fetched_geometries = get_area_geometries(db, missing_ids)
+    # condition matches are drawn on the map, so each needs its geometry: anything matched only via
+    # the shared nearby fetch (which skips geometry) is fetched by id. Nearby-only consultees are
+    # listed, and drawn from the manage app's own display geometry, so they go without
+    condition_matched = [
+        area_id
+        for area_id, match in consultees.items()
+        if "geometryWkt" not in match.area and any(reason["type"] == "condition" for reason in match.reasons)
+    ]
+    for area_id, geometry in get_area_geometries(db, condition_matched).items():
+        consultees[area_id].area["geometryWkt"] = geometry
 
-    matches: list[AreaMatch] = []
-    for area_id, match in matches_by_id.items():
-        geometry = known_geometries.get(area_id) or fetched_geometries.get(area_id)
-        # absent only if the row was deleted between queries (a reference data reload mid-request)
-        if geometry:
-            matches.append(AreaMatch({**match.area, "geometryWkt": geometry}, match.distance_metres))
-
-    return RunRulesetResult(matches=_sort_matches(matches), all_nearby=_sort_matches(all_nearby))
+    return RunRulesetResult(consultees=_sort_matches(list(consultees.values())))

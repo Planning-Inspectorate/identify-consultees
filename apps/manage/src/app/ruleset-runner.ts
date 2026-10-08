@@ -1,9 +1,9 @@
+import type { ConsulteeAreaProperties } from '@pins/identify-consultees-database/src/geospatial/consultee-areas.ts';
 import type {
-	ConsulteeAreaMatch,
-	ConsulteeAreaProperties,
-	ConsulteeAreaSummaryMatch
-} from '@pins/identify-consultees-database/src/geospatial/consultee-areas.ts';
-import type { Ruleset, RunRulesetResult } from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
+	ConsulteeReason,
+	Ruleset,
+	RunRulesetResult
+} from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
 import type { Geometry } from '@pins/identify-consultees-database/src/geospatial/wkt.ts';
 import { geometryToWkt, wktToGeometry } from '@pins/identify-consultees-database/src/geospatial/wkt.ts';
 
@@ -25,8 +25,7 @@ interface RunRulesetResponseFeature {
 }
 
 interface RunRulesetResponse {
-	matches: { feature: RunRulesetResponseFeature & { geometryWkt: string }; distanceMetres: number }[];
-	allNearby: { feature: RunRulesetResponseFeature; distanceMetres: number }[];
+	consultees: { feature: RunRulesetResponseFeature; distanceMetres: number; reasons: ConsulteeReason[] }[];
 }
 
 /**
@@ -39,23 +38,20 @@ export function runRulesetUrl(pythonFunctionUrl: string): string {
 }
 
 export function toRunRulesetResult(body: RunRulesetResponse): RunRulesetResult {
-	if (!Array.isArray(body?.matches) || !Array.isArray(body?.allNearby)) {
+	if (!Array.isArray(body?.consultees)) {
 		throw new Error('Python function returned an unexpected run-ruleset response');
 	}
-	const matches: ConsulteeAreaMatch[] = body.matches.map(({ feature, distanceMetres }) => ({
-		distanceMetres,
-		feature: {
-			id: feature.id,
-			type: 'Feature',
-			properties: feature.properties,
-			geometry: wktToGeometry(feature.geometryWkt)
-		}
-	}));
-	const allNearby: ConsulteeAreaSummaryMatch[] = body.allNearby.map(({ feature, distanceMetres }) => ({
-		distanceMetres,
-		feature: { id: feature.id, properties: feature.properties }
-	}));
-	return { matches, allNearby };
+	return {
+		consultees: body.consultees.map(({ feature, distanceMetres, reasons }) => ({
+			distanceMetres,
+			reasons,
+			feature: {
+				id: feature.id,
+				properties: feature.properties,
+				...(feature.geometryWkt ? { geometry: wktToGeometry(feature.geometryWkt) } : {})
+			}
+		}))
+	};
 }
 
 /**
