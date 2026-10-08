@@ -87,7 +87,7 @@ export function buildReportConsulteesPage(service: ManageService): AsyncRequestH
 		const visible = matches.filter(
 			(match) => match.feature.properties.consulteeCategory === category && !excluded.has(match.feature.id)
 		);
-		const searchArea = await buildSearchAreaSafely(db, project, visible, [], nearbyConsulteeRadiusMetres, logger);
+		const searchArea = await buildSearchAreaSafely(db, project, visible, nearbyConsulteeRadiusMetres, logger);
 		const staticMapSrc = categoryStaticMapUrl(project.id, ruleset.id, category, selection);
 		const staticMapAlt = `Static map showing ${category} consultees for ${project.properties.caseName}`;
 		const map = buildCaseMapConfig(project, visible, category, searchArea, { src: staticMapSrc, alt: staticMapAlt });

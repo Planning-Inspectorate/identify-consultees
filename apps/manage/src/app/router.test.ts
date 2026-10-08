@@ -111,7 +111,7 @@ describe('manage router wiring', () => {
 		assert.match(response.text, /Shapefile/);
 		assert.match(response.text, /Example ruleset/);
 		assert.match(response.text, /Preview report/);
-		assert.match(response.text, /Run Intersection logic/);
+		assert.doesNotMatch(response.text, /Run Intersection logic/);
 		assert.match(response.text, /app-consultee-map/);
 	});
 
@@ -155,20 +155,6 @@ describe('manage router wiring', () => {
 			.post(`/consultees/${homePageTestCaseId}/shapefile`)
 			.type('form')
 			.send({ _csrf: csrf, shapefile: homePageTestCaseId, ruleset: 'example-ruleset' });
-		assert.equal(response.status, 302);
-		assert.equal(response.headers.location, `/consultees/${homePageTestCaseId}?ruleset=example-ruleset`);
-	});
-
-	test('POST /consultees/:id/run-intersection redirects back to the map page', async () => {
-		const agent = request.agent(authDisabledApp);
-		const page = await agent.get(`/consultees/${homePageTestCaseId}?ruleset=example-ruleset`);
-		const csrf = /name="_csrf" value="([^"]+)"/.exec(page.text)?.[1];
-		assert.ok(csrf, 'expected the run-intersection form to carry a CSRF token');
-
-		const response = await agent
-			.post(`/consultees/${homePageTestCaseId}/run-intersection`)
-			.type('form')
-			.send({ _csrf: csrf, ruleset: 'example-ruleset' });
 		assert.equal(response.status, 302);
 		assert.equal(response.headers.location, `/consultees/${homePageTestCaseId}?ruleset=example-ruleset`);
 	});

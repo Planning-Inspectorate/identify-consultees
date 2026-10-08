@@ -56,14 +56,7 @@ export function buildConsulteesResultsPage(service: ManageService): AsyncRequest
 			nearbyConsulteeRadiusMetres,
 			logger
 		);
-		const searchArea = await buildSearchAreaSafely(
-			db,
-			project,
-			matches,
-			allNearby,
-			nearbyConsulteeRadiusMetres,
-			logger
-		);
+		const searchArea = await buildSearchAreaSafely(db, project, matches, nearbyConsulteeRadiusMetres, logger);
 		const staticMapSrc = `/consultees/${encodeURIComponent(project.id)}/results/static-map?ruleset=${encodeURIComponent(ruleset.id)}`;
 		const staticMapAlt = `Static map showing ${ruleset.name} for ${project.properties.caseName}`;
 		const map = buildCaseMapConfig(project, matches, ruleset.name, searchArea, {
@@ -113,13 +106,7 @@ export function buildResultsStaticMap(service: ManageService, forceSvg = false):
 			return;
 		}
 
-		const { matches, allNearby, failed } = await runRulesetSafely(
-			db,
-			project,
-			ruleset,
-			nearbyConsulteeRadiusMetres,
-			logger
-		);
+		const { matches, failed } = await runRulesetSafely(db, project, ruleset, nearbyConsulteeRadiusMetres, logger);
 		if (failed) {
 			// not an empty map: that would be cached (see Cache-Control below) as if it were a real
 			// "no matches" result
@@ -137,16 +124,8 @@ export function buildResultsStaticMap(service: ManageService, forceSvg = false):
 							(!category || match.feature.properties.consulteeCategory === category) && !excluded.has(match.feature.id)
 					)
 				: matches;
-		// same search area as the interactive map, so both open on the same view - the static renderer
-		// draws the project and matches only, not the nearby layer
-		const searchArea = await buildSearchAreaSafely(
-			db,
-			project,
-			displayMatches,
-			category ? [] : allNearby,
-			nearbyConsulteeRadiusMetres,
-			logger
-		);
+		// same search area as the interactive map, so both open on the same view
+		const searchArea = await buildSearchAreaSafely(db, project, displayMatches, nearbyConsulteeRadiusMetres, logger);
 		const map = buildCaseMapConfig(project, displayMatches, category || ruleset.name, searchArea);
 		const ifNoneMatch = typeof req.headers['if-none-match'] === 'string' ? req.headers['if-none-match'] : undefined;
 		const accept = typeof req.headers.accept === 'string' ? req.headers.accept : undefined;

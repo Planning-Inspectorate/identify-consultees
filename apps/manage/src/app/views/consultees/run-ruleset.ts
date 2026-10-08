@@ -1,9 +1,6 @@
 import type { ManageService } from '#service';
 import type { CaseBoundaryFeature } from '@pins/identify-consultees-database/src/geospatial/case-boundaries.ts';
-import type {
-	ConsulteeAreaMatch,
-	ConsulteeAreaSummaryMatch
-} from '@pins/identify-consultees-database/src/geospatial/consultee-areas.ts';
+import type { ConsulteeAreaMatch } from '@pins/identify-consultees-database/src/geospatial/consultee-areas.ts';
 import {
 	bufferGeometryForDisplay,
 	getConsulteeAreaDisplayGeometries
@@ -47,31 +44,24 @@ export async function runRulesetSafely(
 }
 
 /**
- * The interactive map's search area - the site grown by the nearby radius - with every nearby
- * consultee and ruleset match clipped to it. The map is an extra: if this fails, the page still
- * lists every consultee in its tables.
+ * The interactive map's search area - the site grown by the nearby radius - with every ruleset
+ * match clipped to it. The map is an extra: if this fails, the page still lists every consultee
+ * in its tables.
  */
 export async function buildSearchAreaSafely(
 	db: ManageService['db'],
 	project: CaseBoundaryFeature,
 	matches: ConsulteeAreaMatch[],
-	nearby: ConsulteeAreaSummaryMatch[],
 	nearbyRadiusMetres: number,
 	logger: ManageService['logger']
 ): Promise<SearchAreaDisplay | undefined> {
-	if (nearby.length === 0 && matches.length === 0) {
+	if (matches.length === 0) {
 		return undefined;
 	}
 	try {
 		const area = await bufferGeometryForDisplay(db, project.geometry, nearbyRadiusMetres);
-		const ids = [...new Set([...nearby, ...matches].map((match) => match.feature.id))];
-		const radiusKm = nearbyRadiusMetres / 1000;
-		return {
-			area,
-			nearbyLabel: `All consultees within ${radiusKm}km`,
-			nearby,
-			geometries: await getConsulteeAreaDisplayGeometries(db, ids, area)
-		};
+		const ids = [...new Set(matches.map((match) => match.feature.id))];
+		return { area, geometries: await getConsulteeAreaDisplayGeometries(db, ids, area) };
 	} catch (error) {
 		logger.error({ error, caseId: project.id }, 'Failed to build the map search area');
 		return undefined;
