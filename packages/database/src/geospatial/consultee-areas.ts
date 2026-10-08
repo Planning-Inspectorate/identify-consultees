@@ -477,6 +477,13 @@ export async function getConsulteeAreaGeometries(
 export const DISPLAY_SIMPLIFY_TOLERANCE_METRES = 25;
 
 /**
+ * Larger areas are drawn coarser: tolerance is the area's width (the square root of its area)
+ * divided by this, or DISPLAY_SIMPLIFY_TOLERANCE_METRES if that's larger. A parish stays at 25m; a
+ * 3,000km² county is simplified to ~270m, which can't be seen at the zoom it fills the map at.
+ */
+export const DISPLAY_SIMPLIFY_WIDTH_RATIO = 200;
+
+/**
  * `geometry` grown by `metres`, for drawing - e.g. a site's search area. Simplified first and
  * built to display tolerance: a detailed 180km route would otherwise take seconds to buffer by
  * kilometres, into an outline with far more points than any map needs.
@@ -498,11 +505,11 @@ export async function bufferGeometryForDisplay(
 }
 
 /**
- * Geometry of specific consultee areas for drawing around a site: each clipped to `window` and
- * simplified. Regional areas - counties, police forces, health boards - stretch far beyond any
- * site's surroundings, coastline and all, so clipping is what keeps this small: the ~470 areas
- * within 20km of a central London site come to ~300KB of GeoJSON clipped, against ~3MB whole.
- * Display only - never measure distances on these. Ids with no matching row, or nothing inside
+ * Whole geometry of specific consultee areas for drawing around a site, for those that touch
+ * `window` - simplified more the larger they are (see DISPLAY_SIMPLIFY_WIDTH_RATIO). Regional
+ * areas - counties, police forces, health boards - are detailed, coastline and all: at a flat 25m,
+ * the areas within 20km of Norwich to Tilbury come to ~3.8MB; simplified by size, ~1.5MB.
+ * Display only - never measure distances on these. Ids with no matching row, or not touching
  * `window`, are absent.
  */
 export async function getConsulteeAreaDisplayGeometries(
@@ -516,13 +523,17 @@ export async function getConsulteeAreaDisplayGeometries(
 		const batch = ids.slice(i, i + GEOMETRY_LOOKUP_BATCH_SIZE);
 		const rows = await withDeadlockRetry(
 			() => dbClient.$queryRaw<{ id: string; geometryWkt: string }[]>`
-				SELECT id, clipped.geometry.STAsText() AS geometryWkt
+				SELECT id, geometrySimplified.Reduce(tolerance.metres).STAsText() AS geometryWkt
 				FROM consultee_area
 				CROSS APPLY (
-					SELECT geometrySimplified.STIntersection(geography::STGeomFromText(${windowWkt}, 4326))
-						.Reduce(${DISPLAY_SIMPLIFY_TOLERANCE_METRES}) AS geometry
-				) AS clipped
-				WHERE id IN (${Prisma.join(batch)}) AND clipped.geometry.STIsEmpty() = 0
+					SELECT CASE
+						WHEN SQRT(geometrySimplified.STArea()) / ${DISPLAY_SIMPLIFY_WIDTH_RATIO} > ${DISPLAY_SIMPLIFY_TOLERANCE_METRES}
+							THEN SQRT(geometrySimplified.STArea()) / ${DISPLAY_SIMPLIFY_WIDTH_RATIO}
+						ELSE ${DISPLAY_SIMPLIFY_TOLERANCE_METRES}
+					END AS metres
+				) AS tolerance
+				WHERE id IN (${Prisma.join(batch)})
+					AND geometrySimplified.STIntersects(geography::STGeomFromText(${windowWkt}, 4326)) = 1
 			`
 		);
 		for (const row of rows) {

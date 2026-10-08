@@ -41,9 +41,9 @@ The example ruleset has 27 conditions: 7 that must touch the site, 16 within a d
 
 After the run, the results map shows the ruleset's matches. Every other consultee within the nearby radius is on a layer that starts hidden.
 
-1. **Search area:** the site grown by 20km (`bufferGeometryForDisplay`), drawn as a dashed outline. Both the interactive and static maps open on it.
-2. **Display geometry:** each nearby area and match is clipped to the search area and simplified to 25m (`getConsulteeAreaDisplayGeometries`, `DISPLAY_SIMPLIFY_TOLERANCE_METRES`), from `geometrySimplified`. Without clipping, regional areas such as counties and ambulance trusts made the page several megabytes; Hinkley Point C went from 1.5MB to 360KB.
-3. Areas with nothing inside the search area aren't drawn, but are still listed in the tables. This includes bordering matches more than 20km away.
+1. **Search area:** the site grown by 20km (`bufferGeometryForDisplay`). It isn't drawn, but both the interactive and static maps open on it.
+2. **Display geometry:** each nearby area and match touching the search area is drawn whole, from `geometrySimplified`, simplified more the larger it is (`getConsulteeAreaDisplayGeometries`): the larger of 25m (`DISPLAY_SIMPLIFY_TOLERANCE_METRES`) and 1/200th of its width (`DISPLAY_SIMPLIFY_WIDTH_RATIO`). At a flat 25m, regional areas such as counties and ambulance trusts made pages several megabytes.
+3. Areas not touching the search area aren't drawn, but are still listed in the tables. This includes bordering matches more than 20km away.
 4. Matches are filled in their category's colour; regional categories are only tinted. See [Maps](../maps.md#results-map-layers).
 
 If building the search area fails, the page still renders, with the project and matches drawn from original geometry. See [Maps](../maps.md#results-map-layers) for the layers and styling.
@@ -135,7 +135,7 @@ The data processing is being redeveloped with new ids and a new schema. For the 
 | **Category names that match the ruleset vocabulary**                | Rulesets refer to short codes, mapped to category names in `CATEGORY_ALIASES`. A renamed category silently matches nothing | 27 categories — see the [catalogue](./reference-data-catalogue.md)                        |
 | **Valid `geography` (SRID 4326), correctly wound**                  | Invalid shapes make SQL Server reject the whole query, and a backwards ring matches the whole globe                        | `MakeValid()` and winding correction on import                                            |
 | **A simplified copy of each geometry, with a spatial index**        | All screening queries run on it, and the 30m/50m margins assume a 10m tolerance                                            | `geometrySimplified`, `Reduce(10).MakeValid()`, `consultee_area_geometry_simplified_sidx` |
-| **The original geometry**                                           | Kept as the source of truth; the map draws a clipped copy of the simplified geometry                                       | `geometry`                                                                                |
+| **The original geometry**                                           | Kept as the source of truth; the map draws a further-simplified copy of `geometrySimplified`                               | `geometry`                                                                                |
 | **Features split at a sensible scale**                              | A national-scale shape such as merged Railway makes every nearby query slow and matches everywhere                         | Railway excluded                                                                          |
 | **Case boundaries as valid `geography`**                            | The site being screened                                                                                                    | `case_boundary.geometry`                                                                  |
 

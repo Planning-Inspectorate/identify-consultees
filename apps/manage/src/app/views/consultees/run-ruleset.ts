@@ -15,7 +15,7 @@ import type { SearchAreaDisplay } from '../../maps/case-geojson.ts';
 /**
  * Shared plumbing for the consultee pages that run a ruleset (the project map page and the
  * results/report page): normalising the ?ruleset query param, running the ruleset without
- * letting a failure take the whole page down, and building the map's search-area layer.
+ * letting a failure take the whole page down, and building the map's search area.
  */
 
 /** First string from a possibly-repeated query/body param (`?a=1&a=2` parses to an array). */
@@ -68,7 +68,6 @@ export async function buildSearchAreaSafely(
 		const radiusKm = nearbyRadiusMetres / 1000;
 		return {
 			area,
-			areaLabel: `Search area (${radiusKm}km)`,
 			nearbyLabel: `All consultees within ${radiusKm}km`,
 			nearby,
 			geometries: await getConsulteeAreaDisplayGeometries(db, ids, area)

@@ -55,7 +55,7 @@ export function buildProjectGeojson(project: CaseBoundaryFeature): GeoJsonFeatur
 // especially in the server-side static-map SVG/PNG fallback - is slow enough to be a real
 // reliability risk, not just a cosmetic one. Above MAP_SAMPLING_THRESHOLD matches, the map shows
 // only a sample; the results table (built from the full, unsampled list) is unaffected.
-// Display geometry clipped to a search area is small enough to draw every match.
+// Display geometry, simplified by size, is small enough to draw every match.
 export const MAP_SAMPLING_THRESHOLD = 50;
 export const MAX_SAMPLED_MAP_MATCHES = 30;
 
@@ -89,7 +89,7 @@ export function buildConsulteeMatchesGeojson(
 
 /**
  * Every consultee area near the site, for the map's "all consultees nearby" layer. `geometries` is
- * display geometry (already clipped to the map's surroundings and simplified - see
+ * display geometry (whole areas touching the map's surroundings, simplified - see
  * getConsulteeAreaDisplayGeometries); an area without one is left off the map, though it's still
  * listed in the table.
  */
@@ -124,17 +124,16 @@ export function buildNearbyConsulteesGeojson(
 }
 
 /**
- * The interactive map's view of a site's search area - the site grown by the nearby radius. When
- * given, the map opens on the search area and everything on it is clipped to it: regional areas
- * (counties, ambulance trusts) otherwise fill the view and hide everything near the site.
+ * A site's search area - the site grown by the nearby radius - and the consultee areas touching
+ * it. When given, the map opens on the search area, which isn't drawn: framing on whole regional
+ * areas (counties, ambulance trusts) would zoom out so far the site is lost.
  */
 export interface SearchAreaDisplay {
 	/** The site grown by the nearby radius. */
 	area: Geometry;
-	areaLabel: string;
 	nearbyLabel: string;
 	nearby: ConsulteeAreaSummaryMatch[];
-	/** Display geometry clipped to `area`, by consultee area id - nearby areas and the ruleset's matches. */
+	/** Whole display geometry of areas touching `area`, by consultee area id - nearby areas and the ruleset's matches. */
 	geometries: Map<string, Geometry>;
 }
 
@@ -165,9 +164,7 @@ export interface CaseMapConfig {
 	 * data-* attributes on the map container are JSON.parsed by the InteractiveMap constructor.
 	 */
 	fallback?: StaticMapFallbackConfig;
-	/** The search area outline, and every consultee inside it - interactive map only. */
-	searchAreaLabel?: string;
-	searchAreaGeojson?: GeoJsonFeatureCollection;
+	/** Every consultee touching the search area - interactive map only. */
 	nearbyLayerLabel?: string;
 	nearbyGeojson?: GeoJsonFeatureCollection;
 }
@@ -191,9 +188,9 @@ function boundingBoxArea(features: GeoJsonFeature[]): number {
  */
 function withFillOpacity(
 	collection: GeoJsonFeatureCollection,
-	searchArea?: GeoJsonFeatureCollection
+	searchArea?: GeoJsonFeature[]
 ): GeoJsonFeatureCollection {
-	const regionalArea = searchArea ? boundingBoxArea(searchArea.features) * REGIONAL_COVERAGE : Infinity;
+	const regionalArea = searchArea ? boundingBoxArea(searchArea) * REGIONAL_COVERAGE : Infinity;
 	const regional = new Set(
 		collection.features
 			.filter((feature) => boundingBoxArea([feature]) >= regionalArea)
@@ -215,7 +212,7 @@ function withFillOpacity(
 	};
 }
 
-/** `matches` with their display geometry from `geometries`; any with none (outside the area) are left out. */
+/** `matches` with their display geometry from `geometries`; any with none (not touching the area) are left out. */
 function withDisplayGeometry(matches: ConsulteeAreaMatch[], geometries: Map<string, Geometry>): ConsulteeAreaMatch[] {
 	return matches.flatMap((match) => {
 		const geometry = geometries.get(match.feature.id);
@@ -233,25 +230,17 @@ export function buildCaseMapConfig(
 	const projectGeojson = buildProjectGeojson(project);
 	// one colour per category across both layers, the ruleset's matches first
 	const colours = assignCategoryColours(matches.map(categoryOf), searchArea?.nearby.map(categoryOf));
-	const searchAreaGeojson: GeoJsonFeatureCollection | undefined = searchArea && {
-		type: 'FeatureCollection',
-		features: [
-			{
-				type: 'Feature',
-				id: 'search-area',
-				properties: { name: searchArea.areaLabel },
-				geometry: roundGeometry(searchArea.area)
-			}
-		]
-	};
+	const searchAreaFeatures: GeoJsonFeature[] | undefined = searchArea && [
+		{ type: 'Feature', properties: {}, geometry: searchArea.area }
+	];
 	const consulteeGeojson = withFillOpacity(
 		searchArea
 			? buildConsulteeMatchesGeojson(withDisplayGeometry(matches, searchArea.geometries), colours, false)
 			: buildConsulteeMatchesGeojson(matches, colours),
-		searchAreaGeojson
+		searchAreaFeatures
 	);
 	const view = computeMapView({
-		features: searchAreaGeojson?.features ?? [...projectGeojson.features, ...consulteeGeojson.features]
+		features: searchAreaFeatures ?? [...projectGeojson.features, ...consulteeGeojson.features]
 	});
 	const mapLabel = `${rulesetName} for ${project.properties.caseName} (${project.properties.caseReference})`;
 
@@ -270,8 +259,6 @@ export function buildCaseMapConfig(
 		...(fallback ? { fallback: { ...fallback, width: MAP_VIEWPORT.width, height: MAP_VIEWPORT.height } } : {}),
 		...(searchArea
 			? {
-					searchAreaLabel: searchArea.areaLabel,
-					searchAreaGeojson,
 					nearbyLayerLabel: searchArea.nearbyLabel,
 					nearbyGeojson: buildNearbyConsulteesGeojson(searchArea.nearby, searchArea.geometries, colours)
 				}

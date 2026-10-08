@@ -152,23 +152,9 @@ export function showStaticMapFallback(container, fallback) {
 export function buildDatasets(config) {
 	const datasets = [];
 
-	// datasets draw in order: the search area and the nearby consultees under the ruleset's matches,
-	// and the project site on top of them all. The nearby layer starts hidden - the matches are what the
+	// datasets draw in order: the nearby consultees under the ruleset's matches, and the project site
+	// on top of them all. The nearby layer starts hidden - the matches are what the
 	// ruleset identified - and can be switched on from the layers menu
-	if (config.searchAreaGeojson?.features?.length > 0) {
-		datasets.push({
-			id: 'search-area',
-			label: config.searchAreaLabel ?? 'Search area',
-			idProperty: 'name',
-			geojson: config.searchAreaGeojson,
-			minZoom: 0,
-			maxZoom: 24,
-			showInKey: true,
-			showInMenu: true,
-			style: { stroke: '#0b0c0c', strokeWidth: 2, strokeDashArray: [4, 3], fill: 'transparent' }
-		});
-	}
-
 	if (config.nearbyGeojson?.features?.length > 0) {
 		datasets.push({
 			id: 'nearby-consultees',
