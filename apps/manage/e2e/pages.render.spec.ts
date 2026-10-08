@@ -1,3 +1,4 @@
+import type { Page } from '@playwright/test';
 import { expect, test } from '@playwright/test';
 import {
 	SAMPLE_CASE_ID,
@@ -6,6 +7,18 @@ import {
 	SAMPLE_RULESET_ID,
 	SAMPLE_RULESET_NAME
 } from './fixtures.ts';
+
+/**
+ * The opening tag of the element with `className`, as the server sent it. The live DOM won't do:
+ * the map adds its own data-breakpoint to the container once it starts, so whether it's there
+ * depends on how fast the map loaded.
+ */
+async function serverRenderedOpeningTag(page: Page, path: string, className: string): Promise<string> {
+	const html = await (await page.request.get(path)).text();
+	const tag = html.match(new RegExp(`<[a-z]+\\s[^>]*class="[^"]*\\b${className}\\b[^"]*"[^>]*>`))?.[0];
+	expect(tag, `no element with class ${className} in ${path}`).toBeDefined();
+	return tag ?? '';
+}
 
 /**
  * Cross-browser render completeness checks (Firefox + WebKit/Safari).
@@ -209,7 +222,13 @@ test.describe('cross-browser render completeness', () => {
 
 		// the static-map fallback travels in the page config - data-* attributes on the map
 		// container are JSON.parsed by the InteractiveMap constructor and must stay off it
-		expect(await mapRegion.evaluate((el) => Object.keys(el.dataset))).toEqual([]);
+		expect(
+			await serverRenderedOpeningTag(
+				page,
+				`/consultees/${SAMPLE_CASE_ID}/results?ruleset=${SAMPLE_RULESET_ID}`,
+				'app-consultee-map'
+			)
+		).not.toMatch(/\sdata-/);
 		const config = JSON.parse((await page.locator('#case-map-data').textContent()) ?? '{}');
 		expect(config.fallback.src).toMatch(/\/static-map/);
 		expect(config.fallback.width).toBe(960);
@@ -238,7 +257,7 @@ test.describe('cross-browser render completeness', () => {
 		await expect(host).toBeAttached();
 		await expect(host).toHaveAttribute('role', 'region');
 		await expect(host).toHaveAttribute('aria-label', /overlay layers/i);
-		expect(await host.evaluate((el) => Object.keys(el.dataset))).toEqual([]);
+		expect(await serverRenderedOpeningTag(page, '/map-layers-demo', 'app-map-layers-demo')).not.toMatch(/\sdata-/);
 		await expect(page.locator('#map-layers-demo-data')).toBeAttached();
 	});
 });
