@@ -16,7 +16,7 @@ Two spatial datasets drive the service: **consultee areas** (the areas each pote
 | 2. Upload       | Files are put in the environment's blob container                                                                                      | Admin page `/admin/upload-to-blob`, using the app's managed identity                                                            |
 | 3. Import       | GeoJSON is converted and upserted into SQL in batches; each geometry is validated and a simplified copy made                           | Admin page `/admin/import-reference-data`, the DB Seed pipeline, or the `db-import` CLI — see [Loading data](./loading-data.md) |
 | 4. Store        | `consultee_area` and `case_boundary` tables, with spatial indexes                                                                      | Azure SQL Database                                                                                                              |
-| 5. Screen       | A ruleset's conditions run as spatial queries against `consultee_area` for one case boundary                                           | `runRuleset` in `packages/database/src/geospatial/rulesets.ts`, called by `/consultees/:caseId/results`                         |
+| 5. Screen       | A ruleset's conditions run as spatial queries against `consultee_area` for one case boundary                                           | `run_ruleset` in `apps/function-python/querying/rulesets.py`, called by the manage app's results pages                          |
 | 6. Present      | Matches are shown in tables and on a map (original geometry); a static map image serves no-JavaScript users                            | Manage app                                                                                                                      |
 
 ## Stores
@@ -26,7 +26,7 @@ Two spatial datasets drive the service: **consultee areas** (the areas each pote
 | Azure SQL Database     | `consultee_area`, `case_boundary` (plus Prisma's `_prisma_migrations`)                                                            | App via connection string from Key Vault; schema changes by Prisma migrations run in the Deploy pipeline                 |
 | Blob storage container | The source GeoJSON files                                                                                                          | Private network only, no shared keys; the web and function apps' managed identities have _Storage Blob Data Contributor_ |
 | Repo sample data       | `apps/function-python/setup_database/sample_data/` — a small `reference_data.geojson` and `sample_application_boundaries.geojson` | Seeded into Dev/Test/Training by the DB Seed pipeline when the full data isn't requested; used by tests                  |
-| Ruleset definition     | `packages/database/src/geospatial/example_ruleset.csv`                                                                            | Read into memory when the app starts                                                                                     |
+| Ruleset definition     | `packages/database/src/geospatial/england_wales_post_20240430_ruleset.csv`                                                        | Read into memory when the app starts                                                                                     |
 
 ## Readers and writers
 

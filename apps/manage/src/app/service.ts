@@ -3,6 +3,8 @@ import type { PrismaClient } from '@pins/identify-consultees-database/src/client
 import { BaseService } from '@planning-inspectorate/core/app';
 import path from 'node:path';
 import type { Config } from './config.ts';
+import type { RulesetRunner } from './ruleset-runner.ts';
+import { buildPythonRulesetRunner } from './ruleset-runner.ts';
 
 /**
  * This class encapsulates all the services and clients for the application
@@ -12,10 +14,17 @@ export class ManageService extends BaseService<PrismaClient> {
 	 * @private
 	 */
 	#config: Config;
+	#rulesetRunner: RulesetRunner;
 
-	constructor(config: Config) {
+	/**
+	 * @param rulesetRunner - stands in for the Python function in tests; defaults to calling it
+	 */
+	constructor(config: Config, rulesetRunner?: RulesetRunner) {
 		super(config, initDatabaseClient);
 		this.#config = config;
+		this.#rulesetRunner =
+			rulesetRunner ??
+			buildPythonRulesetRunner({ pythonFunctionUrl: config.pythonFunctionUrl, apiKey: config.pythonFunctionApiKey });
 	}
 
 	get authConfig(): Config['auth'] {
@@ -32,6 +41,11 @@ export class ManageService extends BaseService<PrismaClient> {
 
 	get pythonFunctionApiKey(): string | undefined {
 		return this.#config.pythonFunctionApiKey;
+	}
+
+	/** Runs a ruleset's intersection logic - in the Python function (see ruleset-runner.ts). */
+	get rulesetRunner(): RulesetRunner {
+		return this.#rulesetRunner;
 	}
 
 	get blobStoreConfig(): Config['blobStore'] {

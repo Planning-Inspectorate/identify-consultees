@@ -14,12 +14,12 @@ This work sits in the lineage of the **PINS data spike / CBOS-adjacent explorati
 
 These are the spike hypotheses as currently reflected in the codebase and docs. Treat them as working assumptions until product records them formally.
 
-| Hypothesis                                                         | What we are testing                                                                                   | Evidence in this repo                                                                         |
-| ------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
-| A GOV.UK server-rendered UI is enough for early consultee journeys | Users can search real project boundaries, pick a ruleset, and review map-backed results without a SPA | Homepage + `/consultees/:caseId` → `/results` using Nunjucks / GOV.UK macros                  |
-| Progressive enhancement for maps is viable                         | Interactive Defra map when JS works; static image when it does not                                    | `consultee-map-region.njk`, static-map routes, Defra vendor assets                            |
-| SQL spatial screening can drive the whole journey                  | Rulesets run as `GEOGRAPHY` queries in SQL Server; seeded sample data stands in for the full dataset  | `runRuleset` + `searchCaseBoundaries` in `packages/database/src/geospatial`                   |
-| Node can call Python geo tooling over HTTP without hard-coupling   | Manage app stays up if Python or DB is down                                                           | `/consultee-areas-python` + `PYTHON_FUNCTION_URL`/`PYTHON_FUNCTION_API_KEY` graceful error UI |
+| Hypothesis                                                         | What we are testing                                                                                       | Evidence in this repo                                                                        |
+| ------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| A GOV.UK server-rendered UI is enough for early consultee journeys | Users can search real project boundaries, pick a ruleset, and review map-backed results without a SPA     | Homepage + `/consultees/:caseId` → `/results` using Nunjucks / GOV.UK macros                 |
+| Progressive enhancement for maps is viable                         | Interactive Defra map when JS works; static image when it does not                                        | `consultee-map-region.njk`, static-map routes, Defra vendor assets                           |
+| SQL spatial screening can drive the whole journey                  | Rulesets run as `GEOGRAPHY` queries in SQL Server; seeded sample data stands in for the full dataset      | Python `run_ruleset` (`apps/function-python`) + `searchCaseBoundaries` (`packages/database`) |
+| Node can call Python geo tooling over HTTP without hard-coupling   | Rulesets run in the Python function; the manage app stays up, with a clear error, if it or the DB is down | `ruleset-runner.ts` + `PYTHON_FUNCTION_URL`/`PYTHON_FUNCTION_API_KEY`                        |
 
 ## What is intentionally out of scope (today)
 

@@ -25,11 +25,6 @@ export interface CaseBoundaryFeatureCollection {
 	features: CaseBoundaryFeature[];
 }
 
-export interface CaseBoundaryMatch {
-	feature: CaseBoundaryFeature;
-	distanceMetres: number;
-}
-
 interface CaseBoundaryRow {
 	id: string;
 	geometryType: string;
@@ -368,45 +363,4 @@ export async function searchCaseBoundaries(dbClient: PrismaClient, options: Sear
 		features: rows.map(rowToSummary),
 		total
 	};
-}
-
-/**
- * Find case boundaries within `radiusMetres` of `geometry`, nearest first. `STDistance` returns
- * true great-circle metres for `geography` columns, so a single threshold behaves consistently
- * regardless of latitude - don't compare raw WGS84 degrees as if they were a distance unit.
- */
-export async function findCaseBoundariesNear(
-	dbClient: PrismaClient,
-	geometry: Geometry,
-	radiusMetres: number
-): Promise<CaseBoundaryMatch[]> {
-	const wkt = geometryToWkt(geometry);
-	const rows = await withDeadlockRetry(
-		() => dbClient.$queryRaw<(CaseBoundaryRow & { distanceMetres: number })[]>`
-			SELECT ${selectColumns},
-				geometry.STDistance(geography::STGeomFromText(${wkt}, 4326)) AS distanceMetres
-			FROM case_boundary
-			WHERE geometry.STDistance(geography::STGeomFromText(${wkt}, 4326)) <= ${radiusMetres}
-			ORDER BY distanceMetres
-		`
-	);
-	return rows.map((row) => ({ feature: rowToFeature(row), distanceMetres: row.distanceMetres }));
-}
-
-/**
- * Find case boundaries that intersect `geometry`.
- */
-export async function findCaseBoundariesIntersecting(
-	dbClient: PrismaClient,
-	geometry: Geometry
-): Promise<CaseBoundaryFeatureCollection> {
-	const wkt = geometryToWkt(geometry);
-	const rows = await withDeadlockRetry(
-		() => dbClient.$queryRaw<CaseBoundaryRow[]>`
-			SELECT ${selectColumns}
-			FROM case_boundary
-			WHERE geometry.STIntersects(geography::STGeomFromText(${wkt}, 4326)) = 1
-		`
-	);
-	return { type: 'FeatureCollection', features: rows.map(rowToFeature) };
 }

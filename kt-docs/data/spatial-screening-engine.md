@@ -1,6 +1,6 @@
 # Spatial screening engine
 
-**Status:** Current — `packages/database/src/geospatial/rulesets.ts` and `consultee-areas.ts` on `main`, October 2026.
+**Status:** Current — the engine runs in the Python function (`apps/function-python/querying/rulesets.py`, `POST /api/run-ruleset`); ruleset definitions stay in `packages/database/src/geospatial/rulesets.ts`. October 2026.
 
 ## What it does
 
@@ -10,7 +10,7 @@ The guiding policy: **when in doubt, include.** Consulting one body too many is 
 
 ## Rulesets
 
-One ruleset exists today: `example-ruleset`, read at start-up from `example_ruleset.csv`, a tab-separated export with one row per condition.
+One ruleset exists today: `example-ruleset`, read at start-up from `england_wales_post_20240430_ruleset.csv`, a tab-separated export with one row per condition. The manage app loads it and sends the selected ruleset's conditions with each run, so the definitions have one home: the report pages also read them, to explain why each consultee matched.
 
 | CSV column                               | Meaning                                                                                                                                      |
 | ---------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -27,11 +27,11 @@ The example ruleset has 27 conditions: 7 that must touch the site, 16 within a d
 
 ## How a run works
 
-`runRuleset(db, siteGeometry, ruleset)`:
+The manage app posts the site (as WKT), the nearby radius and the ruleset's conditions to the Python function's `POST /api/run-ruleset`; `run_ruleset` in `querying/rulesets.py` runs them over pymssql. The geometry maths runs inside SQL Server (`geography` methods against its spatial index); Python decides which queries to run and combines what comes back.
 
 1. **Simplify the site** to 10m, once. Detailed boundaries are the main cost: Silvertown Tunnel goes from 2,536 points to 66.
 2. **Fetch everything nearby, once.** One query finds every consultee area within 20km of the site, in any category except Railway. This answers the 20 conditions with a distance of 20km or less, which are filtered from it in memory, and it is the "all consultees within 20km" list on the results page. The radius comes from `NEARBY_CONSULTEE_RADIUS_KM` (default 20).
-3. **Run the other conditions**, six at a time:
+3. **Run the other conditions**, six at a time, each on its own connection:
    - **Wider than 20km** (three 35km conditions): one query each, limited to their category.
    - **Bordering** (four conditions): grow the site by the margin once, then find **hosts** (areas of the host category that intersect it), grow each host by 50m, and find **neighbours** (areas of the matching categories that intersect a grown host, excluding the host itself).
 4. **Merge** the results, keeping each area's smallest distance. Bordering matches that no other condition already measured get their distance from the site measured once, here.
@@ -39,10 +39,10 @@ The example ruleset has 27 conditions: 7 that must touch the site, 16 within a d
 
 ## Results map
 
-After the run, the results map shows the ruleset's matches. Every other consultee within the nearby radius is on a layer that starts hidden.
+After the run, the manage app draws the results map itself: the project site, and the ruleset's matches with one layer per category. Consultees within the nearby radius that no condition matched are listed in the results page's table only.
 
 1. **Search area:** the site grown by 20km (`bufferGeometryForDisplay`). It isn't drawn, but both the interactive and static maps open on it.
-2. **Display geometry:** each nearby area and match touching the search area is drawn whole, from `geometrySimplified`, simplified more the larger it is (`getConsulteeAreaDisplayGeometries`): the larger of 25m (`DISPLAY_SIMPLIFY_TOLERANCE_METRES`) and 1/200th of its width (`DISPLAY_SIMPLIFY_WIDTH_RATIO`). At a flat 25m, regional areas such as counties and ambulance trusts made pages several megabytes.
+2. **Display geometry:** each match touching the search area is drawn whole, from `geometrySimplified`, simplified more the larger it is (`getConsulteeAreaDisplayGeometries`): the larger of 25m (`DISPLAY_SIMPLIFY_TOLERANCE_METRES`) and 1/200th of its width (`DISPLAY_SIMPLIFY_WIDTH_RATIO`). At a flat 25m, regional areas such as counties and ambulance trusts made pages several megabytes.
 3. Areas not touching the search area aren't drawn, but are still listed in the tables. This includes bordering matches more than 20km away.
 4. Matches are filled in their category's colour; regional categories are only tinted. See [Maps](../maps.md#results-map-layers).
 
@@ -52,11 +52,13 @@ If building the search area fails, the page still renders, with the project and 
 
 All screening runs on simplified shapes (`geometrySimplified`, and the simplified site). Simplifying both sides can shift a distance by up to 20m, so every threshold is widened beyond that:
 
-| Constant (`consultee-areas.ts`) | Value | Meaning                                                                                                                                             |
-| ------------------------------- | ----: | --------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `SIMPLIFY_TOLERANCE_METRES`     |   10m | Every point of a simplified shape is within this of the original                                                                                    |
-| `DISTANCE_MARGIN_METRES`        |   30m | Added to every distance threshold, including "must touch" (0km → 30m) and the 20km nearby fetch. Also how close an area must be to count as a host  |
-| `BORDERING_TOLERANCE_METRES`    |   50m | How close two areas must be to count as bordering. Covers the simplification error, plus small gaps between boundaries drawn from different sources |
+| Constant (`querying/rulesets.py`) | Value | Meaning                                                                                                                                             |
+| --------------------------------- | ----: | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `SIMPLIFY_TOLERANCE_METRES`       |   10m | Every point of a simplified shape is within this of the original                                                                                    |
+| `DISTANCE_MARGIN_METRES`          |   30m | Added to every distance threshold, including "must touch" (0km → 30m) and the 20km nearby fetch. Also how close an area must be to count as a host  |
+| `BORDERING_TOLERANCE_METRES`      |   50m | How close two areas must be to count as bordering. Covers the simplification error, plus small gaps between boundaries drawn from different sources |
+
+`SIMPLIFY_TOLERANCE_METRES` must also match the migration that built `geometrySimplified` and the Node loader that maintains it (`consultee-areas.ts`), and the report pages use their own copy of `DISTANCE_MARGIN_METRES` to say which buffer a match fell within — keep them equal.
 
 **Effect:** across all 282 case boundaries, no consultee was lost compared with an exact calculation, and about 2% more were included (median 1 per project). Examples:
 
@@ -83,23 +85,23 @@ The site straddles five authorities: Luton and Central Bedfordshire (unitary), H
 
 Two techniques keep the queries fast. Both are easy to undo by accident.
 
-| Technique                                                                                               | Why                                                                                                                                                                                                                                                                                                                                                    |
-| ------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **Forced spatial index** — `WITH (INDEX(consultee_area_geometry_simplified_sidx))` on screening queries | Prisma sends parameterised SQL. With a category filter, SQL Server sometimes chose to read every row of that category nationally and measure each one, ignoring the spatial index — about 180 times slower for district councils. The same query tested with values typed into the SQL picks the right plan, so this doesn't show up in ad-hoc testing |
-| **Intersects with a grown shape instead of distance**                                                   | "Within n metres of X" is answered as "intersects X grown by n". An intersects check stops at the first point of contact; a distance check can't. For a 180km route, finding host parishes went from timing out at 15s to about 2s                                                                                                                     |
+| Technique                                                                                               | Why                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| ------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Forced spatial index** — `WITH (INDEX(consultee_area_geometry_simplified_sidx))` on screening queries | Found when the engine ran in Node, where Prisma sends parameterised SQL. pymssql substitutes values into the SQL text before sending it, which tends to pick the right plan anyway, but the hint stays so a driver change can't quietly undo it. With a category filter, SQL Server sometimes chose to read every row of that category nationally and measure each one, ignoring the spatial index — about 180 times slower for district councils. The same query tested with values typed into the SQL picks the right plan, so this doesn't show up in ad-hoc testing |
+| **Intersects with a grown shape instead of distance**                                                   | "Within n metres of X" is answered as "intersects X grown by n". An intersects check stops at the first point of contact; a distance check can't. For a 180km route, finding host parishes went from timing out at 15s to about 2s                                                                                                                                                                                                                                                                                                                                      |
 
 ## Timeouts and failures
 
-| Setting                   | Behaviour                                                                                                |
-| ------------------------- | -------------------------------------------------------------------------------------------------------- |
-| Database request timeout  | 45s per query, for the app (`APP_REQUEST_TIMEOUT_MS` in `packages/database/src/index.ts`)                |
-| Deadlocks                 | Retried up to 3 times                                                                                    |
-| Timeouts                  | **Not** retried. Re-running a slow query just repeats the wait; this was the cause of multi-minute hangs |
-| Failure shown to the user | "The ruleset could not be run" with a "Try again" link, never empty tables                               |
+| Setting                   | Behaviour                                                                                                                                                                                               |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Run timeout               | The manage app waits 60s for the function (`RUN_RULESET_TIMEOUT_MS` in `apps/manage/src/app/ruleset-runner.ts`)                                                                                         |
+| Deadlocks                 | Retried up to 3 times                                                                                                                                                                                   |
+| Timeouts                  | **Not** retried. Re-running a slow query just repeats the wait; this was the cause of multi-minute hangs                                                                                                |
+| Failure shown to the user | "The ruleset could not be run" with a "Try again" link, never empty tables — including when the function is down or unreachable. There's no in-app fallback, so there's one implementation of the logic |
 
 ## Performance
 
-Measured locally (laptop, full dataset) across all 282 case boundaries:
+Measured locally (laptop, full dataset) across all 282 case boundaries, when the engine ran in Node. The Python port runs the same queries in about the same total time (345s against 351s over 283 projects):
 
 | Measure         | Time                                                        |
 | --------------- | ----------------------------------------------------------- |
@@ -114,20 +116,21 @@ Large linear schemes are the slowest by far. Azure SQL tiers are slower than a l
 
 | Check                                                                                              | Where                                                                                                                                                                                                                                                                                                     |
 | -------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Unit tests for each condition type, de-duplication, tolerances and failures                        | `rulesets.test.ts`, `consultee-areas.test.ts` (CI)                                                                                                                                                                                                                                                        |
-| **Golden tests**: five real projects (London, Somerset coast/nuclear, Wales, offshore wind, Luton) | `rulesets.golden.test.ts` with `ruleset-golden-cases.json`. They need the full dataset, so they run locally and skip in CI                                                                                                                                                                                |
+| Tests for each condition type, de-duplication, tolerances, failures and request validation         | `apps/function-python/querying/test_rulesets.py`, `test_function_app.py` (pytest, CI); the manage app's client in `ruleset-runner.test.ts`                                                                                                                                                                |
+| **Golden tests**: five real projects (London, Somerset coast/nuclear, Wales, offshore wind, Luton) | `apps/manage/src/app/ruleset-runner.golden.test.ts` with `ruleset-golden-cases.json`, end to end through the running function. They need the full dataset and the function, so they run locally and skip in CI                                                                                            |
+| Port parity                                                                                        | When the engine moved from Node to Python, both were run over all 283 local case boundaries: identical matches, order and nearby lists (distances within 10⁻⁹m)                                                                                                                                           |
 | Independent check                                                                                  | The golden results came from a separate Python/shapely calculation over the raw GeoJSON, sharing no code with the app. Each case lists `mustInclude` (an exact calculation) and `mayAlsoInclude` (a deliberately generous one); the app must return every exact match and nothing beyond the generous set |
 
 ## Changing a ruleset
 
-1. Edit `example_ruleset.csv`, or add a new ruleset to `RULESETS` in `rulesets.ts`.
+1. Edit `england_wales_post_20240430_ruleset.csv`, or add a new ruleset to `RULESETS` in `rulesets.ts`. The function needs no change — conditions arrive with each request.
 2. Add any new short codes to `CATEGORY_ALIASES`.
 3. Check every condition's category exists in the [catalogue](./reference-data-catalogue.md) — unmatched ones silently find nothing.
 4. The golden tests' expected results will change. Regenerate them from an independent calculation rather than from the app's own output.
 
 ## What screening needs from the data
 
-The data processing is being redeveloped with new ids and a new schema. For the intersection logic to keep working, the new data needs to provide the following. All the SQL that reads the tables is in `consultee-areas.ts` and `case-boundaries.ts`; `rulesets.ts` has none, so repointing at new tables is contained to those two files.
+The data processing is being redeveloped with new ids and a new schema. For the intersection logic to keep working, the new data needs to provide the following. The screening SQL is all in `apps/function-python/querying/rulesets.py`; the manage app's own SQL (case boundaries, and map display geometry) is in `consultee-areas.ts` and `case-boundaries.ts`. Repointing at new tables is contained to those three files.
 
 | Need                                                                | Why                                                                                                                        | Today                                                                                     |
 | ------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |

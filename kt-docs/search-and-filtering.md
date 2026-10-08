@@ -56,7 +56,7 @@ Continuing the journey:
 | Concern               | Owner module / path                                                                                |
 | --------------------- | -------------------------------------------------------------------------------------------------- |
 | Project rows + search | `packages/database/src/geospatial/case-boundaries.ts`                                              |
-| Ruleset definitions   | `packages/database/src/geospatial/rulesets.ts` + `example_ruleset.csv`                             |
+| Ruleset definitions   | `packages/database/src/geospatial/rulesets.ts` + `england_wales_post_20240430_ruleset.csv`         |
 | Results map config    | `apps/manage/src/app/maps/case-geojson.ts`                                                         |
 | Seeded sample rows    | `packages/database/src/seed/data-dev.ts` (loads `apps/function-python/setup_database/sample_data`) |
 

@@ -4,29 +4,23 @@ import { withDeadlockRetry } from './db-retry.ts';
 import type { Geometry } from './wkt.ts';
 import { geometryToWkt, wktToGeometry } from './wkt.ts';
 
-export { isDeadlockError, withDeadlockRetry } from './db-retry.ts';
-
 /**
- * Distance and bordering checks run against simplified geometries (Douglas-Peucker, this
- * tolerance): every point of a simplified shape is within this distance of the original, at a
+ * The ruleset's distance and bordering checks (apps/function-python) run against simplified
+ * geometries (Douglas-Peucker, this tolerance), which the loader below stores alongside the
+ * original: every point of a simplified shape is within this distance of the original, at a
  * fraction of the points to compare - a 2,536-point site boundary drops to 66. Original geometries
  * are kept for the map. Must match the migration that backfilled consultee_area.geometrySimplified.
  */
 export const SIMPLIFY_TOLERANCE_METRES = 10;
 
 /**
- * Simplifying both shapes can move a distance by up to twice the tolerance, so every distance
- * threshold is widened by more than that: simplification can only *add* a borderline consultee,
- * never drop one. The service would rather consult one body too many than miss one.
+ * Simplifying both shapes can move a distance by up to twice the tolerance, so the ruleset's
+ * distance thresholds are widened by more than that: simplification can only *add* a borderline
+ * consultee, never drop one. The ruleset runs in apps/function-python (querying/rulesets.py, which
+ * defines the same margin - keep the two equal); the report pages use this copy to say which
+ * condition's buffer a match fell within.
  */
 export const DISTANCE_MARGIN_METRES = 2 * SIMPLIFY_TOLERANCE_METRES + 10;
-
-/**
- * Areas within this distance of each other count as bordering - the simplification error, plus
- * small gaps between boundaries drawn from different sources (e.g. 32m between Sundon parish and
- * Luton's boundary in the reference data, which really do border).
- */
-export const BORDERING_TOLERANCE_METRES = 50;
 
 export interface ConsulteeAreaProperties {
 	consulteeCategory?: string | null;
@@ -234,7 +228,6 @@ const summaryColumnList = `
 	id, geometryType, consulteeCategory, consultee, region, caseReference, documentId,
 	consulteeId, organisationId, currentVersion, metadata
 `;
-const summaryColumns = Prisma.raw(summaryColumnList);
 const selectColumns = Prisma.raw(`${summaryColumnList}, geometry.STAsText() AS geometryWkt`);
 
 /**
@@ -280,198 +273,8 @@ export async function listConsulteeAreas(
 	return { type: 'FeatureCollection', features: rows.map(rowToFeature) };
 }
 
-/**
- * Find consultee areas within `radiusMetres` of `geometry`, nearest first. `STDistance` returns
- * true great-circle metres for `geography` columns, so a single threshold behaves consistently
- * regardless of latitude - don't compare raw WGS84 degrees as if they were a distance unit.
- *
- * Distances are measured between simplified shapes (see SIMPLIFY_TOLERANCE_METRES) - each area's
- * stored `geometrySimplified`, and `geometry` as given, which callers should pass through
- * simplifyGeometry first for speed (an unsimplified one is still correct, just slower). They're
- * approximate, so the radius is widened by DISTANCE_MARGIN_METRES: borderline areas are included,
- * never missed. Returned features still carry their original geometry, for the map.
- *
- * `consulteeCategories`, when given, restricts to those categories only (e.g. `['Railway']`) -
- * this is the query a ruleset runs (see geospatial/rulesets.ts): each ruleset is just a
- * categories + radius pair, so one generic, index-backed query covers all of them.
- *
- * `excludeCategories`, when given, drops those categories instead of restricting to them - for a
- * query with no `consulteeCategories` filter at all (i.e. "any category"), this is the only way to
- * keep a known-pathological category (see rulesets.ts's CATEGORIES_EXCLUDED_FROM_NEARBY) out of the
- * result.
- *
- * `WITH (INDEX(consultee_area_geometry_simplified_sidx))` forces the spatial index as the access path - without
- * it, once this query is genuinely parameterized (as every real caller does it: Prisma always sends
- * `sp_executesql` with out-of-band parameters, never literal SQL text), SQL Server's optimizer can
- * choose to seek the `consulteeCategory` index instead and compute exact `STDistance` against
- * *every* row of that category nationally, ignoring the spatial index's candidate-pruning entirely.
- * This is easy to miss testing locally: the SAME query with the category/radius inlined as literal
- * SQL text (rather than passed as parameters) reliably picks the fast, spatial-index plan on its
- * own, which is why a hint that only nudges the optimizer (e.g. `.Filter()`, or `OPTION (RECOMPILE)`)
- * tested against literal SQL can look like it works and then do nothing once Prisma's real,
- * parameterized query hits the same table - confirmed by reproducing Prisma's exact `sp_executesql`
- * call shape directly: neither `.Filter()` nor `OPTION (RECOMPILE)` changed the plan for every
- * affected category, while this hint fixed all of them, and is a no-op (confirmed, timed) on a query
- * with no category filter at all, which already always chooses the spatial index on its own.
- * Real-data impact measured this way: a 164-row category went from ~1.25s to ~2ms; a 40-row category
- * of unusually complex geometries (some England/Wales National Landscape boundaries run to
- * thousands of points) went from ~1.3s to ~70ms.
- */
-export async function findConsulteeAreasNear(
-	dbClient: PrismaClient,
-	geometry: Geometry,
-	radiusMetres: number,
-	consulteeCategories?: string[],
-	excludeCategories?: string[]
-): Promise<ConsulteeAreaMatch[]> {
-	const rows = await queryAreasNear<ConsulteeAreaRow>(
-		dbClient,
-		selectColumns,
-		geometry,
-		radiusMetres,
-		consulteeCategories,
-		excludeCategories
-	);
-	return rows.map((row) => ({ feature: rowToFeature(row), distanceMetres: row.distanceMetres }));
-}
-
-/**
- * findConsulteeAreasNear without each area's geometry - for a listing that only shows names,
- * categories and distances. Geometry is by far the largest part of a row (a county or National
- * Park boundary runs to tens of KB of WKT), so a wide "everything nearby" fetch that skips it
- * moves and parses a fraction of the data.
- */
-export async function findConsulteeAreaSummariesNear(
-	dbClient: PrismaClient,
-	geometry: Geometry,
-	radiusMetres: number,
-	consulteeCategories?: string[],
-	excludeCategories?: string[]
-): Promise<ConsulteeAreaSummaryMatch[]> {
-	const rows = await queryAreasNear<ConsulteeAreaSummaryRow>(
-		dbClient,
-		summaryColumns,
-		geometry,
-		radiusMetres,
-		consulteeCategories,
-		excludeCategories
-	);
-	return rows.map((row) => ({ feature: rowToSummary(row), distanceMetres: row.distanceMetres }));
-}
-
-async function queryAreasNear<Row>(
-	dbClient: PrismaClient,
-	columns: Prisma.Sql,
-	geometry: Geometry,
-	radiusMetres: number,
-	consulteeCategories?: string[],
-	excludeCategories?: string[]
-): Promise<(Row & { distanceMetres: number })[]> {
-	const wkt = geometryToWkt(geometry);
-	const categoryFilter =
-		consulteeCategories && consulteeCategories.length > 0
-			? Prisma.sql`AND consulteeCategory IN (${Prisma.join(consulteeCategories)})`
-			: Prisma.empty;
-	// NULL-safe: a plain "NOT IN" would also drop any row with no category at all, since
-	// `NULL NOT IN (...)` is unknown, not true - that's a real row, not a pathological one, and
-	// should still show up here
-	const excludeFilter =
-		excludeCategories && excludeCategories.length > 0
-			? Prisma.sql`AND (consulteeCategory IS NULL OR consulteeCategory NOT IN (${Prisma.join(excludeCategories)}))`
-			: Prisma.empty;
-	return withDeadlockRetry(
-		() =>
-			dbClient.$queryRaw<(Row & { distanceMetres: number })[]>`
-			SELECT ${columns},
-				geometrySimplified.STDistance(geography::STGeomFromText(${wkt}, 4326)) AS distanceMetres
-			FROM consultee_area WITH (INDEX(consultee_area_geometry_simplified_sidx))
-			WHERE geometrySimplified.STDistance(geography::STGeomFromText(${wkt}, 4326)) <= ${radiusMetres + DISTANCE_MARGIN_METRES}
-				${categoryFilter}
-				${excludeFilter}
-			ORDER BY distanceMetres
-		`
-	);
-}
-
-/**
- * Simplify `geometry` the same way consultee areas' `geometrySimplified` is (see
- * SIMPLIFY_TOLERANCE_METRES) - done once per ruleset run, then used for every query in it. Detailed
- * site boundaries are where most of a run's time went: one 0.3 km² site had 2,536 points, mostly
- * under a metre apart.
- */
-export async function simplifyGeometry(dbClient: PrismaClient, geometry: Geometry): Promise<Geometry> {
-	const [row] = await withDeadlockRetry(
-		() => dbClient.$queryRaw<{ wkt: string }[]>`
-			SELECT geography::STGeomFromText(${geometryToWkt(geometry)}, 4326)
-				.Reduce(${SIMPLIFY_TOLERANCE_METRES}).MakeValid().STAsText() AS wkt
-		`
-	);
-	return wktToGeometry(row.wkt);
-}
-
-/**
- * `geometry` grown outwards by `metres` (to within 1m). "Within n metres of X" then becomes "intersects
- * X grown by n" - a much cheaper check against detailed shapes, because an intersects test can stop
- * at the first point of contact where a distance calculation can't (for a 180km route, a host lookup
- * went from timing out at 15s to ~2s).
- */
-export async function growGeometry(dbClient: PrismaClient, geometry: Geometry, metres: number): Promise<Geometry> {
-	const [row] = await withDeadlockRetry(
-		() => dbClient.$queryRaw<{ wkt: string }[]>`
-			SELECT geography::STGeomFromText(${geometryToWkt(geometry)}, 4326).BufferWithTolerance(${metres}, 1, 0).STAsText() AS wkt
-		`
-	);
-	return wktToGeometry(row.wkt);
-}
-
 // SQL Server caps a single statement at 2,100 parameters
 const GEOMETRY_LOOKUP_BATCH_SIZE = 1000;
-
-/**
- * Approximate distance (simplified shapes) from `geometry` to specific consultee areas by id. Ids with
- * no matching row are absent.
- */
-export async function getConsulteeAreaDistances(
-	dbClient: PrismaClient,
-	geometry: Geometry,
-	ids: string[]
-): Promise<Map<string, number>> {
-	const wkt = geometryToWkt(geometry);
-	const distances = new Map<string, number>();
-	for (let i = 0; i < ids.length; i += GEOMETRY_LOOKUP_BATCH_SIZE) {
-		const batch = ids.slice(i, i + GEOMETRY_LOOKUP_BATCH_SIZE);
-		const rows = await withDeadlockRetry(
-			() => dbClient.$queryRaw<{ id: string; distanceMetres: number }[]>`
-				SELECT id, geometrySimplified.STDistance(geography::STGeomFromText(${wkt}, 4326)) AS distanceMetres
-				FROM consultee_area WHERE id IN (${Prisma.join(batch)})
-			`
-		);
-		for (const row of rows) {
-			distances.set(row.id, row.distanceMetres);
-		}
-	}
-	return distances;
-}
-
-/** Fetch the geometries of specific consultee areas by id. Ids with no matching row are absent. */
-export async function getConsulteeAreaGeometries(
-	dbClient: PrismaClient,
-	ids: string[]
-): Promise<Map<string, Geometry>> {
-	const geometries = new Map<string, Geometry>();
-	for (let i = 0; i < ids.length; i += GEOMETRY_LOOKUP_BATCH_SIZE) {
-		const batch = ids.slice(i, i + GEOMETRY_LOOKUP_BATCH_SIZE);
-		const rows = await withDeadlockRetry(
-			() => dbClient.$queryRaw<{ id: string; geometryWkt: string }[]>`
-				SELECT id, geometry.STAsText() AS geometryWkt FROM consultee_area WHERE id IN (${Prisma.join(batch)})
-			`
-		);
-		for (const row of rows) {
-			geometries.set(row.id, wktToGeometry(row.geometryWkt));
-		}
-	}
-	return geometries;
-}
 
 /** Douglas-Peucker tolerance for geometry that's only drawn, never measured - see getConsulteeAreaDisplayGeometries. */
 export const DISPLAY_SIMPLIFY_TOLERANCE_METRES = 25;
@@ -541,82 +344,4 @@ export async function getConsulteeAreaDisplayGeometries(
 		}
 	}
 	return geometries;
-}
-
-/**
- * Find consultee areas of `matchingCategories` that share a border with a `hostCategory` area
- * the site is in - e.g. "neighbouring parishes of the parish the site sits in".
- *
- * Takes the site already grown by DISTANCE_MARGIN_METRES (see growGeometry), so a host is any
- * `hostCategory` area that intersects it - i.e. within the margin of the site. A neighbour is any
- * matching area within BORDERING_TOLERANCE_METRES of a host - "touching" exactly would miss real
- * neighbours whose boundaries come from different sources and don't quite meet. The host itself is
- * excluded by id. Both are intersects checks against pre-grown shapes, on simplified geometry:
- * unlike a distance check, an intersects test stops at the first point of contact, which is what
- * keeps this fast for long routes crossing a hundred parishes or large council boundaries.
- *
- * Returns the matching areas without a distance - matching isn't about distance from the site, and
- * measuring it here would repeat for every host (see runRuleset, which measures it once).
- *
- * Two round trips, not one: a single query comparing `candidate.geometry` with `host.geometry`
- * column-to-column can't use the spatial index (it needs a constant on one side), so it degrades
- * to a near full-table scan - confirmed by a real 15s+ timeout on this project's own reference
- * data. Fetching the host areas first, then querying with each one's geometry as a parameter,
- * keeps both queries on the indexed `STIntersects(column, constant)` path.
- */
-export async function findConsulteeAreasBordering(
-	dbClient: PrismaClient,
-	siteWithinMargin: Geometry,
-	hostCategory: string,
-	matchingCategories: string[]
-): Promise<ConsulteeAreaFeature[]> {
-	if (matchingCategories.length === 0) {
-		return [];
-	}
-	const wkt = geometryToWkt(siteWithinMargin);
-
-	return withDeadlockRetry(async () => {
-		// each host comes back already grown by the bordering tolerance (to within 1m, well inside its
-		// slack) - Somerset's neighbours by distance took ~930ms, by intersects with it grown ~220ms
-		const hosts = await dbClient.$queryRaw<{ id: string; grownHostWkt: string }[]>`
-			SELECT id, geometrySimplified.BufferWithTolerance(${BORDERING_TOLERANCE_METRES}, 1, 0).STAsText() AS grownHostWkt
-			FROM consultee_area WITH (INDEX(consultee_area_geometry_simplified_sidx))
-			WHERE consulteeCategory = ${hostCategory}
-				AND geometrySimplified.STIntersects(geography::STGeomFromText(${wkt}, 4326)) = 1
-		`;
-
-		const matchesById = new Map<string, ConsulteeAreaRow>();
-		for (const host of hosts) {
-			const rows = await dbClient.$queryRaw<ConsulteeAreaRow[]>`
-				SELECT ${selectColumns}
-				FROM consultee_area WITH (INDEX(consultee_area_geometry_simplified_sidx))
-				WHERE consulteeCategory IN (${Prisma.join(matchingCategories)})
-					AND id <> CAST(${host.id} AS UNIQUEIDENTIFIER)
-					AND geometrySimplified.STIntersects(geography::STGeomFromText(${host.grownHostWkt}, 4326)) = 1
-			`;
-			for (const row of rows) {
-				matchesById.set(row.id, row);
-			}
-		}
-
-		return [...matchesById.values()].map(rowToFeature);
-	});
-}
-
-/**
- * Find consultee areas that intersect `geometry`.
- */
-export async function findConsulteeAreasIntersecting(
-	dbClient: PrismaClient,
-	geometry: Geometry
-): Promise<ConsulteeAreaFeatureCollection> {
-	const wkt = geometryToWkt(geometry);
-	const rows = await withDeadlockRetry(
-		() => dbClient.$queryRaw<ConsulteeAreaRow[]>`
-			SELECT ${selectColumns}
-			FROM consultee_area
-			WHERE geometry.STIntersects(geography::STGeomFromText(${wkt}, 4326)) = 1
-		`
-	);
-	return { type: 'FeatureCollection', features: rows.map(rowToFeature) };
 }

@@ -53,9 +53,10 @@ Then open **http://localhost:8090**.
 4. Waits for SQL Server on **localhost:1434**
 5. Runs migrations (`npm run db-migrate-dev`)
 6. Seeds the database (`npm run db-seed`) with a real sample of UK case boundaries and consultee areas — the main search → ruleset → results journey and the Playwright e2e tests need this data
-7. Starts the manage app in watch mode
+7. Starts the Python function on **localhost:7071**, which runs the consultee intersection logic. It creates `apps/function-python/.venv` (Python 3.12) and installs its dependencies, and gives the function and the manage app the same local API key (`local.settings.json` / `.env`). It needs [Azure Functions Core Tools](https://learn.microsoft.com/en-us/azure/azure-functions/functions-run-local) (`npm install -g azure-functions-core-tools@4`); without them, `npm start` warns and carries on, and consultee pages say "The ruleset could not be run"
+8. Starts the manage app in watch mode
 
-Stop with `Ctrl+C`. The SQL container keeps running until you stop it (`docker compose down`).
+Stop with `Ctrl+C` (stops both the app and the function). The SQL container keeps running until you stop it (`docker compose down`).
 
 ### What you get by default
 
@@ -64,7 +65,7 @@ Stop with `Ctrl+C`. The SQL container keeps running until you stop it (`docker c
 | Manage app | http://localhost:8090 |
 | SQL Server | `localhost:1434` (container maps host `1434` → container `1433`) |
 | Auth | Disabled (`AUTH_DISABLED=true` when `.env` is created by `npm start`) |
-| `PYTHON_FUNCTION_URL` | `http://localhost:7071/api/consultee-areas` (Azure Functions Core Tools) |
+| Python function | http://localhost:7071 (`PYTHON_FUNCTION_URL` names its `/api/consultee-areas` route; `/api/run-ruleset` is resolved next to it) |
 
 Do not commit `.env` files. Copy from the `.env.example` files only as a template.
 
@@ -88,11 +89,9 @@ For real Microsoft Entra sign-in locally:
 2. Fill in `AUTH_CLIENT_ID`, `AUTH_CLIENT_SECRET`, `AUTH_GROUP_APPLICATION_ACCESS`, and confirm `AUTH_TENANT_ID` / `APP_HOSTNAME` with a teammate
 3. Restart the manage app
 
-### Optional: Python function (consultee-areas)
+### Python function
 
-The manage app can start without the Python function running. You only need it for pages that call `PYTHON_FUNCTION_URL` (for example `/consultee-areas-python`).
-
-Full setup is in [`apps/function-python/README.md`](./apps/function-python/README.md). In short: Python 3.12, venv, Azure Functions Core Tools, Azurite, then `func start` in `apps/function-python` so the endpoint is available at `http://localhost:7071/api/consultee-areas`.
+The ruleset — which consultees a project needs — runs in the Python function, so the project, results and report pages need it running. `npm start` starts it; to run it yourself, see [`apps/function-python/README.md`](./apps/function-python/README.md). The manage app still boots without it, and those pages show "The ruleset could not be run" until it's back.
 
 ### Running pieces separately
 
@@ -113,7 +112,7 @@ Useful npm scripts from the repo root:
 
 | Script | Purpose |
 | ------ | ------- |
-| `npm start` | Full local bootstrap (env, DB, migrate, seed, manage app) |
+| `npm start` | Full local bootstrap (env, DB, migrate, seed, Python function, manage app) |
 | `npm run db-migrate-dev` | Apply Prisma migrations (dev) |
 | `npm run db-seed` | Seed the database (sample boundary data) |
 | `npm run db-import -- --type=<consultee-areas\|case-boundaries> --file=<path>` | Import a GeoJSON dataset from a local file |

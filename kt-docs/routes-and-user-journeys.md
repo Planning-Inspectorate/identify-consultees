@@ -9,14 +9,14 @@ Registered primarily from `apps/manage/src/app/router.ts`.
 | Method / path                                                                                    | Journey                                                              | Data                                                  |
 | ------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------- | ----------------------------------------------------- |
 | `GET /`                                                                                          | Homepage: DB-backed search + paginated project list                  | `case_boundary` via `searchCaseBoundaries`            |
-| `GET /consultees/:caseId?ruleset=…`                                                              | Project map page: shapefile/ruleset rows + map + report link         | `runRuleset` spatial queries                          |
+| `GET /consultees/:caseId?ruleset=…`                                                              | Project map page: shapefile/ruleset rows + map + report link         | Python `run-ruleset` spatial queries                  |
 | `GET /consultees/:caseId/ruleset` · `POST /consultees/:caseId/ruleset`                           | Change-ruleset radios; posts back and returns to the map             | Case summary + `RULESETS`                             |
 | `GET /consultees/:caseId/shapefile` · `POST /consultees/:caseId/shapefile`                       | Change-shapefile radios; lands on the chosen boundary's map          | `listCaseBoundaryFiles`                               |
-| `GET /consultees/:caseId/report?ruleset=…&exclude=…&add=…`                                       | Check page: report details + per-category consultee counts           | `runRuleset` match counts                             |
-| `GET /consultees/:caseId/report/consultees?ruleset=…&category=…&exclude=…&add=…`                 | Shared per-category Change page: map + removable consultee rows      | `runRuleset` spatial queries                          |
+| `GET /consultees/:caseId/report?ruleset=…&exclude=…&add=…`                                       | Check page: report details + per-category consultee counts           | Python `run-ruleset` match counts                     |
+| `GET /consultees/:caseId/report/consultees?ruleset=…&category=…&exclude=…&add=…`                 | Shared per-category Change page: map + removable consultee rows      | Python `run-ruleset` spatial queries                  |
 | `GET /consultees/:caseId/report/consultees/add` · `POST …/add`                                   | "Select a consultee" form; posts back and returns to the Change page | Case summary + `RULESETS`                             |
 | `GET /consultees/:caseId/report/created?ruleset=…`                                               | Report created confirmation + download link (placeholder)            | Case summary                                          |
-| `GET /consultees/:caseId/results?ruleset=…`                                                      | Consultee tables (the future report) for the selection               | `runRuleset` spatial queries                          |
+| `GET /consultees/:caseId/results?ruleset=…`                                                      | Consultee tables (the future report) for the selection               | Python `run-ruleset` spatial queries                  |
 | `GET /consultees/:caseId/results/static-map`                                                     | Static map image — AVIF/WebP/PNG negotiated from `Accept`            | Same, server-rendered; `category`/`exclude` filter it |
 | `GET /consultees/:caseId/results/static-map.svg`                                                 | Explicit SVG static map variant                                      | Same                                                  |
 | `GET /map-layers-demo`                                                                           | Layer toggles experiment                                             | Demo GeoJSON                                          |
@@ -61,7 +61,7 @@ Details: [Maps](./maps.md).
 There is no end-user upload wizard route in `apps/manage` yet. What exists:
 
 - **Admin data loading**: `/admin/upload-to-blob` (file → app's blob container) and `/admin/import-reference-data` (known blobs → `consultee_area` / `case_boundary`). These back the DB Seed pipeline's `loadFullReferenceData` flow.
-- **In-app screening**: `runRuleset` (`packages/database/src/geospatial/rulesets.ts`) runs the chosen ruleset's conditions as real spatial queries on the results page.
+- **Screening**: the Python function (`POST /api/run-ruleset`, `apps/function-python/querying/rulesets.py`) runs the chosen ruleset's conditions as real spatial queries for every results page; the definitions come from `packages/database/src/geospatial/rulesets.ts`.
 - External shapefile packaging remains documented in `docs/gis-shapefile-upload-and-report.md`.
 
 ## Journeys by dependency

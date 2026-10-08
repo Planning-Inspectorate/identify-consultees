@@ -6,8 +6,9 @@ import {
 	getConsulteeAreaDisplayGeometries
 } from '@pins/identify-consultees-database/src/geospatial/consultee-areas.ts';
 import type { Ruleset, RunRulesetResult } from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
-import { getRuleset, RULESETS, runRuleset } from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
+import { getRuleset, RULESETS } from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
 import type { SearchAreaDisplay } from '../../maps/case-geojson.ts';
+import type { RulesetRunner } from '../../ruleset-runner.ts';
 
 /**
  * Shared plumbing for the consultee pages that run a ruleset (the project map page and the
@@ -28,15 +29,20 @@ interface RulesetRun extends RunRulesetResult {
 	failed: boolean;
 }
 
+/**
+ * Run the ruleset in the Python function (see ruleset-runner.ts). If it's down, slow or errors, the
+ * page says the ruleset couldn't be run - there's no in-app fallback, so there's one implementation
+ * of the intersection logic rather than two that could quietly disagree.
+ */
 export async function runRulesetSafely(
-	db: ManageService['db'],
+	runRuleset: RulesetRunner,
 	project: CaseBoundaryFeature,
 	ruleset: Ruleset,
 	nearbyRadiusMetres: number,
 	logger: ManageService['logger']
 ): Promise<RulesetRun> {
 	try {
-		return { ...(await runRuleset(db, project.geometry, ruleset, nearbyRadiusMetres)), failed: false };
+		return { ...(await runRuleset(project.geometry, ruleset, nearbyRadiusMetres)), failed: false };
 	} catch (error) {
 		logger.error({ error, caseId: project.id, rulesetId: ruleset.id }, 'Failed to run ruleset');
 		return { matches: [], allNearby: [], failed: true };

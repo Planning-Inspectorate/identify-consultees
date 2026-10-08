@@ -60,7 +60,7 @@ To set up your local dev environment, in `/apps/function-python`:
   ```
   (match the connection string to whatever's in `packages/database/.env`)
 
-  `CONSULTEE_AREAS_API_KEY` is the shared `x-api-key` secret the `consultee-areas` route checks -
+  `CONSULTEE_AREAS_API_KEY` is the shared `x-api-key` secret the `consultee-areas` and `run-ruleset` routes check -
   **the endpoint fails closed without it** (500 "Endpoint is not configured"). Set the same value as
   `PYTHON_FUNCTION_API_KEY` in `apps/manage/.env` for the manage app to call it; a wrong or missing
   header gets a 401. `/api/health` needs no key.
@@ -69,9 +69,12 @@ See also [Code and test Azure Functions locally](https://learn.microsoft.com/en-
 
 ## Run
 
-* Run `azurite` in a temporary directory somewhere as a storage emulator
-* Run `func start` in `apps/function-python` to start the function
-* `curl http://localhost:7071/api/consultee-areas` to call it
+`npm start` from the repo root does all of the above (venv, dependencies, a shared local API key) and
+runs the function alongside the manage app. By hand:
+
+* Run `func start` in `apps/function-python`, with the venv activated, to start the function. The
+  HTTP routes run without a storage emulator; run `azurite` too if you add a trigger that needs one
+* `curl http://localhost:7071/api/health` to check it can reach the database
 
 ## Test
 

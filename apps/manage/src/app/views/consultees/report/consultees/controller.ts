@@ -55,7 +55,7 @@ function identifiedBy(match: ConsulteeAreaMatch, ruleset: Ruleset, category: str
  * the check page.
  */
 export function buildReportConsulteesPage(service: ManageService): AsyncRequestHandler {
-	const { db, logger, nearbyConsulteeRadiusMetres } = service;
+	const { db, logger, nearbyConsulteeRadiusMetres, rulesetRunner } = service;
 
 	return async (req, res) => {
 		const caseId = String(req.params.caseId ?? '');
@@ -83,7 +83,13 @@ export function buildReportConsulteesPage(service: ManageService): AsyncRequestH
 		const excluded = excludedIds(req.query.exclude);
 		const adds = addedConsultees(req.query.add);
 		const selection: ConsulteeSelection = { excluded, adds };
-		const { matches, failed } = await runRulesetSafely(db, project, ruleset, nearbyConsulteeRadiusMetres, logger);
+		const { matches, failed } = await runRulesetSafely(
+			rulesetRunner,
+			project,
+			ruleset,
+			nearbyConsulteeRadiusMetres,
+			logger
+		);
 		const visible = matches.filter(
 			(match) => match.feature.properties.consulteeCategory === category && !excluded.has(match.feature.id)
 		);
