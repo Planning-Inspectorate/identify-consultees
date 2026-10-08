@@ -4,6 +4,8 @@ import { afterEach, describe, mock, test } from 'node:test';
 import {
 	buildCategorySublayers,
 	buildDatasets,
+	buildSelectableLayers,
+	featureDetailsHtml,
 	initAllConsulteeMaps,
 	initConsulteeMap,
 	readMapConfig,
@@ -257,6 +259,99 @@ describe('consultees-map client helpers', () => {
 
 		initConsulteeMap('map-2');
 		assert.equal(InteractiveMap.mock.callCount(), 1);
+	});
+
+	test('buildSelectableLayers lists the MapLibre layers of each consultee sublayer and the project site', () => {
+		const area = { properties: { consulteeCategory: 'Police', colour: '#1d70b8' }, geometry: { type: 'Polygon' } };
+		const layers = buildSelectableLayers(
+			buildDatasets({
+				searchAreaGeojson: { features: [{}] },
+				nearbyGeojson: { features: [area] },
+				consulteeGeojson: { features: [area] },
+				projectGeojson: { features: [{}] }
+			})
+		);
+
+		assert.deepEqual(
+			layers.map((layer) => `${layer.layerId}:${layer.idProperty}`),
+			[
+				'nearby-consultees-nearby-0:consulteeId',
+				'nearby-consultees-nearby-0-stroke:consulteeId',
+				'consultee-areas-identified-0:consulteeId',
+				'consultee-areas-identified-0-stroke:consulteeId',
+				'project-site:reference',
+				'project-site-stroke:reference'
+			]
+		);
+		assert.ok(layers.every((layer) => layer.labelProperty === 'name'));
+	});
+
+	test('featureDetailsHtml describes a consultee or the project site, escaping their text', () => {
+		assert.equal(
+			featureDetailsHtml({ consulteeId: 'x', name: 'A & <B>', consulteeCategory: 'Police', region: 'East' }),
+			'<p class="govuk-body govuk-!-font-weight-bold govuk-!-margin-bottom-2">A &amp; &lt;B&gt;</p>' +
+				'<p class="govuk-body-s govuk-!-margin-bottom-1">Category: Police</p>' +
+				'<p class="govuk-body-s govuk-!-margin-bottom-1">Region: East</p>'
+		);
+		assert.match(
+			featureDetailsHtml({ consulteeId: 'x', name: '', consulteeCategory: 'Hospital', region: '' }),
+			/Unnamed.*Category: Hospital<\/p>$/
+		);
+		assert.match(featureDetailsHtml({ name: 'Luton', reference: 'TR020001' }), /Luton.*Reference: TR020001/);
+	});
+
+	test('initConsulteeMap shows a selected feature in a panel, and clears the selection when it closes', () => {
+		installDom(
+			`<!DOCTYPE html><html><body>
+				<div id="map-4" class="app-consultee-map"></div>
+				<script id="map-4-data" type="application/json">{"center":[0,0],"zoom":8,"projectGeojson":{"features":[{"type":"Feature"}]}}</script>
+			</body></html>`
+		);
+		const handlers = {};
+		const map = {
+			on: (event, handler) => {
+				handlers[event] = handler;
+			},
+			addPanel: mock.fn((id, options) => {
+				document.body.insertAdjacentHTML('beforeend', options.html);
+			}),
+			showPanel: mock.fn(),
+			hidePanel: mock.fn()
+		};
+		const interact = { enable: mock.fn(), clear: mock.fn() };
+		const interactPlugin = mock.fn(() => interact);
+		globalThis.defra = {
+			InteractiveMap: function InteractiveMap() {
+				return map;
+			},
+			maplibreProvider: mock.fn(() => ({})),
+			datasetsPlugin: mock.fn(() => ({})),
+			mapKeyPlugin: mock.fn(() => ({})),
+			interactPlugin
+		};
+		globalThis.window.defra = globalThis.defra;
+
+		initConsulteeMap('map-4');
+		assert.deepEqual(interactPlugin.mock.calls[0].arguments[0].interactionModes, ['selectFeature']);
+
+		handlers['map:ready']();
+		assert.equal(interact.enable.mock.callCount(), 1);
+		assert.equal(map.addPanel.mock.calls[0].arguments[0], 'consultee-details');
+		assert.equal(map.hidePanel.mock.callCount(), 1);
+
+		handlers['interact:selectionchange']({
+			selectedFeatures: [{ properties: { consulteeId: 'x', name: 'Offley', consulteeCategory: 'Parish Council' } }]
+		});
+		assert.equal(map.showPanel.mock.callCount(), 1);
+		assert.match(document.getElementById('consultee-details-content').innerHTML, /Offley/);
+
+		handlers['interact:selectionchange']({ selectedFeatures: [] });
+		assert.equal(map.hidePanel.mock.callCount(), 2);
+
+		handlers['app:panelclosed']({ panelId: 'some-other-panel' });
+		assert.equal(interact.clear.mock.callCount(), 0);
+		handlers['app:panelclosed']({ panelId: 'consultee-details' });
+		assert.equal(interact.clear.mock.callCount(), 1);
 	});
 
 	test('initConsulteeMap falls back when InteractiveMap throws', () => {

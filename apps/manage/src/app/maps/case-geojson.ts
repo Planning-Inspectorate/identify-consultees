@@ -75,6 +75,8 @@ export function buildConsulteeMatchesGeojson(
 			type: 'Feature',
 			id: match.feature.id,
 			properties: {
+				// MapLibre drops string feature ids, so map selection needs the id as a property
+				consulteeId: match.feature.id,
 				name: match.feature.properties.consultee ?? '',
 				consulteeCategory: categoryOf(match),
 				region: match.feature.properties.region ?? '',
@@ -108,8 +110,10 @@ export function buildNearbyConsulteesGeojson(
 					type: 'Feature' as const,
 					id: match.feature.id,
 					properties: {
+						consulteeId: match.feature.id,
 						name: match.feature.properties.consultee ?? '',
 						consulteeCategory: categoryOf(match),
+						region: match.feature.properties.region ?? '',
 						colour: colourFor(colours, categoryOf(match))
 					},
 					geometry: roundGeometry(geometry)

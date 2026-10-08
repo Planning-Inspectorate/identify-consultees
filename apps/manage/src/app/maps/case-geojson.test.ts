@@ -98,9 +98,23 @@ describe('buildNearbyConsulteesGeojson', () => {
 		assert.deepStrictEqual(geojson.features[0], {
 			type: 'Feature',
 			id: 'a',
-			properties: { name: 'Mid Suffolk', consulteeCategory: 'Lower Tier Authority', colour: '#1d70b8' },
+			properties: {
+				consulteeId: 'a',
+				name: 'Mid Suffolk',
+				consulteeCategory: 'Lower Tier Authority',
+				region: '',
+				colour: '#1d70b8'
+			},
 			geometry: { type: 'Point', coordinates: [1.12346, 52.98765] }
 		});
+	});
+
+	it('carries the region, for the map details panel', () => {
+		const geojson = buildNearbyConsulteesGeojson(
+			[nearby('a', { region: 'East of England' })],
+			new Map([['a', { type: 'Point' as const, coordinates: [1, 52] as [number, number] }]])
+		);
+		assert.strictEqual(geojson.features[0].properties.region, 'East of England');
 	});
 
 	it('rounds geometry collections and defaults missing names and categories', () => {
@@ -116,7 +130,13 @@ describe('buildNearbyConsulteesGeojson', () => {
 				]
 			])
 		);
-		assert.deepStrictEqual(geojson.features[0].properties, { name: '', consulteeCategory: 'Other', colour: '#1d70b8' });
+		assert.deepStrictEqual(geojson.features[0].properties, {
+			consulteeId: 'a',
+			name: '',
+			consulteeCategory: 'Other',
+			region: '',
+			colour: '#1d70b8'
+		});
 		assert.deepStrictEqual(geojson.features[0].geometry, {
 			type: 'GeometryCollection',
 			geometries: [{ type: 'LineString', coordinates: [[0, 1.00001]] }]

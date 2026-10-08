@@ -159,6 +159,7 @@ export function buildDatasets(config) {
 		datasets.push({
 			id: 'search-area',
 			label: config.searchAreaLabel ?? 'Search area',
+			idProperty: 'name',
 			geojson: config.searchAreaGeojson,
 			minZoom: 0,
 			maxZoom: 24,
@@ -172,6 +173,8 @@ export function buildDatasets(config) {
 		datasets.push({
 			id: 'nearby-consultees',
 			label: config.nearbyLayerLabel ?? 'All consultees nearby',
+			// MapLibre only keeps numeric feature ids - selection needs a promoted id property
+			idProperty: 'consulteeId',
 			geojson: config.nearbyGeojson,
 			minZoom: 0,
 			maxZoom: 24,
@@ -187,6 +190,7 @@ export function buildDatasets(config) {
 		datasets.push({
 			id: 'consultee-areas',
 			label: config.consulteeLayerLabel ?? 'Consultee areas',
+			idProperty: 'consulteeId',
 			geojson: config.consulteeGeojson,
 			minZoom: 0,
 			maxZoom: 24,
@@ -205,6 +209,7 @@ export function buildDatasets(config) {
 		datasets.push({
 			id: 'project-site',
 			label: config.projectLayerLabel ?? 'Project site',
+			idProperty: 'reference',
 			geojson: config.projectGeojson,
 			minZoom: 0,
 			maxZoom: 24,
@@ -218,6 +223,106 @@ export function buildDatasets(config) {
 	}
 
 	return datasets;
+}
+
+const DETAILS_PANEL_ID = 'consultee-details';
+
+/**
+ * The map layers a click can select: each consultee sublayer, and the project site. These are
+ * MapLibre layer ids as the datasets plugin names them - `<dataset>-<sublayer>` for a sublayer,
+ * plus a `-stroke` layer when it's drawn with both a fill and an outline.
+ *
+ * @param {object[]} datasets - from buildDatasets
+ * @returns {object[]}
+ */
+export function buildSelectableLayers(datasets) {
+	const layers = [];
+	const add = (layerId, idProperty) => {
+		for (const id of [layerId, `${layerId}-stroke`]) {
+			layers.push({ layerId: id, idProperty, labelProperty: 'name' });
+		}
+	};
+	for (const dataset of datasets) {
+		if (dataset.id === 'project-site') {
+			add(dataset.id, dataset.idProperty);
+		}
+		for (const sublayer of dataset.sublayers ?? []) {
+			add(`${dataset.id}-${sublayer.id}`, dataset.idProperty);
+		}
+	}
+	return layers;
+}
+
+/**
+ * @param {unknown} value
+ * @returns {string}
+ */
+function escapeHtml(value) {
+	return String(value)
+		.replaceAll('&', '&amp;')
+		.replaceAll('<', '&lt;')
+		.replaceAll('>', '&gt;')
+		.replaceAll('"', '&quot;');
+}
+
+/**
+ * The details panel's HTML for a selected feature: a consultee's name, category and region, or the
+ * project site's name and reference.
+ *
+ * @param {object} properties
+ * @returns {string}
+ */
+export function featureDetailsHtml(properties) {
+	const rows = properties.consulteeId
+		? [
+				['Category', properties.consulteeCategory],
+				['Region', properties.region]
+			]
+		: [['Reference', properties.reference]];
+	return (
+		`<p class="govuk-body govuk-!-font-weight-bold govuk-!-margin-bottom-2">${escapeHtml(properties.name || 'Unnamed')}</p>` +
+		rows
+			.filter(([, value]) => value)
+			.map(([label, value]) => `<p class="govuk-body-s govuk-!-margin-bottom-1">${label}: ${escapeHtml(value)}</p>`)
+			.join('')
+	);
+}
+
+/**
+ * Click an area or point to see what it is in a panel; clicking away closes it.
+ *
+ * @param {object} map - InteractiveMap instance
+ * @param {object} interactPlugin
+ */
+function wireFeatureDetails(map, interactPlugin) {
+	map.on('map:ready', () => {
+		// the core attaches enable etc. to the plugin when it mounts, so not before map:ready
+		interactPlugin.enable();
+		map.addPanel(DETAILS_PANEL_ID, {
+			focus: false,
+			label: 'Selected on the map',
+			html: `<div id="${DETAILS_PANEL_ID}-content"></div>`,
+			mobile: { slot: 'drawer', dismissible: true },
+			tablet: { slot: 'left-top', dismissible: true, width: '300px' },
+			desktop: { slot: 'left-top', dismissible: true, width: '300px' }
+		});
+		map.hidePanel(DETAILS_PANEL_ID);
+	});
+	map.on('interact:selectionchange', ({ selectedFeatures }) => {
+		if (selectedFeatures.length > 0) {
+			document.getElementById(`${DETAILS_PANEL_ID}-content`).innerHTML = featureDetailsHtml(
+				selectedFeatures[0].properties
+			);
+			map.showPanel(DETAILS_PANEL_ID);
+		} else {
+			map.hidePanel(DETAILS_PANEL_ID);
+		}
+	});
+	map.on('app:panelclosed', ({ panelId }) => {
+		if (panelId === DETAILS_PANEL_ID) {
+			interactPlugin.clear();
+		}
+	});
 }
 
 /**
@@ -240,10 +345,16 @@ export function initConsulteeMap(mapId) {
 	container.classList.add('app-case-map-interactive');
 
 	try {
-		const datasetsPlugin = defra.datasetsPlugin({ datasets: buildDatasets(config) });
+		const datasets = buildDatasets(config);
+		const datasetsPlugin = defra.datasetsPlugin({ datasets });
 		const mapKeyPlugin = defra.mapKeyPlugin();
+		const interactPlugin = defra.interactPlugin?.({
+			interactionModes: ['selectFeature'],
+			deselectOnClickOutside: true,
+			layers: buildSelectableLayers(datasets)
+		});
 
-		void new defra.InteractiveMap(mapId, {
+		const map = new defra.InteractiveMap(mapId, {
 			behaviour: 'inline',
 			mapProvider: defra.maplibreProvider(),
 			mapStyle: {
@@ -255,8 +366,11 @@ export function initConsulteeMap(mapId) {
 			zoom: config.zoom,
 			containerHeight: `${config.height ?? 516}px`,
 			mapLabel: config.mapLabel,
-			plugins: [datasetsPlugin, mapKeyPlugin]
+			plugins: [datasetsPlugin, mapKeyPlugin, ...(interactPlugin ? [interactPlugin] : [])]
 		});
+		if (interactPlugin) {
+			wireFeatureDetails(map, interactPlugin);
+		}
 	} catch {
 		showStaticMapFallback(container, config.fallback);
 	}
