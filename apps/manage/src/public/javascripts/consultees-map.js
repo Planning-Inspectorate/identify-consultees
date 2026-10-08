@@ -48,14 +48,13 @@ const SMALL_CIRCLE_SYMBOL = {
  * One sublayer per consultee category, in the category's colour, so each can be shown or hidden
  * from the map's layers menu. Points (hospitals, harbours) are drawn as small dots; areas are
  * filled at the category's `fillOpacity`, lightest first so the regional tints sit under the local
- * areas - or drawn as outlines only when `filled` is false.
+ * areas.
  *
  * @param {object[]} features
  * @param {string} idPrefix
- * @param {boolean} filled
  * @returns {object[]}
  */
-export function buildCategorySublayers(features, idPrefix, filled) {
+export function buildCategorySublayers(features, idPrefix) {
 	const byCategory = new Map();
 	for (const feature of features) {
 		const category = feature.properties?.consulteeCategory || 'Other';
@@ -74,14 +73,9 @@ export function buildCategorySublayers(features, idPrefix, filled) {
 	return categories.map(({ category, members, opacity }, index) => {
 		const colour = members[0].properties?.colour || DEFAULT_CONSULTEE_COLOUR;
 		const isPoints = members.every((feature) => POINT_TYPES.has(feature.geometry?.type));
-		let style;
-		if (isPoints) {
-			style = { ...SMALL_CIRCLE_SYMBOL, symbolBackgroundColor: colour };
-		} else if (filled) {
-			style = { stroke: colour, strokeWidth: 2, fill: translucent(colour, opacity) };
-		} else {
-			style = { stroke: colour, strokeWidth: 2, fill: 'transparent' };
-		}
+		const style = isPoints
+			? { ...SMALL_CIRCLE_SYMBOL, symbolBackgroundColor: colour }
+			: { stroke: colour, strokeWidth: 2, fill: translucent(colour, opacity) };
 		return {
 			id: `${idPrefix}-${index}`,
 			label: `${category} (${members.length})`,
@@ -152,26 +146,7 @@ export function showStaticMapFallback(container, fallback) {
 export function buildDatasets(config) {
 	const datasets = [];
 
-	// datasets draw in order: the nearby consultees under the ruleset's matches, and the project site
-	// on top of them all. The nearby layer starts hidden - the matches are what the
-	// ruleset identified - and can be switched on from the layers menu
-	if (config.nearbyGeojson?.features?.length > 0) {
-		datasets.push({
-			id: 'nearby-consultees',
-			label: config.nearbyLayerLabel ?? 'All consultees nearby',
-			// MapLibre only keeps numeric feature ids - selection needs a promoted id property
-			idProperty: 'consulteeId',
-			geojson: config.nearbyGeojson,
-			minZoom: 0,
-			maxZoom: 24,
-			showInKey: true,
-			showInMenu: true,
-			visible: false,
-			style: { stroke: '#505a5f', strokeWidth: 2, fill: 'transparent' },
-			sublayers: buildCategorySublayers(config.nearbyGeojson.features, 'nearby', false)
-		});
-	}
-
+	// datasets draw in order: the project site on top of the consultee areas
 	if (config.consulteeGeojson?.features?.length > 0) {
 		datasets.push({
 			id: 'consultee-areas',
@@ -187,7 +162,7 @@ export function buildDatasets(config) {
 				strokeWidth: 2,
 				fill: translucent(DEFAULT_CONSULTEE_COLOUR, DEFAULT_FILL_OPACITY)
 			},
-			sublayers: buildCategorySublayers(config.consulteeGeojson.features, 'identified', true)
+			sublayers: buildCategorySublayers(config.consulteeGeojson.features, 'identified')
 		});
 	}
 

@@ -1,17 +1,11 @@
 import type { ManageService } from '#service';
 import { stringifyForInlineScript } from '#util/inline-json.ts';
 import { getRuleset, RULESETS } from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
-import type { AsyncRequestHandler, AsyncRequestHandlerWithBody } from '@planning-inspectorate/core/util';
+import type { AsyncRequestHandler } from '@planning-inspectorate/core/util';
 import { buildCaseMapConfig, MAX_SAMPLED_MAP_MATCHES } from '../../../maps/case-geojson.ts';
 import { MAP_VIEWPORT } from '../../../maps/sample-geojson.ts';
-import { isCaseId, resolveCase } from '../resolve-case.ts';
-import {
-	buildSearchAreaSafely,
-	firstQueryValue,
-	projectPageUrl,
-	runRulesetSafely,
-	selectedRuleset
-} from '../run-ruleset.ts';
+import { resolveCase } from '../resolve-case.ts';
+import { buildSearchAreaSafely, firstQueryValue, projectPageUrl, runRulesetSafely } from '../run-ruleset.ts';
 import { describeCaseSector } from './sector.ts';
 import type { ConsulteeProjectViewModel } from './view-model.ts';
 
@@ -48,21 +42,8 @@ export function buildConsulteeProjectPage(service: ManageService): AsyncRequestH
 			'consultee project map page'
 		);
 
-		const { matches, allNearby, failed } = await runRulesetSafely(
-			db,
-			project,
-			ruleset,
-			nearbyConsulteeRadiusMetres,
-			logger
-		);
-		const searchArea = await buildSearchAreaSafely(
-			db,
-			project,
-			matches,
-			allNearby,
-			nearbyConsulteeRadiusMetres,
-			logger
-		);
+		const { matches, failed } = await runRulesetSafely(db, project, ruleset, nearbyConsulteeRadiusMetres, logger);
+		const searchArea = await buildSearchAreaSafely(db, project, matches, nearbyConsulteeRadiusMetres, logger);
 		const staticMapSrc = `/consultees/${encodeURIComponent(project.id)}/results/static-map?ruleset=${encodeURIComponent(ruleset.id)}`;
 		const staticMapAlt = `Static map showing ${ruleset.name} for ${project.properties.caseName}`;
 		const map = buildCaseMapConfig(project, matches, ruleset.name, searchArea, {
@@ -84,8 +65,6 @@ export function buildConsulteeProjectPage(service: ManageService): AsyncRequestH
 			rulesetName: ruleset.name,
 			rulesetChangeUrl: `/consultees/${encodeURIComponent(project.id)}/ruleset?ruleset=${encodeURIComponent(ruleset.id)}`,
 			previewReportUrl: `/consultees/${encodeURIComponent(project.id)}/report?ruleset=${encodeURIComponent(ruleset.id)}`,
-			runIntersectionUrl: `/consultees/${encodeURIComponent(project.id)}/run-intersection`,
-			rulesetId: ruleset.id,
 			mapId: 'case-map',
 			mapRegionLabel: `Map showing ${ruleset.name} for ${project.properties.caseName}`,
 			staticMapSrc,
@@ -101,23 +80,5 @@ export function buildConsulteeProjectPage(service: ManageService): AsyncRequestH
 		};
 
 		return res.render('views/consultees/project/view.njk', viewModel);
-	};
-}
-
-/**
- * "Run Intersection logic" on the map page: posting sends the browser back to the map page for
- * the same boundary/ruleset pair, whose GET handler re-runs the ruleset's intersection logic and
- * re-renders the map with the fresh matches - the same pattern as the pickers' "Save and return".
- * The ruleset runs once, on that GET, rather than once here and again on the redirect.
- */
-export function buildRunIntersectionSubmit(): AsyncRequestHandlerWithBody<{ ruleset?: unknown }> {
-	return async (req, res) => {
-		const caseId = String(req.params.caseId ?? '');
-		if (!isCaseId(caseId)) {
-			res.status(404).render('views/errors/404.njk', { pageHeading: 'Page not found' });
-			return;
-		}
-
-		res.redirect(projectPageUrl(caseId, selectedRuleset(req.body?.ruleset).id));
 	};
 }

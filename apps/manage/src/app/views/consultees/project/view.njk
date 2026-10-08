@@ -87,14 +87,6 @@
 			text: "Preview report",
 			href: previewReportUrl
 		}) }}
-		<form method="post" action="{{ runIntersectionUrl }}">
-			<input type="hidden" name="_csrf" value="{{ _csrf }}">
-			<input type="hidden" name="ruleset" value="{{ rulesetId }}">
-			{{ govukButton({
-				text: "Run Intersection logic",
-				classes: "govuk-button--secondary"
-			}) }}
-		</form>
 	</div>
 {% endblock %}
 

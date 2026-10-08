@@ -80,11 +80,8 @@ describe('consultees results page', () => {
 		assert.strictEqual(viewModel.nearbyMatches[0].consultee, 'Network Rail');
 		assert.strictEqual(viewModel.nearbyMatchCount, 1);
 		assert.strictEqual(viewModel.nearbyRadiusKm, 20);
-		// and on the interactive map, as its own layer
-		const mapConfig = JSON.parse(viewModel.mapConfigJson);
-		assert.strictEqual(mapConfig.nearbyLayerLabel, 'All consultees within 20km');
-		assert.strictEqual(mapConfig.nearbyGeojson.features.length, 1);
-		assert.strictEqual(mapConfig.nearbyGeojson.features[0].properties.name, 'Network Rail');
+		// but not on the interactive map, which shows only the project and the ruleset's matches
+		assert.strictEqual('nearbyGeojson' in JSON.parse(viewModel.mapConfigJson), false);
 	});
 
 	it('still renders every nearby consultee in the table if their map geometry fails to load', async () => {
@@ -106,7 +103,6 @@ describe('consultees results page', () => {
 		const viewModel = mockRes.render.mock.calls[0].arguments[1];
 		assert.strictEqual(viewModel.rulesetFailed, false);
 		assert.strictEqual(viewModel.nearbyMatches.length, 1);
-		assert.strictEqual('nearbyGeojson' in JSON.parse(viewModel.mapConfigJson), false);
 		assert.strictEqual(logger.error.mock.callCount(), 1);
 	});
 
