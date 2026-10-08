@@ -10,7 +10,7 @@ The guiding policy: **when in doubt, include.** Consulting one body too many is 
 
 ## Rulesets
 
-One ruleset exists today: `example-ruleset`, read at start-up from `england_wales_post_20240430_ruleset.csv`, a tab-separated export with one row per condition. The manage app loads it and sends the selected ruleset's conditions with each run, so the definitions have one home: the report pages also read them, to explain why each consultee matched.
+Each ruleset is a tab-separated CSV export with one row per condition, named `<name>_ruleset.csv` and kept in `packages/database/src/geospatial/`. At start-up the app loads every such file; its id (used in `?ruleset=` URLs) and display name come from the file name, so `england_wales_post_20240430_ruleset.csv` becomes `england-wales-post-20240430`, shown as "England Wales post 30 April 2024". Words are capitalised except joining words (`and`, `post`, ...), and `YYYYMMDD` dates are written out. Rename the file to change what users see. The first file alphabetically is the default. One ruleset exists today. The manage app loads it and sends the selected ruleset's conditions with each run, so the definitions have one home: the report pages also read them, to explain why each consultee matched.
 
 | CSV column                               | Meaning                                                                                                                                      |
 | ---------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -23,7 +23,7 @@ One ruleset exists today: `example-ruleset`, read at start-up from `england_wale
 
 CSV identifiers are short codes (`distr_council`, `ambulance_services_epsg27700`); the database uses readable names (`Lower Tier Authority`, `Ambulance Trust`). `CATEGORY_ALIASES` in `rulesets.ts` maps one to the other. **An identifier with no alias and no matching category silently matches nothing** — check new conditions against the [catalogue](./reference-data-catalogue.md).
 
-The example ruleset has 27 conditions: 7 that must touch the site, 16 within a distance (1km to 35km), and 4 bordering.
+The ruleset has 27 conditions: 7 that must touch the site, 16 within a distance (1km to 35km), and 4 bordering.
 
 ## How a run works
 
@@ -123,7 +123,7 @@ Large linear schemes are the slowest by far. Azure SQL tiers are slower than a l
 
 ## Changing a ruleset
 
-1. Edit `england_wales_post_20240430_ruleset.csv`, or add a new ruleset to `RULESETS` in `rulesets.ts`. The function needs no change — conditions arrive with each request.
+1. Edit `england_wales_post_20240430_ruleset.csv`, or add a new ruleset by adding another `<name>_ruleset.csv` next to it. Neither the app nor the function needs a code change: conditions arrive with each request.
 2. Add any new short codes to `CATEGORY_ALIASES`.
 3. Check every condition's category exists in the [catalogue](./reference-data-catalogue.md) — unmatched ones silently find nothing.
 4. The golden tests' expected results will change. Regenerate them from an independent calculation rather than from the app's own output.

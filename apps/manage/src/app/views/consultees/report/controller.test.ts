@@ -76,7 +76,10 @@ describe('consultee report check page', () => {
 			render: mock.fn((view, data) => nunjucks.render(view, data))
 		};
 		const db = dbReturning([[realProjectRow()], [parishMatchRow()]]);
-		await handlerFor(db)({ params: { caseId: realProjectId }, query: { ruleset: 'example-ruleset' } }, mockRes);
+		await handlerFor(db)(
+			{ params: { caseId: realProjectId }, query: { ruleset: 'england-wales-post-20240430' } },
+			mockRes
+		);
 
 		assert.strictEqual(mockRes.render.mock.calls[0].arguments[0], 'views/consultees/report/view.njk');
 		const viewModel = mockRes.render.mock.calls[0].arguments[1];
@@ -84,12 +87,15 @@ describe('consultee report check page', () => {
 		assert.strictEqual(viewModel.caseName, 'Real Test Project');
 		assert.strictEqual(viewModel.reference, 'EN010099');
 		assert.strictEqual(viewModel.stage, 'Acceptance');
-		assert.strictEqual(viewModel.rulesetName, 'Example ruleset');
-		assert.strictEqual(viewModel.backLinkUrl, `/consultees/${realProjectId}?ruleset=example-ruleset`);
-		assert.strictEqual(viewModel.rulesetChangeUrl, `/consultees/${realProjectId}/ruleset?ruleset=example-ruleset`);
+		assert.strictEqual(viewModel.rulesetName, 'England Wales post 30 April 2024');
+		assert.strictEqual(viewModel.backLinkUrl, `/consultees/${realProjectId}?ruleset=england-wales-post-20240430`);
+		assert.strictEqual(
+			viewModel.rulesetChangeUrl,
+			`/consultees/${realProjectId}/ruleset?ruleset=england-wales-post-20240430`
+		);
 		assert.strictEqual(
 			viewModel.generateReportUrl,
-			`/consultees/${realProjectId}/report/created?ruleset=example-ruleset`
+			`/consultees/${realProjectId}/report/created?ruleset=england-wales-post-20240430`
 		);
 
 		// one row per ruleset category, in ruleset order - matched ones carry their count
@@ -100,7 +106,9 @@ describe('consultee report check page', () => {
 		// every category's Change link opens its shared consultees page for the same ruleset
 		assert.ok(
 			viewModel.consultees.every((row: { changeUrl: string }) =>
-				row.changeUrl.startsWith(`/consultees/${realProjectId}/report/consultees?ruleset=example-ruleset&category=`)
+				row.changeUrl.startsWith(
+					`/consultees/${realProjectId}/report/consultees?ruleset=england-wales-post-20240430&category=`
+				)
 			)
 		);
 		assert.match(parishRow.changeUrl, /category=Parish%20Council/);
@@ -116,7 +124,7 @@ describe('consultee report check page', () => {
 		const excludedId = '55555555-5555-5555-5555-555555555555';
 		const db = dbReturning([[realProjectRow()], [parishMatchRow()]]);
 		await handlerFor(db)(
-			{ params: { caseId: realProjectId }, query: { ruleset: 'example-ruleset', exclude: excludedId } },
+			{ params: { caseId: realProjectId }, query: { ruleset: 'england-wales-post-20240430', exclude: excludedId } },
 			mockRes
 		);
 
@@ -136,7 +144,7 @@ describe('consultee report check page', () => {
 		await handlerFor(db)(
 			{
 				params: { caseId: realProjectId },
-				query: { ruleset: 'example-ruleset', add: [parishAdd, hospitalAdd] }
+				query: { ruleset: 'england-wales-post-20240430', add: [parishAdd, hospitalAdd] }
 			},
 			mockRes
 		);
@@ -159,7 +167,7 @@ describe('consultee report check page', () => {
 		await handlerFor(db)({ params: { caseId: realProjectId }, query: {} }, mockRes);
 
 		const viewModel = mockRes.render.mock.calls[0].arguments[1];
-		assert.strictEqual(viewModel.rulesetName, 'Example ruleset');
+		assert.strictEqual(viewModel.rulesetName, 'England Wales post 30 April 2024');
 	});
 
 	it('should 404 for a present-but-unknown ruleset', async () => {
@@ -244,7 +252,7 @@ describe('report created page', () => {
 		assert.strictEqual(viewModel.pageHeading, 'Report created');
 		assert.strictEqual(viewModel.caseName, 'Real Test Project');
 		assert.strictEqual(viewModel.reference, 'EN010099');
-		assert.strictEqual(viewModel.backLinkUrl, `/consultees/${realProjectId}?ruleset=example-ruleset`);
+		assert.strictEqual(viewModel.backLinkUrl, `/consultees/${realProjectId}?ruleset=england-wales-post-20240430`);
 
 		const html = mockRes.render.mock.calls[0].result;
 		assert.match(html, /Report created/);

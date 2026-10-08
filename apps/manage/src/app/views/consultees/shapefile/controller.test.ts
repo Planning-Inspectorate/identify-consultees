@@ -45,13 +45,13 @@ describe('shapefile picker page', () => {
 			render: mock.fn((view, data) => nunjucks.render(view, data))
 		};
 		const handler = buildShapefilePickerPage({ db: dbReturning([[summaryRow()], fileRows()]) });
-		await handler({ params: { caseId: realProjectId }, query: { ruleset: 'example-ruleset' } }, mockRes);
+		await handler({ params: { caseId: realProjectId }, query: { ruleset: 'england-wales-post-20240430' } }, mockRes);
 
 		assert.strictEqual(mockRes.render.mock.calls[0].arguments[0], 'views/consultees/shapefile/view.njk');
 		const viewModel = mockRes.render.mock.calls[0].arguments[1];
 		assert.strictEqual(viewModel.pageHeading, 'Project shapefile');
-		assert.strictEqual(viewModel.rulesetId, 'example-ruleset');
-		assert.strictEqual(viewModel.backLinkUrl, `/consultees/${realProjectId}?ruleset=example-ruleset`);
+		assert.strictEqual(viewModel.rulesetId, 'england-wales-post-20240430');
+		assert.strictEqual(viewModel.backLinkUrl, `/consultees/${realProjectId}?ruleset=england-wales-post-20240430`);
 		assert.strictEqual(viewModel.files.length, 2);
 		assert.strictEqual(viewModel.files[0].text, 'EN010099.geojson');
 		assert.strictEqual(viewModel.files[0].checked, true);
@@ -133,12 +133,12 @@ describe('shapefile picker submit', () => {
 		};
 		const handler = buildShapefilePickerSubmit({ db: dbReturning([[summaryRow()], fileRows()]) });
 		await handler(
-			{ params: { caseId: realProjectId }, body: { shapefile: siblingFileId, ruleset: 'example-ruleset' } },
+			{ params: { caseId: realProjectId }, body: { shapefile: siblingFileId, ruleset: 'england-wales-post-20240430' } },
 			mockRes
 		);
 		assert.strictEqual(
 			mockRes.redirect.mock.calls[0].arguments[0],
-			`/consultees/${siblingFileId}?ruleset=example-ruleset`
+			`/consultees/${siblingFileId}?ruleset=england-wales-post-20240430`
 		);
 	});
 
@@ -152,20 +152,20 @@ describe('shapefile picker submit', () => {
 		await handler(
 			{
 				params: { caseId: realProjectId },
-				body: { shapefile: '99999999-9999-9999-9999-999999999999', ruleset: 'example-ruleset' }
+				body: { shapefile: '99999999-9999-9999-9999-999999999999', ruleset: 'england-wales-post-20240430' }
 			},
 			mockRes
 		);
 		assert.strictEqual(
 			mockRes.redirect.mock.calls[0].arguments[0],
-			`/consultees/${realProjectId}/shapefile?ruleset=example-ruleset`
+			`/consultees/${realProjectId}/shapefile?ruleset=england-wales-post-20240430`
 		);
 
 		// missing body entirely - nothing selected
 		await handler({ params: { caseId: realProjectId } }, mockRes);
 		assert.strictEqual(
 			mockRes.redirect.mock.calls[1].arguments[0],
-			`/consultees/${realProjectId}/shapefile?ruleset=example-ruleset`
+			`/consultees/${realProjectId}/shapefile?ruleset=england-wales-post-20240430`
 		);
 	});
 

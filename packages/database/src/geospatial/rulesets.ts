@@ -1,10 +1,10 @@
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { ConsulteeAreaMatch, ConsulteeAreaSummaryMatch } from './consultee-areas.ts';
 
 /**
- * One condition within a ruleset (one row of the ruleset export - see RULESET_CSV_PATH below).
+ * One condition within a ruleset (one row of a ruleset export - see loadRulesets below).
  * A ruleset is made up of many of these; running the ruleset means running every one of its
  * conditions and combining the results - which the Python function does (apps/function-python,
  * querying/rulesets.py; the manage app sends it these definitions) - a single condition on its own (e.g.
@@ -165,21 +165,96 @@ export function buildRulesetFromCsv(id: string, name: string, contents: string):
 	return { id, name, rules: parseRulesetCsv(contents) };
 }
 
-// co-located with this module (not under apps/function-python/setup_database/sample_data, where
-// it originally lived) so it's guaranteed to exist wherever packages/database is deployed - a
-// cross-app relative path here previously crashed the manage app's Docker image at startup, since
-// that image only ever copies packages/ and apps/manage/, never apps/function-python
-const RULESET_CSV_PATH = path.join(
-	path.dirname(fileURLToPath(import.meta.url)),
-	'england_wales_post_20240430_ruleset.csv'
-);
+// Every ruleset is its own CSV export, named `<name>_ruleset.csv`, co-located with this module (not
+// under apps/function-python/setup_database/sample_data, where the first one originally lived) so
+// it's guaranteed to exist wherever packages/database is deployed - a cross-app relative path here
+// previously crashed the manage app's Docker image at startup, since that image only ever copies
+// packages/ and apps/manage/, never apps/function-python
+const RULESETS_DIR = path.dirname(fileURLToPath(import.meta.url));
+const RULESET_FILE_SUFFIX = '_ruleset.csv';
 
-// Only one ruleset exists yet, built from the one real export provided so far. The real set
-// (around 8) will replace this list later - each presumably its own named CSV export loaded the
-// same way, not a change to how a ruleset is run.
-export const RULESETS: Ruleset[] = [
-	buildRulesetFromCsv('example-ruleset', 'Example ruleset', readFileSync(RULESET_CSV_PATH, 'utf8'))
+const MONTHS = [
+	'January',
+	'February',
+	'March',
+	'April',
+	'May',
+	'June',
+	'July',
+	'August',
+	'September',
+	'October',
+	'November',
+	'December'
 ];
+
+// joining words stay lower case in a ruleset's display name, so `england_and_wales_post_...` reads
+// "England and Wales post ..." rather than "England And Wales Post ..."
+const LOWER_CASE_WORDS = new Set([
+	'and',
+	'or',
+	'of',
+	'the',
+	'in',
+	'on',
+	'to',
+	'from',
+	'pre',
+	'post',
+	'before',
+	'after'
+]);
+
+function rulesetStem(fileName: string): string {
+	return path.basename(fileName, RULESET_FILE_SUFFIX);
+}
+
+/** A ruleset's id - used in `?ruleset=` URLs - from its CSV's file name: `england_wales_post_20240430_ruleset.csv` → `england-wales-post-20240430`. */
+export function rulesetIdFromFileName(fileName: string): string {
+	return rulesetStem(fileName).toLowerCase().replaceAll('_', '-');
+}
+
+/**
+ * A ruleset's display name from its CSV's file name: words capitalised (except joining words like
+ * "and" or "post"), and a `YYYYMMDD` date written out - `england_wales_post_20240430_ruleset.csv`
+ * → "England Wales post 30 April 2024". Rename the file to change what users see.
+ */
+export function rulesetNameFromFileName(fileName: string): string {
+	const words = rulesetStem(fileName)
+		.split('_')
+		.filter(Boolean)
+		.map((word, index) => {
+			const date = /^(\d{4})(\d{2})(\d{2})$/.exec(word);
+			const month = date ? MONTHS[Number(date[2]) - 1] : undefined;
+			if (date && month && Number(date[3]) >= 1 && Number(date[3]) <= 31) {
+				return `${Number(date[3])} ${month} ${date[1]}`;
+			}
+			const lower = word.toLowerCase();
+			return index > 0 && LOWER_CASE_WORDS.has(lower) ? lower : lower.charAt(0).toUpperCase() + lower.slice(1);
+		});
+	return words.join(' ');
+}
+
+/** Every `*_ruleset.csv` in `dir`, in file-name order - the first is the default ruleset. */
+export function loadRulesets(dir: string = RULESETS_DIR): Ruleset[] {
+	const files = readdirSync(dir)
+		.filter((file) => file.endsWith(RULESET_FILE_SUFFIX))
+		.sort();
+	if (files.length === 0) {
+		throw new Error(`No ruleset exports (*${RULESET_FILE_SUFFIX}) found in ${dir}`);
+	}
+	return files.map((file) =>
+		buildRulesetFromCsv(
+			rulesetIdFromFileName(file),
+			rulesetNameFromFileName(file),
+			readFileSync(path.join(dir, file), 'utf8')
+		)
+	);
+}
+
+// Only one ruleset exists yet. The real set (around 8) arrives as more CSV exports in the same
+// shape - dropping each in alongside this module is all it takes for the app to offer it.
+export const RULESETS: Ruleset[] = loadRulesets();
 
 export function getRuleset(id: string): Ruleset | undefined {
 	return RULESETS.find((ruleset) => ruleset.id === id);

@@ -86,7 +86,10 @@ describe('report consultees change page', () => {
 		};
 		const db = dbReturning([[realProjectRow()], [parishMatchRow()]]);
 		await handlerFor(db)(
-			{ params: { caseId: realProjectId }, query: { ruleset: 'example-ruleset', category: 'Parish Council' } },
+			{
+				params: { caseId: realProjectId },
+				query: { ruleset: 'england-wales-post-20240430', category: 'Parish Council' }
+			},
 			mockRes
 		);
 
@@ -94,19 +97,25 @@ describe('report consultees change page', () => {
 		const viewModel = mockRes.render.mock.calls[0].arguments[1];
 		assert.strictEqual(viewModel.pageHeading, 'Parish Council');
 		assert.strictEqual(viewModel.pageCaption, 'Real Test Project');
-		assert.strictEqual(viewModel.backLinkUrl, `/consultees/${realProjectId}/report?ruleset=example-ruleset`);
-		assert.strictEqual(viewModel.saveAndReturnUrl, `/consultees/${realProjectId}/report?ruleset=example-ruleset`);
+		assert.strictEqual(
+			viewModel.backLinkUrl,
+			`/consultees/${realProjectId}/report?ruleset=england-wales-post-20240430`
+		);
+		assert.strictEqual(
+			viewModel.saveAndReturnUrl,
+			`/consultees/${realProjectId}/report?ruleset=england-wales-post-20240430`
+		);
 		assert.strictEqual(viewModel.rows.length, 1);
 		assert.strictEqual(viewModel.rows[0].name, 'Little Snoring Parish Council');
 		// the parish rules intersect the site - a zero-buffer identification
 		assert.strictEqual(viewModel.rows[0].identified, 'Intersects the site');
 		assert.strictEqual(
 			viewModel.rows[0].removeUrl,
-			`/consultees/${realProjectId}/report/consultees?ruleset=example-ruleset&category=Parish%20Council&exclude=${matchId}`
+			`/consultees/${realProjectId}/report/consultees?ruleset=england-wales-post-20240430&category=Parish%20Council&exclude=${matchId}`
 		);
 		assert.strictEqual(
 			viewModel.addConsulteeUrl,
-			`/consultees/${realProjectId}/report/consultees/add?ruleset=example-ruleset&category=Parish%20Council`
+			`/consultees/${realProjectId}/report/consultees/add?ruleset=england-wales-post-20240430&category=Parish%20Council`
 		);
 		assert.ok(viewModel.mapConfigJson.includes('FeatureCollection'));
 
@@ -199,11 +208,11 @@ describe('report consultees change page', () => {
 		// the remaining row's remove link carries the existing exclusion forward
 		assert.strictEqual(
 			viewModel.rows[0].removeUrl,
-			`/consultees/${realProjectId}/report/consultees?ruleset=example-ruleset&category=Parish%20Council&exclude=${matchId}&exclude=${otherMatchId}`
+			`/consultees/${realProjectId}/report/consultees?ruleset=england-wales-post-20240430&category=Parish%20Council&exclude=${matchId}&exclude=${otherMatchId}`
 		);
 		assert.strictEqual(
 			viewModel.saveAndReturnUrl,
-			`/consultees/${realProjectId}/report?ruleset=example-ruleset&exclude=${matchId}`
+			`/consultees/${realProjectId}/report?ruleset=england-wales-post-20240430&exclude=${matchId}`
 		);
 	});
 
@@ -227,7 +236,7 @@ describe('report consultees change page', () => {
 		// only the real exclusion is carried forward
 		assert.strictEqual(
 			viewModel.saveAndReturnUrl,
-			`/consultees/${realProjectId}/report?ruleset=example-ruleset&exclude=${matchId}`
+			`/consultees/${realProjectId}/report?ruleset=england-wales-post-20240430&exclude=${matchId}`
 		);
 	});
 
@@ -256,11 +265,11 @@ describe('report consultees change page', () => {
 		// removing the first added row drops only its add param - the second stays
 		assert.strictEqual(
 			viewModel.rows[1].removeUrl,
-			`/consultees/${realProjectId}/report/consultees?ruleset=example-ruleset&category=Parish%20Council&add=${encodeURIComponent(secondAdd)}&add=${encodeURIComponent(otherCategoryAdd)}`
+			`/consultees/${realProjectId}/report/consultees?ruleset=england-wales-post-20240430&category=Parish%20Council&add=${encodeURIComponent(secondAdd)}&add=${encodeURIComponent(otherCategoryAdd)}`
 		);
 		assert.strictEqual(
 			viewModel.rows[2].removeUrl,
-			`/consultees/${realProjectId}/report/consultees?ruleset=example-ruleset&category=Parish%20Council&add=${encodeURIComponent(firstAdd)}&add=${encodeURIComponent(otherCategoryAdd)}`
+			`/consultees/${realProjectId}/report/consultees?ruleset=england-wales-post-20240430&category=Parish%20Council&add=${encodeURIComponent(firstAdd)}&add=${encodeURIComponent(otherCategoryAdd)}`
 		);
 		// the adds ride along to the check page and the next add
 		assert.ok(viewModel.saveAndReturnUrl.includes(`add=${encodeURIComponent(firstAdd)}`));

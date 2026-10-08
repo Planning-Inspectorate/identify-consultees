@@ -26,7 +26,7 @@ Typical content:
 - One map region (interactive + static fallback) showing the project boundary and the matched consultee areas, filled by category — see [Maps](./maps.md#results-map-layers)
 - A GOV.UK table of matches: consultee, category, region. Distances aren't shown
 
-Matches are real spatial query output: the Python function (`run_ruleset`, via `service.rulesetRunner`) runs every condition in the ruleset (`intersection` within a buffer, or `bordering` a host area) and returns the de-duplicated union, nearest first. This is the actual screening engine, not a stand-in — though only one ruleset (`example-ruleset`, built from `england_wales_post_20240430_ruleset.csv`) exists so far.
+Matches are real spatial query output: the Python function (`run_ruleset`, via `service.rulesetRunner`) runs every condition in the ruleset (`intersection` within a buffer, or `bordering` a host area) and returns the de-duplicated union, nearest first. This is the actual screening engine, not a stand-in — though only one ruleset (`england-wales-post-20240430`, built from `england_wales_post_20240430_ruleset.csv`) exists so far.
 
 ## Which database rows are reachable
 
