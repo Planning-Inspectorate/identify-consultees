@@ -48,6 +48,15 @@ The static fallback opens on the same search area and uses the same colours and 
 
 > **Category colours are interim.** They're a placeholder palette of 14 (`CONSULTEE_CATEGORY_COLOURS` in `app/maps/category-colours.ts`). On each map, the ruleset's match categories are coloured first in alphabetical order, then any other nearby categories, so a category's colour can differ between projects. Consultee categories aren't in the GIS Tool Styling tables, so per [`AGENTS.md`](../AGENTS.md) they need product/design sign-off.
 
+### Selecting a consultee
+
+Clicking an area or point selects it, and a "Selected on the map" panel shows its name, category and region (or, for the project site, its name and reference). Clicking away or closing the panel clears the selection. There's no hover: the Defra map only offers selection, through the interact plugin (`buildSelectableLayers` and `wireFeatureDetails` in `javascripts/consultees-map.js`).
+
+Two things have to line up for a click to match a feature:
+
+- **Each dataset needs an `idProperty`.** MapLibre drops string feature ids, so features carry their id as a property (`consulteeId`, or `reference` for the project) and the dataset promotes it. Without it, nothing can be selected, and the console warns about "string native IDs".
+- **Interact `layerId`s are MapLibre layer ids, not dataset config ids.** The datasets plugin names a sublayer's layer `<dataset id>-<sublayer id>` (for example `consultee-areas-identified-0`), with a `-stroke` layer when it has both a fill and an outline.
+
 ### Defra map styling gotchas
 
 - **There is no fill-opacity option.** A `fillOpacity` style property is silently ignored and the fill is drawn solid. Put the transparency in the colour instead (`translucent('#55A868', 0.05)` → `rgba(...)`). The map-layers demo and interactive map examples still use `fillOpacity` and draw solid fills.
