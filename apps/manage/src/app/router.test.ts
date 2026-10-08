@@ -74,7 +74,10 @@ describe('manage router wiring', () => {
 		for (const [text, href] of [
 			['Terms and conditions', '/terms-and-conditions'],
 			['Accessibility statement', '/accessibility-statement'],
-			['Privacy', '/privacy'],
+			[
+				'Privacy',
+				'https://www.gov.uk/government/publications/planning-inspectorate-privacy-notices/customer-privacy-notice'
+			],
 			['Cookies', '/cookies'],
 			['Contact', '/contact']
 		]) {
@@ -85,7 +88,6 @@ describe('manage router wiring', () => {
 	for (const [path, expected] of [
 		['/terms-and-conditions', /Terms and conditions/],
 		['/accessibility-statement', /Accessibility statement for Identify consultees/],
-		['/privacy', /Privacy notice/],
 		['/cookies', /Cookies/],
 		['/contact', /Contact us/]
 	] as const) {

@@ -30,7 +30,10 @@ export function addLocalsConfiguration(): Handler {
 			footerLinks: [
 				{ text: 'Terms and conditions', link: '/terms-and-conditions' },
 				{ text: 'Accessibility statement', link: '/accessibility-statement' },
-				{ text: 'Privacy', link: '/privacy' },
+				{
+					text: 'Privacy',
+					link: 'https://www.gov.uk/government/publications/planning-inspectorate-privacy-notices/customer-privacy-notice'
+				},
 				{ text: 'Cookies', link: '/cookies' },
 				{ text: 'Contact', link: '/contact' }
 			]

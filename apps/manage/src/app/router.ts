@@ -79,7 +79,7 @@ export function buildRouter(service: ManageService, options: BuildRouterOptions 
 		});
 	});
 
-	// the footer's content pages (terms, accessibility, privacy, cookies, contact) stay reachable
+	// the footer's content pages (terms, accessibility, cookies, contact) stay reachable
 	// without signing in - policy pages on a service shouldn't sit behind its login
 	router.use('/', createFooterRoutes());
 

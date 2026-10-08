@@ -28,7 +28,10 @@ const pageLocals = {
 		footerLinks: [
 			{ text: 'Terms and conditions', link: '/terms-and-conditions' },
 			{ text: 'Accessibility statement', link: '/accessibility-statement' },
-			{ text: 'Privacy', link: '/privacy' },
+			{
+				text: 'Privacy',
+				link: 'https://www.gov.uk/government/publications/planning-inspectorate-privacy-notices/customer-privacy-notice'
+			},
 			{ text: 'Cookies', link: '/cookies' },
 			{ text: 'Contact', link: '/contact' }
 		]
@@ -410,7 +413,6 @@ describe('manage page accessibility smoke', () => {
 	for (const [view, pageHeading] of [
 		['views/footer/terms-and-conditions.njk', 'Terms and conditions'],
 		['views/footer/accessibility-statement.njk', 'Accessibility statement for Identify consultees'],
-		['views/footer/privacy.njk', 'Privacy notice'],
 		['views/footer/cookies.njk', 'Cookies'],
 		['views/footer/contact.njk', 'Contact us']
 	] as const) {

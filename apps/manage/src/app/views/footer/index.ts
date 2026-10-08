@@ -9,7 +9,6 @@ const PAGES = [
 		view: 'views/footer/accessibility-statement.njk',
 		pageHeading: 'Accessibility statement for Identify consultees'
 	},
-	{ path: '/privacy', view: 'views/footer/privacy.njk', pageHeading: 'Privacy notice' },
 	{ path: '/cookies', view: 'views/footer/cookies.njk', pageHeading: 'Cookies' },
 	{ path: '/contact', view: 'views/footer/contact.njk', pageHeading: 'Contact us' }
 ];

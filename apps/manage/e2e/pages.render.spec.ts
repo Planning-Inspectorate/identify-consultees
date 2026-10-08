@@ -131,12 +131,6 @@ const pages = [
 		mustSee: [/How accessible this website is/i, /Enforcement procedure/i]
 	},
 	{
-		path: '/privacy',
-		name: 'privacy',
-		heading: /Privacy notice/i,
-		mustSee: [/data controller/i, /Your rights/i]
-	},
-	{
 		path: '/cookies',
 		name: 'cookies',
 		heading: /Cookies/i,
