@@ -300,7 +300,7 @@ describe('manage page accessibility smoke', () => {
 			rows: [
 				{
 					name: 'Little Snoring Parish Council',
-					identified: 'Intersects the site',
+					identified: ['"B" host Parishes or Community Councils: intersects the site', 'Within 20km of the site'],
 					removeUrl:
 						'/consultees/11111111-1111-1111-1111-111111111111/report/consultees?ruleset=england-wales-post-20240430&category=Parish%20Council&exclude=55555555-5555-5555-5555-555555555555'
 				}
@@ -543,8 +543,6 @@ describe('manage page accessibility smoke', () => {
 			matchCount: 1,
 			mapIsSampled: false,
 			mapSampleSize: 30,
-			nearbyMatches: [],
-			nearbyMatchCount: 0,
 			nearbyRadiusKm: 20
 		});
 		await assertNoSeriousA11yViolations(html);
@@ -567,15 +565,23 @@ describe('manage page accessibility smoke', () => {
 			mapWidth: 960,
 			mapHeight: 516,
 			mapConfigJson: '{"center":[-1.78,50.62],"zoom":11}',
-			matches: [{ consultee: 'Network Rail', consulteeCategory: 'Railway', region: 'South West', distanceMetres: 123 }],
+			matches: [
+				{
+					consultee: 'Example Hospital',
+					consulteeCategory: 'Hospital',
+					region: 'South West',
+					reasons: ['Hospitals: within 10km of the site', 'Within 20km of the site']
+				},
+				{
+					consultee: 'NeuConnect Interconnector',
+					consulteeCategory: 'Interconnector',
+					region: null,
+					reasons: ['Within 20km of the site']
+				}
+			],
 			matchCount: 120,
 			mapIsSampled: true,
 			mapSampleSize: 30,
-			nearbyMatches: [
-				{ consultee: 'Network Rail', consulteeCategory: 'Railway', region: 'South West', distanceMetres: 123 },
-				{ consultee: 'Example Hospital', consulteeCategory: 'Hospital', region: 'South West', distanceMetres: 4500 }
-			],
-			nearbyMatchCount: 2,
 			nearbyRadiusKm: 20
 		});
 		await assertNoSeriousA11yViolations(html);
@@ -604,8 +610,6 @@ describe('manage page accessibility smoke', () => {
 			matchCount: 0,
 			mapIsSampled: false,
 			mapSampleSize: 30,
-			nearbyMatches: [],
-			nearbyMatchCount: 0,
 			nearbyRadiusKm: 20
 		});
 		assert.match(html, /The ruleset could not be run/);

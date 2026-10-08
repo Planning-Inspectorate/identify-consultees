@@ -1,4 +1,5 @@
 import type { PrismaClient } from '@pins/identify-consultees-database/src/client/client.ts';
+import type { ConsulteeReason } from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
 import { geometryToWkt } from '@pins/identify-consultees-database/src/geospatial/wkt.ts';
 import { mock } from 'node:test';
 import type { RulesetRunner } from '../ruleset-runner.ts';
@@ -16,9 +17,14 @@ export interface ConsulteeAreaMatchRow {
 	organisationId?: string | null;
 	currentVersion?: number;
 	metadata?: string;
-	geometryWkt: string;
+	/** Absent for a consultee only the nearby search found - the function sends those without it. */
+	geometryWkt?: string;
 	distanceMetres: number;
+	/** Defaults to one condition reason, `test-condition`. */
+	reasons?: ConsulteeReason[];
 }
+
+const DEFAULT_REASONS: ConsulteeReason[] = [{ type: 'condition', conditionId: 'test-condition' }];
 
 function feature(row: ConsulteeAreaMatchRow) {
 	return {
@@ -34,26 +40,22 @@ function feature(row: ConsulteeAreaMatchRow) {
 			currentVersion: row.currentVersion ?? 1,
 			metadata: JSON.parse(row.metadata ?? '{}')
 		},
-		geometryWkt: row.geometryWkt
+		...(row.geometryWkt ? { geometryWkt: row.geometryWkt } : {})
 	};
 }
 
 /**
- * Stands in for the Python function: resolves with `matches` (and `nearby` as the all-nearby list,
- * by default the same rows), passed through the real response mapping.
+ * Stands in for the Python function: resolves with `rows` as its consultees (each with its own
+ * `reasons`, or one condition reason by default), passed through the real response mapping.
  */
-export function rulesetRunnerReturning(
-	matches: ConsulteeAreaMatchRow[],
-	nearby: ConsulteeAreaMatchRow[] = matches
-): RulesetRunner & ReturnType<typeof mock.fn> {
+export function rulesetRunnerReturning(rows: ConsulteeAreaMatchRow[]): RulesetRunner & ReturnType<typeof mock.fn> {
 	return mock.fn<RulesetRunner>(async () =>
 		toRunRulesetResult({
-			matches: matches.map((row) => ({ feature: feature(row), distanceMetres: row.distanceMetres })),
-			// listed, never drawn - the function sends nearby areas without geometry
-			allNearby: nearby.map((row) => {
-				const { id, properties } = feature(row);
-				return { feature: { id, properties }, distanceMetres: row.distanceMetres };
-			})
+			consultees: rows.map((row) => ({
+				feature: feature(row),
+				distanceMetres: row.distanceMetres,
+				reasons: row.reasons ?? DEFAULT_REASONS
+			}))
 		})
 	) as RulesetRunner & ReturnType<typeof mock.fn>;
 }
@@ -67,7 +69,7 @@ export function failingRulesetRunner(): RulesetRunner & ReturnType<typeof mock.f
 
 /**
  * A rough, database-backed stand-in for the Python function, for the integration and Playwright
- * tests: the app's pages need real-looking matches from the seeded data to click through, but CI
+ * tests: the app's pages need real-looking consultees from the seeded data to click through, but CI
  * doesn't run the function. Only `intersection` conditions, one query, no simplification margins or
  * bordering logic - the real intersection logic is tested in apps/function-python.
  */
@@ -86,13 +88,18 @@ export function buildDatabaseRulesetRunner(getDb: () => PrismaClient): RulesetRu
 				AND (consulteeCategory IS NULL OR consulteeCategory <> 'Railway')
 			ORDER BY distanceMetres, id
 		`;
-		const matches = rows.filter((row) =>
-			rules.some(
-				(rule) =>
-					rule.categories.includes(row.consulteeCategory ?? '') && row.distanceMetres <= (rule.bufferMetres ?? 0)
-			)
-		);
-		const nearby = rows.filter((row) => row.distanceMetres <= nearbyRadiusMetres);
-		return rulesetRunnerReturning(matches, nearby)(site, ruleset, nearbyRadiusMetres);
+		const consultees = rows.flatMap((row) => {
+			const reasons: ConsulteeReason[] = rules
+				.filter(
+					(rule) =>
+						rule.categories.includes(row.consulteeCategory ?? '') && row.distanceMetres <= (rule.bufferMetres ?? 0)
+				)
+				.map((rule) => ({ type: 'condition', conditionId: rule.id }));
+			if (row.distanceMetres <= nearbyRadiusMetres) {
+				reasons.push({ type: 'nearby', radiusMetres: nearbyRadiusMetres });
+			}
+			return reasons.length > 0 ? [{ ...row, reasons }] : [];
+		});
+		return rulesetRunnerReturning(consultees)(site, ruleset, nearbyRadiusMetres);
 	};
 }

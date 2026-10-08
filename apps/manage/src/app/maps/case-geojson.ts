@@ -1,14 +1,11 @@
 /**
  * Build the GeoJSON (and derived map view) for a case's ruleset results page: the project's own
- * boundary, plus every consultee area a ruleset matched - the same two layers the interactive map
+ * boundary, plus every consultee a ruleset run found - the same two layers the interactive map
  * and its static-map fallback both render.
  */
 
 import type { CaseBoundaryFeature } from '@pins/identify-consultees-database/src/geospatial/case-boundaries.ts';
-import type {
-	ConsulteeAreaMatch,
-	ConsulteeAreaSummaryMatch
-} from '@pins/identify-consultees-database/src/geospatial/consultee-areas.ts';
+import type { ConsulteeMatch } from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
 import type { Geometry } from '@pins/identify-consultees-database/src/geospatial/wkt.ts';
 import { assignCategoryColours, colourFor, UNCATEGORISED } from './category-colours.ts';
 import { computeBounds, computeMapView } from './geometry-bounds.ts';
@@ -59,16 +56,28 @@ export function buildProjectGeojson(project: CaseBoundaryFeature): GeoJsonFeatur
 export const MAP_SAMPLING_THRESHOLD = 50;
 export const MAX_SAMPLED_MAP_MATCHES = 30;
 
-function categoryOf(match: ConsulteeAreaSummaryMatch): string {
+function categoryOf(match: Pick<ConsulteeMatch, 'feature'>): string {
 	return match.feature.properties.consulteeCategory || UNCATEGORISED;
 }
 
+type DrawableMatch = ConsulteeMatch & { feature: { geometry: Geometry } };
+
+function isDrawable(match: ConsulteeMatch): match is DrawableMatch {
+	return match.feature.geometry !== undefined;
+}
+
+/**
+ * The consultees that have geometry to draw - consultees found only by the nearby search come
+ * without original geometry, so they're drawn only from display geometry (see buildCaseMapConfig).
+ */
 export function buildConsulteeMatchesGeojson(
-	matches: ConsulteeAreaMatch[],
+	matches: ConsulteeMatch[],
 	colours: Map<string, string> = assignCategoryColours(matches.map(categoryOf)),
 	sample = true
 ): GeoJsonFeatureCollection {
-	const drawn = sample && matches.length > MAP_SAMPLING_THRESHOLD ? matches.slice(0, MAX_SAMPLED_MAP_MATCHES) : matches;
+	const drawable = matches.filter(isDrawable);
+	const drawn =
+		sample && drawable.length > MAP_SAMPLING_THRESHOLD ? drawable.slice(0, MAX_SAMPLED_MAP_MATCHES) : drawable;
 	return {
 		type: 'FeatureCollection',
 		features: drawn.map((match) => ({
@@ -172,7 +181,7 @@ function withFillOpacity(
 }
 
 /** `matches` with their display geometry from `geometries`; any with none (not touching the area) are left out. */
-function withDisplayGeometry(matches: ConsulteeAreaMatch[], geometries: Map<string, Geometry>): ConsulteeAreaMatch[] {
+function withDisplayGeometry(matches: ConsulteeMatch[], geometries: Map<string, Geometry>): ConsulteeMatch[] {
 	return matches.flatMap((match) => {
 		const geometry = geometries.get(match.feature.id);
 		return geometry ? [{ ...match, feature: { ...match.feature, geometry: roundGeometry(geometry) } }] : [];
@@ -181,7 +190,7 @@ function withDisplayGeometry(matches: ConsulteeAreaMatch[], geometries: Map<stri
 
 export function buildCaseMapConfig(
 	project: CaseBoundaryFeature,
-	matches: ConsulteeAreaMatch[],
+	matches: ConsulteeMatch[],
 	rulesetName: string,
 	searchArea?: SearchAreaDisplay,
 	fallback?: { src: string; alt: string }

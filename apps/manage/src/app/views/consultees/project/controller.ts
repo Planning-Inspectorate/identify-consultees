@@ -42,17 +42,17 @@ export function buildConsulteeProjectPage(service: ManageService): AsyncRequestH
 			'consultee project map page'
 		);
 
-		const { matches, failed } = await runRulesetSafely(
+		const { consultees, failed } = await runRulesetSafely(
 			rulesetRunner,
 			project,
 			ruleset,
 			nearbyConsulteeRadiusMetres,
 			logger
 		);
-		const searchArea = await buildSearchAreaSafely(db, project, matches, nearbyConsulteeRadiusMetres, logger);
+		const searchArea = await buildSearchAreaSafely(db, project, consultees, nearbyConsulteeRadiusMetres, logger);
 		const staticMapSrc = `/consultees/${encodeURIComponent(project.id)}/results/static-map?ruleset=${encodeURIComponent(ruleset.id)}`;
 		const staticMapAlt = `Static map showing ${ruleset.name} for ${project.properties.caseName}`;
-		const map = buildCaseMapConfig(project, matches, ruleset.name, searchArea, {
+		const map = buildCaseMapConfig(project, consultees, ruleset.name, searchArea, {
 			src: staticMapSrc,
 			alt: staticMapAlt
 		});

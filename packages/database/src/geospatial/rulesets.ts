@@ -1,7 +1,8 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import type { ConsulteeAreaMatch, ConsulteeAreaSummaryMatch } from './consultee-areas.ts';
+import type { ConsulteeAreaSummary } from './consultee-areas.ts';
+import type { Geometry } from './wkt.ts';
 
 /**
  * One condition within a ruleset (one row of a ruleset export - see loadRulesets below).
@@ -260,12 +261,21 @@ export function getRuleset(id: string): Ruleset | undefined {
 	return RULESETS.find((ruleset) => ruleset.id === id);
 }
 
+/**
+ * Why an area is a consultee: a ruleset condition it met (by the condition's id - see
+ * RuleCondition), or the general search for every consultee within the nearby radius.
+ */
+export type ConsulteeReason = { type: 'condition'; conditionId: string } | { type: 'nearby'; radiusMetres: number };
+
+/** One consultee a ruleset run found, with every reason it qualified. */
+export interface ConsulteeMatch {
+	/** Condition matches carry their original geometry; nearby-only ones don't (they're drawn from display geometry). */
+	feature: ConsulteeAreaSummary & { geometry?: Geometry };
+	distanceMetres: number;
+	reasons: ConsulteeReason[];
+}
+
 export interface RunRulesetResult {
-	/** The ruleset's own matches - the union of every condition, deduplicated, nearest first. */
-	matches: ConsulteeAreaMatch[];
-	/**
-	 * Every consultee area within the nearby radius, any category except Railway (whose reference
-	 * data is one nationwide geometry). Without geometry: this is only ever listed, never drawn.
-	 */
-	allNearby: ConsulteeAreaSummaryMatch[];
+	/** Every consultee, nearest first, each once: what any condition met, and everything nearby. */
+	consultees: ConsulteeMatch[];
 }

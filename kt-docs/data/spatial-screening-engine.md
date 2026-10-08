@@ -30,19 +30,32 @@ The ruleset has 27 conditions: 7 that must touch the site, 16 within a distance 
 The manage app posts the site (as WKT), the nearby radius and the ruleset's conditions to the Python function's `POST /api/run-ruleset`; `run_ruleset` in `querying/rulesets.py` runs them over pymssql. The geometry maths runs inside SQL Server (`geography` methods against its spatial index); Python decides which queries to run and combines what comes back.
 
 1. **Simplify the site** to 10m, once. Detailed boundaries are the main cost: Silvertown Tunnel goes from 2,536 points to 66.
-2. **Fetch everything nearby, once.** One query finds every consultee area within 20km of the site, in any category except Railway. This answers the 20 conditions with a distance of 20km or less, which are filtered from it in memory, and it is the "all consultees within 20km" list on the results page. The radius comes from `NEARBY_CONSULTEE_RADIUS_KM` (default 20).
+2. **Fetch everything nearby, once.** One query finds every consultee area within 20km of the site, in any category except Railway. This answers the 20 conditions with a distance of 20km or less, which are filtered from it in memory, and every consultee it finds is returned with a `nearby` reason, whether or not a condition also matched it. The radius comes from `NEARBY_CONSULTEE_RADIUS_KM` (default 20).
 3. **Run the other conditions**, six at a time, each on its own connection:
    - **Wider than 20km** (three 35km conditions): one query each, limited to their category.
    - **Bordering** (four conditions): grow the site by the margin once, then find **hosts** (areas of the host category that intersect it), grow each host by 50m, and find **neighbours** (areas of the matching categories that intersect a grown host, excluding the host itself).
-4. **Merge** the results, keeping each area's smallest distance. Bordering matches that no other condition already measured get their distance from the site measured once, here.
-5. **Fetch original geometry** for the final matches only. The results map only falls back to it if the step below fails.
+4. **Merge** into one list of consultees, each once with its smallest distance and **every reason** it qualified: a `condition` reason (by condition id) for each condition it met, in the ruleset's order, then a `nearby` reason if the nearby fetch found it. Bordering matches that nothing else measured get their distance from the site measured once, here.
+5. **Fetch original geometry** for condition matches only. The results map only falls back to it if the step below fails.
+
+### Reasons
+
+The report pages show why each consultee was identified, from the reasons the function returns (`apps/manage/src/app/views/consultees/reasons.ts`):
+
+| Reason                             | Shown as                                                                                             |
+| ---------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| Intersection condition, buffer 0   | `"B" host District Councils: intersects the site`                                                    |
+| Intersection condition, buffer > 0 | `Hospitals: within 10km of the site`                                                                 |
+| Bordering condition                | The condition's own description, e.g. `"A" Community Councils bordering "B" host Community Councils` |
+| Nearby search                      | `Within 20km of the site`                                                                            |
+
+A consultee lists every reason, one per line. The check page counts and category pages include consultees the nearby search found in categories no condition names (e.g. Interconnector), after the ruleset's own categories.
 
 ## Results map
 
-After the run, the manage app draws the results map itself: the project site, and the ruleset's matches with one layer per category. Consultees within the nearby radius that no condition matched are listed in the results page's table only.
+After the run, the manage app draws the results map itself: the project site, and every consultee the run found, one layer per category.
 
 1. **Search area:** the site grown by 20km (`bufferGeometryForDisplay`). It isn't drawn, but both the interactive and static maps open on it.
-2. **Display geometry:** each match touching the search area is drawn whole, from `geometrySimplified`, simplified more the larger it is (`getConsulteeAreaDisplayGeometries`): the larger of 25m (`DISPLAY_SIMPLIFY_TOLERANCE_METRES`) and 1/200th of its width (`DISPLAY_SIMPLIFY_WIDTH_RATIO`). At a flat 25m, regional areas such as counties and ambulance trusts made pages several megabytes.
+2. **Display geometry:** each consultee touching the search area is drawn whole, from `geometrySimplified`, simplified more the larger it is (`getConsulteeAreaDisplayGeometries`): the larger of 25m (`DISPLAY_SIMPLIFY_TOLERANCE_METRES`) and 1/200th of its width (`DISPLAY_SIMPLIFY_WIDTH_RATIO`). At a flat 25m, regional areas such as counties and ambulance trusts made pages several megabytes.
 3. Areas not touching the search area aren't drawn, but are still listed in the tables. This includes bordering matches more than 20km away.
 4. Matches are filled in their category's colour; regional categories are only tinted. See [Maps](../maps.md#results-map-layers).
 
@@ -58,7 +71,7 @@ All screening runs on simplified shapes (`geometrySimplified`, and the simplifie
 | `DISTANCE_MARGIN_METRES`          |   30m | Added to every distance threshold, including "must touch" (0km → 30m) and the 20km nearby fetch. Also how close an area must be to count as a host  |
 | `BORDERING_TOLERANCE_METRES`      |   50m | How close two areas must be to count as bordering. Covers the simplification error, plus small gaps between boundaries drawn from different sources |
 
-`SIMPLIFY_TOLERANCE_METRES` must also match the migration that built `geometrySimplified` and the Node loader that maintains it (`consultee-areas.ts`), and the report pages use their own copy of `DISTANCE_MARGIN_METRES` to say which buffer a match fell within — keep them equal.
+`SIMPLIFY_TOLERANCE_METRES` must also match the migration that built `geometrySimplified` and the Node loader that maintains it (`consultee-areas.ts`) — keep them equal. The margins live only in Python: the function says which conditions each consultee met, so the manage app never re-derives it.
 
 **Effect:** across all 282 case boundaries, no consultee was lost compared with an exact calculation, and about 2% more were included (median 1 per project). Examples:
 

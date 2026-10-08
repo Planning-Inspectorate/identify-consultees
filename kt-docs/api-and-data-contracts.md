@@ -46,7 +46,7 @@ Response (200):
 
 ```json
 {
-	"matches": [
+	"consultees": [
 		{
 			"feature": {
 				"id": "<lowercase uuid>",
@@ -63,15 +63,24 @@ Response (200):
 				},
 				"geometryWkt": "POINT (...)"
 			},
-			"distanceMetres": 6512.3
+			"distanceMetres": 6512.3,
+			"reasons": [
+				{ "type": "condition", "conditionId": "hospital" },
+				{ "type": "nearby", "radiusMetres": 20000 }
+			]
+		},
+		{
+			"feature": { "id": "...", "properties": { "consulteeCategory": "Interconnector", "...": "..." } },
+			"distanceMetres": 4210.8,
+			"reasons": [{ "type": "nearby", "radiusMetres": 20000 }]
 		}
-	],
-	"allNearby": [{ "feature": { "id": "...", "properties": { "...": "..." } }, "distanceMetres": 0 }]
+	]
 }
 ```
 
-- `matches`: the union of every condition, de-duplicated, nearest first (ties by id), each with its original geometry as WKT
-- `allNearby`: every area within `nearbyRadiusMetres`, any category except Railway, without geometry
+- `consultees`: every consultee the run found, each once, nearest first (ties by id) — the union of what any condition matched and every area within `nearbyRadiusMetres` (any category except Railway)
+- `reasons`: every reason it qualified, in the ruleset's order: `condition` for each condition it met (by the `id` sent in the request), then `nearby` if it's within the radius. At least one, of either kind. The manage app turns them into text (`apps/manage/src/app/views/consultees/reasons.ts`)
+- `geometryWkt`: original geometry, for condition matches only. Nearby-only consultees come without it; the map draws every consultee from the manage app's own display geometry
 - Ids are lowercase, matching what the manage app's own Prisma queries return — it uses them to look up display geometry and in `exclude=` URLs
 - Errors: 401 (bad key), 500 `{ "error": "Failed to run the ruleset" }` (no internal detail)
 

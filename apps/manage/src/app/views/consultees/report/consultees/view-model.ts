@@ -2,11 +2,11 @@ export interface ConsulteeRow {
 	/** The consultee's name (e.g. the council or authority), fallback "Unnamed consultee". */
 	name: string;
 	/**
-	 * How the consultee was identified - "Within 1km buffer", "Intersects the site", a bordering
-	 * condition's description, or the reason given when it was added by hand ("Manually added"
-	 * when none was given).
+	 * Every reason the consultee was identified, one per line - the ruleset conditions it met and/or
+	 * the general nearby search (see reasons.ts), or for one added by hand, the reason given
+	 * ("Manually added" when none was).
 	 */
-	identified: string;
+	identified: string[];
 	/**
 	 * Reloads this page with the consultee removed: a match joins the exclusion set, a
 	 * hand-added consultee loses its `add` param.
