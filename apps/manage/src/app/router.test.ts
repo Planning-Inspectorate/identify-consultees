@@ -10,6 +10,10 @@ import { buildManageTestConfig, createManageTestApp, createManageTestService } f
 // database is migrated but never seeded - see .azure/pipelines/pr.yml)
 const homePageTestCaseId = '33333333-3333-3333-3333-333333333333';
 
+// footer hrefs are literal strings (including an external URL) - escape them before
+// they go into a RegExp, otherwise '.' etc. match more than the literal href
+const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
 describe('manage router wiring', () => {
 	const authDisabledService = createManageTestService(true);
 	const authDisabledApp = createManageTestApp(authDisabledService);
@@ -81,7 +85,7 @@ describe('manage router wiring', () => {
 			['Cookies', '/cookies'],
 			['Contact', '/contact']
 		]) {
-			assert.match(response.text, new RegExp(`href="${href}"[^>]*>\\s*${text}`));
+			assert.match(response.text, new RegExp(`href="${escapeRegExp(href)}"[^>]*>\\s*${escapeRegExp(text)}`));
 		}
 	});
 
