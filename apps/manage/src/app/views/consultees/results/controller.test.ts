@@ -82,7 +82,6 @@ describe('consultees results page', () => {
 		assert.strictEqual(viewModel.nearbyRadiusKm, 20);
 		// and on the interactive map, as its own layer
 		const mapConfig = JSON.parse(viewModel.mapConfigJson);
-		assert.strictEqual(mapConfig.searchAreaLabel, 'Search area (20km)');
 		assert.strictEqual(mapConfig.nearbyLayerLabel, 'All consultees within 20km');
 		assert.strictEqual(mapConfig.nearbyGeojson.features.length, 1);
 		assert.strictEqual(mapConfig.nearbyGeojson.features[0].properties.name, 'Network Rail');
@@ -96,7 +95,7 @@ describe('consultees results page', () => {
 			$queryRaw: mock.fn(async (sql: TemplateStringsArray) => {
 				const text = sql.join('');
 				if (!/\bFROM\b/.test(text)) return [{ wkt: realProjectRow().geometryWkt }];
-				if (text.includes('STIntersection')) throw new Error('display query failed');
+				if (text.includes('AS tolerance')) throw new Error('display query failed');
 				return rows[Math.min(call++, rows.length - 1)];
 			})
 		};
@@ -355,8 +354,8 @@ describe('consultees results static map', () => {
 		await handler({ params: { caseId: realProjectId }, query: { ruleset: 'example-ruleset' }, headers: {} }, mockRes);
 
 		assert.strictEqual(mockRes.status.mock.calls[0].arguments[0], 200);
-		// the display geometry query - clipped to the search area - ran for the static map too
-		assert.ok(db.$queryRaw.mock.calls.some((call) => call.arguments[0].join('').includes('STIntersection')));
+		// the display geometry query ran for the static map too
+		assert.ok(db.$queryRaw.mock.calls.some((call) => call.arguments[0].join('').includes('AS tolerance')));
 	});
 
 	it('should draw only the requested category’s non-excluded matches', async () => {
@@ -390,7 +389,7 @@ describe('consultees results static map', () => {
 			// Prisma.join nests the id list inside a Sql param, so stringify the args
 			const displayCall = db.$queryRaw.mock.calls
 				.slice(callsBefore)
-				.find((call) => String(call.arguments[0].join('')).includes('STIntersection'));
+				.find((call) => String(call.arguments[0].join('')).includes('AS tolerance'));
 			return displayCall ? JSON.stringify(displayCall.arguments.slice(1)) : '[]';
 		};
 

@@ -103,8 +103,6 @@ describe('consultees-map client helpers', () => {
 			geometry: { type: 'Polygon', coordinates: [] }
 		});
 		const datasets = buildDatasets({
-			searchAreaLabel: 'Search area (20km)',
-			searchAreaGeojson: { features: [{}] },
 			nearbyLayerLabel: 'All consultees within 20km',
 			nearbyGeojson: {
 				features: [
@@ -120,11 +118,9 @@ describe('consultees-map client helpers', () => {
 
 		assert.deepEqual(
 			datasets.map((dataset) => dataset.id),
-			['search-area', 'nearby-consultees', 'consultee-areas', 'project-site']
+			['nearby-consultees', 'consultee-areas', 'project-site']
 		);
-		const [searchArea, nearby, matches] = datasets;
-		assert.equal(searchArea.label, 'Search area (20km)');
-		assert.deepEqual(searchArea.style.strokeDashArray, [4, 3]);
+		const [nearby, matches] = datasets;
 
 		assert.equal(nearby.visible, false);
 		assert.equal(nearby.label, 'All consultees within 20km');
@@ -188,12 +184,10 @@ describe('consultees-map client helpers', () => {
 		assert.equal(sublayers[1].style.stroke, '#55A868');
 	});
 
-	test('buildDatasets defaults the nearby and search area labels', () => {
-		const [searchArea, nearby] = buildDatasets({
-			searchAreaGeojson: { features: [{}] },
+	test('buildDatasets defaults the nearby label', () => {
+		const [nearby] = buildDatasets({
 			nearbyGeojson: { features: [{ properties: { consulteeCategory: 'Hospital' }, geometry: { type: 'Point' } }] }
 		});
-		assert.equal(searchArea.label, 'Search area');
 		assert.equal(nearby.label, 'All consultees nearby');
 	});
 
@@ -265,7 +259,6 @@ describe('consultees-map client helpers', () => {
 		const area = { properties: { consulteeCategory: 'Police', colour: '#1d70b8' }, geometry: { type: 'Polygon' } };
 		const layers = buildSelectableLayers(
 			buildDatasets({
-				searchAreaGeojson: { features: [{}] },
 				nearbyGeojson: { features: [area] },
 				consulteeGeojson: { features: [area] },
 				projectGeojson: { features: [{}] }

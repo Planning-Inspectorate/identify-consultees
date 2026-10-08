@@ -130,7 +130,7 @@ describe('consultee areas (requires a local SQL Server - see docker-compose.yml)
 			assert.equal(geometries.has('00000000-0000-0000-0000-000000000000'), false);
 			assert.equal((await getConsulteeAreaGeometries(dbClient, [])).size, 0);
 
-			// display geometry is clipped to the window: the eastern half of the stored polygon
+			// an area touching the window is drawn whole, not clipped to it
 			const window = {
 				type: 'Polygon' as const,
 				coordinates: [
@@ -143,14 +143,11 @@ describe('consultee areas (requires a local SQL Server - see docker-compose.yml)
 					]
 				] as [number, number][][]
 			};
-			const clipped = (await getConsulteeAreaDisplayGeometries(dbClient, [testAreaId], window)).get(testAreaId);
-			assert.ok(clipped && clipped.type === 'Polygon', 'expected a clipped polygon');
-			const longitudes = clipped.coordinates[0].map(([longitude]) => longitude);
-			assert.ok(
-				Math.min(...longitudes) > -0.126,
-				`expected nothing west of the window, got ${Math.min(...longitudes)}`
-			);
-			assert.ok(Math.max(...longitudes) < -0.099, 'expected the stored polygon to end at its own eastern edge');
+			const whole = (await getConsulteeAreaDisplayGeometries(dbClient, [testAreaId], window)).get(testAreaId);
+			assert.ok(whole && whole.type === 'Polygon', 'expected a polygon');
+			const longitudes = whole.coordinates[0].map(([longitude]) => longitude);
+			assert.equal(Math.min(...longitudes), -0.15, 'expected the part west of the window too');
+			assert.equal(Math.max(...longitudes), -0.1);
 
 			// a display buffer of a point is a ring roughly the distance away in every direction
 			const buffered = await bufferGeometryForDisplay(dbClient, { type: 'Point', coordinates: [-0.1, 51.5] }, 1_000);

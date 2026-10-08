@@ -157,26 +157,24 @@ describe('buildCaseMapConfig with a search area', () => {
 			]
 		] as [number, number][][]
 	};
-	const clipped = { type: 'Point' as const, coordinates: [1.1234567, 52.1234567] as [number, number] };
+	const display = { type: 'Point' as const, coordinates: [1.1234567, 52.1234567] as [number, number] };
 
-	it('opens on the search area, with matches clipped to it and the nearby layer and outline added', () => {
+	it('opens on the search area without drawing it, with matches in their display geometry and the nearby layer', () => {
 		const config = buildCaseMapConfig(project(), [match('inside'), match('outside')], 'Example ruleset', {
 			area,
-			areaLabel: 'Search area (20km)',
 			nearbyLabel: 'All consultees within 20km',
 			nearby: [{ feature: { id: 'inside', properties: { consultee: 'Mid Suffolk' } }, distanceMetres: 0 }],
-			geometries: new Map([['inside', clipped]])
+			geometries: new Map([['inside', display]])
 		});
 
 		assert.deepStrictEqual(config.center, [1.15, 52.1]);
-		// only the match inside the area is drawn, with its clipped geometry - but the count is every match
+		// only the match touching the area is drawn, in its display geometry - but the count is every match
 		assert.deepStrictEqual(
 			config.consulteeGeojson.features.map((feature) => [feature.id, feature.geometry]),
 			[['inside', { type: 'Point', coordinates: [1.12346, 52.12346] }]]
 		);
 		assert.strictEqual(config.matchCount, 2);
-		assert.strictEqual(config.searchAreaLabel, 'Search area (20km)');
-		assert.strictEqual(config.searchAreaGeojson?.features[0].properties.name, 'Search area (20km)');
+		assert.strictEqual('searchAreaGeojson' in config, false);
 		assert.strictEqual(config.nearbyLayerLabel, 'All consultees within 20km');
 		assert.strictEqual(config.nearbyGeojson?.features.length, 1);
 	});
@@ -185,7 +183,6 @@ describe('buildCaseMapConfig with a search area', () => {
 		const matches = Array.from({ length: MAP_SAMPLING_THRESHOLD + 1 }, (_, i) => match(`${i}`));
 		const config = buildCaseMapConfig(project(), matches, 'Example ruleset', {
 			area,
-			areaLabel: 'Search area (20km)',
 			nearbyLabel: 'All consultees within 20km',
 			nearby: [
 				{
@@ -197,7 +194,7 @@ describe('buildCaseMapConfig with a search area', () => {
 					distanceMetres: 0
 				}
 			],
-			geometries: new Map([...matches.map((m) => [m.feature.id, clipped] as const), ['h', clipped]])
+			geometries: new Map([...matches.map((m) => [m.feature.id, display] as const), ['h', display]])
 		});
 
 		assert.strictEqual(config.isSampled, false);
@@ -229,11 +226,10 @@ describe('buildCaseMapConfig with a search area', () => {
 		const empty = { type: 'GeometryCollection' as const, geometries: [] };
 		const config = buildCaseMapConfig(project(), [match('parish'), regionalMatch, match('empty')], 'Example ruleset', {
 			area,
-			areaLabel: 'Search area (20km)',
 			nearbyLabel: 'All consultees within 20km',
 			nearby: [],
 			geometries: new Map<string, Geometry>([
-				['parish', clipped],
+				['parish', display],
 				['county', area],
 				['empty', empty]
 			])
@@ -266,9 +262,8 @@ describe('buildCaseMapConfig with a search area', () => {
 		});
 	});
 
-	it('leaves the search area out, and draws matches whole, without one', () => {
+	it('draws matches in their stored geometry, with no nearby layer, without a search area', () => {
 		const config = buildCaseMapConfig(project(), [match('a')], 'Example ruleset');
-		assert.strictEqual('searchAreaGeojson' in config, false);
 		assert.strictEqual('nearbyGeojson' in config, false);
 		assert.deepStrictEqual(config.consulteeGeojson.features[0].geometry, match('a').feature.geometry);
 	});
