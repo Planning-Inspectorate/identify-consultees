@@ -3,6 +3,8 @@
 {% from "govuk/components/button/macro.njk" import govukButton %}
 {% from "govuk/components/error-message/macro.njk" import govukErrorMessage %}
 {% from "govuk/components/notification-banner/macro.njk" import govukNotificationBanner %}
+{% from "govuk/components/warning-text/macro.njk" import govukWarningText %}
+{% from "govuk/components/summary-list/macro.njk" import govukSummaryList %}
 
 {% block pageTitle %}
     {{ pageHeading }} - {{ config.headerTitle }}
@@ -13,10 +15,29 @@
 
     <p class="govuk-body">
         Internal tool - downloads a file already uploaded to blob storage
-        (<a class="govuk-link" href="/admin/upload-to-blob">/admin/upload-to-blob</a>) and imports it
-        into the database, using the app's own managed identity. A large import can take a while -
-        wait for the page to finish loading rather than submitting again.
+        (<a class="govuk-link" href="/admin/upload-to-blob">/admin/upload-to-blob</a>) and replaces
+        the matching table with its contents, using the app's own managed identity.
     </p>
+
+    {{ govukWarningText({
+        text: "Each import deletes every existing row in its table first, then loads the file. The table is only cleared once the file has downloaded and been read.",
+        iconFallbackText: "Warning"
+    }) }}
+
+    <p class="govuk-body">
+        A full import can take several minutes. If the page times out, the import carries on - wait a
+        few minutes, then reload this page and check the counts below rather than submitting again.
+    </p>
+
+    {% if loadedConsulteeAreas != undefined %}
+        <h2 class="govuk-heading-m">Currently loaded</h2>
+        {{ govukSummaryList({
+            rows: [
+                { key: { text: "Consultee areas" }, value: { text: loadedConsulteeAreas } },
+                { key: { text: "Case boundaries" }, value: { text: loadedCaseBoundaries } }
+            ]
+        }) }}
+    {% endif %}
 
     {% if error %}
         {{ govukErrorMessage({ text: error }) }}
@@ -26,7 +47,7 @@
         {{ govukNotificationBanner({
             type: "success",
             titleText: "Success",
-            text: "Imported " ~ consulteeAreasImported ~ " consultee areas."
+            text: "Replaced consultee areas: imported " ~ consulteeAreasImported ~ "."
         }) }}
     {% endif %}
 
@@ -34,21 +55,21 @@
         {{ govukNotificationBanner({
             type: "success",
             titleText: "Success",
-            text: "Imported " ~ caseBoundariesImported ~ " case boundaries."
+            text: "Replaced case boundaries: imported " ~ caseBoundariesImported ~ "."
         }) }}
     {% endif %}
 
     <h2 class="govuk-heading-m">Consultee areas</h2>
-    <p class="govuk-body">Imports <code>combined_reference_data_v1.geojson</code> from blob storage.</p>
+    <p class="govuk-body">Replaces all consultee areas with <code>combined_reference_data_v1.geojson</code> from blob storage.</p>
     <form method="post" action="/admin/import-reference-data/run-consultee-areas" novalidate>
         <input type="hidden" name="_csrf" value="{{ _csrf }}">
-        {{ govukButton({ text: "Import consultee areas" }) }}
+        {{ govukButton({ text: "Replace consultee areas", classes: "govuk-button--warning" }) }}
     </form>
 
     <h2 class="govuk-heading-m">Case boundaries</h2>
-    <p class="govuk-body">Imports <code>all-project-boundaries.geojson</code> from blob storage.</p>
+    <p class="govuk-body">Replaces all case boundaries with <code>all-project-boundaries.geojson</code> from blob storage.</p>
     <form method="post" action="/admin/import-reference-data/run-case-boundaries" novalidate>
         <input type="hidden" name="_csrf" value="{{ _csrf }}">
-        {{ govukButton({ text: "Import case boundaries" }) }}
+        {{ govukButton({ text: "Replace case boundaries", classes: "govuk-button--warning" }) }}
     </form>
 {% endblock %}

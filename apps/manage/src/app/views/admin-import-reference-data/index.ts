@@ -10,7 +10,7 @@ import {
 
 export function createRoutes(service: ManageService): IRouter {
 	const router = createRouter({ mergeParams: true });
-	const importReferenceDataPage = buildImportReferenceDataPage();
+	const importReferenceDataPage = buildImportReferenceDataPage(service);
 	const runImportConsulteeAreas = buildRunImportConsulteeAreas(service);
 	const runImportCaseBoundaries = buildRunImportCaseBoundaries(service);
 

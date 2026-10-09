@@ -454,8 +454,10 @@ job:
   which `storage_pipeline_read` (`infrastructure/storage.tf`) grants Storage Blob Data Reader.
 - **In-app import**: the same blobs can be imported from the manage app itself at
   `/admin/import-reference-data` (with `/admin/upload-to-blob` for getting files into the
-  container) - the app's managed identity has Storage Blob Data Contributor. This route merges
-  only; use the pipeline's `replaceExistingData` to replace a dataset.
+  container) - the app's managed identity has Storage Blob Data Contributor. This route always
+  **replaces** the table (same safeguards as the pipeline's `replaceExistingData`), and shows the
+  rows currently loaded, so an import that outlasts Front Door's response timeout can be confirmed
+  by reloading the page.
 - **One-off local imports**: `npm run db-import -- --type=<consultee-areas|case-boundaries> --file=<path>`
   works against any `SQL_CONNECTION_STRING` you can reach directly (e.g. from a machine with a
   route to a real environment's database), independently of any pipeline.
