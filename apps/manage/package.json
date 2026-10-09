@@ -32,7 +32,6 @@
     "express": "*",
     "express-rate-limit": "*",
     "express-session": "*",
-    "express-validator": "*",
     "govuk-frontend": "*",
     "helmet": "*",
     "multer": "*",

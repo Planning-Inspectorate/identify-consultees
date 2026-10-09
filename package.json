@@ -62,7 +62,6 @@
     "express": "^5.2.1",
     "express-rate-limit": "^8.7.0",
     "express-session": "^1.19.0",
-    "express-validator": "^7.3.2",
     "govuk-frontend": "^6.5.1",
     "helmet": "^8.3.0",
     "lusca": "^1.7.0",
@@ -137,6 +136,9 @@
     "preact": "^10.29.8",
     "polygon-splitter": {
       "glob": "^13.0.6"
+    },
+    "@prisma/config": {
+      "deepmerge-ts": "^8.0.2"
     }
   }
 }
