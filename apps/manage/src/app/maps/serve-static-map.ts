@@ -8,6 +8,7 @@
 
 import {
 	STATIC_MAP_CACHE_CONTROL,
+	STATIC_MAP_CACHE_CONTROL_PRIVATE,
 	buildStaticMapFingerprint,
 	etagFromFingerprint,
 	etagMatches,
@@ -49,6 +50,14 @@ export type BuildConsulteeStaticMapOptions = {
 	fetchImpl?: typeof fetch;
 	ifNoneMatch?: string;
 	accept?: string;
+	/**
+	 * True only for images that are safe for shared caches (Front Door) to
+	 * serve without a session - i.e. content that isn't access-controlled,
+	 * such as the /components showcase examples. Case-derived images must
+	 * stay `private` (the default): a shared-cached copy would bypass the
+	 * auth guards for anyone holding the URL.
+	 */
+	sharedCache?: boolean;
 };
 
 async function fetchGoogleBasemap(url: string, fetchImpl: typeof fetch): Promise<Buffer | undefined> {
@@ -73,6 +82,8 @@ export async function buildConsulteeStaticMapResponse(
 	const preferGoogle = !forceSvg && Boolean(googleMapsApiKey);
 	const width = options.map.width ?? 960;
 	const height = options.map.height ?? 516;
+
+	const cacheControl = options.sharedCache === true ? STATIC_MAP_CACHE_CONTROL : STATIC_MAP_CACHE_CONTROL_PRIVATE;
 
 	const fingerprintInput: StaticMapFingerprintInput = {
 		geometryId: options.geometryId,
@@ -100,7 +111,7 @@ export async function buildConsulteeStaticMapResponse(
 			status: 304,
 			body: Buffer.alloc(0),
 			contentType,
-			cacheControl: STATIC_MAP_CACHE_CONTROL,
+			cacheControl,
 			etag,
 			vary
 		};
@@ -120,7 +131,7 @@ export async function buildConsulteeStaticMapResponse(
 			status: 200,
 			body: svg,
 			contentType: SVG_CONTENT_TYPE,
-			cacheControl: STATIC_MAP_CACHE_CONTROL,
+			cacheControl,
 			etag
 		};
 	}
@@ -134,7 +145,7 @@ export async function buildConsulteeStaticMapResponse(
 		status: 200,
 		body: raster,
 		contentType,
-		cacheControl: STATIC_MAP_CACHE_CONTROL,
+		cacheControl,
 		etag,
 		vary
 	};

@@ -13,8 +13,21 @@ import { createHash } from 'node:crypto';
  * Heavy caching is required: OSM tile and commercial static-image servers
  * rate-limit aggressive clients. Prefer long reuse plus validators over
  * re-fetching tiles on every noscript / progressive-enhancement hit.
+ *
+ * `public` is only for images whose contents are not access-controlled
+ * (the /components showcase examples): a shared cache (Front Door, which
+ * caches this route - see infrastructure/front-door.tf) may serve them to
+ * anyone holding the URL, without a session.
  */
 export const STATIC_MAP_CACHE_CONTROL = 'public, max-age=3600, stale-while-revalidate=86400';
+
+/**
+ * Same lifetime, but browser-only: case-derived images (project boundary +
+ * identified consultees) are authenticated content, so they must not be
+ * stored by shared caches - a cached copy would bypass the auth guards for
+ * whoever holds the URL until it expires.
+ */
+export const STATIC_MAP_CACHE_CONTROL_PRIVATE = 'private, max-age=3600';
 
 export type StaticMapFingerprintInput = {
 	geometryId: string;

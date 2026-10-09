@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import {
 	STATIC_MAP_CACHE_CONTROL,
+	STATIC_MAP_CACHE_CONTROL_PRIVATE,
 	buildStaticMapFingerprint,
 	etagFromFingerprint,
 	etagMatches
@@ -41,5 +42,11 @@ describe('static-map-cache', () => {
 	it('uses a long-lived Cache-Control directive', () => {
 		assert.match(STATIC_MAP_CACHE_CONTROL, /max-age=3600/);
 		assert.match(STATIC_MAP_CACHE_CONTROL, /stale-while-revalidate/);
+	});
+
+	it('keeps case-derived images out of shared caches', () => {
+		assert.match(STATIC_MAP_CACHE_CONTROL_PRIVATE, /^private/);
+		assert.match(STATIC_MAP_CACHE_CONTROL_PRIVATE, /max-age=3600/);
+		assert.doesNotMatch(STATIC_MAP_CACHE_CONTROL_PRIVATE, /stale-while-revalidate/);
 	});
 });
