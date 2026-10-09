@@ -460,9 +460,12 @@ export function renderStaticMapOverlaySvg(options: StaticMapBuildOptions): strin
 	const badgeMarkup = (options.featureBadges ?? [])
 		.map(({ coords, label, fill }) => {
 			const [x, y] = project(coords[0], coords[1]);
+			// fill lands inside an SVG attribute - only hex colours are valid; anything else
+			// falls back rather than interpolating (same rule as consulteeColours)
+			const badgeFill = typeof fill === 'string' && /^#[0-9a-f]{6}$/i.test(fill) ? fill : '#0b0c0c';
 			return (
 				`<g transform="translate(${x.toFixed(1)} ${y.toFixed(1)})">` +
-				`<circle r="9" fill="${fill ?? '#0b0c0c'}" stroke="#ffffff" stroke-width="1.5"/>` +
+				`<circle r="9" fill="${badgeFill}" stroke="#ffffff" stroke-width="1.5"/>` +
 				`<text y="3.5" text-anchor="middle" font-size="10" font-weight="700" fill="#ffffff">${escapeXml(label)}</text>` +
 				'</g>'
 			);

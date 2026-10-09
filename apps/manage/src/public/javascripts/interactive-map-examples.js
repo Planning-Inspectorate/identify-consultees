@@ -122,7 +122,12 @@ function panelInnerId(panel) {
  * @returns {string}
  */
 function escapeHtml(value) {
-	return String(value).replace(/</g, '&lt;');
+	return String(value)
+		.replaceAll('&', '&amp;')
+		.replaceAll('<', '&lt;')
+		.replaceAll('>', '&gt;')
+		.replaceAll('"', '&quot;')
+		.replaceAll("'", '&#39;');
 }
 
 /**

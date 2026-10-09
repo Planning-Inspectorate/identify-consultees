@@ -10,7 +10,11 @@ services:
     init: true
     environment:
       - 'ACCEPT_EULA=1'
-      - 'MSSQL_SA_PASSWORD=DockerDatabaseP@22word!'
+      # local-only throwaway credential for the dev container - never used by deployed
+      # environments (Azure SQL is provisioned via Terraform with managed identity). It is
+      # referenced by tests/docs so the dev flow works out of the box; overridable via
+      # MSSQL_SA_PASSWORD in the environment or a gitignored .env file.
+      - 'MSSQL_SA_PASSWORD=${MSSQL_SA_PASSWORD:-DockerDatabaseP@22word!}'
     ports:
       # host port 1434 (not 1433) to avoid clashing with other local SQL Server containers
       - 1434:1433
