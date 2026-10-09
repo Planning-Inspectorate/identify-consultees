@@ -22,6 +22,7 @@ const managedKeys = [
 	'AUTH_TENANT_ID',
 	'BLOB_STORE_CONTAINER',
 	'BLOB_STORE_HOST',
+	'ENABLE_DEV_PAGES',
 	'ENVIRONMENT',
 	'LOG_LEVEL',
 	'CACHE_CONTROL_MAX_AGE',
@@ -161,6 +162,19 @@ describe('manage loadConfig', () => {
 		assert.equal(config.auth.disabled, false);
 		assert.equal(config.auth.clientId, 'client-id');
 		assert.equal(config.httpPort, 8090);
+	});
+
+	test('enables dev pages outside production and gates them behind ENABLE_DEV_PAGES in production', () => {
+		setBaseEnv({ AUTH_DISABLED: 'true', NODE_ENV: 'development', ENABLE_DEV_PAGES: '' });
+		assert.equal(loadConfig().devPagesEnabled, true);
+
+		resetConfigCache();
+		setBaseEnv({ AUTH_DISABLED: 'true', NODE_ENV: 'production', ENABLE_DEV_PAGES: '' });
+		assert.equal(loadConfig().devPagesEnabled, false);
+
+		resetConfigCache();
+		setBaseEnv({ AUTH_DISABLED: 'true', NODE_ENV: 'production', ENABLE_DEV_PAGES: 'true' });
+		assert.equal(loadConfig().devPagesEnabled, true);
 	});
 
 	test('returns cached config on subsequent calls', () => {

@@ -56,6 +56,11 @@ export class ManageService extends BaseService<PrismaClient> {
 		return this.#config.nearbyConsulteeRadiusMetres;
 	}
 
+	/** Whether the prototype/debug pages are mounted - see Config.devPagesEnabled. */
+	get devPagesEnabled(): boolean {
+		return this.#config.devPagesEnabled;
+	}
+
 	/**
 	 * Built asset root (fingerprinted + Brotli sidecars). Used by our static middleware.
 	 */
