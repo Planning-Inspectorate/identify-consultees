@@ -3,9 +3,7 @@ packages/database/src/schema.prisma) from Python, proving the Python function
 can talk to the same database as the rest of this project.
 """
 
-import pymssql
-
-from setup_database.db import ConnectionParams
+from setup_database.db import ConnectionParams, connect
 
 # the geometry column can't come back as-is over pymssql - it's converted to
 # WKT text with STAsText(), the same pattern the Node data-access layer uses
@@ -24,19 +22,11 @@ def fetch_consultee_areas(params: ConnectionParams, limit: int = 50) -> list[dic
         raise TypeError("limit must be an integer")
     if not 1 <= limit <= 500:
         raise ValueError("limit must be between 1 and 500")
-    top = limit
 
-    connection = pymssql.connect(
-        server=params.server,
-        port=params.port,
-        database=params.database,
-        user=params.user,
-        password=params.password,
-        as_dict=True,
-    )
+    connection = connect(params, as_dict=True)
     try:
         with connection.cursor() as cursor:
-            cursor.execute(f"SELECT TOP ({top}) {_SELECT_COLUMNS} FROM consultee_area ORDER BY lastUpdated DESC")
+            cursor.execute(f"SELECT TOP ({limit}) {_SELECT_COLUMNS} FROM consultee_area ORDER BY lastUpdated DESC")
             rows = cursor.fetchall()
     finally:
         connection.close()

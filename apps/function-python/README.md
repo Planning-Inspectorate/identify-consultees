@@ -14,19 +14,28 @@ be read back over pymssql directly - the same pattern the Node data-access layer
 ## Layout
 
 ```
-function_app.py            HTTP trigger entry point (required at the app root by Azure Functions)
+function_app.py            HTTP routes: health, consultee-areas, run-ruleset (Azure Functions needs it at the root)
+intersector/               rule-based screening - the consultee intersection logic behind run-ruleset
+  screening.py             run_ruleset: the steps of a run, from the site to the consultees and their reasons
+  queries.py               the SQL against consultee_area (the geometry maths runs in SQL Server)
+  models.py                RuleCondition, ConsulteeArea, Consultee and the reasons a consultee qualified
+  tolerances.py            the distance margins screening works to, and why
+  database.py              a connection per thread for a run, with deadlock retries
+  api.py                   the run-ruleset request validation and response JSON
 setup_database/
-  db.py                    connection string parsing + pymssql connection params
+  db.py                    connection string parsing and connecting
   sample_data/             real UK boundary GeoJSON exports - also loaded by `npm run db-seed`
 querying/
-  consultee_areas.py       the consultee_area query
+  consultee_areas.py       the consultee-areas demo query
 ```
 
 This mirrors the directory concerns of the `PINS-data-spike` reference this was built from
-(`setup_database/`, `querying/`, plus `data_processing/`, `orchestrator/` and `intersector/` for
-GeoJSON conversion, writing data, and rule-based screening respectively) - only the two directories
-this function actually needs exist so far. Add the others in the same style if/when this function
-needs to write geometry data or run rule-based screening, rather than pre-building empty stubs now.
+(`setup_database/`, `querying/`, `intersector/`, plus `data_processing/` and `orchestrator/` for
+GeoJSON conversion and writing data) - add those in the same style if/when this function needs to
+write geometry data, rather than pre-building empty stubs now.
+
+To follow a run, start at `run_ruleset` in `intersector/screening.py`: each step is a named
+function, and the SQL each one runs is in `queries.py`.
 
 Tests are colocated next to the code they test (`test_db.py` beside `db.py`, etc.), matching this
 repo's convention for the TypeScript apps.

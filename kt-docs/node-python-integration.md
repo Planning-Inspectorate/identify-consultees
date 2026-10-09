@@ -8,7 +8,7 @@ Every page that shows a ruleset's results — the project map, results, report c
 
 1. `ManageService.rulesetRunner` (`apps/manage/src/app/ruleset-runner.ts`) posts to `POST /api/run-ruleset`, resolved next to `PYTHON_FUNCTION_URL` (which names the consultee-areas route, so the infrastructure's existing setting covers both), with the `x-api-key` header
 2. The body carries the site as WKT, the nearby radius, and the selected ruleset's conditions (`id`, `logicType`, `categories`, `bufferMetres`, `hostCategory`). The definitions stay in the manage app (`packages/database/src/geospatial/rulesets.ts`), which also uses them to explain each match on the report pages
-3. The function validates the body (400 on anything malformed), runs `run_ruleset` (`querying/rulesets.py`) and returns `{ consultees }`, each with the reasons it was identified — see [API and data contracts](./api-and-data-contracts.md#run-ruleset)
+3. The function validates the body (400 on anything malformed), runs `run_ruleset` (`intersector/screening.py`) and returns `{ consultees }`, each with the reasons it was identified — see [API and data contracts](./api-and-data-contracts.md#run-ruleset)
 4. `runRulesetSafely` turns any failure — URL unset, unreachable, 60s timeout, non-2xx — into the page's "The ruleset could not be run" banner with a Try again link
 
 There is deliberately no in-app fallback: one implementation of the logic, rather than two that could quietly disagree. How the engine works is in [Spatial screening engine](./data/spatial-screening-engine.md).
