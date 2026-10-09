@@ -174,6 +174,8 @@ export function buildInteractiveMapStaticMap(forceSvg = false): AsyncRequestHand
 		const image = await buildConsulteeStaticMapResponse({
 			geometryId: `interactive-map-example:${example.id}`,
 			sectionId: 'components-showcase',
+			// showcase content is not access-controlled - shared caches (Front Door) may serve it
+			sharedCache: true,
 			map: {
 				center: clientConfig.center,
 				zoom: clientConfig.zoom,

@@ -442,7 +442,8 @@ describe('manage router wiring', () => {
 			assert.equal(webp.status, 200);
 			assert.match(webp.headers['content-type'] || '', /image\/webp/);
 			assert.equal(webp.headers.vary, 'Accept');
-			assert.match(webp.headers['cache-control'] || '', /max-age=/);
+			// showcase images are not access-controlled - shared caches (Front Door) may serve them
+			assert.match(webp.headers['cache-control'] || '', /^public, max-age=/);
 			assert.ok(webp.headers.etag);
 
 			const cached = await request(authDisabledApp)
@@ -488,7 +489,8 @@ describe('manage router wiring', () => {
 			);
 			assert.equal(response.status, 200);
 			assert.match(response.headers['content-type'] || '', /image\/(svg\+xml|png)/);
-			assert.match(response.headers['cache-control'] || '', /max-age=/);
+			// case-derived images are authenticated content - private so shared caches can't serve them
+			assert.match(response.headers['cache-control'] || '', /^private, max-age=/);
 			assert.ok(response.headers.etag);
 
 			const cached = await request(authDisabledApp)
