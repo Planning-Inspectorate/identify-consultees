@@ -695,6 +695,36 @@ describe('manage page accessibility smoke', () => {
 		await assertNoSeriousA11yViolations(html);
 	});
 
+	test('admin CBOS connection page has no serious a11y violations', async () => {
+		const html = nunjucks.render('views/admin-cbos-connection/view.njk', {
+			...pageLocals,
+			pageHeading: 'Check the CBOS connection',
+			_csrf: 'test-csrf'
+		});
+		await assertNoSeriousA11yViolations(html);
+	});
+
+	test('admin CBOS connection page with a result has no serious a11y violations', async () => {
+		const html = nunjucks.render('views/admin-cbos-connection/view.njk', {
+			...pageLocals,
+			pageHeading: 'Check the CBOS connection',
+			_csrf: 'test-csrf',
+			database: { status: 'ERROR', detail: 'OperationalError: Login failed' },
+			storage: { status: 'OK', detail: 'listed 5 blob name(s) in document-service-uploads' }
+		});
+		await assertNoSeriousA11yViolations(html);
+	});
+
+	test('admin CBOS connection page with an error has no serious a11y violations', async () => {
+		const html = nunjucks.render('views/admin-cbos-connection/view.njk', {
+			...pageLocals,
+			pageHeading: 'Check the CBOS connection',
+			_csrf: 'test-csrf',
+			error: 'Could not reach the Python function.'
+		});
+		await assertNoSeriousA11yViolations(html);
+	});
+
 	test('consultee areas python page with empty rows has no serious a11y violations', async () => {
 		const html = nunjucks.render('views/consultee-areas-python/view.njk', {
 			...pageLocals,

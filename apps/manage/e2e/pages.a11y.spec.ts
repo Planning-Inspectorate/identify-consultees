@@ -49,6 +49,7 @@ const pages = [
 	{ path: '/contact', name: 'contact' },
 	{ path: '/items', name: 'items list' },
 	{ path: '/consultee-areas-python', name: 'consultee areas python' },
+	{ path: '/admin/cbos-connection', name: 'admin CBOS connection' },
 	{ path: '/unauthenticated', name: '401 unauthenticated' },
 	{ path: '/error/firewall-error', name: 'firewall error' },
 	{ path: '/this-page-does-not-exist', name: '404' }

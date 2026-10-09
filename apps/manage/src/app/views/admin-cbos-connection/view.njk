@@ -1,0 +1,47 @@
+{% extends "views/layouts/main.njk" %}
+
+{% from "govuk/components/button/macro.njk" import govukButton %}
+{% from "govuk/components/error-message/macro.njk" import govukErrorMessage %}
+{% from "govuk/components/summary-list/macro.njk" import govukSummaryList %}
+{% from "govuk/components/tag/macro.njk" import govukTag %}
+
+{% macro checkValue(check) %}
+    {{ govukTag({
+        text: "Connected" if check.status == "OK" else "Failed",
+        classes: "govuk-tag--green" if check.status == "OK" else "govuk-tag--red"
+    }) }}
+    <p class="govuk-body govuk-!-margin-top-2 govuk-!-margin-bottom-0">{{ check.detail }}</p>
+{% endmacro %}
+
+{% block pageTitle %}
+    {{ pageHeading }} - {{ config.headerTitle }}
+{% endblock %}
+
+{% block pageContent %}
+    <h1 class="govuk-heading-l">{{ pageHeading }}</h1>
+
+    <p class="govuk-body">
+        Internal tool - asks the Python function to sign in to CBOS (the IDAS back office) as its own
+        managed identity, run <code>SELECT 1</code> against its database and list a few names in its
+        document storage. Nothing is read from either beyond that.
+    </p>
+
+    <form method="post" action="/admin/cbos-connection/run" novalidate>
+        <input type="hidden" name="_csrf" value="{{ _csrf }}">
+        {{ govukButton({ text: "Check connection" }) }}
+    </form>
+
+    {% if error %}
+        {{ govukErrorMessage({ text: error }) }}
+    {% endif %}
+
+    {% if database and storage %}
+        <h2 class="govuk-heading-m">Result</h2>
+        {{ govukSummaryList({
+            rows: [
+                { key: { text: "Database" }, value: { html: checkValue(database) } },
+                { key: { text: "Document storage" }, value: { html: checkValue(storage) } }
+            ]
+        }) }}
+    {% endif %}
+{% endblock %}
