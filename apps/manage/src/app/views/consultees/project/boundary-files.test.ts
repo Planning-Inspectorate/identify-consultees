@@ -43,6 +43,11 @@ describe('boundaryFileOptions', () => {
 		assert.ok(standIn.receivedDate.getTime() < new Date('2026-09-19T00:00:00Z').getTime());
 	});
 
+	it('should leave the stand-in without a date when the real file has none', () => {
+		const options = boundaryFileOptions([file('a', 'real.geojson')], 'a', 'Test Project');
+		assert.strictEqual(options[1].receivedDate, null);
+	});
+
 	it('should not add a stand-in when the case already has two files', () => {
 		const options = boundaryFileOptions([file('a'), file('b')], 'a', 'Test Project');
 		assert.strictEqual(options.length, 2);
@@ -102,6 +107,43 @@ describe('scaledGeometry', () => {
 				[0.5, 0],
 				[1.5, 0]
 			]
+		});
+	});
+
+	it('should scale each member of a geometry collection, leaving nested collections alone', () => {
+		const scaled = scaledGeometry(
+			{
+				type: 'GeometryCollection' as const,
+				geometries: [
+					{ type: 'Point' as const, coordinates: [0, 0] },
+					{ type: 'Point' as const, coordinates: [2, 0] },
+					{ type: 'GeometryCollection' as const, geometries: [] }
+				]
+			},
+			0.5
+		);
+		assert.deepStrictEqual(scaled, {
+			type: 'GeometryCollection',
+			geometries: [
+				{ type: 'Point', coordinates: [0.5, 0] },
+				{ type: 'Point', coordinates: [1.5, 0] },
+				{ type: 'GeometryCollection', geometries: [] }
+			]
+		});
+	});
+
+	it('should ignore stray numbers inside coordinate arrays', () => {
+		// a truncated coordinate ([5] is not a position) is left as-is rather than scaled
+		const scaled = scaledGeometry(
+			{
+				type: 'MultiPoint' as const,
+				coordinates: [[0, 0], [2, 0], [5]]
+			},
+			0.5
+		);
+		assert.deepStrictEqual(scaled, {
+			type: 'MultiPoint',
+			coordinates: [[0.5, 0], [1.5, 0], [5]]
 		});
 	});
 

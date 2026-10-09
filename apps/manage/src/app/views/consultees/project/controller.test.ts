@@ -128,6 +128,35 @@ describe('consultee project boundary page', () => {
 		});
 	});
 
+	it('should leave a file off the map when its geometry cannot be loaded', async () => {
+		const mockRes = { status: mock.fn(() => mockRes), render: mock.fn() };
+		// the sibling is listed as a file but its geometry row is gone by the time it is fetched
+		const db = dbReturning([
+			[realProjectRow()],
+			[boundaryFile(siblingProjectRow()), boundaryFile(realProjectRow())],
+			[]
+		]);
+		await pageHandlerFor(db)({ params: { caseId: realProjectId }, query: {} }, mockRes);
+
+		const viewModel = mockRes.render.mock.calls[0].arguments[1];
+		// the radios still offer both files; only the map loses the unresolvable one
+		assert.strictEqual(viewModel.files.length, 2);
+		const mapConfig = JSON.parse(viewModel.mapConfigJson);
+		assert.strictEqual(mapConfig.shapefileDatasets.length, 1);
+		assert.strictEqual(mapConfig.shapefileDatasets[0].id, `shapefile-${realProjectId}`);
+	});
+
+	it('should render radios without hints when the files have no upload date', async () => {
+		const mockRes = { status: mock.fn(() => mockRes), render: mock.fn() };
+		const undatedRow = realProjectRow({ receivedDate: null });
+		const db = dbReturning([[undatedRow], [boundaryFile(undatedRow)]]);
+		await pageHandlerFor(db)({ params: { caseId: realProjectId }, query: {} }, mockRes);
+
+		const viewModel = mockRes.render.mock.calls[0].arguments[1];
+		assert.strictEqual(viewModel.files.length, 2);
+		assert.ok(viewModel.files.every((file: { hint?: unknown }) => file.hint === undefined));
+	});
+
 	it('should 404 when caseId is missing', async () => {
 		const mockRes = { status: mock.fn(() => mockRes), render: mock.fn() };
 		await pageHandlerFor({ $queryRaw: mock.fn() })({ params: {}, query: {} }, mockRes);
@@ -171,29 +200,36 @@ describe('project boundary submit', () => {
 
 	it('should return to the page when the submitted file is missing or not one of this project', async () => {
 		const mockRes = { status: mock.fn(() => mockRes), render: mock.fn(), redirect: mock.fn() };
-		// each submit needs the summary row then the file list - supply them for both calls
+		// each submit needs the summary row then the file list - supply them for all three calls
 		const db = dbReturning([
+			[realProjectRow()],
+			[boundaryFile(realProjectRow())],
 			[realProjectRow()],
 			[boundaryFile(realProjectRow())],
 			[realProjectRow()],
 			[boundaryFile(realProjectRow())]
 		]);
 		await submitHandlerFor(db)({ params: { caseId: realProjectId }, body: {} }, mockRes);
+		await submitHandlerFor(db)({ params: { caseId: realProjectId } }, mockRes);
 		await submitHandlerFor(db)(
 			{ params: { caseId: realProjectId }, body: { shapefile: '99999999-9999-9999-9999-999999999999' } },
 			mockRes
 		);
 		assert.strictEqual(mockRes.redirect.mock.calls[0].arguments[0], `/consultees/${realProjectId}`);
 		assert.strictEqual(mockRes.redirect.mock.calls[1].arguments[0], `/consultees/${realProjectId}`);
+		assert.strictEqual(mockRes.redirect.mock.calls[2].arguments[0], `/consultees/${realProjectId}`);
 	});
 
 	it('should 404 for a malformed or unknown case', async () => {
 		const mockRes = { status: mock.fn(() => mockRes), render: mock.fn(), redirect: mock.fn() };
-		await submitHandlerFor({ $queryRaw: mock.fn() })({ params: { caseId: 'not-a-uuid' }, body: {} }, mockRes);
+		await submitHandlerFor({ $queryRaw: mock.fn() })({ params: {}, body: {} }, mockRes);
 		assert.strictEqual(mockRes.status.mock.calls[0].arguments[0], 404);
 
-		await submitHandlerFor(dbReturning([[]]))({ params: { caseId: realProjectId }, body: {} }, mockRes);
+		await submitHandlerFor({ $queryRaw: mock.fn() })({ params: { caseId: 'not-a-uuid' }, body: {} }, mockRes);
 		assert.strictEqual(mockRes.status.mock.calls[1].arguments[0], 404);
+
+		await submitHandlerFor(dbReturning([[]]))({ params: { caseId: realProjectId }, body: {} }, mockRes);
+		assert.strictEqual(mockRes.status.mock.calls[2].arguments[0], 404);
 	});
 });
 
@@ -216,8 +252,17 @@ describe('project boundary static map', () => {
 			end: mock.fn()
 		};
 		try {
-			const db = dbReturning([[realProjectRow()]]);
+			const db = dbReturning([[realProjectRow()], [realProjectRow()]]);
 			const handler = buildBoundaryStaticMap({ db, logger: mockLogger() }, true);
+			await handler(
+				{
+					params: { caseId: realProjectId },
+					query: {},
+					headers: { 'if-none-match': '"stale-etag"', accept: 'image/png' }
+				},
+				mockRes
+			);
+			// and without conditional-request headers
 			await handler({ params: { caseId: realProjectId }, query: {}, headers: {} }, mockRes);
 			assert.strictEqual(mockRes.status.mock.calls[0].arguments[0], 200);
 			assert.match(String(mockRes.type.mock.calls[0].arguments[0]), /image\/svg\+xml/);
@@ -230,7 +275,9 @@ describe('project boundary static map', () => {
 	it('should 404 for a malformed or unknown case', async () => {
 		const mockRes = { status: mock.fn(() => mockRes), type: mock.fn(() => mockRes), send: mock.fn() };
 		const handler = buildBoundaryStaticMap({ db: { $queryRaw: mock.fn() } });
-		await handler({ params: { caseId: 'not-a-uuid' }, query: {}, headers: {} }, mockRes);
+		await handler({ params: {}, query: {}, headers: {} }, mockRes);
 		assert.strictEqual(mockRes.status.mock.calls[0].arguments[0], 404);
+		await handler({ params: { caseId: 'not-a-uuid' }, query: {}, headers: {} }, mockRes);
+		assert.strictEqual(mockRes.status.mock.calls[1].arguments[0], 404);
 	});
 });
