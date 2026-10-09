@@ -9,6 +9,7 @@
  */
 
 import type { Geometry, Position } from '@pins/identify-consultees-database/src/geospatial/wkt.ts';
+import { fetchWithTimeout, MapCache } from '@planning-inspectorate/core/util';
 import type { GeoJsonFeature, GeoJsonFeatureCollection } from './sample-geojson.ts';
 import { MAP_VIEWPORT } from './sample-geojson.ts';
 
@@ -41,8 +42,9 @@ export type StaticMapBuildOptions = {
 const GOOGLE_STATIC_MAP_MAX_URL_LENGTH = 16_384;
 const OSM_TILE_SIZE = 256;
 const OSM_USER_AGENT = 'identify-consultees/0.1 (+https://github.com/Planning-Inspectorate/identify-consultees)';
-const OSM_TILE_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 const OSM_TILE_FETCH_CONCURRENCY = 2;
+// tiles are small; a slow or dead tile server must not stall the page render
+const OSM_TILE_FETCH_TIMEOUT_MS = 10_000;
 
 type FeatureColours = { stroke: string; fill: string; fillOpacity: number; googleFill: string; googleStroke: string };
 
@@ -86,15 +88,21 @@ export function consulteeColours(feature: GeoJsonFeature): FeatureColours {
 	};
 }
 
-type CachedTile = { png: Buffer; expiresAt: number };
-const osmTileCache = new Map<string, CachedTile>();
+// tiles keep for a day - core's MapCache is the TTL map this needs
+const osmTileCache = new MapCache<Buffer>(24 * 60);
 
 export function clearOsmTileCacheForTests(): void {
-	osmTileCache.clear();
+	osmTileCache.cache.clear();
 }
 
 export function osmTileCacheSizeForTests(): number {
-	return osmTileCache.size;
+	return osmTileCache.cache.size;
+}
+
+export function ageOsmTileCacheForTests(): void {
+	for (const entry of osmTileCache.cache.values()) {
+		entry.updated = new Date(0);
+	}
 }
 
 export function googleMapsApiKeyFromEnv(env: NodeJS.ProcessEnv = process.env): string | undefined {
@@ -156,29 +164,12 @@ function tileCacheKey(zoom: number, tileX: number, tileY: number): string {
 	return `${zoom}/${tileX}/${tileY}`;
 }
 
-function readCachedTile(key: string): Buffer | undefined {
-	const entry = osmTileCache.get(key);
-	if (!entry) {
-		return undefined;
-	}
-	if (entry.expiresAt <= Date.now()) {
-		osmTileCache.delete(key);
-		return undefined;
-	}
-	return entry.png;
-}
-
-function writeCachedTile(key: string, png: Buffer): void {
-	osmTileCache.set(key, { png, expiresAt: Date.now() + OSM_TILE_CACHE_TTL_MS });
-}
-
 /**
  * Fetch OSM raster tiles for a viewport, reusing the in-process tile cache.
  * Low concurrency and identifying User-Agent follow OSM tile usage policy.
  */
 export async function fetchOsmBasemapTiles(
-	options: Pick<StaticMapBuildOptions, 'center' | 'zoom' | 'width' | 'height'>,
-	fetchImpl: typeof fetch = fetch
+	options: Pick<StaticMapBuildOptions, 'center' | 'zoom' | 'width' | 'height'>
 ): Promise<OsmBasemapTile[]> {
 	const width = options.width ?? MAP_VIEWPORT.width;
 	const height = options.height ?? MAP_VIEWPORT.height;
@@ -192,21 +183,27 @@ export async function fetchOsmBasemapTiles(
 		const results = await Promise.all(
 			batch.map(async (tile) => {
 				const key = tileCacheKey(zoom, tile.tileX, tile.tileY);
-				const cached = readCachedTile(key);
+				const cached = osmTileCache.get(key);
 				if (cached) {
 					return { ...tile, png: cached } satisfies OsmBasemapTile;
 				}
 
 				const url = `https://tile.openstreetmap.org/${zoom}/${tile.tileX}/${tile.tileY}.png`;
 				try {
-					const response = await fetchImpl(url, {
-						headers: { 'User-Agent': OSM_USER_AGENT, Accept: 'image/png' }
-					});
+					const response = await fetchWithTimeout(
+						url,
+						{
+							timeoutMs: OSM_TILE_FETCH_TIMEOUT_MS
+						},
+						{
+							headers: { 'User-Agent': OSM_USER_AGENT, Accept: 'image/png' }
+						}
+					);
 					if (!response.ok) {
 						return undefined;
 					}
 					const png = Buffer.from(await response.arrayBuffer());
-					writeCachedTile(key, png);
+					osmTileCache.set(key, png);
 					return { ...tile, png } satisfies OsmBasemapTile;
 				} catch {
 					return undefined;
