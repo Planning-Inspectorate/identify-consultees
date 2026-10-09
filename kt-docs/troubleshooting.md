@@ -40,13 +40,14 @@
 
 ## Database connectivity
 
-| Symptom                          | Likely cause                                        | Fix                                                           |
-| -------------------------------- | --------------------------------------------------- | ------------------------------------------------------------- |
-| Migrations fail                  | Container not ready                                 | Wait for healthy SQL on 1434; re-run `npm run db-migrate-dev` |
-| Homepage search shows no results | `case_boundary` empty / not seeded                  | `npm run db-seed` (or `npm start`, which seeds)               |
-| Results page 404s for a case     | `caseId` isn't a UUID, or the row isn't seeded      | Deep-link by case id from the homepage, not by case reference |
-| e2e journey specs fail           | Seeded DB missing (server on 8091 queries real SQL) | `npm start` first; check `e2e/fixtures.ts` ids match the seed |
-| `/items` fails                   | DB down                                             | Start compose; check connection string                        |
+| Symptom                                                       | Likely cause                                                                                                     | Fix                                                                                                            |
+| ------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| Migrations fail                                               | Container not ready                                                                                              | Wait for healthy SQL on 1434; re-run `npm run db-migrate-dev`                                                  |
+| `CLI.UNKNOWN_COMMAND` / `No command registered for 'migrate'` | `prisma` CLI bumped ahead of `@prisma/client` (e.g. onto a prerelease — Prisma 8 renames the migration commands) | Revert `prisma` to the same major as `@prisma/client` in `package.json`, restore `package-lock.json`, `npm ci` |
+| Homepage search shows no results                              | `case_boundary` empty / not seeded                                                                               | `npm run db-seed` (or `npm start`, which seeds)                                                                |
+| Results page 404s for a case                                  | `caseId` isn't a UUID, or the row isn't seeded                                                                   | Deep-link by case id from the homepage, not by case reference                                                  |
+| e2e journey specs fail                                        | Seeded DB missing (server on 8091 queries real SQL)                                                              | `npm start` first; check `e2e/fixtures.ts` ids match the seed                                                  |
+| `/items` fails                                                | DB down                                                                                                          | Start compose; check connection string                                                                         |
 
 ## Apple Silicon note
 
