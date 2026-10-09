@@ -21,21 +21,26 @@
 	{{ govukSummaryList({
 		rows: [
 			{
-				key: { text: "Case" },
+				key: { text: "Project" },
 				value: { text: caseName },
 				actions: {
 					items: [
-						{ href: caseChangeUrl, text: "Change", visuallyHiddenText: "case" }
+						{ href: caseChangeUrl, text: "Change", visuallyHiddenText: "project" }
 					]
 				}
 			},
 			{
-				key: { text: "Case ID" },
+				key: { text: "Project reference" },
 				value: { text: reference }
 			},
 			{
-				key: { text: "Case stage" },
-				value: { text: stage or "Not provided" }
+				key: { text: "Shapefile" },
+				value: { text: shapefileName },
+				actions: {
+					items: [
+						{ href: shapefileChangeUrl, text: "Change", visuallyHiddenText: "shapefile" }
+					]
+				}
 			},
 			{
 				key: { text: "Ruleset" },
@@ -53,9 +58,23 @@
 		<h2 class="govuk-heading-m">Identified consultees</h2>
 		{% set consulteeRows = [] %}
 		{% for consultee in consultees %}
+			{% set valueHtml %}
+				{% if consultee.total == 0 %}
+					0
+				{% else %}
+					{% if consultee.total > consultee.names.length %}
+						<p class="govuk-body">Showing {{ consultee.names.length }} of {{ consultee.total }} consultees</p>
+					{% endif %}
+					<ul class="govuk-list govuk-list--bullet">
+						{% for name in consultee.names %}
+							<li>{{ name }}</li>
+						{% endfor %}
+					</ul>
+				{% endif %}
+			{% endset %}
 			{% set consulteeRows = (consulteeRows.push({
 				key: { text: consultee.name },
-				value: { text: consultee.count },
+				value: { html: valueHtml },
 				actions: {
 					items: [
 						{ href: consultee.changeUrl, text: "Change", visuallyHiddenText: consultee.name }
@@ -67,7 +86,7 @@
 	{% endif %}
 
 	{{ govukButton({
-		text: "Generate report",
+		text: "Create report",
 		href: generateReportUrl
 	}) }}
 {% endblock %}

@@ -109,7 +109,6 @@ describe('manage page accessibility smoke', () => {
 			pageHeading: 'Identify consultees for a NSIP project',
 			searchQuery: 'EN01',
 			pageSize: 25,
-			pageSizeOptions: [25, 50, 100],
 			resultsFrom: 1,
 			resultsTo: 3,
 			resultsTotal: 100,
@@ -123,7 +122,6 @@ describe('manage page accessibility smoke', () => {
 					{ number: 100, href: '/?q=EN01&pageSize=25&page=100' }
 				]
 			},
-			exampleCase: { reference: 'EN010025', caseName: 'East Anglia ONE Offshore Windfarm' },
 			geometries: [
 				{
 					id: '11111111-1111-1111-1111-111111111111',
@@ -148,11 +146,9 @@ describe('manage page accessibility smoke', () => {
 			pageHeading: 'Identify consultees for a NSIP project',
 			searchQuery: 'ZZZ-NOMATCH-XXX',
 			pageSize: 25,
-			pageSizeOptions: [25, 50, 100],
 			resultsFrom: 0,
 			resultsTo: 0,
 			resultsTotal: 0,
-			exampleCase: null,
 			geometries: []
 		});
 		await assertNoSeriousA11yViolations(html);
@@ -162,8 +158,10 @@ describe('manage page accessibility smoke', () => {
 		const html = nunjucks.render('views/consultees/ruleset/view.njk', {
 			...pageLocals,
 			pageHeading: 'Ruleset',
-			backLinkUrl: '/consultees/11111111-1111-1111-1111-111111111111?ruleset=england-wales-post-20240430',
+			pageCaption: 'Longfield Solar Farm',
+			backLinkUrl: '/consultees/11111111-1111-1111-1111-111111111111',
 			caseId: '11111111-1111-1111-1111-111111111111',
+			formAction: '/consultees/11111111-1111-1111-1111-111111111111/ruleset?ruleset=england-wales-post-20240430',
 			_csrf: 'test-csrf',
 			rulesets: [
 				{ value: 'england-wales-post-20240430', text: 'England Wales post 30 April 2024', checked: true },
@@ -173,13 +171,17 @@ describe('manage page accessibility smoke', () => {
 		await assertNoSeriousA11yViolations(html);
 	});
 
-	test('shapefile picker page has no serious a11y violations', async () => {
-		const html = nunjucks.render('views/consultees/shapefile/view.njk', {
+	test('consultee project boundary page has no serious a11y violations', async () => {
+		const html = nunjucks.render('views/consultees/project/view.njk', {
 			...pageLocals,
-			pageHeading: 'Project shapefile',
-			backLinkUrl: '/consultees/11111111-1111-1111-1111-111111111111?ruleset=england-wales-post-20240430',
+			pageHeading: 'Project boundary',
+			pageCaption: 'Longfield Solar Farm',
+			reference: 'EN0110007',
+			caseName: 'Longfield Solar Farm',
 			caseId: '11111111-1111-1111-1111-111111111111',
-			rulesetId: 'england-wales-post-20240430',
+			backLinkUrl: '/',
+			backLinkText: 'Back to projects',
+			formAction: '/consultees/11111111-1111-1111-1111-111111111111',
 			_csrf: 'test-csrf',
 			files: [
 				{
@@ -189,82 +191,20 @@ describe('manage page accessibility smoke', () => {
 					checked: true
 				},
 				{
-					value: '22222222-2222-2222-2222-222222222222',
-					text: 'Longfield solar farm shapefiles.geojson',
+					value: '11111111-1111-1111-1111-111111111111:placeholder',
+					text: 'Longfield-solar-farm-shapefile.geojson',
 					hint: { text: 'Uploaded: 12:16, 29 Jul 2026' },
 					checked: false
 				}
-			]
-		});
-		await assertNoSeriousA11yViolations(html);
-	});
-
-	test('consultee project map page has no serious a11y violations', async () => {
-		const html = nunjucks.render('views/consultees/project/view.njk', {
-			...pageLocals,
-			pageHeading: 'Longfield Solar Farm',
-			reference: 'EN0110007',
-			caseName: 'Longfield Solar Farm',
-			caseId: '11111111-1111-1111-1111-111111111111',
-			backLinkUrl: '/',
-			backLinkText: 'Back to projects',
-			sectorDescription: 'Energy, Generating Stations, Solar',
-			stage: 'Acceptance',
-			shapefileName: 'EN0110007.geojson',
-			shapefileChangeUrl:
-				'/consultees/11111111-1111-1111-1111-111111111111/shapefile?ruleset=england-wales-post-20240430',
-			rulesetName: 'England Wales post 30 April 2024',
-			rulesetChangeUrl: '/consultees/11111111-1111-1111-1111-111111111111/ruleset?ruleset=england-wales-post-20240430',
-			previewReportUrl: '/consultees/11111111-1111-1111-1111-111111111111/report?ruleset=england-wales-post-20240430',
+			],
 			mapId: 'case-map',
-			mapRegionLabel: 'Map showing England Wales post 30 April 2024 for Longfield Solar Farm',
-			staticMapSrc:
-				'/consultees/11111111-1111-1111-1111-111111111111/results/static-map?ruleset=england-wales-post-20240430',
-			staticMapAlt: 'Static map showing England Wales post 30 April 2024 for Longfield Solar Farm',
+			mapRegionLabel: 'Map showing the project boundary for Longfield Solar Farm',
+			staticMapSrc: '/consultees/11111111-1111-1111-1111-111111111111/boundary-map',
+			staticMapAlt: 'Static map showing the project boundary for Longfield Solar Farm',
 			mapWidth: 960,
 			mapHeight: 516,
-			mapConfigJson: '{"center":[-1.78,50.62],"zoom":11}',
-			rulesetFailed: false,
-			retryUrl: '/consultees/11111111-1111-1111-1111-111111111111?ruleset=england-wales-post-20240430',
-			matchCount: 120,
-			mapIsSampled: true,
-			mapSampleSize: 30
+			mapConfigJson: '{"center":[-1.78,50.62],"zoom":11}'
 		});
-		await assertNoSeriousA11yViolations(html);
-	});
-
-	test('consultee project map page when the ruleset could not be run has no serious a11y violations', async () => {
-		const html = nunjucks.render('views/consultees/project/view.njk', {
-			...pageLocals,
-			pageHeading: 'Longfield Solar Farm',
-			reference: 'EN0110007',
-			caseName: 'Longfield Solar Farm',
-			caseId: '11111111-1111-1111-1111-111111111111',
-			backLinkUrl: '/',
-			backLinkText: 'Back to projects',
-			sectorDescription: null,
-			stage: null,
-			shapefileName: 'Not provided',
-			shapefileChangeUrl:
-				'/consultees/11111111-1111-1111-1111-111111111111/shapefile?ruleset=england-wales-post-20240430',
-			rulesetName: 'England Wales post 30 April 2024',
-			rulesetChangeUrl: '/consultees/11111111-1111-1111-1111-111111111111/ruleset?ruleset=england-wales-post-20240430',
-			previewReportUrl: '/consultees/11111111-1111-1111-1111-111111111111/report?ruleset=england-wales-post-20240430',
-			mapId: 'case-map',
-			mapRegionLabel: 'Map showing England Wales post 30 April 2024 for Longfield Solar Farm',
-			staticMapSrc:
-				'/consultees/11111111-1111-1111-1111-111111111111/results/static-map?ruleset=england-wales-post-20240430',
-			staticMapAlt: 'Static map showing England Wales post 30 April 2024 for Longfield Solar Farm',
-			mapWidth: 960,
-			mapHeight: 516,
-			mapConfigJson: '{"center":[-1.78,50.62],"zoom":11}',
-			rulesetFailed: true,
-			retryUrl: '/consultees/11111111-1111-1111-1111-111111111111?ruleset=england-wales-post-20240430',
-			matchCount: 0,
-			mapIsSampled: false,
-			mapSampleSize: 30
-		});
-		assert.match(html, /The ruleset could not be run/);
 		await assertNoSeriousA11yViolations(html);
 	});
 
@@ -272,22 +212,56 @@ describe('manage page accessibility smoke', () => {
 		const html = nunjucks.render('views/consultees/report/view.njk', {
 			...pageLocals,
 			pageHeading: 'Check consultees before creating the report',
-			backLinkUrl: '/consultees/11111111-1111-1111-1111-111111111111?ruleset=england-wales-post-20240430',
+			backLinkUrl: '/consultees/11111111-1111-1111-1111-111111111111/ruleset?ruleset=england-wales-post-20240430',
 			caseName: 'Longfield Solar Farm',
 			reference: 'EN0110007',
-			stage: 'Acceptance',
 			caseChangeUrl: '/',
+			shapefileName: 'EN0110007.geojson',
+			shapefileChangeUrl: '/consultees/11111111-1111-1111-1111-111111111111',
 			rulesetName: 'England Wales post 30 April 2024',
 			rulesetChangeUrl: '/consultees/11111111-1111-1111-1111-111111111111/ruleset?ruleset=england-wales-post-20240430',
 			consultees: [
-				{ name: 'Parish Council', count: '3', changeUrl: '#' },
-				{ name: 'Railway', count: '12', changeUrl: '#' }
+				{
+					name: 'Parish Council',
+					names: ['Little Snoring Parish Council', 'Great Snoring Parish Council', 'Barmer Parish Council'],
+					total: 3,
+					changeUrl: '#'
+				},
+				{
+					name: 'Police and Crime Commission',
+					names: ['Norfolk Police and Crime Commissioner'],
+					total: 1,
+					changeUrl: '#'
+				},
+				{ name: 'Railway', names: [], total: 0, changeUrl: '#' }
 			],
 			generateReportUrl:
 				'/consultees/11111111-1111-1111-1111-111111111111/report/created?ruleset=england-wales-post-20240430',
 			rulesetFailed: false,
-			retryUrl: '/consultees/11111111-1111-1111-1111-111111111111?ruleset=england-wales-post-20240430'
+			retryUrl: '/consultees/11111111-1111-1111-1111-111111111111/report?ruleset=england-wales-post-20240430'
 		});
+		await assertNoSeriousA11yViolations(html);
+	});
+
+	test('consultee report check page when the ruleset could not be run has no serious a11y violations', async () => {
+		const html = nunjucks.render('views/consultees/report/view.njk', {
+			...pageLocals,
+			pageHeading: 'Check consultees before creating the report',
+			backLinkUrl: '/consultees/11111111-1111-1111-1111-111111111111/ruleset?ruleset=england-wales-post-20240430',
+			caseName: 'Longfield Solar Farm',
+			reference: 'EN0110007',
+			caseChangeUrl: '/',
+			shapefileName: 'EN0110007.geojson',
+			shapefileChangeUrl: '/consultees/11111111-1111-1111-1111-111111111111',
+			rulesetName: 'England Wales post 30 April 2024',
+			rulesetChangeUrl: '/consultees/11111111-1111-1111-1111-111111111111/ruleset?ruleset=england-wales-post-20240430',
+			consultees: [],
+			generateReportUrl:
+				'/consultees/11111111-1111-1111-1111-111111111111/report/created?ruleset=england-wales-post-20240430',
+			rulesetFailed: true,
+			retryUrl: '/consultees/11111111-1111-1111-1111-111111111111/report?ruleset=england-wales-post-20240430'
+		});
+		assert.match(html, /The ruleset could not be run/);
 		await assertNoSeriousA11yViolations(html);
 	});
 

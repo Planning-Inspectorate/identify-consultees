@@ -2,7 +2,6 @@
 
 {% from "govuk/components/button/macro.njk" import govukButton %}
 {% from "govuk/components/input/macro.njk" import govukInput %}
-{% from "govuk/components/inset-text/macro.njk" import govukInsetText %}
 {% from "govuk/components/pagination/macro.njk" import govukPagination %}
 {% from "govuk/components/table/macro.njk" import govukTable %}
 {% from "govuk/components/tag/macro.njk" import govukTag %}
@@ -12,13 +11,6 @@
 {% endblock %}
 
 {% block pageContent %}
-	{% if exampleCase %}
-		{% set exampleHint %}For example, try searching for <strong>{{ exampleCase.reference }}</strong> ({{ exampleCase.caseName }}).{% endset %}
-		{{ govukInsetText({
-			html: exampleHint
-		}) }}
-	{% endif %}
-
 	<form method="get" action="/">
 		<div class="pins-inline-search">
 			{{ govukInput({
@@ -47,24 +39,9 @@
 	</form>
 
 	{% if geometries.length %}
-		<div class="govuk-!-margin-top-6 govuk-!-margin-bottom-3">
-			<p class="govuk-body">
-				Showing {{ resultsFrom }} to {{ resultsTo }} of {{ resultsTotal }} results
-			</p>
-			<p class="govuk-body">
-				Results per page:
-				{% for size in pageSizeOptions %}
-					{% if size == pageSize %}
-						<span class="govuk-!-font-weight-bold">{{ size }}</span>
-					{% else %}
-						<a class="govuk-link" href="/?q={{ searchQuery | urlencode }}&amp;pageSize={{ size }}">{{ size }}</a>
-					{% endif %}
-					{% if not loop.last %}
-						<span class="govuk-!-margin-left-1 govuk-!-margin-right-1" aria-hidden="true">|</span>
-					{% endif %}
-				{% endfor %}
-			</p>
-		</div>
+		<p class="govuk-body govuk-!-margin-top-6 govuk-!-margin-bottom-3">
+			Showing {{ resultsFrom }} to {{ resultsTo }} of {{ resultsTotal }} results
+		</p>
 
 		{% set tableRows = [] %}
 		{% for geometry in geometries %}
@@ -81,7 +58,7 @@
 		{% endfor %}
 
 		{{ govukTable({
-			caption: "All cases",
+			caption: "All projects",
 			captionClasses: "govuk-table__caption--m",
 			firstCellIsHeader: false,
 			head: [

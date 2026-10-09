@@ -6,6 +6,7 @@
  * `forceSvg` keeps the SVG+embedded-tiles output for the explicit `.svg` route.
  */
 
+import type { Response } from 'express';
 import {
 	STATIC_MAP_CACHE_CONTROL,
 	STATIC_MAP_CACHE_CONTROL_PRIVATE,
@@ -40,6 +41,25 @@ export type StaticMapResponseBody = {
 	etag: string;
 	vary?: string;
 };
+
+/** Write a built static-map response onto an Express response - shared by every static-map route. */
+export function sendStaticMapResponse(res: Response, image: StaticMapResponseBody): void {
+	res
+		.status(image.status)
+		.set({
+			'Cache-Control': image.cacheControl,
+			ETag: image.etag,
+			...(image.vary ? { Vary: image.vary } : {})
+		})
+		.type(image.contentType);
+
+	if (image.status === 304) {
+		res.end();
+		return;
+	}
+
+	res.send(image.body);
+}
 
 export type BuildConsulteeStaticMapOptions = {
 	geometryId: string;

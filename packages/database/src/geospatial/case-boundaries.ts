@@ -285,22 +285,6 @@ export async function listCaseBoundaryFiles(
 	);
 }
 
-/**
- * Pick one case at random - just enough to show a real "try searching for..." example on the
- * home page. `ORDER BY NEWID()` forces a full scan/sort, which is fine at this table's size
- * (hundreds of rows) but wouldn't be a sensible way to sample from a genuinely large table.
- */
-export async function getRandomCaseSummary(dbClient: PrismaClient): Promise<CaseBoundarySummary | null> {
-	const rows = await withDeadlockRetry(
-		() => dbClient.$queryRaw<
-			{ id: string; caseReference: string; caseName: string; receivedDate: Date | null; acceptance: string | null }[]
-		>`
-			SELECT TOP 1 ${summaryColumns} FROM case_boundary ORDER BY NEWID()
-		`
-	);
-	return rows[0] ? rowToSummary(rows[0]) : null;
-}
-
 export interface SearchOptions {
 	query?: string;
 	limit?: number;

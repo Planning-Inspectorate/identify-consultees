@@ -86,9 +86,15 @@ describe('consultee report check page', () => {
 		assert.strictEqual(viewModel.pageHeading, 'Check consultees before creating the report');
 		assert.strictEqual(viewModel.caseName, 'Real Test Project');
 		assert.strictEqual(viewModel.reference, 'EN010099');
-		assert.strictEqual(viewModel.stage, 'Acceptance');
+		assert.strictEqual(viewModel.caseChangeUrl, '/');
+		assert.strictEqual(viewModel.shapefileName, 'Not provided');
+		assert.strictEqual(viewModel.shapefileChangeUrl, `/consultees/${realProjectId}`);
 		assert.strictEqual(viewModel.rulesetName, 'England Wales post 30 April 2024');
-		assert.strictEqual(viewModel.backLinkUrl, `/consultees/${realProjectId}?ruleset=england-wales-post-20240430`);
+		// back, and the ruleset's Change, both lead to the ruleset picker the check page followed
+		assert.strictEqual(
+			viewModel.backLinkUrl,
+			`/consultees/${realProjectId}/ruleset?ruleset=england-wales-post-20240430`
+		);
 		assert.strictEqual(
 			viewModel.rulesetChangeUrl,
 			`/consultees/${realProjectId}/ruleset?ruleset=england-wales-post-20240430`
@@ -98,10 +104,11 @@ describe('consultee report check page', () => {
 			`/consultees/${realProjectId}/report/created?ruleset=england-wales-post-20240430`
 		);
 
-		// one row per ruleset category, in ruleset order - matched ones carry their count
+		// one row per ruleset category, in ruleset order - matched ones carry their consultee names
 		const parishRow = viewModel.consultees.find((row: { name: string }) => row.name === 'Parish Council');
-		assert.strictEqual(parishRow.count, '1');
-		assert.ok(viewModel.consultees.every((row: { count: string }) => typeof row.count === 'string'));
+		assert.strictEqual(parishRow.total, 1);
+		assert.deepStrictEqual(parishRow.names, ['Little Snoring Parish Council']);
+		assert.ok(viewModel.consultees.every((row: { names: string[] }) => Array.isArray(row.names)));
 		assert.ok(viewModel.consultees.length > 1);
 		// every category's Change link opens its shared consultees page for the same ruleset
 		assert.ok(
@@ -116,7 +123,8 @@ describe('consultee report check page', () => {
 		const html = mockRes.render.mock.calls[0].result;
 		assert.match(html, /Report details/);
 		assert.match(html, /Identified consultees/);
-		assert.match(html, /Generate report/);
+		assert.match(html, /Little Snoring Parish Council/);
+		assert.match(html, /Create report/);
 	});
 
 	it('should subtract excluded consultees from the counts and carry exclusions through the links', async () => {
@@ -129,9 +137,10 @@ describe('consultee report check page', () => {
 		);
 
 		const viewModel = mockRes.render.mock.calls[0].arguments[1];
-		// the only match was excluded - the count is the number of rows its Change page would list
+		// the only match was excluded - the total is the number of rows its Change page would list
 		const parishRow = viewModel.consultees.find((row: { name: string }) => row.name === 'Parish Council');
-		assert.strictEqual(parishRow.count, '0');
+		assert.strictEqual(parishRow.total, 0);
+		assert.deepStrictEqual(parishRow.names, []);
 		assert.ok(parishRow.changeUrl.includes(`&exclude=${excludedId}`));
 		assert.ok(viewModel.generateReportUrl.includes(`&exclude=${excludedId}`));
 	});
@@ -153,12 +162,41 @@ describe('consultee report check page', () => {
 		const parishRow = viewModel.consultees.find((row: { name: string }) => row.name === 'Parish Council');
 		const hospitalRow = viewModel.consultees.find((row: { name: string }) => row.name === 'Hospital');
 		// one ruleset match + one hand-added row
-		assert.strictEqual(parishRow.count, '2');
-		assert.strictEqual(hospitalRow.count, '1');
+		assert.strictEqual(parishRow.total, 2);
+		assert.deepStrictEqual(parishRow.names, ['Little Snoring Parish Council', 'Test Consultee']);
+		assert.strictEqual(hospitalRow.total, 1);
+		assert.deepStrictEqual(hospitalRow.names, ['Other Test Consultee']);
 		// the adds reach the Change pages and the report-created link unchanged
 		assert.ok(parishRow.changeUrl.includes(`add=${encodeURIComponent(parishAdd)}`));
 		assert.ok(hospitalRow.changeUrl.includes(`add=${encodeURIComponent(hospitalAdd)}`));
 		assert.ok(viewModel.generateReportUrl.includes(`add=${encodeURIComponent(parishAdd)}`));
+	});
+
+	it('should cap the listed names at 10 and say how many the category really has', async () => {
+		const nunjucks = configureNunjucks();
+		const mockRes = {
+			status: mock.fn(() => mockRes),
+			render: mock.fn((view, data) => nunjucks.render(view, data))
+		};
+		const manyParishes = Array.from({ length: 12 }, (_, i) => ({
+			...parishMatchRow(),
+			id: `55555555-5555-5555-5555-${String(i + 1).padStart(12, '0')}`,
+			consultee: `Parish Council ${i + 1}`
+		}));
+		const db = dbReturning([[realProjectRow()], manyParishes]);
+		await handlerFor(db)(
+			{ params: { caseId: realProjectId }, query: { ruleset: 'england-wales-post-20240430' } },
+			mockRes
+		);
+
+		const viewModel = mockRes.render.mock.calls[0].arguments[1];
+		const parishRow = viewModel.consultees.find((row: { name: string }) => row.name === 'Parish Council');
+		assert.strictEqual(parishRow.total, 12);
+		assert.strictEqual(parishRow.names.length, 10);
+		assert.strictEqual(parishRow.names[0], 'Parish Council 1');
+
+		const html = mockRes.render.mock.calls[0].result;
+		assert.match(html, /Showing 10 of 12 consultees/);
 	});
 
 	it('should run the default (first) ruleset when none is selected', async () => {
@@ -263,7 +301,11 @@ describe('report created page', () => {
 		assert.strictEqual(viewModel.pageHeading, 'Report created');
 		assert.strictEqual(viewModel.caseName, 'Real Test Project');
 		assert.strictEqual(viewModel.reference, 'EN010099');
-		assert.strictEqual(viewModel.backLinkUrl, `/consultees/${realProjectId}?ruleset=england-wales-post-20240430`);
+		// back lands on the check page the report was created from
+		assert.strictEqual(
+			viewModel.backLinkUrl,
+			`/consultees/${realProjectId}/report?ruleset=england-wales-post-20240430`
+		);
 		// by category, in the check page's order (the ruleset names parishes before hospitals)
 		assert.deepStrictEqual(viewModel.report, [
 			{

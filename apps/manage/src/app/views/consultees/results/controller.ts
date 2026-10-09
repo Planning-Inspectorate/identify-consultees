@@ -5,11 +5,11 @@ import { getRuleset } from '@pins/identify-consultees-database/src/geospatial/ru
 import type { AsyncRequestHandler } from '@planning-inspectorate/core/util';
 import { buildCaseMapConfig, MAX_SAMPLED_MAP_MATCHES } from '../../../maps/case-geojson.ts';
 import { MAP_VIEWPORT } from '../../../maps/sample-geojson.ts';
-import { buildConsulteeStaticMapResponse } from '../../../maps/serve-static-map.ts';
+import { buildConsulteeStaticMapResponse, sendStaticMapResponse } from '../../../maps/serve-static-map.ts';
 import { describeReasons } from '../reasons.ts';
-import { excludedIds } from '../report/urls.ts';
+import { excludedIds, reportUrl } from '../report/urls.ts';
 import { resolveCase } from '../resolve-case.ts';
-import { buildSearchAreaSafely, firstQueryValue, projectPageUrl, runRulesetSafely } from '../run-ruleset.ts';
+import { buildSearchAreaSafely, firstQueryValue, runRulesetSafely } from '../run-ruleset.ts';
 import type { ConsulteeMatchRow, ConsulteesResultsViewModel } from './view-model.ts';
 
 function resultsUrl(caseId: string, rulesetId: string): string {
@@ -68,7 +68,7 @@ export function buildConsulteesResultsPage(service: ManageService): AsyncRequest
 
 		const viewModel: ConsulteesResultsViewModel = {
 			pageHeading: `Consultees identified for ${project.properties.caseName} (${project.properties.caseReference})`,
-			backLinkUrl: projectPageUrl(project.id, ruleset.id),
+			backLinkUrl: reportUrl(project.id, ruleset.id),
 			rulesetName: ruleset.name,
 			reference: project.properties.caseReference,
 			caseName: project.properties.caseName,
@@ -145,20 +145,6 @@ export function buildResultsStaticMap(service: ManageService, forceSvg = false):
 			accept
 		});
 
-		res
-			.status(image.status)
-			.set({
-				'Cache-Control': image.cacheControl,
-				ETag: image.etag,
-				...(image.vary ? { Vary: image.vary } : {})
-			})
-			.type(image.contentType);
-
-		if (image.status === 304) {
-			res.end();
-			return;
-		}
-
-		res.send(image.body);
+		sendStaticMapResponse(res, image);
 	};
 }

@@ -14,9 +14,8 @@ const pages = [
 	{ path: '/', name: 'home' },
 	{ path: '/?q=ZZZ-NOMATCH-XXX', name: 'home with no search results' },
 	{ path: '/?pageSize=50', name: 'home with 50 results per page' },
-	{ path: `/consultees/${SAMPLE_CASE_ID}`, name: 'project map' },
+	{ path: `/consultees/${SAMPLE_CASE_ID}`, name: 'project boundary' },
 	{ path: `/consultees/${SAMPLE_CASE_ID}/ruleset`, name: 'ruleset picker' },
-	{ path: `/consultees/${SAMPLE_CASE_ID}/shapefile`, name: 'shapefile picker' },
 	{ path: `/consultees/${SAMPLE_CASE_ID}/report?ruleset=${SAMPLE_RULESET_ID}`, name: 'report check' },
 	{
 		path: `/consultees/${SAMPLE_CASE_ID}/report/consultees?ruleset=${SAMPLE_RULESET_ID}&category=Parish%20Council`,

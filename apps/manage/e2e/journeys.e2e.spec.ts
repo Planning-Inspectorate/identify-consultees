@@ -40,14 +40,11 @@ test.describe('manage journeys', () => {
 		await expect(page.getByText(SAMPLE_CASE_NAME).first()).toBeVisible();
 	});
 
-	test('home page respects results per page', async ({ page }) => {
+	test('home page keeps the requested page size across searches', async ({ page }) => {
 		await page.goto('/?pageSize=50');
-		// real seed data has fewer than 50 case boundaries, so "to" is capped at however many
-		// actually matched - just confirm the requested page size took effect
+		// the choice rides along as a hidden input so a fresh search keeps it
+		await expect(page.locator('input[name="pageSize"]')).toHaveValue('50');
 		await expect(page.getByText(/Showing 1 to \d+ of \d+ results/)).toBeVisible();
-		await expect(
-			page.locator('.govuk-body', { hasText: 'Results per page' }).getByText('50', { exact: true })
-		).toBeVisible();
 	});
 
 	test('home search paginates when results exceed one page', async ({ page }) => {
@@ -76,41 +73,38 @@ test.describe('manage journeys', () => {
 		}
 	});
 
-	test('choosing a project shows its map page, and changing the ruleset returns to it', async ({ page }) => {
+	test('choosing a project starts the boundary-ruleset-check journey', async ({ page }) => {
 		await page.goto(`/?q=${SAMPLE_CASE_REFERENCE}`);
 		// a caseReference isn't guaranteed unique (a project can have several boundary submissions),
 		// so follow the link by its href (a specific case id) rather than by its visible text
 		await page.locator(`a[href="/consultees/${SAMPLE_CASE_ID}"]`).click();
 
-		// the map page runs the default ruleset straight away
-		await expect(page.getByRole('heading', { level: 1 })).toContainText(SAMPLE_CASE_NAME);
-		await expect(page.getByRole('button', { name: 'Preview report' })).toBeVisible();
+		// the boundary page maps the case's shapefiles; the radios below confirm the single file
+		// carried forward (a stand-in second file fills in when the case only holds one)
+		await expect(page.getByRole('heading', { level: 1 })).toContainText('Project boundary');
+		await expect(page.getByText(SAMPLE_CASE_NAME).first()).toBeVisible();
+		const shapefileRadios = page.getByRole('radio');
+		expect(await shapefileRadios.count()).toBeGreaterThanOrEqual(2);
+		await page.getByRole('button', { name: 'Continue' }).click();
 
-		// "Change" (ruleset) -> radios page -> "Save and return" brings the choice back to the map
-		await page.getByRole('link', { name: 'Change ruleset' }).click();
+		// the ruleset page picks the ruleset the report is generated with
+		await expect(page).toHaveURL(new RegExp(`/consultees/${SAMPLE_CASE_ID}/ruleset`));
 		await expect(page.getByRole('heading', { level: 1 })).toContainText('Ruleset');
+		await expect(page.getByText(SAMPLE_CASE_NAME).first()).toBeVisible();
 		await page.getByRole('radio', { name: SAMPLE_RULESET_NAME }).check();
-		await page.getByRole('button', { name: 'Save and return' }).click();
+		await page.getByRole('button', { name: 'Identify consultees' }).click();
 
-		await expect(page).toHaveURL(new RegExp(`/consultees/${SAMPLE_CASE_ID}\\?ruleset=${SAMPLE_RULESET_ID}`));
-		await expect(page.getByRole('heading', { level: 1 })).toContainText(SAMPLE_CASE_NAME);
-
-		// "Preview report" leads to the check page for the same selection
-		await page.getByRole('button', { name: 'Preview report' }).click();
+		// the check page lists each category's consultee names (capped at 10 per category, with
+		// "Showing 10 of N" when it's bigger) - its Change page lists them all
 		await expect(page).toHaveURL(new RegExp(`/consultees/${SAMPLE_CASE_ID}/report\\?ruleset=${SAMPLE_RULESET_ID}`));
 		await expect(page.getByRole('heading', { level: 1 })).toContainText('Check consultees before creating the report');
 
-		// a category's "Change" opens its shared consultees page: the map above its rows, each with
-		// a Remove link - and the check page's count is exactly the number of rows listed
 		const parishChange = page.getByRole('link', { name: 'Change Parish Council' });
-		const parishCount = Number(
-			(
-				await page
-					.locator('.govuk-summary-list__row', { has: parishChange })
-					.locator('.govuk-summary-list__value')
-					.innerText()
-			).trim()
-		);
+		const parishValue = page
+			.locator('.govuk-summary-list__row', { has: parishChange })
+			.locator('.govuk-summary-list__value');
+		const showingMatch = (await parishValue.innerText()).match(/Showing \d+ of (\d+) consultees/);
+		const parishCount = showingMatch ? Number(showingMatch[1]) : await parishValue.locator('li').count();
 		await parishChange.click();
 
 		await expect(page).toHaveURL(/\/report\/consultees\?.*category=Parish/);
@@ -160,19 +154,25 @@ test.describe('manage journeys', () => {
 		await expect(page.getByRole('rowheader', { name: 'First Test Consultee' })).toBeVisible();
 		await expect(page.getByRole('link', { name: /Remove/ })).toHaveCount(parishCount - removed + 1);
 
-		// "Save and return" lands back on the check page, its count matching the rows just listed
+		// "Save and return" lands back on the check page - the row's list/total matching the rows
+		// just listed (a hand-added consultee shows by name when the list isn't capped)
 		await page.getByRole('button', { name: 'Save and return' }).click();
 		await expect(page).toHaveURL(new RegExp(`/consultees/${SAMPLE_CASE_ID}/report\\?ruleset=${SAMPLE_RULESET_ID}`));
 		await expect(page.getByRole('heading', { level: 1 })).toContainText('Check consultees before creating the report');
-		await expect(
-			page
-				.locator('.govuk-summary-list__row', { hasText: 'Parish Council' })
-				.locator('.govuk-summary-list__value')
-				.first()
-		).toHaveText(String(parishCount - removed + 1));
+		const returnedValue = page
+			.locator('.govuk-summary-list__row', { hasText: 'Parish Council' })
+			.locator('.govuk-summary-list__value')
+			.first();
+		const expectedTotal = parishCount - removed + 1;
+		if (expectedTotal > 10) {
+			await expect(returnedValue).toContainText(`Showing 10 of ${expectedTotal} consultees`);
+		} else {
+			await expect(returnedValue.locator('li')).toHaveCount(expectedTotal);
+			await expect(returnedValue).toContainText('First Test Consultee');
+		}
 
-		// "Generate report" leads to the confirmation page with the download link
-		await page.getByRole('button', { name: 'Generate report' }).click();
+		// "Create report" leads to the confirmation page with the download link
+		await page.getByRole('button', { name: 'Create report' }).click();
 		await expect(page).toHaveURL(
 			new RegExp(`/consultees/${SAMPLE_CASE_ID}/report/created\\?ruleset=${SAMPLE_RULESET_ID}`)
 		);
@@ -196,18 +196,23 @@ test.describe('manage journeys', () => {
 		await expect(page.getByRole('heading', { level: 2, name: 'Consultees identified' })).toBeVisible();
 	});
 
-	test('the shapefile change page lists the project’s files and returns on save', async ({ page }) => {
-		await page.goto(`/consultees/${SAMPLE_CASE_ID}/shapefile?ruleset=${SAMPLE_RULESET_ID}`);
-		await expect(page.getByRole('heading', { level: 1 })).toContainText('Project shapefile');
+	test('the boundary page offers the project’s shapefiles and continues with one', async ({ page }) => {
+		await page.goto(`/consultees/${SAMPLE_CASE_ID}`);
+		await expect(page.getByRole('heading', { level: 1 })).toContainText('Project boundary');
+		await expect(page.getByText('Confirm shapefile for report')).toBeVisible();
 
-		await page.getByRole('radio').first().check();
-		await page.getByRole('button', { name: 'Save and return' }).click();
-		await expect(page).toHaveURL(/\/consultees\/[0-9a-f-]{36}\?ruleset=/);
+		const radios = page.getByRole('radio');
+		// a single-file case gets a stand-in second file; a multi-file case lists them all
+		expect(await radios.count()).toBeGreaterThanOrEqual(2);
+		await radios.first().check();
+		await page.getByRole('button', { name: 'Continue' }).click();
+		await expect(page).toHaveURL(/\/consultees\/[0-9a-f-]{36}\/ruleset/);
 	});
 
-	test('a direct link to the project map page works', async ({ page }) => {
+	test('a direct link to the project boundary page works', async ({ page }) => {
 		await page.goto(`/consultees/${SAMPLE_CASE_ID}`);
-		await expect(page.getByRole('heading', { level: 1 })).toContainText(SAMPLE_CASE_NAME);
+		await expect(page.getByRole('heading', { level: 1 })).toContainText('Project boundary');
+		await expect(page.getByText(SAMPLE_CASE_NAME).first()).toBeVisible();
 		await expect(page.getByRole('link', { name: 'Back to projects' })).toBeVisible();
 	});
 
