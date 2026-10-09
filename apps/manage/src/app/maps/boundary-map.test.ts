@@ -50,6 +50,29 @@ describe('buildBoundaryMapConfig', () => {
 		assert.match(config.mapLabel, /Test Project \(EN010099\)/);
 	});
 
+	it('should round each member of a geometry collection', () => {
+		const config = buildBoundaryMapConfig('Test Project', 'EN010099', [
+			{
+				...boundaryFile('collection-file', true),
+				geometry: {
+					type: 'GeometryCollection' as const,
+					geometries: [
+						{ type: 'Point' as const, coordinates: [-1.5000001, 52.5000001] },
+						{ type: 'Point' as const, coordinates: [-1.4000001, 52.6000001] }
+					]
+				}
+			}
+		]);
+
+		assert.deepStrictEqual(config.shapefileDatasets[0].geojson.features[0].geometry, {
+			type: 'GeometryCollection',
+			geometries: [
+				{ type: 'Point', coordinates: [-1.5, 52.5] },
+				{ type: 'Point', coordinates: [-1.4, 52.6] }
+			]
+		});
+	});
+
 	it('should carry the static-map fallback when given one', () => {
 		const config = buildBoundaryMapConfig('Test Project', 'EN010099', [boundaryFile('only-file', true)], {
 			src: '/consultees/abc/boundary-map',

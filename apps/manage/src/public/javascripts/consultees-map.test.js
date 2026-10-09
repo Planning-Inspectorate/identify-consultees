@@ -174,6 +174,58 @@ describe('consultees-map client helpers', () => {
 		assert.deepEqual(buildDatasets({ projectGeojson: { features: [] }, consulteeGeojson: null }), []);
 	});
 
+	test('buildDatasets lists each shapefile under the GIS shapefiles group, checked only when selected', () => {
+		const feature = { type: 'Feature', geometry: { type: 'Point', coordinates: [0, 0] } };
+		const datasets = buildDatasets({
+			shapefileDatasets: [
+				{ id: 'file-a', label: 'a.geojson', checked: true, geojson: { features: [feature] } },
+				{ id: 'file-b', label: 'b.geojson', checked: false, geojson: { features: [feature] } },
+				// a file with no geometry produces no dataset at all
+				{ id: 'file-empty', label: 'empty.geojson', checked: false, geojson: { features: [] } }
+			]
+		});
+
+		assert.deepEqual(
+			datasets.map((dataset) => [dataset.id, dataset.visible, dataset.groupLabel]),
+			[
+				['file-a', true, 'GIS shapefiles'],
+				['file-b', false, 'GIS shapefiles']
+			]
+		);
+		assert.equal(datasets[0].idProperty, 'fileKey');
+		assert.equal(datasets[0].showInMenu, true);
+	});
+
+	test('buildDatasets honours a custom shapefile group label', () => {
+		const datasets = buildDatasets({
+			shapefileGroupLabel: 'Boundary submissions',
+			shapefileDatasets: [
+				{ id: 'file-a', label: 'a.geojson', checked: true, geojson: { features: [{ type: 'Feature' }] } }
+			]
+		});
+		assert.equal(datasets[0].groupLabel, 'Boundary submissions');
+	});
+
+	test('buildSelectableLayers lists each shapefile dataset as selectable', () => {
+		const layers = buildSelectableLayers(
+			buildDatasets({
+				shapefileDatasets: [
+					{
+						id: 'file-a',
+						label: 'a.geojson',
+						checked: true,
+						geojson: { features: [{ type: 'Feature' }] }
+					}
+				]
+			})
+		);
+
+		assert.deepEqual(
+			layers.map((layer) => `${layer.layerId}:${layer.idProperty}`),
+			['file-a:fileKey', 'file-a-stroke:fileKey']
+		);
+	});
+
 	test('showStaticMapFallback inserts an image when a static src is available', () => {
 		const dom = installDom(
 			'<!DOCTYPE html><html><body><div id="map" class="app-case-map-interactive"></div></body></html>'
