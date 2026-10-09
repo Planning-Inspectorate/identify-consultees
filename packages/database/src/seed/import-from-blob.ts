@@ -9,6 +9,10 @@
  *   npm run db-import-from-blob -- --type=consultee-areas --blob=combined_reference_data_v1.geojson
  *   npm run db-import-from-blob -- --type=case-boundaries --blob=all-project-boundaries.geojson
  *
+ * Add `--replace` to delete every existing row of that type first (once the file has downloaded
+ * and parsed with features), so the table ends up holding exactly the file's contents - see
+ * clearExistingRows.
+ *
  * Requires BLOB_STORE_HOST and BLOB_STORE_CONTAINER (the same env var names the running app
  * already uses - see infrastructure/app-web.tf) and an ambient Azure identity DefaultAzureCredential
  * can use (the pipeline's own Azure auth step when run in CI; `az login`'s cached credential for a
@@ -25,6 +29,7 @@ import { pipeline } from 'node:stream/promises';
 import { fileURLToPath } from 'node:url';
 import { loadConfig } from '../configuration/config.ts';
 import { newDatabaseClient, withExtendedTimeout } from '../index.ts';
+import type { ImportType } from './geojson-import.ts';
 import { importCaseBoundaries, importConsulteeAreas } from './geojson-import.ts';
 
 // see withExtendedTimeout in import-cli.ts - a large/complex real geometry can exceed the
@@ -32,14 +37,21 @@ import { importCaseBoundaries, importConsulteeAreas } from './geojson-import.ts'
 const IMPORT_REQUEST_TIMEOUT_MS = 120_000;
 
 export interface ParsedArgs {
-	type: 'consultee-areas' | 'case-boundaries';
+	type: ImportType;
 	blob: string;
 	batchSize?: number;
+	/** Delete the table's existing rows before importing, rather than merging into them. */
+	replace: boolean;
 }
 
 export function parseArgs(argv: string[]): ParsedArgs {
 	const values: Record<string, string> = {};
+	let replace = false;
 	for (const arg of argv) {
+		if (arg === '--replace') {
+			replace = true;
+			continue;
+		}
 		const match = /^--([^=]+)=(.*)$/.exec(arg);
 		if (match) {
 			values[match[1]] = match[2];
@@ -59,7 +71,7 @@ export function parseArgs(argv: string[]): ParsedArgs {
 		throw new Error(`--batch-size must be a positive integer (got: ${values['batch-size']})`);
 	}
 
-	return { type, blob: values.blob, batchSize };
+	return { type, blob: values.blob, batchSize, replace };
 }
 
 /**
@@ -112,11 +124,13 @@ async function run() {
 	console.log(`Downloading ${args.blob} from blob storage...`);
 	const { filePath, cleanup } = await downloadBlobToTempFile(args.blob);
 
-	console.log(`Importing ${args.type} from ${args.blob}...`);
-	const startedAt = Date.now();
-
 	try {
-		const options = { batchSize: args.batchSize, onProgress: logProgress(startedAt) };
+		// replacing clears the table only once the download has succeeded and the file has parsed
+		// with features (see clearIfReplacing) - a missing blob, a permissions failure or a bad file
+		// mustn't leave the table empty
+		console.log(`Importing ${args.type} from ${args.blob}${args.replace ? ', replacing existing rows' : ''}...`);
+		const startedAt = Date.now();
+		const options = { batchSize: args.batchSize, onProgress: logProgress(startedAt), replace: args.replace };
 		const count =
 			args.type === 'consultee-areas'
 				? await importConsulteeAreas(dbClient, filePath, options)
