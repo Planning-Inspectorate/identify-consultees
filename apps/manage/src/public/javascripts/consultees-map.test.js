@@ -263,6 +263,10 @@ describe('consultees-map client helpers', () => {
 			/Unnamed.*Category: Hospital<\/p>$/
 		);
 		assert.match(featureDetailsHtml({ name: 'Luton', reference: 'TR020001' }), /Luton.*Reference: TR020001/);
+		assert.match(
+			featureDetailsHtml({ name: `O'Brien & "Sons"`, reference: 'x' }),
+			/O&#39;Brien &amp; &quot;Sons&quot;/
+		);
 	});
 
 	test('initConsulteeMap shows a selected feature in a panel, and clears the selection when it closes', () => {

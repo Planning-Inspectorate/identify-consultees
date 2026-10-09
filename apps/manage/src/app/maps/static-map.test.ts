@@ -162,6 +162,25 @@ describe('static-map helpers', () => {
 		assert.match(svg, /#00897B/);
 	});
 
+	test('renderStaticMapOverlaySvg rejects badge fill values that are not hex colours', () => {
+		const svg = renderStaticMapOverlaySvg({
+			center: [-1.75, 50.65],
+			zoom: 10,
+			projectGeojson: emptyCollection,
+			consulteeGeojson: emptyCollection,
+			featureBadges: [
+				{ coords: [-1.75, 50.65], label: '1', fill: '#00897B' },
+				{ coords: [-1.74, 50.66], label: '2', fill: 'red' },
+				{ coords: [-1.74, 50.64], label: '3', fill: '"/><script>alert(1)</script>' }
+			]
+		});
+
+		// the valid hex colour renders; anything else falls back to the default
+		assert.match(svg, /fill="#00897B"/);
+		assert.equal(svg.match(/fill="#0b0c0c"/g)?.length, 2);
+		assert.doesNotMatch(svg, /red|<script|alert/);
+	});
+
 	test('centroidOfGeometry centres rings, points and falls back to the first vertex', () => {
 		assert.deepEqual(centroidOfGeometry({ type: 'Point', coordinates: [-1, 50] }), [-1, 50]);
 		assert.deepEqual(
