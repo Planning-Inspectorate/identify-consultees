@@ -23,6 +23,6 @@ This package's own scripts:
 
 ## Further reading
 
-- [`kt-docs/`](../../kt-docs/README.md) — the onboarding pack: architecture, routes, maps, testing, troubleshooting
+- [`kt-docs/`](../../kt-docs/README.md) — the onboarding pack: overview, routes, maps, screening, testing, deployment
 - [`AGENTS.md`](../../AGENTS.md) — GDS rules, map/styling requirements, toolchain pins, integration gotchas
-- [`docs/frontend-testing.md`](../../docs/frontend-testing.md) — the full test matrix
+- [`kt-docs/testing.md`](../../kt-docs/testing.md) — the full test matrix

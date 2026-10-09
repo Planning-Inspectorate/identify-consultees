@@ -1,137 +1,55 @@
 # Identify consultees
 
-This is the monorepo for the Identify consultees service — a GIS tool for identifying consultees and managing the associated data.
+The monorepo for the Identify consultees service: finds who must be consulted about a Nationally Significant Infrastructure Project by screening its site boundary against consultee areas.
 
 | Path | Purpose |
 | ---- | ------- |
 | `apps/manage` | Web app (Express + Nunjucks + GOV.UK Frontend) |
-| `apps/function-python` | Python Azure Function (`consultee-areas`) used by some manage pages |
-| `apps/function` | Node Azure Function app |
-| `packages/database` | Prisma schema, migrations, and data access |
-| `packages/lib` | Shared library code |
+| `apps/function-python` | Python Azure Function: runs the screening (`run-ruleset`) |
+| `packages/database` | Prisma schema, migrations, geospatial SQL, rulesets, seed and import |
 | `infrastructure` | Azure / Terraform |
 
 ## Prerequisites
 
-- **Node.js 24.x** — the current LTS (see [`.nvmrc`](./.nvmrc); `package.json` `engines` `^24` and Azure Pipelines `nodeVersion: 24` pin the same major). Use the latest 24.x — the patch is not pinned.
-- **npm 11.x+** (ships with Node 24 — use the bundled version, not a self-installed npm)
-- **Docker** (local SQL Server with spatial types — see [`docker-compose.yml`](./docker-compose.yml))
-- Git access to this repository
+- **Node.js 24.x** and the **npm 11.x** it ships with ([`.nvmrc`](./.nvmrc); `engines` and Azure Pipelines pin the same major)
+- **Docker**, for SQL Server with spatial types. On Apple Silicon it runs under `linux/amd64` emulation; Azure SQL Edge doesn't support `GEOGRAPHY`
+- **Python 3.12** and [Azure Functions Core Tools](https://learn.microsoft.com/en-us/azure/azure-functions/functions-run-local) (`npm install -g azure-functions-core-tools@4`), for the screening function
 
-On Apple Silicon, the SQL Server image runs under `linux/amd64` emulation. That is expected and required: Azure SQL Edge does not support the `GEOGRAPHY` type this project uses.
-
-Confirm the toolchain after install:
-
-```bash
-nvm use
-node -v    # v24.x.y
-npm -v     # 11.x.y
-npm run check-toolchain
-```
-
-## Getting started (new developer)
-
-From a clean clone, these steps are enough to run the manage app locally:
+## Getting started
 
 ```bash
 git clone git@github.com:Planning-Inspectorate/identify-consultees.git
 cd identify-consultees
-nvm use   # latest Node 24.x from .nvmrc
+nvm use
+npm run check-toolchain
 npm ci
 npm start
 ```
 
-Then open **http://localhost:8090**.
+Then open **http://localhost:8090**. `npm start` creates the `.env` files (auth disabled), starts SQL Server in Docker on port 1434, migrates and seeds a real sample of UK boundaries, starts the Python function on port 7071 and the web app in watch mode. `Ctrl+C` stops the app and function; `docker compose down` stops SQL.
 
-`npm start` runs [`scripts/start-local.mjs`](./scripts/start-local.mjs), which:
-
-1. Creates env files if they are missing:
-   - `packages/database/.env` from `.env.example`
-   - `apps/manage/.env` from `.env.example`, with `AUTH_DISABLED=true` and a local SQL connection string
-2. Repairs older local setups if needed (SQL host port `1433` → `1434`; adds `PYTHON_FUNCTION_URL` when missing)
-3. Starts the database container (`docker compose up -d`)
-4. Waits for SQL Server on **localhost:1434**
-5. Runs migrations (`npm run db-migrate-dev`)
-6. Seeds the database (`npm run db-seed`) with a real sample of UK case boundaries and consultee areas — the main search → ruleset → results journey and the Playwright e2e tests need this data
-7. Starts the Python function on **localhost:7071**, which runs the consultee intersection logic. It creates `apps/function-python/.venv` (Python 3.12) and installs its dependencies, and gives the function and the manage app the same local API key (`local.settings.json` / `.env`). It needs [Azure Functions Core Tools](https://learn.microsoft.com/en-us/azure/azure-functions/functions-run-local) (`npm install -g azure-functions-core-tools@4`); without them, `npm start` warns and carries on, and consultee pages say "The ruleset could not be run"
-8. Starts the manage app in watch mode
-
-Stop with `Ctrl+C` (stops both the app and the function). The SQL container keeps running until you stop it (`docker compose down`).
-
-### What you get by default
-
-| Setting | Local default |
-| ------- | ------------- |
-| Manage app | http://localhost:8090 |
-| SQL Server | `localhost:1434` (container maps host `1434` → container `1433`) |
-| Auth | Disabled (`AUTH_DISABLED=true` when `.env` is created by `npm start`) |
-| Python function | http://localhost:7071 (`PYTHON_FUNCTION_URL` names its `/api/consultee-areas` route; `/api/run-ruleset` is resolved next to it) |
-
-Do not commit `.env` files. Copy from the `.env.example` files only as a template.
-
-### Seed data
-
-`npm start` seeds automatically. To re-seed later (the seed is idempotent — rows are merged, not duplicated):
-
-```bash
-npm run db-seed
-```
-
-The dev seed loads a real sample of UK infrastructure case boundaries and consultee-area reference data (from `apps/function-python/setup_database/sample_data`) into `case_boundary` and `consultee_area`. Without it the homepage search returns nothing and the e2e suite fails.
-
-To load the full reference dataset instead, use `npm run db-import` / `npm run db-import-from-blob` — see the "Database operations" section of [AGENTS.md](./AGENTS.md).
-
-### Optional: Entra authentication
-
-For real Microsoft Entra sign-in locally:
-
-1. In `apps/manage/.env`, set `AUTH_DISABLED=false`
-2. Fill in `AUTH_CLIENT_ID`, `AUTH_CLIENT_SECRET`, `AUTH_GROUP_APPLICATION_ACCESS`, and confirm `AUTH_TENANT_ID` / `APP_HOSTNAME` with a teammate
-3. Restart the manage app
-
-### Python function
-
-The ruleset — which consultees a project needs — runs in the Python function, so the project, results and report pages need it running. `npm start` starts it; to run it yourself, see [`apps/function-python/README.md`](./apps/function-python/README.md). The manage app still boots without it, and those pages show "The ruleset could not be run" until it's back.
-
-### Running pieces separately
-
-If you prefer not to use `npm start`:
-
-```bash
-# env files (or copy from the .env.example files yourself)
-cp packages/database/.env.example packages/database/.env
-cp apps/manage/.env.example apps/manage/.env
-# then set AUTH_DISABLED=true and SQL_CONNECTION_STRING for local Docker (port 1434)
-
-docker compose up -d
-npm run db-migrate-dev
-npm run dev --workspace identify-consultees-manage
-```
-
-Useful npm scripts from the repo root:
+Without the function, the app still runs but project pages say "The ruleset could not be run". Configuration, Entra sign-in and troubleshooting: [`kt-docs/local-development.md`](./kt-docs/local-development.md).
 
 | Script | Purpose |
 | ------ | ------- |
-| `npm start` | Full local bootstrap (env, DB, migrate, seed, Python function, manage app) |
-| `npm run db-migrate-dev` | Apply Prisma migrations (dev) |
-| `npm run db-seed` | Seed the database (sample boundary data) |
-| `npm run db-import -- --type=<consultee-areas\|case-boundaries> --file=<path>` | Import a GeoJSON dataset from a local file |
-| `npm run db-import-from-blob -- --type=<...> --blob=<name>` | Import a GeoJSON dataset from the app's blob container |
-| `npm run lint` / `npm test` / `npm run check-types` | Local quality checks |
+| `npm start` | Full local bootstrap |
+| `npm run db-migrate-dev` | Apply Prisma migrations |
+| `npm run db-seed` | Seed the sample data (merges, safe to re-run) |
+| `npm run db-import -- --type=<consultee-areas\|case-boundaries> --file=<path>` | Import a GeoJSON file |
+| `npm run db-import-from-blob -- --type=<...> --blob=<name>` | Import a GeoJSON blob from the app's container |
+| `npm run lint` / `npm run check-types` / `npm run format-prettier-check` | Static checks |
+| `npm test` | Unit tests, the 100% frontend coverage gate and Playwright (needs the seeded database) |
+| `npm run playwright:install` | Install Chromium, Firefox and WebKit, once |
 
-`npm test` includes Playwright e2e, which needs the seeded local database — run `npm start` first (or leave the SQL container up from an earlier run).
+## Where to read next
 
-Frontend testing (unit, GOV.UK fixtures, a11y, Playwright e2e, coverage gate, and optional visual regression) is documented in [`docs/frontend-testing.md`](./docs/frontend-testing.md). Install Chromium, Firefox, and WebKit once with `npm run playwright:install` before browser tests.
-
-For contribution workflow (branches, commits, PRs) see [CONTRIBUTING.md](./CONTRIBUTING.md). To report a security vulnerability see [SECURITY.md](./SECURITY.md). The accessibility policy (WCAG 2.2 AA, testing, statement duties) is in [ACCESSIBILITY.md](./ACCESSIBILITY.md). Agent / GDS guidance for this repo lives in [AGENTS.md](./AGENTS.md). Deeper onboarding material (architecture, routes, maps, testing, troubleshooting) lives in [`kt-docs/`](./kt-docs/README.md).
+- [`kt-docs/`](./kt-docs/README.md): how the service works and how to work on it
+- [CONTRIBUTING.md](./CONTRIBUTING.md): branches, commits and PRs
+- [AGENTS.md](./AGENTS.md): GDS, maps, toolchain and PR rules (for agents and people)
+- [ACCESSIBILITY.md](./ACCESSIBILITY.md), [SECURITY.md](./SECURITY.md)
 
 ## Editor setup
 
-The root [`tsconfig.json`](./tsconfig.json) stays compatible with Cursor / VS Code’s bundled TypeScript language service. Stricter checks such as `erasableSyntaxOnly` live in [`tsconfig.check.json`](./tsconfig.check.json) and run via `npm run check-types` (TypeScript 7 from `@typescript/native`).
+The root [`tsconfig.json`](./tsconfig.json) stays compatible with the VS Code / Cursor TypeScript service. Stricter checks (`erasableSyntaxOnly`) live in [`tsconfig.check.json`](./tsconfig.check.json) and run with `npm run check-types` (TypeScript 7, `@typescript/native`). `.vscode` points `typescript.tsdk` at `node_modules/@typescript/old/lib`; choose **Use Workspace Version** if prompted.
 
-Optional: `.vscode` points `typescript.tsdk` at `node_modules/@typescript/old/lib`. If prompted, choose **Use Workspace Version** for workspace-aligned IntelliSense.
-
-## WebStorm Run Configurations
-
-Run configurations are included for most of the npm scripts. Node and npm must be configured for the project for them to work.
-Go to Settings > Languages and Frameworks > Node.js and set the Node interpreter and package manager.
+WebStorm run configurations are included for most npm scripts; set the Node interpreter and package manager under Settings > Languages and Frameworks > Node.js.

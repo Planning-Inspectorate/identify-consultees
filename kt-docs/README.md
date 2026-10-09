@@ -1,72 +1,24 @@
-# Frontend knowledge transfer (identify consultees)
+# Identify consultees: knowledge transfer
 
-Working draft of frontend knowledge-transfer material for the Identify consultees manage app.
+How the service works and how to work on it. Plain Markdown, so it can move to Confluence later (one child page per file).
 
-> **Dual format:** These pages are written in plain Markdown so they can live in the repo now and be pasted into Confluence later with minimal rewriting. Prefer headings, tables, and short callout paragraphs over GitHub-only features. When moving to Confluence, turn each file into a child page under a parent “Frontend KT” space, and recreate relative links as page links.
+| You want to | Read |
+| ----------- | ---- |
+| Understand the service | [Overview](./overview.md) |
+| Run it locally, or fix a local problem | [Local development](./local-development.md) |
+| Change pages or journeys | [Web app](./web-app.md) → [Frontend conventions](./frontend-conventions.md) |
+| Work on the maps | [Maps](./maps.md) |
+| Work on the screening (which consultees a project needs) | [Screening service](./screening-service.md) → [Screening engine](./data/screening-engine.md) |
+| Add or fix tests | [Testing](./testing.md) |
+| Ship to an environment, or load data there | [Deployment](./deployment.md) → [Data model and loading](./data/data-model.md) |
+| Work on the data | [Data model and loading](./data/data-model.md) → [Reference data](./data/reference-data.md) → [Screening issues](./data/screening-issues.md) |
 
-## How to use this pack
+Elsewhere in the repo:
 
-| Audience | Start here |
-| -------- | ---------- |
-| New engineer joining the spike | [Project overview](./project-overview.md) → [Local setup](./local-setup.md) → [Routes and user journeys](./routes-and-user-journeys.md) |
-| Someone changing UI / GOV.UK pages | [Application structure](./application-structure.md) → [GOV.UK Frontend conventions](./govuk-frontend-conventions.md) |
-| Someone working on maps or Python | [Maps](./maps.md) → [Node–Python integration](./node-python-integration.md) |
-| Someone investigating failures | [Troubleshooting](./troubleshooting.md) |
-| Data architect / anyone working on the spatial data | [Data KT pack](./data/README.md) |
+- [`README.md`](../README.md): clone and start
+- [`AGENTS.md`](../AGENTS.md): rules for coding agents (GDS, maps, toolchain, PR practice)
+- [`CONTRIBUTING.md`](../CONTRIBUTING.md), [`ACCESSIBILITY.md`](../ACCESSIBILITY.md), [`SECURITY.md`](../SECURITY.md)
+- [`docs/gis-shapefile-upload-and-report.md`](../docs/gis-shapefile-upload-and-report.md): today's manual GIS process, which the service replaces
+- [`apps/function-python/README.md`](../apps/function-python/README.md): the Python function
 
-## Document status legend
-
-Used at the top of each page:
-
-| Status | Meaning |
-| ------ | ------- |
-| **Current** | Matches the codebase as of this draft |
-| **Partial** | Topic exists; some detail still unknown or still evolving |
-| **Planned / sparse** | Named for KT completeness; little or no implementation yet |
-
-## Contents
-
-1. [Project overview](./project-overview.md) — purpose, hypotheses, out of scope
-2. [Architecture and tracks](./architecture-and-tracks.md) — Tracks A / B / C and sample-data guidance
-3. [Local setup](./local-setup.md) — Node, npm, Python, env, start the web app
-4. [Application structure](./application-structure.md) — tour of `apps/manage`
-5. [Routes and user journeys](./routes-and-user-journeys.md) — homepage through maps and optional journeys
-6. [GOV.UK Frontend conventions](./govuk-frontend-conventions.md) — macros, layout, progressive enhancement, the `@planning-inspectorate/core` package
-7. [Search and filtering](./search-and-filtering.md) — homepage search over `case_boundary` (maps conceptual `/filter` wording)
-8. [Case and dataset pages](./case-and-dataset-pages.md) — case routing and the ruleset-driven results page
-9. [Maps](./maps.md) — Defra Interactive Map and static-map fallback
-10. [Upload and spatial screening](./upload-and-spatial-screening.md) — admin data loading + ruleset screening; end-user upload still sparse
-11. [Node–Python integration](./node-python-integration.md) — safe UI calls and fallbacks
-12. [API and data contracts](./api-and-data-contracts.md) — JSON / GeoJSON conventions
-13. [Accessibility and quality](./accessibility-and-quality.md) — WCAG expectations and no-JS
-14. [Testing](./testing.md) — lint, unit, Playwright, how to add tests
-15. [Troubleshooting](./troubleshooting.md) — common local failures
-16. [Deployment and environments](./deployment-and-environments.md) — local vs Azure
-17. [Decisions and open questions](./decisions-and-open-questions.md) — constraints and experiments
-
-### Data KT
-
-A separate pack in [`data/`](./data/README.md) covers the intersection logic — how a case is screened against consultee areas — along with the open issues affecting it, the reference data catalogue, and the current data architecture.
-
-## Related repo docs (keep linking from Confluence too)
-
-| Doc | Purpose |
-| --- | ------- |
-| [`README.md`](../README.md) | Clone, bootstrap, and day-one runbook |
-| [`AGENTS.md`](../AGENTS.md) | GDS, maps, toolchain, PR practices |
-| [`ACCESSIBILITY.md`](../ACCESSIBILITY.md) | Accessibility policy (WCAG 2.2 AA, testing, audit and statement duties) |
-| [`docs/frontend-testing.md`](../docs/frontend-testing.md) | Frontend test matrix |
-| [`docs/gis-shapefile-upload-and-report.md`](../docs/gis-shapefile-upload-and-report.md) | External GIS shapefile / report process |
-| [`apps/function-python/README.md`](../apps/function-python/README.md) | Python Azure Function local setup |
-
-## Confluence migration checklist
-
-When these pages leave the repo:
-
-- [ ] Create a parent page (suggested title: **Identify consultees — frontend KT**)
-- [ ] Create one child page per file below this README (same titles)
-- [ ] Replace relative Markdown links with Confluence page links
-- [ ] Convert “Status” tables / callouts into Confluence Info / Warning macros if desired
-- [ ] Replace file paths with links to the GitHub default branch where helpful
-- [ ] Confirm production secrets / connection strings are **not** copied into Confluence
-- [ ] Leave a short stub in `kt-docs/README.md` pointing to the Confluence parent URL
+Figures (row counts, timings) were measured in October 2026 against the full reference dataset: 18,258 consultee areas and 282 case boundaries.

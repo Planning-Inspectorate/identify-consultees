@@ -41,7 +41,7 @@ npm run check-types
 npm test
 ```
 
-`npm test` runs unit/integration tests (including GOV.UK Frontend fixtures and jsdom a11y smoke), the manage frontend 100% line coverage gate, and Playwright e2e + browser a11y. Visual regression is opt-in (`npm run test:visual`) — see [`docs/frontend-testing.md`](./docs/frontend-testing.md).
+`npm test` runs unit/integration tests (including GOV.UK Frontend fixtures and jsdom a11y smoke), the manage frontend 100% line coverage gate, and Playwright e2e + browser a11y. Visual regression is opt-in (`npm run test:visual`) — see [`kt-docs/testing.md`](./kt-docs/testing.md).
 
 Husky runs lint-staged and commit-message checks on commit.
 

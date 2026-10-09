@@ -74,7 +74,7 @@ Minimum habit for any UI change:
 
 1. **Automated** — keep the axe checks green: `pages.a11y.test.ts` (unit) and the Playwright a11y
    project (e2e). Add coverage when adding pages. See
-   [`docs/frontend-testing.md`](./docs/frontend-testing.md).
+   [`kt-docs/testing.md`](./kt-docs/testing.md).
 2. **Keyboard pass** — complete the changed journey with Tab / Shift+Tab / Enter / Space / arrows only.
 3. **Zoom and reflow** — check at 400% zoom and a narrow viewport; no horizontal scroll or lost content.
 4. **Screen reader spot check** — VoiceOver (macOS) on anything new involving dynamic regions, error
@@ -101,6 +101,6 @@ known barriers.
 ## Related documents
 
 - [AGENTS.md](./AGENTS.md) — GDS design/frontend rules, Service Standard checklist, map styling
-- [`kt-docs/accessibility-and-quality.md`](./kt-docs/accessibility-and-quality.md) — engineering checklist and quality gates
-- [`docs/frontend-testing.md`](./docs/frontend-testing.md) — test matrix including the a11y projects
+- [`kt-docs/frontend-conventions.md`](./kt-docs/frontend-conventions.md) — engineering checklist before merging UI changes
+- [`kt-docs/testing.md`](./kt-docs/testing.md) — test matrix including the a11y projects
 - [CONTRIBUTING.md](./CONTRIBUTING.md) — contribution workflow
