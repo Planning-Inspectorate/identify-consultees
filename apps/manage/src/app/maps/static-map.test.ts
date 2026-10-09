@@ -78,7 +78,7 @@ describe('static-map helpers', () => {
 		assert.equal(escapeXml('a&b<c>"d"\'e'), 'a&amp;b&lt;c&gt;&quot;d&quot;&apos;e');
 	});
 
-	test('renderStaticMapSvg draws polygons and optional basemap tiles', () => {
+	test('renderStaticMapSvg draws polygons and an optional basemap image', () => {
 		const svg = renderStaticMapSvg(
 			{
 				center: [-1.75, 50.65],
@@ -88,13 +88,13 @@ describe('static-map helpers', () => {
 				title: 'Title & more',
 				description: 'Desc <tag>'
 			},
-			[{ tileX: 0, tileY: 0, x: 0, y: 0, png: tinyPng }]
+			tinyPng
 		);
 
 		assert.match(svg, /<svg/);
 		assert.match(svg, /Title &amp; more/);
 		assert.match(svg, /Desc &lt;tag&gt;/);
-		assert.match(svg, /data:image\/png;base64,/);
+		assert.match(svg, /data:image\/jpeg;base64,/);
 		assert.match(svg, /<path /);
 	});
 

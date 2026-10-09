@@ -48,6 +48,38 @@ export function negotiateStaticMapFormat(acceptHeader: string | undefined): Stat
 }
 
 /**
+ * Composite the fetched tiles into one compressed image for embedding in the
+ * SVG static-map variant. Embedding raw PNG tiles balloons the document
+ * (~900KB for a typical viewport, over the static-map size budget in AGENTS.md);
+ * a single JPEG keeps the .svg route small while the overlay stays vector.
+ * JPEG over WebP here because SVG `<image>` decoders outside browsers
+ * (librsvg, document converters) may not support WebP.
+ * Returns undefined when there are no tiles - the SVG's flat background suffices.
+ */
+export async function renderSvgBasemapImage(
+	options: Pick<StaticMapBuildOptions, 'width' | 'height'>,
+	basemapTiles: OsmBasemapTile[]
+): Promise<Buffer | undefined> {
+	if (basemapTiles.length === 0) {
+		return undefined;
+	}
+	const width = options.width ?? MAP_VIEWPORT.width;
+	const height = options.height ?? MAP_VIEWPORT.height;
+	return sharp({
+		create: { width, height, channels: 3, background: BASEMAP_BACKGROUND }
+	})
+		.composite(
+			basemapTiles.map((tile) => ({
+				input: tile.png,
+				left: Math.round(tile.x),
+				top: Math.round(tile.y)
+			}))
+		)
+		.jpeg({ quality: 70 })
+		.toBuffer();
+}
+
+/**
  * Encode a basemap + vector overlay to the requested raster format.
  * `basemapPng` is a pre-composited basemap (e.g. a Google Static Maps PNG);
  * when absent the fetched OSM tiles are composited instead.

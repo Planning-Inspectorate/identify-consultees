@@ -3,7 +3,7 @@
  *
  * Raster path (default): negotiate AVIF → WebP → PNG from `Accept`, composite
  * OSM tiles + vector overlay via sharp (or transcode a Google Static Maps PNG).
- * `forceSvg` keeps the SVG+embedded-tiles output for the explicit `.svg` route.
+ * `forceSvg` keeps the SVG+embedded-basemap output for the explicit `.svg` route.
  */
 
 import { fetchWithTimeout } from '@planning-inspectorate/core/util';
@@ -20,6 +20,7 @@ import {
 	STATIC_MAP_CONTENT_TYPES,
 	negotiateStaticMapFormat,
 	renderStaticMapRaster,
+	renderSvgBasemapImage,
 	type StaticMapFormat
 } from './static-map-raster.ts';
 import {
@@ -147,7 +148,8 @@ export async function buildConsulteeStaticMapResponse(
 
 	if (format === 'svg') {
 		const basemapTiles = await fetchOsmBasemapTiles(buildOptions);
-		const svg = renderStaticMapSvg(buildOptions, basemapTiles);
+		const basemapImage = await renderSvgBasemapImage(buildOptions, basemapTiles);
+		const svg = renderStaticMapSvg(buildOptions, basemapImage);
 		return {
 			status: 200,
 			body: svg,

@@ -479,25 +479,24 @@ export function renderStaticMapOverlaySvg(options: StaticMapBuildOptions): strin
 }
 
 /**
- * Render SVG with optional OSM PNG tiles as a basemap.
+ * Render SVG with an optional pre-composited basemap image (see
+ * `renderSvgBasemapImage` - a single compressed image, never raw tiles).
  * When tile fetch fails, polygons still draw on a plain background.
  */
-export function renderStaticMapSvg(options: StaticMapBuildOptions, basemapTiles: OsmBasemapTile[] = []): string {
+export function renderStaticMapSvg(options: StaticMapBuildOptions, basemapImage?: Buffer): string {
 	const width = options.width ?? MAP_VIEWPORT.width;
 	const height = options.height ?? MAP_VIEWPORT.height;
 
-	const basemapMarkup = basemapTiles
-		.map((tile) => {
-			const href = `data:image/png;base64,${tile.png.toString('base64')}`;
-			return `<image href="${href}" xlink:href="${href}" x="${tile.x.toFixed(1)}" y="${tile.y.toFixed(1)}" width="${OSM_TILE_SIZE}" height="${OSM_TILE_SIZE}" preserveAspectRatio="none"/>`;
-		})
-		.join('\n');
+	// href only - xlink:href is deprecated and doubles the embedded payload
+	const basemapMarkup = basemapImage
+		? `<image href="data:image/jpeg;base64,${basemapImage.toString('base64')}" x="0" y="0" width="${width}" height="${height}" preserveAspectRatio="none"/>`
+		: '';
 
 	const title = escapeXml(options.title ?? 'Static map of project site and consultee areas');
 	const desc = escapeXml(options.description ?? title);
 
 	return `<?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" role="img" aria-labelledby="title desc">
+<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" role="img" aria-labelledby="title desc">
   <title id="title">${title}</title>
   <desc id="desc">${desc}</desc>
   <rect width="100%" height="100%" fill="#f5f5f0"/>
