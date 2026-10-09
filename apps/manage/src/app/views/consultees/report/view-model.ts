@@ -1,10 +1,12 @@
 import type { ReportCategory } from './report-consultees.ts';
 
 export interface IdentifiedConsultee {
-	/** The consultee category (e.g. "Parish Council") the count is for. */
+	/** The consultee category (e.g. "Parish Council") the row is for. */
 	name: string;
-	/** How many areas of this category the ruleset matched - as text, for the summary list. */
-	count: string;
+	/** The category's consultee names, capped at the first few (see total for the real count). */
+	names: string[];
+	/** How many consultees the category has in total - may exceed names.length. */
+	total: number;
 	changeUrl: string;
 }
 
@@ -13,14 +15,15 @@ export interface ReportCheckViewModel {
 	backLinkUrl: string;
 	caseName: string;
 	reference: string;
-	/** Project stage - null when the data source doesn't carry one. */
-	stage: string | null;
 	caseChangeUrl: string;
+	/** The shapefile the report runs against. */
+	shapefileName: string;
+	shapefileChangeUrl: string;
 	rulesetName: string;
 	rulesetChangeUrl: string;
 	/** One row per category the ruleset covers, in the ruleset's own order - zeros included. */
 	consultees: IdentifiedConsultee[];
-	/** The "Generate report" link - the report created confirmation page. */
+	/** The "Create report" link - the report created confirmation page. */
 	generateReportUrl: string;
 	/** True when the ruleset couldn't be run at all - the counts would be misleading zeros. */
 	rulesetFailed: boolean;

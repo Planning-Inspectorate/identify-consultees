@@ -3,19 +3,24 @@ import type { ConsulteeMatch, Ruleset } from '@pins/identify-consultees-database
 import { getRuleset, RULESETS } from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
 import type { AsyncRequestHandler } from '@planning-inspectorate/core/util';
 import { resolveCase } from '../resolve-case.ts';
-import { firstQueryValue, projectPageUrl, runRulesetSafely } from '../run-ruleset.ts';
+import { firstQueryValue, runRulesetSafely } from '../run-ruleset.ts';
 import { reportCategories } from './categories.ts';
-import { reportByCategory } from './report-consultees.ts';
+import { consulteeName, reportByCategory } from './report-consultees.ts';
 import type { ConsulteeSelection } from './urls.ts';
-import { addedConsultees, consulteesUrl, excludedIds, reportCreatedUrl, reportUrl } from './urls.ts';
+import { addedConsultees, consulteesUrl, excludedIds, reportCreatedUrl, reportUrl, rulesetUrl } from './urls.ts';
 import type { IdentifiedConsultee, ReportCheckViewModel, ReportCreatedViewModel } from './view-model.ts';
+
+// the check page lists consultee names per category, capped - seeing or removing the rest is
+// what each category's Change page is for
+const MAX_LISTED_CONSULTEES = 10;
 
 /**
  * Every category the ruleset covers, in the order its rules name them, then any other category the
- * run found (see reportCategories), with each one's visible consultee count - including covered
- * categories that matched nothing, so the list reads as the ruleset's full coverage. Excluded consultees (removed on a
- * category's Change page) don't count and hand-added ones do - the number here is the number of
- * rows that page lists.
+ * run found (see reportCategories), with each one's visible consultee names - including covered
+ * categories that matched nothing, so the list reads as the ruleset's full coverage. Excluded
+ * consultees (removed on a category's Change page) don't appear and hand-added ones do - the
+ * total here is the number of rows that page lists. Categories bigger than MAX_LISTED_CONSULTEES
+ * name only the first few, with the total alongside.
  */
 function identifiedConsultees(
 	ruleset: Ruleset,
@@ -23,21 +28,25 @@ function identifiedConsultees(
 	matches: ConsulteeMatch[],
 	selection: ConsulteeSelection
 ): IdentifiedConsultee[] {
-	const counts = new Map<string, number>();
+	const names = new Map<string, string[]>();
 	for (const match of matches) {
 		const category = match.feature.properties.consulteeCategory;
 		if (category && !selection.excluded.has(match.feature.id)) {
-			counts.set(category, (counts.get(category) ?? 0) + 1);
+			names.set(category, [...(names.get(category) ?? []), consulteeName(match)]);
 		}
 	}
 	for (const add of selection.adds) {
-		counts.set(add.category, (counts.get(add.category) ?? 0) + 1);
+		names.set(add.category, [...(names.get(add.category) ?? []), add.name]);
 	}
-	return reportCategories(ruleset, matches).map((name) => ({
-		name,
-		count: String(counts.get(name) ?? 0),
-		changeUrl: consulteesUrl(caseId, ruleset.id, name, selection)
-	}));
+	return reportCategories(ruleset, matches).map((name) => {
+		const categoryNames = names.get(name) ?? [];
+		return {
+			name,
+			names: categoryNames.slice(0, MAX_LISTED_CONSULTEES),
+			total: categoryNames.length,
+			changeUrl: consulteesUrl(caseId, ruleset.id, name, selection)
+		};
+	});
 }
 
 /**
@@ -58,7 +67,7 @@ export function buildReportCheckPage(service: ManageService): AsyncRequestHandle
 		}
 
 		// same ruleset semantics as the map page: absent means the default, present-but-unknown 404s
-		const requestedRuleset = firstQueryValue(req.query.ruleset);
+		const requestedRuleset = firstQueryValue(req.query?.ruleset);
 		const ruleset = requestedRuleset ? getRuleset(requestedRuleset) : RULESETS[0];
 		if (!ruleset) {
 			res.status(404).render('views/errors/404.njk', { pageHeading: 'Page not found' });
@@ -78,20 +87,22 @@ export function buildReportCheckPage(service: ManageService): AsyncRequestHandle
 			logger
 		);
 		const selection: ConsulteeSelection = {
-			excluded: excludedIds(req.query.exclude),
-			adds: addedConsultees(req.query.add)
+			excluded: excludedIds(req.query?.exclude),
+			adds: addedConsultees(req.query?.add)
 		};
 
 		const viewModel: ReportCheckViewModel = {
 			pageHeading: 'Check consultees before creating the report',
-			backLinkUrl: projectPageUrl(project.id, ruleset.id),
+			backLinkUrl: rulesetUrl(project.id, ruleset.id, selection),
 			caseName: project.properties.caseName,
 			reference: project.properties.caseReference,
-			stage: project.properties.acceptance ?? null,
-			// changing the case means picking a different project - back to the search
+			// changing the project means picking a different one - back to the search
 			caseChangeUrl: '/',
+			shapefileName: project.properties.fileName ?? 'Not provided',
+			// changing the shapefile means re-confirming the boundary - back to the map page
+			shapefileChangeUrl: `/consultees/${encodeURIComponent(project.id)}`,
 			rulesetName: ruleset.name,
-			rulesetChangeUrl: `/consultees/${encodeURIComponent(project.id)}/ruleset?ruleset=${encodeURIComponent(ruleset.id)}`,
+			rulesetChangeUrl: rulesetUrl(project.id, ruleset.id, selection),
 			consultees: identifiedConsultees(ruleset, project.id, consultees, selection),
 			generateReportUrl: reportCreatedUrl(project.id, ruleset.id, selection),
 			rulesetFailed: failed,
@@ -120,7 +131,7 @@ export function buildReportCreatedPage(service: ManageService): AsyncRequestHand
 		}
 
 		// same ruleset semantics as the map page: absent means the default, present-but-unknown 404s
-		const requestedRuleset = firstQueryValue(req.query.ruleset);
+		const requestedRuleset = firstQueryValue(req.query?.ruleset);
 		const ruleset = requestedRuleset ? getRuleset(requestedRuleset) : RULESETS[0];
 		if (!ruleset) {
 			res.status(404).render('views/errors/404.njk', { pageHeading: 'Page not found' });
@@ -128,8 +139,8 @@ export function buildReportCreatedPage(service: ManageService): AsyncRequestHand
 		}
 
 		const selection: ConsulteeSelection = {
-			excluded: excludedIds(req.query.exclude),
-			adds: addedConsultees(req.query.add)
+			excluded: excludedIds(req.query?.exclude),
+			adds: addedConsultees(req.query?.add)
 		};
 		const { consultees, failed } = await runRulesetSafely(
 			rulesetRunner,
@@ -142,7 +153,7 @@ export function buildReportCreatedPage(service: ManageService): AsyncRequestHand
 
 		const viewModel: ReportCreatedViewModel = {
 			pageHeading: 'Report created',
-			backLinkUrl: projectPageUrl(project.id, ruleset.id),
+			backLinkUrl: reportUrl(project.id, ruleset.id, selection),
 			caseName: project.properties.caseName,
 			reference: project.properties.caseReference,
 			rulesetName: ruleset.name,

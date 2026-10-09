@@ -2,16 +2,16 @@
 
 "The map" means the interactive Defra Interactive Map. The "static map" is the server-rendered image shown without JavaScript or when the interactive map fails. The rules (static map caching, Defra gotchas, GIS styling) are in the Maps section of [AGENTS.md](../AGENTS.md); this page explains how the project maps are built.
 
-| Mode        | How                                                                                                                                                                                                                                                                       |
-| ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Interactive | Defra bundles from `/vendor/*`, started by `public/javascripts/consultees-map.js` from the page's inline JSON config                                                                                                                                                      |
-| Static      | `/consultees/:caseId/results/static-map` (AVIF, WebP or PNG from `Accept`) or `.../static-map.svg`. Tiles are fetched and composited by the app, with ETags and long caching (`maps/serve-static-map.ts`, `static-map.ts`, `static-map-raster.ts`, `static-map-cache.ts`) |
+| Mode        | How                                                                                                                                                                                                                                                                                                                                           |
+| ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Interactive | Defra bundles from `/vendor/*`, started by `public/javascripts/consultees-map.js` from the page's inline JSON config                                                                                                                                                                                                                          |
+| Static      | `/consultees/:caseId/results/static-map` — the boundary page's variant is `/consultees/:caseId/boundary-map` (AVIF, WebP or PNG from `Accept`) or `.../static-map.svg`. Tiles are fetched and composited by the app, with ETags and long caching (`maps/serve-static-map.ts`, `static-map.ts`, `static-map-raster.ts`, `static-map-cache.ts`) |
 
-The project page, a report category page and the results page all use the partial `views/partials/consultee-map-region.njk` and the same static map route; a category page adds `category` and `exclude` to it.
+The project boundary page, a report category page and the results page all use the partial `views/partials/consultee-map-region.njk`; the boundary page serves its own `/boundary-map` route, and a category page adds `category` and `exclude` to the results route.
 
 ## Building the map
 
-Each map page's controller does the same steps, with helpers from `views/consultees/run-ruleset.ts`:
+The results and category pages' controllers do the same steps, with helpers from `views/consultees/run-ruleset.ts` (the boundary page is simpler: `maps/boundary-map.ts` turns each stored shapefile into a dataset, no ruleset run):
 
 1. Loads the case boundary (`resolveCase`).
 2. Runs the ruleset in the Python function (`runRulesetSafely`, through `service.rulesetRunner`). It returns every consultee it found, by a condition or within the nearby radius (20km), with its reasons.
@@ -35,7 +35,7 @@ Clicking a feature selects it and a "Selected on the map" panel shows its name, 
 
 ## Defra map gotchas found here
 
-- Each dataset needs an `idProperty` (`consulteeId`, or `reference` for the project). MapLibre drops string feature ids, so without it nothing can be selected and the console warns about "string native IDs".
+- Each dataset needs an `idProperty` (`consulteeId`, `reference` for the project, `fileKey` for the boundary page's shapefiles). MapLibre drops string feature ids, so without it nothing can be selected and the console warns about "string native IDs".
 - Interact `layerId`s are MapLibre layer ids: `<dataset id>-<sublayer id>` (for example `consultee-areas-identified-0`), plus `-stroke` when a sublayer has both fill and outline.
 - There's no fill-opacity option; `fillOpacity` is ignored and the fill drawn solid. Put the alpha in the colour (`translucent('#55A868', 0.05)`). The map-layers demo and component examples still draw solid fills for this reason.
 - A custom `symbolSvgContent` must include `{{haloColor}}`, `{{selectedColor}}` and `{{activeColor}}`, or it isn't drawn.

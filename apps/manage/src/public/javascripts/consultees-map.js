@@ -146,6 +146,30 @@ export function showStaticMapFallback(container, fallback) {
 export function buildDatasets(config) {
 	const datasets = [];
 
+	// the boundary page's shapefiles: one dataset each, grouped under the same Layers-menu
+	// heading - only the confirmed file starts visible (checked), the rest are toggled on
+	for (const file of config.shapefileDatasets ?? []) {
+		if (file.geojson?.features?.length > 0) {
+			datasets.push({
+				id: file.id,
+				label: file.label,
+				groupLabel: config.shapefileGroupLabel ?? 'GIS shapefiles',
+				idProperty: 'fileKey',
+				geojson: file.geojson,
+				minZoom: 0,
+				maxZoom: 24,
+				visible: file.checked !== false,
+				showInKey: true,
+				showInMenu: true,
+				style: {
+					stroke: '#C44E52',
+					strokeWidth: 2,
+					fill: translucent('#C44E52', 0.45)
+				}
+			});
+		}
+	}
+
 	// datasets draw in order: the project site on top of the consultee areas
 	if (config.consulteeGeojson?.features?.length > 0) {
 		datasets.push({
@@ -204,7 +228,7 @@ export function buildSelectableLayers(datasets) {
 		}
 	};
 	for (const dataset of datasets) {
-		if (dataset.id === 'project-site') {
+		if (dataset.id === 'project-site' || dataset.idProperty === 'fileKey') {
 			add(dataset.id, dataset.idProperty);
 		}
 		for (const sublayer of dataset.sublayers ?? []) {

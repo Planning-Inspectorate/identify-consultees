@@ -8,11 +8,13 @@ import {
 	excludedIds,
 	queryValues,
 	reportCreatedUrl,
-	reportUrl
+	reportUrl,
+	rulesetUrl
 } from './urls.ts';
 
 describe('report url helpers', () => {
 	it('should build report URLs without any selection', () => {
+		assert.strictEqual(rulesetUrl('case-1', 'rs-1'), '/consultees/case-1/ruleset?ruleset=rs-1');
 		assert.strictEqual(reportUrl('case-1', 'rs-1'), '/consultees/case-1/report?ruleset=rs-1');
 		assert.strictEqual(reportCreatedUrl('case-1', 'rs-1'), '/consultees/case-1/report/created?ruleset=rs-1');
 		assert.strictEqual(
@@ -34,6 +36,10 @@ describe('report url helpers', () => {
 			excluded: new Set(['a b', 'c']),
 			adds: [{ category: 'Parish Council', name: 'A&B Consultee', reason: 'it borders' }]
 		};
+		assert.strictEqual(
+			rulesetUrl('case-1', 'rs-1', selection),
+			'/consultees/case-1/ruleset?ruleset=rs-1&exclude=a%20b&exclude=c&add=%7B%22c%22%3A%22Parish%20Council%22%2C%22n%22%3A%22A%26B%20Consultee%22%2C%22r%22%3A%22it%20borders%22%7D'
+		);
 		assert.strictEqual(
 			reportUrl('case-1', 'rs-1', selection),
 			'/consultees/case-1/report?ruleset=rs-1&exclude=a%20b&exclude=c&add=%7B%22c%22%3A%22Parish%20Council%22%2C%22n%22%3A%22A%26B%20Consultee%22%2C%22r%22%3A%22it%20borders%22%7D'

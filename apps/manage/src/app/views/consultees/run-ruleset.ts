@@ -85,8 +85,3 @@ export async function buildSearchAreaSafely(
 export function selectedRuleset(requestedId: unknown): Ruleset {
 	return getRuleset(firstQueryValue(requestedId)) ?? RULESETS[0];
 }
-
-/** The project map page for a boundary/ruleset pair - where the pickers' "Save and return" leads. */
-export function projectPageUrl(caseId: string, rulesetId: string): string {
-	return `/consultees/${encodeURIComponent(caseId)}?ruleset=${encodeURIComponent(rulesetId)}`;
-}

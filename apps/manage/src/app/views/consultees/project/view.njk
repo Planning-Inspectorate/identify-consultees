@@ -1,8 +1,7 @@
 {% extends "views/layouts/main.njk" %}
 
 {% from "govuk/components/button/macro.njk" import govukButton %}
-{% from "govuk/components/summary-list/macro.njk" import govukSummaryList %}
-{% from "govuk/components/tag/macro.njk" import govukTag %}
+{% from "govuk/components/radios/macro.njk" import govukRadios %}
 
 {% block pageTitle %}
 	{{ pageHeading }} - {{ config.headerTitle }}
@@ -15,65 +14,7 @@
 	<link rel="stylesheet" href="/{{ config.vendorMapKeyPluginCss }}">
 {% endblock %}
 
-{% block pageHeading %}
-	<div class="govuk-grid-row">
-		<div class="govuk-grid-column-full">
-			<div class="pins-project-header">
-				<h1 class="govuk-heading-xl">
-					<span class="govuk-caption-xl">{{ reference }}</span>
-					{{ caseName }}
-				</h1>
-				{% if sectorDescription %}
-					<p class="govuk-body govuk-!-margin-bottom-2">{{ sectorDescription }}</p>
-				{% endif %}
-				{% if stage %}
-					{{ govukTag({ text: stage }) }}
-				{% endif %}
-			</div>
-		</div>
-	</div>
-{% endblock %}
-
 {% block pageContent %}
-	{% if rulesetFailed %}
-		{% from "govuk/components/notification-banner/macro.njk" import govukNotificationBanner %}
-		{% set failureHtml %}
-			<h3 class="govuk-notification-banner__heading">The ruleset could not be run</h3>
-			<p class="govuk-body">No consultees are shown because the search did not finish. This is not the same as finding no consultees. <a class="govuk-notification-banner__link" href="{{ retryUrl }}">Try again</a>.</p>
-		{% endset %}
-		{{ govukNotificationBanner({ html: failureHtml }) }}
-	{% endif %}
-
-	{{ govukSummaryList({
-		rows: [
-			{
-				key: { text: "Shapefile" },
-				value: { text: shapefileName },
-				actions: {
-					items: [
-						{ href: shapefileChangeUrl, text: "Change", visuallyHiddenText: "shapefile" }
-					]
-				}
-			},
-			{
-				key: { text: "Ruleset" },
-				value: { text: rulesetName },
-				actions: {
-					items: [
-						{ href: rulesetChangeUrl, text: "Change", visuallyHiddenText: "ruleset" }
-					]
-				}
-			}
-		]
-	}) }}
-
-	{% if mapIsSampled %}
-		{% from "govuk/components/inset-text/macro.njk" import govukInsetText %}
-		{{ govukInsetText({
-			text: "This ruleset matched " ~ matchCount ~ " consultees - showing a sample of " ~ mapSampleSize ~ " on the map below."
-		}) }}
-	{% endif %}
-
 	{% set mapRegionLabel = mapRegionLabel %}
 	{% set staticMapSrc = staticMapSrc %}
 	{% set staticMapAlt = staticMapAlt %}
@@ -82,12 +23,24 @@
 	{% set mapConfigJson = mapConfigJson %}
 	{% include "views/partials/consultee-map-region.njk" %}
 
-	<div class="govuk-button-group govuk-!-margin-top-6">
-		{{ govukButton({
-			text: "Preview report",
-			href: previewReportUrl
+	<form method="post" action="{{ formAction }}" novalidate class="govuk-!-margin-top-6">
+		<input type="hidden" name="_csrf" value="{{ _csrf }}">
+		{{ govukRadios({
+			idPrefix: "shapefile",
+			name: "shapefile",
+			fieldset: {
+				legend: {
+					text: "Confirm shapefile for report",
+					classes: "govuk-fieldset__legend--m"
+				}
+			},
+			items: files
 		}) }}
-	</div>
+
+		{{ govukButton({
+			text: "Continue"
+		}) }}
+	</form>
 {% endblock %}
 
 {% block bodyEnd %}

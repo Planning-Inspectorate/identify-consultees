@@ -106,38 +106,36 @@ describe('manage router wiring', () => {
 		const response = await request(authDisabledApp).get('/?q=Router+Test+Fixture&pageSize=50');
 		assert.equal(response.status, 200);
 		assert.match(response.text, /Showing 1 to 1 of 1 results/);
-		assert.match(response.text, />50</);
 	});
 
-	test('GET /consultees/:id renders the project map page', async () => {
+	test('GET /consultees/:id renders the project boundary page', async () => {
 		const response = await request(authDisabledApp).get(`/consultees/${homePageTestCaseId}`);
 		assert.equal(response.status, 200);
+		assert.match(response.text, /Project boundary/);
 		assert.match(response.text, /Router Test Fixture Wind Farm/);
 		assert.match(response.text, /Back to projects/);
-		assert.match(response.text, /Shapefile/);
-		assert.match(response.text, /England Wales post 30 April 2024/);
-		assert.match(response.text, /Preview report/);
-		assert.doesNotMatch(response.text, /Run Intersection logic/);
+		assert.match(response.text, /Confirm shapefile for report/);
+		assert.match(response.text, /Continue/);
 		assert.match(response.text, /app-consultee-map/);
+		// the single stored file plus the stand-in second file the page adds for the file toggle
+		assert.match(response.text, /type="radio"[^>]*value="33333333-3333-3333-3333-333333333333"/);
+		assert.match(response.text, /type="radio"[^>]*value="33333333-3333-3333-3333-333333333333:placeholder"/);
 	});
 
 	test('GET /consultees/:id/ruleset renders the ruleset radios', async () => {
 		const response = await request(authDisabledApp).get(`/consultees/${homePageTestCaseId}/ruleset`);
 		assert.equal(response.status, 200);
-		assert.match(response.text, /<h1[^>]*>\s*Ruleset|Ruleset\s*<\/h1>/);
+		// the fieldset legend is the page heading, with the case name as its caption
+		assert.match(
+			response.text,
+			/<legend[^>]*>\s*<h1[^>]*>\s*<span class="govuk-caption-xl">[^<]*<\/span>Ruleset\s*<\/h1>\s*<\/legend>/
+		);
+		assert.match(response.text, /Router Test Fixture Wind Farm/);
 		assert.match(response.text, /type="radio"[^>]*value="england-wales-post-20240430"/);
-		assert.match(response.text, /Save and return/);
+		assert.match(response.text, /Identify consultees/);
 	});
 
-	test('GET /consultees/:id/shapefile renders the file radios', async () => {
-		const response = await request(authDisabledApp).get(`/consultees/${homePageTestCaseId}/shapefile`);
-		assert.equal(response.status, 200);
-		assert.match(response.text, /Project shapefile/);
-		assert.match(response.text, /type="radio"[^>]*value="33333333-3333-3333-3333-333333333333"/);
-		assert.match(response.text, /Save and return/);
-	});
-
-	test('POST /consultees/:id/ruleset redirects back to the map page with the chosen ruleset', async () => {
+	test('POST /consultees/:id/ruleset leads on to the check page with the chosen ruleset', async () => {
 		const agent = request.agent(authDisabledApp);
 		const page = await agent.get(`/consultees/${homePageTestCaseId}/ruleset`);
 		const csrf = /name="_csrf" value="([^"]+)"/.exec(page.text)?.[1];
@@ -148,21 +146,38 @@ describe('manage router wiring', () => {
 			.type('form')
 			.send({ _csrf: csrf, ruleset: 'england-wales-post-20240430' });
 		assert.equal(response.status, 302);
-		assert.equal(response.headers.location, `/consultees/${homePageTestCaseId}?ruleset=england-wales-post-20240430`);
+		assert.equal(
+			response.headers.location,
+			`/consultees/${homePageTestCaseId}/report?ruleset=england-wales-post-20240430`
+		);
 	});
 
-	test('POST /consultees/:id/shapefile redirects to the chosen boundary’s map page', async () => {
+	test('POST /consultees/:id leads on to the ruleset page for the chosen shapefile', async () => {
 		const agent = request.agent(authDisabledApp);
-		const page = await agent.get(`/consultees/${homePageTestCaseId}/shapefile`);
+		const page = await agent.get(`/consultees/${homePageTestCaseId}`);
 		const csrf = /name="_csrf" value="([^"]+)"/.exec(page.text)?.[1];
 		assert.ok(csrf, 'expected the shapefile form to carry a CSRF token');
 
 		const response = await agent
-			.post(`/consultees/${homePageTestCaseId}/shapefile`)
+			.post(`/consultees/${homePageTestCaseId}`)
 			.type('form')
-			.send({ _csrf: csrf, shapefile: homePageTestCaseId, ruleset: 'england-wales-post-20240430' });
+			.send({ _csrf: csrf, shapefile: homePageTestCaseId });
 		assert.equal(response.status, 302);
-		assert.equal(response.headers.location, `/consultees/${homePageTestCaseId}?ruleset=england-wales-post-20240430`);
+		assert.equal(response.headers.location, `/consultees/${homePageTestCaseId}/ruleset`);
+	});
+
+	test('POST /consultees/:id returns to the page when the shapefile is not one of its files', async () => {
+		const agent = request.agent(authDisabledApp);
+		const page = await agent.get(`/consultees/${homePageTestCaseId}`);
+		const csrf = /name="_csrf" value="([^"]+)"/.exec(page.text)?.[1];
+		assert.ok(csrf, 'expected the shapefile form to carry a CSRF token');
+
+		const response = await agent
+			.post(`/consultees/${homePageTestCaseId}`)
+			.type('form')
+			.send({ _csrf: csrf, shapefile: '99999999-9999-9999-9999-999999999999' });
+		assert.equal(response.status, 302);
+		assert.equal(response.headers.location, `/consultees/${homePageTestCaseId}`);
 	});
 
 	test('GET /consultees/:id/report renders the report check page', async () => {
@@ -173,7 +188,7 @@ describe('manage router wiring', () => {
 		assert.match(response.text, /Check consultees before creating the report/);
 		assert.match(response.text, /Report details/);
 		assert.match(response.text, /Identified consultees/);
-		assert.match(response.text, /Generate report/);
+		assert.match(response.text, /Create report/);
 	});
 
 	test('GET /consultees/:id/report/consultees renders a category’s change page', async () => {

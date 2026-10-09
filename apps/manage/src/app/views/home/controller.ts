@@ -1,12 +1,9 @@
 import type { ManageService } from '#service';
 import type { CaseBoundarySummary } from '@pins/identify-consultees-database/src/geospatial/case-boundaries.ts';
-import {
-	getRandomCaseSummary,
-	searchCaseBoundaries
-} from '@pins/identify-consultees-database/src/geospatial/case-boundaries.ts';
+import { searchCaseBoundaries } from '@pins/identify-consultees-database/src/geospatial/case-boundaries.ts';
 import type { AsyncRequestHandler } from '@planning-inspectorate/core/util';
 import { buildPagination } from './pagination.ts';
-import type { ExampleCase, HomeViewModel, ProjectGeometry } from './view-model.ts';
+import type { HomeViewModel, ProjectGeometry } from './view-model.ts';
 
 const PAGE_SIZE_OPTIONS = [25, 50, 100];
 const DEFAULT_PAGE_SIZE = 25;
@@ -39,7 +36,7 @@ function toProjectGeometry(summary: CaseBoundarySummary): ProjectGeometry {
 
 /**
  * Step 1 of the identify-consultees flow: search for and pick a project. Picking one (see
- * views/home/view.njk) moves on to /consultees/:caseId to choose a ruleset.
+ * views/home/view.njk) moves on to /consultees/:caseId - the project boundary page.
  */
 export function buildHomePage(service: ManageService): AsyncRequestHandler {
 	const { db, logger } = service;
@@ -81,26 +78,16 @@ export function buildHomePage(service: ManageService): AsyncRequestHandler {
 			return res.redirect(hrefForPage(totalPages));
 		}
 
-		let exampleCase: ExampleCase | null = null;
-		try {
-			const summary = await getRandomCaseSummary(db);
-			exampleCase = summary ? { reference: summary.reference, caseName: summary.caseName } : null;
-		} catch (error) {
-			logger.error({ error }, 'Failed to fetch an example case for the home page');
-		}
-
 		const viewModel: HomeViewModel = {
 			pageHeading: 'Identify consultees for a NSIP project',
 			searchQuery,
 			pageSize,
-			pageSizeOptions: PAGE_SIZE_OPTIONS,
 			page,
 			resultsFrom: geometries.length > 0 ? (page - 1) * pageSize + 1 : 0,
 			resultsTo: (page - 1) * pageSize + geometries.length,
 			resultsTotal,
 			geometries,
-			pagination: buildPagination(page, totalPages, hrefForPage),
-			exampleCase
+			pagination: buildPagination(page, totalPages, hrefForPage)
 		};
 
 		return res.render('views/home/view.njk', viewModel);

@@ -29,10 +29,10 @@ A request goes: `server.ts` → `createApp` → `buildRouter` (monitoring, `/ven
 | Path                                                                        | Page                                                                                                                         |
 | --------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
 | `GET /`                                                                     | Project search (`q`), `pageSize` 25, 50 or 100, and `page`. SQL over `case_boundary` (`searchCaseBoundaries`)                |
-| `GET /consultees/:caseId?ruleset=…`                                         | Project page: boundary file, ruleset, map of identified consultees, _Preview report_                                         |
-| `GET, POST /consultees/:caseId/ruleset`                                     | Change ruleset. Returns to the project page                                                                                  |
-| `GET, POST /consultees/:caseId/shapefile`                                   | Change boundary file. Lands on that boundary's project page                                                                  |
-| `GET /consultees/:caseId/report`                                            | Check page: report details and consultee counts per category                                                                 |
+| `GET, POST /consultees/:caseId`                                             | Project boundary page: map of the case's shapefiles, radios to confirm the file for the report. Posts on to the ruleset page |
+| `GET /consultees/:caseId/boundary-map(.svg)`                                | Static boundary map image (AVIF, WebP or PNG from `Accept`; or SVG)                                                          |
+| `GET, POST /consultees/:caseId/ruleset`                                     | Pick the ruleset. Posts on to the check page                                                                                 |
+| `GET /consultees/:caseId/report?ruleset=…`                                  | Check page: report details and each category's consultee names (10 shown per category)                                       |
 | `GET /consultees/:caseId/report/consultees?category=…`                      | One category's map and consultees, each with _Remove_ and **Why identified**                                                 |
 | `GET, POST /consultees/:caseId/report/consultees/add`                       | Add a consultee by hand (name and reason)                                                                                    |
 | `GET /consultees/:caseId/report/created`                                    | Report created: download link (placeholder) and the report's consultees by category, with why each is in it                  |
@@ -55,10 +55,10 @@ Dev pages mount only when `devPagesEnabled` is on (not production, or `ENABLE_DE
 ## The journey
 
 1. Search on `/` and pick a project. Links use the case boundary's id: `resolveCase` 404s anything that isn't a UUID without touching the database. A case reference (`EN010025`) isn't unique, because a project can have several boundary files.
-2. The project page runs the default ruleset through the Python function and shows the map. **Change** the boundary file or ruleset; each returns with the choice in the URL.
-3. _Preview report_ opens the check page with counts per category.
-4. A category's **Change** link lists its consultees. _Remove_ adds `exclude=<consulteeAreaId>` to the URL. _Add consultee_ adds `add=<json>` (`{"c":category,"n":name,"r":reason}`). There's no server-side state, so the counts and lists always agree (`report/urls.ts`).
-5. _Generate report_ carries the same parameters to the created page: the run's consultees less removals, plus additions, each with **Why identified** (`consultees/reasons.ts`).
+2. The project boundary page draws every stored shapefile as a toggleable "GIS shapefiles" map layer; the radios below confirm the single file carried into the report. When a case has only one file, a stand-in second file appears so the toggle can be exercised — submitting it resolves back to the real boundary. Picking a different real file continues the journey under that submission's own id.
+3. _Continue_ leads to the ruleset radios; _Identify consultees_ leads to the check page: report details (project, reference, shapefile, ruleset — each with a _Change_ link) and each category's consultee names, capped at 10 with a "Showing 10 of N" note beyond that.
+4. A category's **Change** link lists its consultees. _Remove_ adds `exclude=<consulteeAreaId>` to the URL. _Add consultee_ adds `add=<json>` (`{"c":category,"n":name,"r":reason}`). There's no server-side state, so the lists and rows always agree (`report/urls.ts`).
+5. _Create report_ carries the same parameters to the created page: the run's consultees less removals, plus additions, each with **Why identified** (`consultees/reasons.ts`).
 
 If the ruleset can't be run (function down, timeout, bad key) the pages say so instead of showing an empty list. With no database the search shows an empty list and logs the error.
 

@@ -74,7 +74,15 @@ function appendSelection(url: string, selection: ConsulteeSelection): string {
 	return url;
 }
 
-/** The report check page ("Preview report" destination) for a boundary/ruleset/selection. */
+/** The ruleset picker page - where the boundary page's "Continue" and the check page's "Change"/back links lead. */
+export function rulesetUrl(caseId: string, rulesetId: string, selection: ConsulteeSelection = NO_SELECTION): string {
+	return appendSelection(
+		`/consultees/${encodeURIComponent(caseId)}/ruleset?ruleset=${encodeURIComponent(rulesetId)}`,
+		selection
+	);
+}
+
+/** The report check page ("Identify consultees" destination) for a boundary/ruleset/selection. */
 export function reportUrl(caseId: string, rulesetId: string, selection: ConsulteeSelection = NO_SELECTION): string {
 	return appendSelection(
 		`/consultees/${encodeURIComponent(caseId)}/report?ruleset=${encodeURIComponent(rulesetId)}`,

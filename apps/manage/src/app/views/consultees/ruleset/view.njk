@@ -11,14 +11,16 @@
 {% block pageHeading %}{% endblock %}
 
 {% block pageContent %}
-	<form method="post" action="/consultees/{{ caseId | urlencode }}/ruleset" novalidate>
+	{# the case name sits inside the legend's h1 as its caption, as the layout renders it #}
+	{% set legendHtml %}<span class="govuk-caption-xl">{{ pageCaption }}</span>{{ pageHeading }}{% endset %}
+	<form method="post" action="{{ formAction }}" novalidate>
 		<input type="hidden" name="_csrf" value="{{ _csrf }}">
 		{{ govukRadios({
 			idPrefix: "ruleset",
 			name: "ruleset",
 			fieldset: {
 				legend: {
-					text: pageHeading,
+					html: legendHtml,
 					isPageHeading: true,
 					classes: "govuk-fieldset__legend--xl"
 				}
@@ -27,7 +29,7 @@
 		}) }}
 
 		{{ govukButton({
-			text: "Save and return"
+			text: "Identify consultees"
 		}) }}
 	</form>
 {% endblock %}

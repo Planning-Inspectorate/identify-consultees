@@ -7,7 +7,11 @@ export interface RulesetOption {
 
 export interface RulesetPickerViewModel {
 	pageHeading: string;
+	/** The case name - sits above the "Ruleset" heading as a caption. */
+	pageCaption: string;
 	backLinkUrl: string;
 	caseId: string;
+	/** Where the "Identify consultees" form posts - carries any consultee selection through. */
+	formAction: string;
 	rulesets: RulesetOption[];
 }
