@@ -3,9 +3,9 @@
 resource "azurerm_mssql_server" "secondary" {
   count = var.secondary_region_enabled ? 1 : 0
 
-  # checkov:skip=CKV2_AZURE_2: "Ensure that Vulnerability Assessment (VA) is enabled on a SQL server by setting a Storage Account"
-  # checkov:skip=CKV_AZURE_23: "Ensure that 'Auditing' is set to 'On' for SQL servers"
-  # checkov:skip=CKV_AZURE_24: "Ensure that 'Auditing' Retention is 'greater than 90 days' for SQL servers"
+  # checkov:skip=CKV2_AZURE_2: "VA runs on the primary server (database-monitoring.tf); a failover replica only needs its own auditing, which is configured there too"
+  # checkov:skip=CKV_AZURE_23: "Auditing is on - see azurerm_mssql_server_extended_auditing_policy.sql_server_secondary in database-monitoring.tf"
+  # checkov:skip=CKV_AZURE_24: "Retention comes from var.sql_config.retention.audit_days (90d) - Checkov can't resolve the variable"
   # checkov:skip=CKV2_AZURE_45: "has a private endpoint (sql_secondary below) - Checkov can't follow the link to a count-indexed resource"
 
   name                          = "${local.org}-sql-${local.secondary_resource_suffix}"

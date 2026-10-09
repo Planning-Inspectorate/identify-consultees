@@ -1,7 +1,7 @@
 resource "azurerm_mssql_server" "primary" {
-  # checkov:skip=CKV2_AZURE_2: "Ensure that Vulnerability Assessment (VA) is enabled on a SQL server by setting a Storage Account"
-  # checkov:skip=CKV_AZURE_23: "Ensure that 'Auditing' is set to 'On' for SQL servers"
-  # checkov:skip=CKV_AZURE_24: "Ensure that 'Auditing' Retention is 'greater than 90 days' for SQL servers"
+  # checkov:skip=CKV2_AZURE_2: "VA is enabled - see azurerm_mssql_server_vulnerability_assessment in database-monitoring.tf (Checkov can't correlate the separate resource)"
+  # checkov:skip=CKV_AZURE_23: "Auditing is on - see azurerm_mssql_server_extended_auditing_policy in database-monitoring.tf (Checkov can't correlate the separate resource)"
+  # checkov:skip=CKV_AZURE_24: "Retention comes from var.sql_config.retention.audit_days (90d) - Checkov can't resolve the variable"
 
   name                          = "${local.org}-sql-${local.service_name}-primary-${var.environment}"
   resource_group_name           = azurerm_resource_group.primary.name
@@ -77,8 +77,6 @@ resource "azurerm_mssql_database" "primary" {
 
 resource "azurerm_key_vault_secret" "sql_admin_connection_string" {
 
-  # checkov:skip=CKV_AZURE_41: TODO: Secret rotation
-
   key_vault_id = azurerm_key_vault.main.id
   name         = "${local.service_name}-sql-admin-connection-string"
   value = join(
@@ -91,14 +89,13 @@ resource "azurerm_key_vault_secret" "sql_admin_connection_string" {
       "trustServerCertificate=false"
     ]
   )
-  content_type = "connection-string"
+  content_type    = "connection-string"
+  expiration_date = local.secret_expiration_date
 
   tags = local.tags
 }
 
 resource "azurerm_key_vault_secret" "sql_app_connection_string" {
-
-  # checkov:skip=CKV_AZURE_41: TODO: Secret rotation
 
   key_vault_id = azurerm_key_vault.main.id
   name         = "${local.service_name}-sql-app-connection-string"
@@ -112,7 +109,8 @@ resource "azurerm_key_vault_secret" "sql_app_connection_string" {
       "trustServerCertificate=false"
     ]
   )
-  content_type = "connection-string"
+  content_type    = "connection-string"
+  expiration_date = local.secret_expiration_date
 
   tags = local.tags
 }
