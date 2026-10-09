@@ -16,14 +16,41 @@ describe('admin import reference data', () => {
 	const newDownload = (filePath = '/tmp/does-not-exist-import-reference-data-test') =>
 		mock.fn(async () => ({ filePath, cleanup: mock.fn(async () => undefined) }));
 
-	it('renders the page with no prior result', async () => {
+	const countingDb = (consulteeAreas = 18_258, caseBoundaries = 283) => ({
+		$queryRaw: mock.fn(async () => [{ consulteeAreas, caseBoundaries }])
+	});
+
+	it('renders the page with no prior result, and the rows currently loaded', async () => {
 		const res = newRes();
-		const page = buildImportReferenceDataPage();
+		const page = buildImportReferenceDataPage({ db: countingDb(), logger: mockLogger() });
 		await page({}, res);
 		assert.strictEqual(res.render.mock.callCount(), 1);
 		assert.strictEqual(res.render.mock.calls[0].arguments[0], 'views/admin-import-reference-data/view.njk');
-		assert.strictEqual(res.render.mock.calls[0].arguments[1].consulteeAreasImported, undefined);
-		assert.strictEqual(res.render.mock.calls[0].arguments[1].caseBoundariesImported, undefined);
+		const viewModel = res.render.mock.calls[0].arguments[1];
+		assert.strictEqual(viewModel.consulteeAreasImported, undefined);
+		assert.strictEqual(viewModel.caseBoundariesImported, undefined);
+		assert.strictEqual(viewModel.loadedConsulteeAreas, 18_258);
+		assert.strictEqual(viewModel.loadedCaseBoundaries, 283);
+		const html = res.render.mock.calls[0].result;
+		assert.match(html, /Currently loaded/);
+		assert.match(html, /deletes every existing row/);
+		assert.match(html, /Replace consultee areas/);
+	});
+
+	it('still renders the page, without counts, if counting fails', async () => {
+		const res = newRes();
+		const logger = mockLogger();
+		const db = {
+			$queryRaw: mock.fn(async () => {
+				throw new Error('database unavailable');
+			})
+		};
+		await buildImportReferenceDataPage({ db, logger })({}, res);
+
+		const viewModel = res.render.mock.calls[0].arguments[1];
+		assert.strictEqual(viewModel.loadedConsulteeAreas, undefined);
+		assert.doesNotMatch(res.render.mock.calls[0].result, /Currently loaded/);
+		assert.strictEqual(logger.warn.mock.callCount(), 1);
 	});
 
 	describe('buildRunImportConsulteeAreas', () => {
@@ -31,15 +58,19 @@ describe('admin import reference data', () => {
 			const res = newRes();
 			const download = newDownload('/tmp/consultee-areas.geojson');
 			const runImport = mock.fn(async () => 18258);
-			const run = buildRunImportConsulteeAreas({ db: {}, logger: mockLogger() }, download, runImport);
+			const run = buildRunImportConsulteeAreas({ db: countingDb(), logger: mockLogger() }, download, runImport);
 			await run({}, res);
 
 			assert.strictEqual(download.mock.calls[0].arguments[0], CONSULTEE_AREAS_BLOB_NAME);
 			assert.strictEqual(runImport.mock.calls[0].arguments[1], '/tmp/consultee-areas.geojson');
+			// replaces the table rather than merging into it
+			assert.deepStrictEqual(runImport.mock.calls[0].arguments[2], { replace: true });
 
-			const { error, consulteeAreasImported } = res.render.mock.calls[0].arguments[1];
+			const { error, consulteeAreasImported, loadedConsulteeAreas } = res.render.mock.calls[0].arguments[1];
 			assert.strictEqual(error, undefined);
 			assert.strictEqual(consulteeAreasImported, 18258);
+			assert.strictEqual(loadedConsulteeAreas, 18_258);
+			assert.match(res.render.mock.calls[0].result, /Replaced consultee areas: imported 18258/);
 		});
 
 		it('renders an error when the download fails, without throwing', async () => {
@@ -81,6 +112,7 @@ describe('admin import reference data', () => {
 			await run({}, res);
 
 			assert.strictEqual(download.mock.calls[0].arguments[0], CASE_BOUNDARIES_BLOB_NAME);
+			assert.deepStrictEqual(runImport.mock.calls[0].arguments[2], { replace: true });
 			assert.strictEqual(runImport.mock.calls[0].arguments[1], '/tmp/case-boundaries.geojson');
 
 			const { error, caseBoundariesImported } = res.render.mock.calls[0].arguments[1];

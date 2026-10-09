@@ -17,10 +17,35 @@ const PAGE_HEADING = 'Import reference data into the database';
 export const CONSULTEE_AREAS_BLOB_NAME = 'combined_reference_data_v1.geojson';
 export const CASE_BOUNDARIES_BLOB_NAME = 'all-project-boundaries.geojson';
 
-export function buildImportReferenceDataPage(): AsyncRequestHandler {
+// imports replace each table rather than merging into it - see clearExistingRows. The loaders
+// upsert by id and never delete, so a merge would leave the sample data, or rows the new file
+// dropped or re-keyed, behind as stale or duplicate consultees
+const REPLACE = { replace: true } as const;
+
+/**
+ * Rows in each table right now. A full import into Azure SQL can outlast Front Door's response
+ * timeout - the browser then shows an error while the import carries on - so the page shows these
+ * to confirm when it's finished. Informational only: a failure just leaves them off the page.
+ */
+async function withLoadedCounts(
+	service: Pick<ManageService, 'db' | 'logger'>,
+	viewModel: ImportReferenceDataViewModel
+): Promise<ImportReferenceDataViewModel> {
+	try {
+		const [counts] = await service.db.$queryRaw<{ consulteeAreas: number; caseBoundaries: number }[]>`
+			SELECT (SELECT COUNT(*) FROM consultee_area) AS consulteeAreas,
+				(SELECT COUNT(*) FROM case_boundary) AS caseBoundaries
+		`;
+		return { ...viewModel, loadedConsulteeAreas: counts.consulteeAreas, loadedCaseBoundaries: counts.caseBoundaries };
+	} catch (error) {
+		service.logger.warn({ error }, 'Could not count the loaded reference data');
+		return viewModel;
+	}
+}
+
+export function buildImportReferenceDataPage(service: ManageService): AsyncRequestHandler {
 	return async (req, res) => {
-		const viewModel: ImportReferenceDataViewModel = { pageHeading: PAGE_HEADING };
-		return res.render(VIEW, viewModel);
+		return res.render(VIEW, await withLoadedCounts(service, { pageHeading: PAGE_HEADING }));
 	};
 }
 
@@ -37,7 +62,7 @@ export function buildRunImportConsulteeAreas(
 		try {
 			const { filePath, cleanup } = await download(CONSULTEE_AREAS_BLOB_NAME);
 			try {
-				viewModel.consulteeAreasImported = await runImport(db, filePath);
+				viewModel.consulteeAreasImported = await runImport(db, filePath, REPLACE);
 			} finally {
 				await cleanup();
 			}
@@ -46,7 +71,7 @@ export function buildRunImportConsulteeAreas(
 			viewModel.error = 'Could not import consultee areas from blob storage.';
 		}
 
-		return res.render(VIEW, viewModel);
+		return res.render(VIEW, await withLoadedCounts(service, viewModel));
 	};
 }
 
@@ -63,7 +88,7 @@ export function buildRunImportCaseBoundaries(
 		try {
 			const { filePath, cleanup } = await download(CASE_BOUNDARIES_BLOB_NAME);
 			try {
-				viewModel.caseBoundariesImported = await runImport(db, filePath);
+				viewModel.caseBoundariesImported = await runImport(db, filePath, REPLACE);
 			} finally {
 				await cleanup();
 			}
@@ -72,6 +97,6 @@ export function buildRunImportCaseBoundaries(
 			viewModel.error = 'Could not import case boundaries from blob storage.';
 		}
 
-		return res.render(VIEW, viewModel);
+		return res.render(VIEW, await withLoadedCounts(service, viewModel));
 	};
 }
