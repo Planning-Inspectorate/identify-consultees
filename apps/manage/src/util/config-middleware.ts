@@ -9,7 +9,7 @@ export function addLocalsConfiguration(options: { devPagesEnabled?: boolean } = 
 		res.locals.config = {
 			styleFile: 'style-245b70cd.css',
 			govukFrontendJs: 'assets/js/govuk-frontend.min-38b6270a.js',
-			consulteesMapJs: 'javascripts/consultees-map-cf6f603e.js',
+			consulteesMapJs: 'javascripts/consultees-map-8eb45801.js',
 			mapLayersDemoJs: 'javascripts/map-layers-demo-370e07ba.js',
 			accessibleAutocompleteJs: 'assets/js/accessible-autocomplete.min-876870ee.js',
 			accessibleAutocompleteCss: 'assets/css/accessible-autocomplete.min-4b7a52dc.css',
@@ -24,7 +24,7 @@ export function addLocalsConfiguration(options: { devPagesEnabled?: boolean } = 
 			vendorDrawPluginJs: 'vendor/draw-plugin/js/index-1f40ff7e.js',
 			vendorMapStylesPluginJs: 'vendor/map-styles-plugin/js/index-c9ffb685.js',
 			vendorMapStylesPluginCss: 'vendor/map-styles-plugin/css/index-d8fa9e70.css',
-			interactiveMapExamplesJs: 'javascripts/interactive-map-examples-452121c5.js',
+			interactiveMapExamplesJs: 'javascripts/interactive-map-examples-3748b87d.js',
 			headerTitle: 'Identify consultees',
 			// the support links the site footer lists - generic Planning Inspectorate pages
 			footerLinks: [
