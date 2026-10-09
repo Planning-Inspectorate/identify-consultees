@@ -5,6 +5,8 @@ import os
 
 import azure.functions as func
 
+from cbos.config import CbosNotConfigured, cbos_config_from_env
+from cbos.connection_check import check_cbos, default_credential
 from intersector.api import BadRequest, consultees_json, parse_run_ruleset_request
 from intersector.screening import run_ruleset
 from querying.consultee_areas import fetch_consultee_areas
@@ -58,6 +60,25 @@ def health(req: func.HttpRequest) -> func.HttpResponse:
         database_status = "ERROR"
 
     return _json_response({"status": "OK", "database": database_status})
+
+
+@app.route(route="cbos/health")
+def cbos_health(req: func.HttpRequest) -> func.HttpResponse:
+    """Whether this app can reach CBOS's database and document storage as its own identity (see
+    cbos/). Keyed, unlike /health: its errors name CBOS's servers and what access is missing."""
+    auth_error = _check_api_key(req)
+    if auth_error is not None:
+        return auth_error
+
+    try:
+        config = cbos_config_from_env()
+    except CbosNotConfigured as error:
+        return _json_response({"status": "ERROR", "error": str(error)}, 500)
+
+    result = check_cbos(config, default_credential())
+    if result["status"] != "OK":
+        logger.error("CBOS connection check failed: %s", result)
+    return _json_response(result, 200 if result["status"] == "OK" else 503)
 
 
 @app.route(route="consultee-areas")
