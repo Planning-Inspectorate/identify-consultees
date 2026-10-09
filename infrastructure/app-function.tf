@@ -1,8 +1,7 @@
 resource "azurerm_storage_account" "functions" {
-  # checkov:skip=CKV_AZURE_33: "Ensure Storage logging is enabled for Queue service for read, write and delete requests"
-  # checkov:skip=CKV2_AZURE_40: "Ensure storage account is not configured with Shared Key authorization
+  # checkov:skip=CKV_AZURE_33: "Queue logging is enabled via azurerm_storage_account_queue_properties below - Checkov predates azurerm v4 and only sees the removed inline block"
+  # checkov:skip=CKV2_AZURE_40: "Ensure storage account is not configured with Shared Key authorization" - the function app authenticates with storage_account_access_key below
   # checkov:skip=CKV2_AZURE_41: "Ensure storage account is configured with SAS expiration policy"
-  # checkov:skip=CKV2_AZURE_38: "Ensure soft-delete is enabled on Azure storage account"
   # checkov:skip=CKV2_AZURE_1: "Ensure storage for critical data are encrypted with Customer Managed Key"
   # checkov:skip=CKV_AZURE_43: "Ensure Storage Accounts adhere to the naming rules"
 
@@ -17,12 +16,66 @@ resource "azurerm_storage_account" "functions" {
   min_tls_version                  = "TLS1_2"
   public_network_access_enabled    = false
 
+  blob_properties {
+    delete_retention_policy {
+      days = 30
+    }
+    container_delete_retention_policy {
+      days = 30
+    }
+  }
+
   network_rules {
     default_action = "Deny"
     bypass         = ["AzureServices"]
   }
 
   tags = local.tags
+}
+
+resource "azurerm_storage_account_queue_properties" "functions" {
+  storage_account_id = azurerm_storage_account.functions.id
+
+  logging {
+    delete                = true
+    read                  = true
+    write                 = true
+    version               = "1.0"
+    retention_policy_days = 10
+  }
+}
+
+# blob + queue request logging to Log Analytics (the Functions runtime uses both)
+resource "azurerm_monitor_diagnostic_setting" "functions_storage_blob" {
+  name                       = "${local.org}-diag-st-func-blob-${local.resource_suffix}"
+  target_resource_id         = "${azurerm_storage_account.functions.id}/blobServices/default"
+  log_analytics_workspace_id = azurerm_log_analytics_workspace.main.id
+
+  enabled_log {
+    category = "StorageRead"
+  }
+  enabled_log {
+    category = "StorageWrite"
+  }
+  enabled_log {
+    category = "StorageDelete"
+  }
+}
+
+resource "azurerm_monitor_diagnostic_setting" "functions_storage_queue" {
+  name                       = "${local.org}-diag-st-func-queue-${local.resource_suffix}"
+  target_resource_id         = "${azurerm_storage_account.functions.id}/queueServices/default"
+  log_analytics_workspace_id = azurerm_log_analytics_workspace.main.id
+
+  enabled_log {
+    category = "StorageRead"
+  }
+  enabled_log {
+    category = "StorageWrite"
+  }
+  enabled_log {
+    category = "StorageDelete"
+  }
 }
 
 resource "azurerm_private_endpoint" "functions_storage" {
@@ -63,8 +116,8 @@ resource "azurerm_private_endpoint" "functions_storage" {
 # `terraform plan` and confirm it does not show an unexpected destroy/recreate before applying.
 #
 # Also note: the shared module provided monitoring/alerting internally (action_group_ids,
-# log_analytics_workspace_id, monitoring_alerts_enabled) - that isn't replicated here, so this
-# Function App currently has no equivalent alerts. Follow-up, not attempted blind.
+# log_analytics_workspace_id, monitoring_alerts_enabled) - replaced by the
+# azurerm_monitor_metric_alert.function_orchestrator_http_5xx alert in monitoring.tf.
 moved {
   from = module.function_orchestrator.azurerm_linux_function_app.function_app
   to   = azurerm_linux_function_app.function_orchestrator
@@ -168,11 +221,11 @@ resource "random_password" "function_api_key" {
 }
 
 resource "azurerm_key_vault_secret" "function_api_key" {
-  #checkov:skip=CKV_AZURE_41: TODO: Secret rotation
-  key_vault_id = azurerm_key_vault.main.id
-  name         = "${local.service_name}-function-api-key"
-  value        = random_password.function_api_key.result
-  content_type = "api-key"
+  key_vault_id    = azurerm_key_vault.main.id
+  name            = "${local.service_name}-function-api-key"
+  value           = random_password.function_api_key.result
+  content_type    = "api-key"
+  expiration_date = local.secret_expiration_date
 
   tags = local.tags
 }

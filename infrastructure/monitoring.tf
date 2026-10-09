@@ -115,12 +115,40 @@ resource "azurerm_monitor_scheduled_query_rules_alert_v2" "log_cap" {
 }
 
 resource "azurerm_key_vault_secret" "app_insights_connection_string" {
-  #checkov:skip=CKV_AZURE_41: expiration not valid
+  key_vault_id    = azurerm_key_vault.main.id
+  name            = "${local.service_name}-app-insights-connection-string"
+  value           = azurerm_application_insights.main.connection_string
+  content_type    = "connection-string"
+  expiration_date = local.secret_expiration_date
 
-  key_vault_id = azurerm_key_vault.main.id
-  name         = "${local.service_name}-app-insights-connection-string"
-  value        = azurerm_application_insights.main.connection_string
-  content_type = "connection-string"
+  tags = local.tags
+}
+
+# Function app alerting - the shared module these alerts used to come through
+# (see app-function.tf) provided them internally; reinstated here so a failing
+# ruleset function doesn't go unnoticed. Http5xx covers crashes and hard
+# failures; the function is private-endpoint only so no external web test.
+resource "azurerm_monitor_metric_alert" "function_orchestrator_http_5xx" {
+  name                = "${local.service_name} Function HTTP 5xx alert ${local.resource_suffix}"
+  resource_group_name = azurerm_resource_group.primary.name
+  scopes              = [azurerm_linux_function_app.function_orchestrator.id]
+  description         = "Action will be triggered when the function app returns HTTP 5xx responses."
+  window_size         = "PT5M"
+  frequency           = "PT1M"
+  severity            = 2
+  enabled             = var.alerts_enabled
+
+  criteria {
+    metric_namespace = "Microsoft.Web/sites"
+    metric_name      = "Http5xx"
+    aggregation      = "Total"
+    operator         = "GreaterThanOrEqual"
+    threshold        = 5
+  }
+
+  action {
+    action_group_id = azurerm_monitor_action_group.consultees_tech.id
+  }
 
   tags = local.tags
 }

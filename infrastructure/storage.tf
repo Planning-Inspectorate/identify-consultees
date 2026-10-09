@@ -2,11 +2,8 @@ resource "azurerm_storage_account" "data" {
   #TODO: Customer Managed Keys
   #checkov:skip=CKV2_AZURE_1: Customer Managed Keys not implemented yet
   #checkov:skip=CKV2_AZURE_18: Customer Managed Keys not implemented yet
-  #TODO: Logging
-  #checkov:skip=CKV_AZURE_33: Logging not implemented yet
-  #checkov:skip=CKV2_AZURE_8: Logging not implemented yet
+  #checkov:skip=CKV_AZURE_33: "Queue logging is enabled via azurerm_storage_account_queue_properties below - Checkov predates azurerm v4 and only sees the removed inline block"
   #checkov:skip=CKV_AZURE_43: "Ensure Storage Accounts adhere to the naming rules"
-  #checkov:skip=CKV2_AZURE_38: "Ensure soft-delete is enabled on Azure storage account"
   #checkov:skip=CKV2_AZURE_40: "Ensure storage account is not configured with Shared Key authorization"
   #checkov:skip=CKV2_AZURE_41: "Ensure storage account is configured with SAS expiration policy"
   #checkov:skip=CKV_AZURE_206: "Ensure that Storage Accounts use replication" - configured per environment
@@ -25,12 +22,67 @@ resource "azurerm_storage_account" "data" {
   # default to Entra auth for Portal access
   default_to_oauth_authentication = true
 
+  blob_properties {
+    delete_retention_policy {
+      days = 30
+    }
+    container_delete_retention_policy {
+      days = 30
+    }
+  }
+
   network_rules {
     default_action = "Deny"
     bypass         = ["AzureServices"]
   }
 
   tags = local.tags
+}
+
+resource "azurerm_storage_account_queue_properties" "data" {
+  storage_account_id = azurerm_storage_account.data.id
+
+  logging {
+    delete                = true
+    read                  = true
+    write                 = true
+    version               = "1.0"
+    retention_policy_days = 10
+  }
+}
+
+# Storage analytics logging: blob + queue request logs to Log Analytics so reads,
+# writes and deletes on the reference-data container are auditable.
+resource "azurerm_monitor_diagnostic_setting" "data_storage_blob" {
+  name                       = "${local.org}-diag-st-data-blob-${local.resource_suffix}"
+  target_resource_id         = "${azurerm_storage_account.data.id}/blobServices/default"
+  log_analytics_workspace_id = azurerm_log_analytics_workspace.main.id
+
+  enabled_log {
+    category = "StorageRead"
+  }
+  enabled_log {
+    category = "StorageWrite"
+  }
+  enabled_log {
+    category = "StorageDelete"
+  }
+}
+
+resource "azurerm_monitor_diagnostic_setting" "data_storage_queue" {
+  name                       = "${local.org}-diag-st-data-queue-${local.resource_suffix}"
+  target_resource_id         = "${azurerm_storage_account.data.id}/queueServices/default"
+  log_analytics_workspace_id = azurerm_log_analytics_workspace.main.id
+
+  enabled_log {
+    category = "StorageRead"
+  }
+  enabled_log {
+    category = "StorageWrite"
+  }
+  enabled_log {
+    category = "StorageDelete"
+  }
 }
 
 resource "azurerm_private_endpoint" "storage_account" {
@@ -55,8 +107,7 @@ resource "azurerm_private_endpoint" "storage_account" {
 }
 
 resource "azurerm_storage_container" "data" {
-  #TODO: Logging
-  #checkov:skip=CKV2_AZURE_21 Logging not implemented yet
+  #checkov:skip=CKV2_AZURE_21: "Blob read logging is on via azurerm_monitor_diagnostic_setting.data_storage_blob - Checkov only recognises the legacy azurerm_log_analytics_storage_insights resource"
   name                  = "${local.service_name}-data"
   storage_account_id    = azurerm_storage_account.data.id
   container_access_type = "private"

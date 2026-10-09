@@ -14,6 +14,12 @@ locals {
     "consultees-client-secret"
   ]
 
+  # expiry stamped on terraform-generated Key Vault secrets so they carry a rotation date.
+  # Advisory only - Key Vault still serves expired secrets (so app KV references keep working),
+  # but the expiry surfaces rotation in the vault inventory and satisfies CKV_AZURE_41.
+  # Bump this when secrets are next rotated.
+  secret_expiration_date = "2027-07-01T00:00:00Z"
+
   key_vault_refs = merge(
     {
       for k, v in azurerm_key_vault_secret.manual_secrets : k => "@Microsoft.KeyVault(SecretUri=${v.versionless_id})"

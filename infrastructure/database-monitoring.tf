@@ -1,9 +1,8 @@
 
 resource "azurerm_storage_account" "sql_server" {
-  # checkov:skip=CKV_AZURE_33: "Ensure Storage logging is enabled for Queue service for read, write and delete requests"
-  # checkov:skip=CKV2_AZURE_40: "Ensure storage account is not configured with Shared Key authorization
+  # checkov:skip=CKV_AZURE_33: "Queue logging is enabled via azurerm_storage_account_queue_properties below - Checkov predates azurerm v4 and only sees the removed inline block"
+  # checkov:skip=CKV2_AZURE_40: "Ensure storage account is not configured with Shared Key authorization" - the SQL security alert policy below authenticates with the account access key
   # checkov:skip=CKV2_AZURE_41: "Ensure storage account is configured with SAS expiration policy"
-  # checkov:skip=CKV2_AZURE_38: "Ensure soft-delete is enabled on Azure storage account"
   # checkov:skip=CKV2_AZURE_1: "Ensure storage for critical data are encrypted with Customer Managed Key"
   # checkov:skip=CKV_AZURE_43: "Ensure Storage Accounts adhere to the naming rules"
 
@@ -18,6 +17,15 @@ resource "azurerm_storage_account" "sql_server" {
   cross_tenant_replication_enabled = false
   public_network_access_enabled    = false
 
+  blob_properties {
+    delete_retention_policy {
+      days = 30
+    }
+    container_delete_retention_policy {
+      days = 30
+    }
+  }
+
   network_rules {
     default_action = "Deny"
     bypass         = ["AzureServices"]
@@ -28,6 +36,36 @@ resource "azurerm_storage_account" "sql_server" {
   }
 
   tags = local.tags
+}
+
+resource "azurerm_storage_account_queue_properties" "sql_server" {
+  storage_account_id = azurerm_storage_account.sql_server.id
+
+  logging {
+    delete                = true
+    read                  = true
+    write                 = true
+    version               = "1.0"
+    retention_policy_days = 10
+  }
+}
+
+# blob request logging to Log Analytics - this account holds SQL audit and
+# vulnerability-assessment output, so access to it is worth auditing itself
+resource "azurerm_monitor_diagnostic_setting" "sql_server_storage_blob" {
+  name                       = "${local.org}-diag-st-sql-blob-${local.resource_suffix}"
+  target_resource_id         = "${azurerm_storage_account.sql_server.id}/blobServices/default"
+  log_analytics_workspace_id = azurerm_log_analytics_workspace.main.id
+
+  enabled_log {
+    category = "StorageRead"
+  }
+  enabled_log {
+    category = "StorageWrite"
+  }
+  enabled_log {
+    category = "StorageDelete"
+  }
 }
 
 resource "azurerm_private_endpoint" "sql_storage" {
@@ -52,8 +90,7 @@ resource "azurerm_private_endpoint" "sql_storage" {
 }
 
 resource "azurerm_storage_container" "sql_server" {
-
-  # checkov:skip=CKV2_AZURE_21: "Ensure Storage logging is enabled for Blob service for read requests"
+  # checkov:skip=CKV2_AZURE_21: "Blob read logging is on via azurerm_monitor_diagnostic_setting.sql_server_storage_blob - Checkov only recognises the legacy azurerm_log_analytics_storage_insights resource"
   name                  = "sqlvulnerabilityassessment"
   storage_account_id    = azurerm_storage_account.sql_server.id
   container_access_type = "private"
@@ -78,6 +115,31 @@ resource "azurerm_mssql_server_extended_auditing_policy" "sql_server" {
   ]
 }
 
+# the secondary SQL server (when enabled) writes audit logs to the same storage account -
+# auditing is on the server, not the database, so a failover partner needs its own policy
+resource "azurerm_role_assignment" "sql_server_storage_secondary" {
+  count = var.secondary_region_enabled ? 1 : 0
+
+  scope                = azurerm_storage_account.sql_server.id
+  role_definition_name = "Storage Blob Data Contributor"
+  principal_id         = azurerm_mssql_server.secondary[0].identity[0].principal_id
+}
+
+resource "azurerm_mssql_server_extended_auditing_policy" "sql_server_secondary" {
+  count = var.secondary_region_enabled ? 1 : 0
+
+  enabled                = true
+  blob_storage_endpoint  = azurerm_storage_account.sql_server.primary_blob_endpoint
+  server_id              = azurerm_mssql_server.secondary[0].id
+  retention_in_days      = var.sql_config.retention.audit_days
+  log_monitoring_enabled = false
+
+  depends_on = [
+    azurerm_role_assignment.sql_server_storage_secondary,
+    azurerm_storage_account.sql_server,
+  ]
+}
+
 resource "azurerm_mssql_server_security_alert_policy" "sql_server" {
   #checkov:skip=CKV_AZURE_27: "Ensure that 'Email service and co-administrators' is 'Enabled' for MSSQL servers"
   state                        = var.alerts_enabled ? "Enabled" : "Disabled"
@@ -93,9 +155,9 @@ resource "azurerm_mssql_server_security_alert_policy" "sql_server" {
 resource "azurerm_mssql_server_vulnerability_assessment" "consultees_sql_server" {
   count = var.alerts_enabled ? 1 : 0
 
-  #checkov:skip=CKV2_AZURE_3: "Ensure that VA setting Periodic Recurring Scans is enabled on a SQL server"
-  #checkov:skip=CKV2_AZURE_4: "Ensure Azure SQL server ADS VA Send scan reports to is configured"
-  #checkov:skip=CKV2_AZURE_5: "Ensure that VA setting 'Also send email notifications to admins and subscription owners' is set for a SQL server"
+  #checkov:skip=CKV2_AZURE_3: "Recurring scans are configured below (enabled = var.alerts_enabled) - Checkov can't resolve the variable"
+  #checkov:skip=CKV2_AZURE_4: "Scan reports go to local.tech_emails below - Checkov can't resolve the local"
+  #checkov:skip=CKV2_AZURE_5: "email_subscription_admins is set below - Checkov can't see it inside the recurring_scans block"
 
   server_security_alert_policy_id = azurerm_mssql_server_security_alert_policy.sql_server.id
   storage_container_path          = "${azurerm_storage_account.sql_server.primary_blob_endpoint}${azurerm_storage_container.sql_server.name}/"

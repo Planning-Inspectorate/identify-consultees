@@ -102,11 +102,11 @@ resource "random_password" "web_session_secret" {
 }
 
 resource "azurerm_key_vault_secret" "web_session_secret" {
-  #checkov:skip=CKV_AZURE_41: TODO: Secret rotation
-  key_vault_id = azurerm_key_vault.main.id
-  name         = "${local.service_name}-web-session-secret"
-  value        = random_password.web_session_secret.result
-  content_type = "session-secret"
+  key_vault_id    = azurerm_key_vault.main.id
+  name            = "${local.service_name}-web-session-secret"
+  value           = random_password.web_session_secret.result
+  content_type    = "session-secret"
+  expiration_date = local.secret_expiration_date
 
   tags = local.tags
 }
