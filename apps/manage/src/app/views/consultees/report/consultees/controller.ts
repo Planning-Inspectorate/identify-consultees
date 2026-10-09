@@ -8,6 +8,7 @@ import { describeReasons } from '../../reasons.ts';
 import { resolveCase } from '../../resolve-case.ts';
 import { buildSearchAreaSafely, firstQueryValue, runRulesetSafely } from '../../run-ruleset.ts';
 import { rulesetCategories } from '../categories.ts';
+import { addedConsulteeReason, consulteeName } from '../report-consultees.ts';
 import type { ConsulteeSelection } from '../urls.ts';
 import {
 	addConsulteeUrl,
@@ -78,7 +79,7 @@ export function buildReportConsulteesPage(service: ManageService): AsyncRequestH
 		// param - removal by index so duplicate entries each get their own link)
 		const rows: ConsulteeRow[] = [
 			...visible.map((match) => ({
-				name: match.feature.properties.consultee ?? 'Unnamed consultee',
+				name: consulteeName(match),
 				identified: describeReasons(match, ruleset),
 				removeUrl: consulteesUrl(project.id, ruleset.id, category, {
 					excluded: new Set([...excluded, match.feature.id]),
@@ -92,7 +93,7 @@ export function buildReportConsulteesPage(service: ManageService): AsyncRequestH
 				return [
 					{
 						name: add.name,
-						identified: [add.reason || 'Manually added'],
+						identified: [addedConsulteeReason(add)],
 						removeUrl: consulteesUrl(project.id, ruleset.id, category, {
 							excluded,
 							adds: adds.filter((_, i) => i !== index)

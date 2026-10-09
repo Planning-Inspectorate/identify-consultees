@@ -2,12 +2,13 @@ import type { ManageService } from '#service';
 import type { ConsulteeMatch, Ruleset } from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
 import { getRuleset, RULESETS } from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
 import type { AsyncRequestHandler } from '@planning-inspectorate/core/util';
-import { resolveCase, resolveCaseSummary } from '../resolve-case.ts';
+import { resolveCase } from '../resolve-case.ts';
 import { firstQueryValue, projectPageUrl, runRulesetSafely } from '../run-ruleset.ts';
 import { reportCategories } from './categories.ts';
+import { reportByCategory } from './report-consultees.ts';
 import type { ConsulteeSelection } from './urls.ts';
 import { addedConsultees, consulteesUrl, excludedIds, reportCreatedUrl, reportUrl } from './urls.ts';
-import type { IdentifiedConsultee, ReportCheckViewModel } from './view-model.ts';
+import type { IdentifiedConsultee, ReportCheckViewModel, ReportCreatedViewModel } from './view-model.ts';
 
 /**
  * Every category the ruleset covers, in the order its rules name them, then any other category the
@@ -102,15 +103,17 @@ export function buildReportCheckPage(service: ManageService): AsyncRequestHandle
 }
 
 /**
- * "Generate report" lands here: a confirmation panel naming the case and a download link. Report
+ * "Generate report" lands here: a confirmation naming the case, a download link, and the report's
+ * consultees by category with why each is in it - the run's results less anything removed, plus
+ * anything added by hand (the selection rides along in the URL, as on the check page). Report
  * generation itself doesn't exist yet, so the download link is a placeholder.
  */
 export function buildReportCreatedPage(service: ManageService): AsyncRequestHandler {
-	const { db } = service;
+	const { db, logger, nearbyConsulteeRadiusMetres, rulesetRunner } = service;
 
 	return async (req, res) => {
 		const caseId = String(req.params.caseId ?? '');
-		const project = await resolveCaseSummary(db, caseId);
+		const project = await resolveCase(db, caseId);
 		if (!project) {
 			res.status(404).render('views/errors/404.njk', { pageHeading: 'Page not found' });
 			return;
@@ -124,14 +127,33 @@ export function buildReportCreatedPage(service: ManageService): AsyncRequestHand
 			return;
 		}
 
-		return res.render('views/consultees/report/created.njk', {
+		const selection: ConsulteeSelection = {
+			excluded: excludedIds(req.query.exclude),
+			adds: addedConsultees(req.query.add)
+		};
+		const { consultees, failed } = await runRulesetSafely(
+			rulesetRunner,
+			project,
+			ruleset,
+			nearbyConsulteeRadiusMetres,
+			logger
+		);
+		const report = failed ? [] : reportByCategory(ruleset, consultees, selection);
+
+		const viewModel: ReportCreatedViewModel = {
 			pageHeading: 'Report created',
 			backLinkUrl: projectPageUrl(project.id, ruleset.id),
-			caseName: project.caseName,
-			reference: project.reference,
+			caseName: project.properties.caseName,
+			reference: project.properties.caseReference,
+			rulesetName: ruleset.name,
 			// placeholder until report generation exists - there is no file to link to yet
 			downloadUrl: '#',
-			downloadText: `Download ${project.caseName} scoping report (ZIP)`
-		});
+			downloadText: `Download ${project.properties.caseName} scoping report (ZIP)`,
+			report,
+			consulteeCount: report.reduce((total, section) => total + section.consultees.length, 0),
+			rulesetFailed: failed,
+			retryUrl: reportCreatedUrl(project.id, ruleset.id, selection)
+		};
+		return res.render('views/consultees/report/created.njk', viewModel);
 	};
 }

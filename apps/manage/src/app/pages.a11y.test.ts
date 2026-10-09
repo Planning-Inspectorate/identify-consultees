@@ -396,7 +396,45 @@ describe('manage page accessibility smoke', () => {
 			caseName: 'Longfield Solar Farm',
 			reference: 'EN0110007',
 			downloadUrl: '#',
-			downloadText: 'Download Longfield Solar Farm scoping report (ZIP)'
+			downloadText: 'Download Longfield Solar Farm scoping report (ZIP)',
+			rulesetName: 'England Wales post 30 April 2024',
+			report: [
+				{
+					category: 'Parish Council',
+					consultees: [
+						{
+							name: 'Little Snoring Parish Council',
+							identified: ['"B" host Parishes or Community Councils: intersects the site', 'Within 20km of the site']
+						},
+						{ name: 'Added Parish Council', identified: ['Asked to be consulted'] }
+					]
+				},
+				{
+					category: 'Hospital',
+					consultees: [{ name: 'Norfolk Hospital', identified: ['Hospitals: within 10km of the site'] }]
+				}
+			],
+			consulteeCount: 3,
+			rulesetFailed: false,
+			retryUrl: '/consultees/11111111-1111-1111-1111-111111111111/report/created?ruleset=england-wales-post-20240430'
+		});
+		await assertNoSeriousA11yViolations(html);
+	});
+
+	test('report created page when the ruleset could not be run has no serious a11y violations', async () => {
+		const html = nunjucks.render('views/consultees/report/created.njk', {
+			...pageLocals,
+			pageHeading: 'Report created',
+			backLinkUrl: '/consultees/11111111-1111-1111-1111-111111111111?ruleset=england-wales-post-20240430',
+			caseName: 'Longfield Solar Farm',
+			reference: 'EN0110007',
+			downloadUrl: '#',
+			downloadText: 'Download Longfield Solar Farm scoping report (ZIP)',
+			rulesetName: 'England Wales post 30 April 2024',
+			report: [],
+			consulteeCount: 0,
+			rulesetFailed: true,
+			retryUrl: '/consultees/11111111-1111-1111-1111-111111111111/report/created?ruleset=england-wales-post-20240430'
 		});
 		await assertNoSeriousA11yViolations(html);
 	});
