@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { describe, it, mock } from 'node:test';
+import { afterEach, describe, it, mock } from 'node:test';
 import { buildConsulteeAreaGeojson, buildProjectSiteGeojson } from './sample-geojson.ts';
 import { buildConsulteeStaticMapResponse } from './serve-static-map.ts';
 import { clearOsmTileCacheForTests, osmTileCacheSizeForTests } from './static-map.ts';
@@ -18,12 +18,15 @@ function isGoogleMapsStaticHost(input: RequestInfo | URL): boolean {
 	return requestHostname(input) === 'maps.googleapis.com';
 }
 
+const originalFetch = globalThis.fetch;
+
+afterEach(() => {
+	globalThis.fetch = originalFetch;
+});
+
 describe('serve-static-map', () => {
 	it('returns 304 without upstream fetches when If-None-Match matches', async () => {
 		clearOsmTileCacheForTests();
-		const fetchImpl = mock.fn(async () => {
-			throw new Error('should not fetch on 304');
-		});
 
 		const map = {
 			center: [-1.78, 50.62] as const,
@@ -36,33 +39,35 @@ describe('serve-static-map', () => {
 			height: 256
 		};
 
+		globalThis.fetch = async () => new Response(tinyPng, { status: 200, headers: { 'content-type': 'image/png' } });
 		const first = await buildConsulteeStaticMapResponse({
 			geometryId: 'geo-1',
 			sectionId: 'ambulance-trusts',
 			map,
-			forceSvg: true,
-			fetchImpl: async () => new Response(tinyPng, { status: 200, headers: { 'content-type': 'image/png' } })
+			forceSvg: true
 		});
 		assert.equal(first.status, 200);
 
+		globalThis.fetch = mock.fn(async () => {
+			throw new Error('should not fetch on 304');
+		});
 		const second = await buildConsulteeStaticMapResponse({
 			geometryId: 'geo-1',
 			sectionId: 'ambulance-trusts',
 			map,
 			forceSvg: true,
-			ifNoneMatch: first.etag,
-			fetchImpl
+			ifNoneMatch: first.etag
 		});
 
 		assert.equal(second.status, 304);
-		assert.equal(fetchImpl.mock.callCount(), 0);
+		assert.equal((globalThis.fetch as ReturnType<typeof mock.fn>).mock.callCount(), 0);
 		assert.ok(first.cacheControl.includes('max-age='));
 	});
 
 	it('caches OSM tiles in-process across builds', async () => {
 		clearOsmTileCacheForTests();
 		let fetchCount = 0;
-		const fetchImpl: typeof fetch = async () => {
+		globalThis.fetch = async () => {
 			fetchCount += 1;
 			return new Response(tinyPng, { status: 200, headers: { 'content-type': 'image/png' } });
 		};
@@ -82,8 +87,7 @@ describe('serve-static-map', () => {
 			geometryId: 'geo-1',
 			sectionId: 'ambulance-trusts',
 			map,
-			forceSvg: true,
-			fetchImpl
+			forceSvg: true
 		});
 		const firstFetches = fetchCount;
 		assert.ok(firstFetches > 0);
@@ -93,15 +97,14 @@ describe('serve-static-map', () => {
 			geometryId: 'geo-1',
 			sectionId: 'ambulance-trusts',
 			map,
-			forceSvg: true,
-			fetchImpl
+			forceSvg: true
 		});
 		assert.equal(fetchCount, firstFetches);
 	});
 
 	it('returns a Google Static Map PNG when a key is configured', async () => {
 		clearOsmTileCacheForTests();
-		const fetchImpl = async (input: RequestInfo | URL) => {
+		globalThis.fetch = async (input) => {
 			assert.equal(requestHostname(input), 'maps.googleapis.com');
 			return new Response(tinyPng, { status: 200, headers: { 'content-type': 'image/png' } });
 		};
@@ -119,8 +122,7 @@ describe('serve-static-map', () => {
 			geometryId: 'geo-1',
 			sectionId: 'ambulance-trusts',
 			map,
-			googleMapsApiKey: 'test-key',
-			fetchImpl
+			googleMapsApiKey: 'test-key'
 		});
 
 		assert.equal(response.status, 200);
@@ -141,25 +143,25 @@ describe('serve-static-map', () => {
 			height: 256
 		};
 
+		globalThis.fetch = async () => new Response(tinyPng, { status: 200, headers: { 'content-type': 'image/png' } });
 		const first = await buildConsulteeStaticMapResponse({
 			geometryId: 'geo-1',
 			sectionId: 'ambulance-trusts',
 			map,
-			googleMapsApiKey: 'test-key',
-			fetchImpl: async () => new Response(tinyPng, { status: 200, headers: { 'content-type': 'image/png' } })
+			googleMapsApiKey: 'test-key'
 		});
 		assert.equal(first.status, 200);
 		assert.equal(first.contentType, 'image/png');
 
+		globalThis.fetch = async () => {
+			throw new Error('should not fetch on 304');
+		};
 		const second = await buildConsulteeStaticMapResponse({
 			geometryId: 'geo-1',
 			sectionId: 'ambulance-trusts',
 			map,
 			googleMapsApiKey: 'test-key',
-			ifNoneMatch: first.etag,
-			fetchImpl: async () => {
-				throw new Error('should not fetch on 304');
-			}
+			ifNoneMatch: first.etag
 		});
 
 		assert.equal(second.status, 304);
@@ -179,32 +181,32 @@ describe('serve-static-map', () => {
 			height: 256
 		};
 
+		globalThis.fetch = async (input) => {
+			if (isGoogleMapsStaticHost(input)) {
+				return new Response('nope', { status: 503 });
+			}
+			return new Response(tinyPng, { status: 200, headers: { 'content-type': 'image/png' } });
+		};
 		const nonOk = await buildConsulteeStaticMapResponse({
 			geometryId: 'geo-1',
 			sectionId: 'ambulance-trusts',
 			map,
-			googleMapsApiKey: 'test-key',
-			fetchImpl: async (input) => {
-				if (isGoogleMapsStaticHost(input)) {
-					return new Response('nope', { status: 503 });
-				}
-				return new Response(tinyPng, { status: 200, headers: { 'content-type': 'image/png' } });
-			}
+			googleMapsApiKey: 'test-key'
 		});
 		assert.equal(nonOk.status, 200);
 		assert.equal(nonOk.contentType, 'image/png');
 
+		globalThis.fetch = async (input) => {
+			if (isGoogleMapsStaticHost(input)) {
+				throw new Error('network down');
+			}
+			return new Response(tinyPng, { status: 200, headers: { 'content-type': 'image/png' } });
+		};
 		const thrown = await buildConsulteeStaticMapResponse({
 			geometryId: 'geo-1',
 			sectionId: 'ambulance-trusts',
 			map,
-			googleMapsApiKey: 'test-key',
-			fetchImpl: async (input) => {
-				if (isGoogleMapsStaticHost(input)) {
-					throw new Error('network down');
-				}
-				return new Response(tinyPng, { status: 200, headers: { 'content-type': 'image/png' } });
-			}
+			googleMapsApiKey: 'test-key'
 		});
 		assert.equal(thrown.status, 200);
 		assert.equal(thrown.contentType, 'image/png');
@@ -222,15 +224,13 @@ describe('serve-static-map', () => {
 			width: 256,
 			height: 256
 		};
-		const fetchImpl: typeof fetch = async () =>
-			new Response(tinyPng, { status: 200, headers: { 'content-type': 'image/png' } });
+		globalThis.fetch = async () => new Response(tinyPng, { status: 200, headers: { 'content-type': 'image/png' } });
 
 		const avif = await buildConsulteeStaticMapResponse({
 			geometryId: 'geo-1',
 			sectionId: 'ambulance-trusts',
 			map,
-			accept: 'image/avif,image/webp,image/png,*/*;q=0.8',
-			fetchImpl
+			accept: 'image/avif,image/webp,image/png,*/*;q=0.8'
 		});
 		assert.equal(avif.contentType, 'image/avif');
 		assert.equal(avif.vary, 'Accept');
@@ -240,8 +240,7 @@ describe('serve-static-map', () => {
 			geometryId: 'geo-1',
 			sectionId: 'ambulance-trusts',
 			map,
-			accept: 'image/webp,image/png,*/*;q=0.8',
-			fetchImpl
+			accept: 'image/webp,image/png,*/*;q=0.8'
 		});
 		assert.equal(webp.contentType, 'image/webp');
 
@@ -249,8 +248,7 @@ describe('serve-static-map', () => {
 			geometryId: 'geo-1',
 			sectionId: 'ambulance-trusts',
 			map,
-			accept: 'image/png,*/*;q=0.8',
-			fetchImpl
+			accept: 'image/png,*/*;q=0.8'
 		});
 		assert.equal(png.contentType, 'image/png');
 
@@ -272,13 +270,13 @@ describe('serve-static-map', () => {
 			height: 256
 		};
 
+		globalThis.fetch = async () => new Response(tinyPng, { status: 200, headers: { 'content-type': 'image/png' } });
 		const response = await buildConsulteeStaticMapResponse({
 			geometryId: 'geo-1',
 			sectionId: 'ambulance-trusts',
 			map,
 			googleMapsApiKey: 'test-key',
-			accept: 'image/avif,image/webp,*/*;q=0.8',
-			fetchImpl: async () => new Response(tinyPng, { status: 200, headers: { 'content-type': 'image/png' } })
+			accept: 'image/avif,image/webp,*/*;q=0.8'
 		});
 
 		assert.equal(response.status, 200);
@@ -299,13 +297,13 @@ describe('serve-static-map', () => {
 			height: 256
 		};
 
+		globalThis.fetch = async () => new Response(tinyPng, { status: 200, headers: { 'content-type': 'image/png' } });
 		const response = await buildConsulteeStaticMapResponse({
 			geometryId: 'geo-1',
 			sectionId: 'ambulance-trusts',
 			map,
 			forceSvg: true,
-			accept: 'image/avif,image/webp,*/*;q=0.8',
-			fetchImpl: async () => new Response(tinyPng, { status: 200, headers: { 'content-type': 'image/png' } })
+			accept: 'image/avif,image/webp,*/*;q=0.8'
 		});
 
 		assert.equal(response.status, 200);

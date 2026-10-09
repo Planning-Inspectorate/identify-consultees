@@ -1,5 +1,5 @@
 import type { ManageService } from '#service';
-import type { AsyncRequestHandler } from '@planning-inspectorate/core/util';
+import { fetchWithTimeout, type AsyncRequestHandler } from '@planning-inspectorate/core/util';
 import type { CbosCheck, CbosConnectionViewModel } from './view-model.ts';
 
 const VIEW = 'views/admin-cbos-connection/view.njk';
@@ -39,10 +39,11 @@ export function buildRunCbosConnectionCheck(service: ManageService): AsyncReques
 
 		try {
 			const headers = service.pythonFunctionApiKey ? { 'x-api-key': service.pythonFunctionApiKey } : undefined;
-			const response = await fetch(cbosHealthUrl(service.pythonFunctionUrl), {
-				headers,
-				signal: AbortSignal.timeout(CHECK_TIMEOUT_MS)
-			});
+			const response = await fetchWithTimeout(
+				cbosHealthUrl(service.pythonFunctionUrl),
+				{ timeoutMs: CHECK_TIMEOUT_MS },
+				{ headers }
+			);
 			// 200 and 503 both carry a result for each part; anything else is the function itself refusing
 			const body = (await response.json().catch(() => ({}))) as Record<string, unknown>;
 			if (isCheck(body.database) && isCheck(body.storage)) {

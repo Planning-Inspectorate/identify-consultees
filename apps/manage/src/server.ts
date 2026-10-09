@@ -1,4 +1,5 @@
 import { ManageService } from '#service';
+import { sleep } from '@planning-inspectorate/core/util';
 import { createApp, prepareStaticAssetServing } from './app/app.ts';
 import { loadConfig } from './app/config.ts';
 
@@ -18,7 +19,7 @@ async function waitForRedisReady(): Promise<void> {
 	}
 	const deadline = Date.now() + 15_000;
 	while (!client.isReady && Date.now() < deadline) {
-		await new Promise((resolve) => setTimeout(resolve, 100));
+		await sleep(100);
 	}
 	if (!client.isReady) {
 		service.logger.warn('Redis was not ready after 15s waiting at startup - starting anyway');

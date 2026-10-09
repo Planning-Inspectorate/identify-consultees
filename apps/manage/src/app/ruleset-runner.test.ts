@@ -1,6 +1,6 @@
 import type { Ruleset } from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
 import assert from 'node:assert/strict';
-import { describe, it, mock } from 'node:test';
+import { afterEach, describe, it, mock } from 'node:test';
 import { buildPythonRulesetRunner, runRulesetUrl } from './ruleset-runner.ts';
 
 const ruleset: Ruleset = {
@@ -20,9 +20,19 @@ const ruleset: Ruleset = {
 const site = { type: 'Point' as const, coordinates: [-1.5, 52.5] as [number, number] };
 const properties = { consulteeCategory: 'Hospital', consultee: 'Example Hospital', region: null, metadata: {} };
 
-function respondWith(body: unknown, status = 200) {
-	return mock.fn<typeof fetch>(async () => new Response(JSON.stringify(body), { status }));
+const originalFetch = globalThis.fetch;
+
+function stubFetch(impl: typeof fetch) {
+	return (globalThis.fetch = mock.fn(impl));
 }
+
+function respondWith(body: unknown, status = 200) {
+	return stubFetch(async () => new Response(JSON.stringify(body), { status }));
+}
+
+afterEach(() => {
+	globalThis.fetch = originalFetch;
+});
 
 describe('runRulesetUrl', () => {
 	it('resolves run-ruleset alongside the configured consultee-areas route', () => {
@@ -36,16 +46,15 @@ describe('runRulesetUrl', () => {
 
 describe('buildPythonRulesetRunner', () => {
 	it("posts the site, radius and ruleset's conditions with the API key", async () => {
-		const fetchImpl = respondWith({ consultees: [] });
+		const fetchMock = respondWith({ consultees: [] });
 		const run = buildPythonRulesetRunner({
 			pythonFunctionUrl: 'http://localhost:7071/api/consultee-areas',
-			apiKey: 'shared-key',
-			fetchImpl
+			apiKey: 'shared-key'
 		});
 
 		await run(site, ruleset, 20_000);
 
-		const [url, init] = fetchImpl.mock.calls[0].arguments;
+		const [url, init] = fetchMock.mock.calls[0].arguments;
 		assert.equal(url, 'http://localhost:7071/api/run-ruleset');
 		assert.equal(init?.method, 'POST');
 		assert.deepEqual(init?.headers, { 'content-type': 'application/json', 'x-api-key': 'shared-key' });
@@ -66,19 +75,19 @@ describe('buildPythonRulesetRunner', () => {
 			{ type: 'condition', conditionId: 'hospital' },
 			{ type: 'nearby', radiusMetres: 20_000 }
 		];
+		respondWith({
+			consultees: [
+				{
+					feature: { id: 'a', properties, geometryWkt: 'POINT (-1.4 52.6)' },
+					distanceMetres: 12.5,
+					reasons: conditionAndNearby
+				},
+				{ feature: { id: 'b', properties }, distanceMetres: 900, reasons: [conditionAndNearby[1]] }
+			]
+		});
 		const run = buildPythonRulesetRunner({
 			pythonFunctionUrl: 'http://localhost:7071/api/consultee-areas',
-			apiKey: undefined,
-			fetchImpl: respondWith({
-				consultees: [
-					{
-						feature: { id: 'a', properties, geometryWkt: 'POINT (-1.4 52.6)' },
-						distanceMetres: 12.5,
-						reasons: conditionAndNearby
-					},
-					{ feature: { id: 'b', properties }, distanceMetres: 900, reasons: [conditionAndNearby[1]] }
-				]
-			})
+			apiKey: undefined
 		});
 
 		const { consultees } = await run(site, ruleset, 20_000);
@@ -94,34 +103,31 @@ describe('buildPythonRulesetRunner', () => {
 	});
 
 	it('sends no API key header when none is configured', async () => {
-		const fetchImpl = respondWith({ consultees: [] });
-		await buildPythonRulesetRunner({ pythonFunctionUrl: 'http://f/api/x', apiKey: undefined, fetchImpl })(
-			site,
-			ruleset,
-			1
-		);
-		assert.deepEqual(fetchImpl.mock.calls[0].arguments[1]?.headers, { 'content-type': 'application/json' });
+		const fetchMock = respondWith({ consultees: [] });
+		await buildPythonRulesetRunner({ pythonFunctionUrl: 'http://f/api/x', apiKey: undefined })(site, ruleset, 1);
+		assert.deepEqual(fetchMock.mock.calls[0].arguments[1]?.headers, { 'content-type': 'application/json' });
 	});
 
 	it('rejects without calling out when the function URL is not configured', async () => {
-		const fetchImpl = respondWith({});
-		const run = buildPythonRulesetRunner({ pythonFunctionUrl: undefined, apiKey: undefined, fetchImpl });
+		const fetchMock = respondWith({});
+		const run = buildPythonRulesetRunner({ pythonFunctionUrl: undefined, apiKey: undefined });
 		await assert.rejects(() => run(site, ruleset, 20_000), /PYTHON_FUNCTION_URL is not configured/);
-		assert.equal(fetchImpl.mock.callCount(), 0);
+		assert.equal(fetchMock.mock.callCount(), 0);
 	});
 
 	it('rejects on a non-2xx response, an unexpected body, or a network failure', async () => {
-		const runWith = (fetchImpl: typeof fetch) =>
-			buildPythonRulesetRunner({ pythonFunctionUrl: 'http://f/api/x', apiKey: 'k', fetchImpl })(site, ruleset, 1);
+		const run = buildPythonRulesetRunner({ pythonFunctionUrl: 'http://f/api/x', apiKey: 'k' });
+		const attempt = () => run(site, ruleset, 1);
 
-		await assert.rejects(() => runWith(respondWith({ error: 'Unauthorised' }, 401)), /status 401/);
-		await assert.rejects(() => runWith(respondWith({ matches: [] })), /unexpected run-ruleset response/);
-		await assert.rejects(
-			() =>
-				runWith(async () => {
-					throw new TypeError('fetch failed');
-				}),
-			/fetch failed/
-		);
+		respondWith({ error: 'Unauthorised' }, 401);
+		await assert.rejects(attempt, /status 401/);
+
+		respondWith({ matches: [] });
+		await assert.rejects(attempt, /unexpected run-ruleset response/);
+
+		stubFetch(async () => {
+			throw new TypeError('fetch failed');
+		});
+		await assert.rejects(attempt, /fetch failed/);
 	});
 });

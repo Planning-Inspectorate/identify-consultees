@@ -1,5 +1,5 @@
 import type { ManageService } from '#service';
-import type { AsyncRequestHandler } from '@planning-inspectorate/core/util';
+import { fetchWithTimeout, type AsyncRequestHandler } from '@planning-inspectorate/core/util';
 import type { ConsulteeAreasPythonViewModel } from './view-model.ts';
 
 const VIEW = 'views/consultee-areas-python/view.njk';
@@ -27,11 +27,8 @@ export function buildRunConsulteeAreasPython(service: ManageService): AsyncReque
 			// the function requires an x-api-key shared secret (see function_app.py); a missing
 			// key on either side fails closed with 401/500, which surfaces as the same error
 			const headers = service.pythonFunctionApiKey ? { 'x-api-key': service.pythonFunctionApiKey } : undefined;
-			const response = await fetch(service.pythonFunctionUrl, {
-				headers,
-				// don't let a hung function request hang the page request indefinitely
-				signal: AbortSignal.timeout(15_000)
-			});
+			// don't let a hung function request hang the page request indefinitely
+			const response = await fetchWithTimeout(service.pythonFunctionUrl, { timeoutMs: 15_000 }, { headers });
 			if (!response.ok) {
 				throw new Error(`Python function responded with status ${response.status}`);
 			}

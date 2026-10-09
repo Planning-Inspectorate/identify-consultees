@@ -6,6 +6,7 @@ import type {
 } from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
 import type { Geometry } from '@pins/identify-consultees-database/src/geospatial/wkt.ts';
 import { geometryToWkt, wktToGeometry } from '@pins/identify-consultees-database/src/geospatial/wkt.ts';
+import { fetchWithTimeout } from '@planning-inspectorate/core/util';
 
 /**
  * Runs a ruleset against a project site - the consultee intersection logic. It lives in the Python
@@ -63,31 +64,33 @@ export function toRunRulesetResult(body: RunRulesetResponse): RunRulesetResult {
 export function buildPythonRulesetRunner(options: {
 	pythonFunctionUrl: string | undefined;
 	apiKey: string | undefined;
-	fetchImpl?: typeof fetch;
 }): RulesetRunner {
-	const { pythonFunctionUrl, apiKey, fetchImpl = fetch } = options;
+	const { pythonFunctionUrl, apiKey } = options;
 	return async (site, ruleset, nearbyRadiusMetres) => {
 		if (!pythonFunctionUrl) {
 			throw new Error('PYTHON_FUNCTION_URL is not configured');
 		}
-		const response = await fetchImpl(runRulesetUrl(pythonFunctionUrl), {
-			method: 'POST',
-			// the function requires the x-api-key shared secret (see function_app.py) - a missing key
-			// on either side fails closed with 401/500
-			headers: { 'content-type': 'application/json', ...(apiKey ? { 'x-api-key': apiKey } : {}) },
-			body: JSON.stringify({
-				siteWkt: geometryToWkt(site),
-				nearbyRadiusMetres,
-				rules: ruleset.rules.map(({ id, logicType, categories, bufferMetres, hostCategory }) => ({
-					id,
-					logicType,
-					categories,
-					bufferMetres,
-					hostCategory
-				}))
-			}),
-			signal: AbortSignal.timeout(RUN_RULESET_TIMEOUT_MS)
-		});
+		const response = await fetchWithTimeout(
+			runRulesetUrl(pythonFunctionUrl),
+			{ timeoutMs: RUN_RULESET_TIMEOUT_MS },
+			{
+				method: 'POST',
+				// the function requires the x-api-key shared secret (see function_app.py) - a missing key
+				// on either side fails closed with 401/500
+				headers: { 'content-type': 'application/json', ...(apiKey ? { 'x-api-key': apiKey } : {}) },
+				body: JSON.stringify({
+					siteWkt: geometryToWkt(site),
+					nearbyRadiusMetres,
+					rules: ruleset.rules.map(({ id, logicType, categories, bufferMetres, hostCategory }) => ({
+						id,
+						logicType,
+						categories,
+						bufferMetres,
+						hostCategory
+					}))
+				})
+			}
+		);
 		if (!response.ok) {
 			throw new Error(`Python function run-ruleset responded with status ${response.status}`);
 		}
