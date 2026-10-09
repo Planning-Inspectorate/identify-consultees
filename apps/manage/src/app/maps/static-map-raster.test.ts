@@ -1,7 +1,12 @@
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
 import type { GeoJsonFeatureCollection } from './sample-geojson.ts';
-import { negotiateStaticMapFormat, renderStaticMapRaster, STATIC_MAP_CONTENT_TYPES } from './static-map-raster.ts';
+import {
+	negotiateStaticMapFormat,
+	renderStaticMapRaster,
+	renderSvgBasemapImage,
+	STATIC_MAP_CONTENT_TYPES
+} from './static-map-raster.ts';
 
 const tinyPng = Buffer.from(
 	'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
@@ -122,5 +127,24 @@ describe('STATIC_MAP_CONTENT_TYPES', () => {
 		assert.equal(STATIC_MAP_CONTENT_TYPES.avif, 'image/avif');
 		assert.equal(STATIC_MAP_CONTENT_TYPES.webp, 'image/webp');
 		assert.equal(STATIC_MAP_CONTENT_TYPES.png, 'image/png');
+	});
+});
+
+describe('renderSvgBasemapImage', () => {
+	test('composites tiles into a single jpeg image', async () => {
+		const jpeg = await renderSvgBasemapImage(baseOptions, [
+			{ tileX: 0, tileY: 0, x: 0, y: 0, png: tinyPng },
+			{ tileX: 1, tileY: 0, x: -128, y: 0, png: tinyPng }
+		]);
+		assert.equal(jpeg?.subarray(0, 3).toString('hex'), 'ffd8ff');
+	});
+
+	test('returns undefined when there are no tiles', async () => {
+		assert.equal(await renderSvgBasemapImage(baseOptions, []), undefined);
+	});
+
+	test('uses MAP_VIEWPORT defaults when size is omitted', async () => {
+		const jpeg = await renderSvgBasemapImage({}, [{ tileX: 0, tileY: 0, x: 0, y: 0, png: tinyPng }]);
+		assert.equal(jpeg?.subarray(0, 3).toString('hex'), 'ffd8ff');
 	});
 });
