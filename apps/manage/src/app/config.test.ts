@@ -18,6 +18,7 @@ const managedKeys = [
 	'AUTH_CLIENT_ID',
 	'AUTH_CLIENT_SECRET',
 	'AUTH_DISABLED',
+	'AUTH_GROUP_ADMIN',
 	'AUTH_GROUP_APPLICATION_ACCESS',
 	'AUTH_TENANT_ID',
 	'BLOB_STORE_CONTAINER',
@@ -243,6 +244,15 @@ describe('manage loadConfig', () => {
 		assert.equal(config.auth.clientId, 'client-id');
 		assert.equal(config.auth.clientSecret, 'client-secret');
 		assert.equal(config.auth.groups.applicationAccess, 'group-id');
+	});
+
+	test('reads the optional admin group and defaults it to empty (deny-all) when unset', () => {
+		setBaseEnv({ AUTH_DISABLED: 'false', AUTH_GROUP_ADMIN: 'admin-group-id' });
+		assert.equal(loadConfig().auth.groups.admin, 'admin-group-id');
+
+		resetConfigCache();
+		setBaseEnv({ AUTH_DISABLED: 'false', AUTH_GROUP_ADMIN: '' });
+		assert.equal(loadConfig().auth.groups.admin, '');
 	});
 });
 

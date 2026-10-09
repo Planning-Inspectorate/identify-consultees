@@ -1,8 +1,9 @@
 import { LogLevel } from '@azure/msal-node';
 import { mockLogger } from '@planning-inspectorate/core/testing';
+import type { Request } from 'express';
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
-import { buildMsalConfig } from './auth.ts';
+import { auditActor, buildMsalConfig } from './auth.ts';
 
 describe('buildMsalConfig', () => {
 	test('maps MSAL log levels onto the application logger', () => {
@@ -13,7 +14,7 @@ describe('buildMsalConfig', () => {
 				clientId: 'client',
 				clientSecret: 'secret',
 				disabled: false,
-				groups: { applicationAccess: 'group' },
+				groups: { applicationAccess: 'group', admin: 'admin-group' },
 				redirectUri: 'http://localhost/auth/redirect',
 				signoutUrl: 'https://login.microsoftonline.com/common/oauth2/v2.0/logout'
 			},
@@ -35,5 +36,27 @@ describe('buildMsalConfig', () => {
 		assert.equal(logger.info.mock.callCount(), 1);
 		assert.equal(logger.debug.mock.callCount(), 1);
 		assert.equal(logger.trace.mock.callCount(), 1);
+	});
+});
+
+describe('auditActor', () => {
+	test('returns the signed-in account username and object id', () => {
+		const req = {
+			session: {
+				account: {
+					username: 'case.officer@planninginspectorate.gov.uk',
+					localAccountId: '00000000-0000-0000-0000-000000000001'
+				}
+			}
+		} as Request;
+		assert.deepEqual(auditActor(req), {
+			userId: '00000000-0000-0000-0000-000000000001',
+			username: 'case.officer@planninginspectorate.gov.uk'
+		});
+	});
+
+	test('returns "unknown" when the session carries no account', () => {
+		assert.deepEqual(auditActor({ session: {} } as Request), { username: 'unknown' });
+		assert.deepEqual(auditActor({} as Request), { username: 'unknown' });
 	});
 });

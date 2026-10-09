@@ -1,5 +1,9 @@
 import type { ManageService } from '#service';
-import { createRoutesAndGuards as createAuthRoutesAndGuards } from '@planning-inspectorate/core/auth';
+import {
+	AuthService,
+	buildAssertGroupAccess,
+	createRoutesAndGuards as createAuthRoutesAndGuards
+} from '@planning-inspectorate/core/auth';
 import { createMonitoringRoutes } from '@planning-inspectorate/core/controllers';
 import { cacheNoCacheMiddleware } from '@planning-inspectorate/core/middleware';
 import type { IRouter, RequestHandler } from 'express';
@@ -49,7 +53,12 @@ export type BuildRouterOptions = {
 export function buildRouter(service: ManageService, options: BuildRouterOptions = {}): IRouter {
 	const router = createRouter();
 	const monitoringRoutes = createMonitoringRoutes(service);
-	const { router: authRoutes, guards: authGuards } = createAuthRoutesAndGuards(service);
+	const authService = new AuthService({
+		config: service.authConfig,
+		logger: service.logger,
+		redisClient: service.redisClient
+	});
+	const { router: authRoutes, guards: authGuards } = createAuthRoutesAndGuards(service, authService);
 	const homeRoutes = createHomeRoutes(service);
 	const consulteeRoutes = createConsulteeRoutes(service);
 	const mapLayersDemoRoutes = createMapLayersDemoRoutes();
@@ -93,6 +102,14 @@ export function buildRouter(service: ManageService, options: BuildRouterOptions 
 		router.use(authGuards.assertIsAuthenticated);
 		// check group membership
 		router.use(authGuards.assertGroupAccess);
+
+		// the /admin tooling can write arbitrary blobs and replace whole reference-data
+		// tables, so it needs a dedicated Entra group on top of general access. With no
+		// AUTH_GROUP_ADMIN configured the guard fails closed - no group can match ''.
+		if (!service.authConfig.groups.admin) {
+			service.logger.warn('AUTH_GROUP_ADMIN is not configured - /admin pages will deny every request');
+		}
+		router.use('/admin', buildAssertGroupAccess(service.logger, authService, service.authConfig.groups.admin));
 	} else {
 		service.logger.warn('auth disabled; auth routes and guards skipped');
 

@@ -1,9 +1,11 @@
 import { ManageService } from '#service';
 import { loadCaseBoundaries } from '@pins/identify-consultees-database/src/geospatial/case-boundaries.ts';
+import { AuthService } from '@planning-inspectorate/core/auth';
 import assert from 'node:assert/strict';
 import { after, before, describe, test } from 'node:test';
 import request from 'supertest';
-import { buildAuthRateLimiter } from './router.ts';
+import { configureNunjucks } from './nunjucks.ts';
+import { buildAuthRateLimiter, buildRouter } from './router.ts';
 import { buildManageTestConfig, createManageTestApp, createManageTestService } from './testing/create-test-app.ts';
 
 // a fixed id, rather than depending on whatever sample data may or may not be seeded (CI's
@@ -326,11 +328,117 @@ describe('manage router wiring', () => {
 		// multipart body end-to-end; the test service has no blobStore configured (see
 		// buildManageTestConfig), so this also exercises that guard rather than a real Azure call -
 		// the successful-upload path is covered by controller.test.ts with an injected uploader
-		const response = await request(authDisabledApp)
+		const agent = request.agent(authDisabledApp);
+		const page = await agent.get('/admin/upload-to-blob');
+		const csrf = /name="_csrf" value="([^"]+)"/.exec(page.text)?.[1];
+		assert.ok(csrf, 'expected the upload form to carry a CSRF token');
+
+		const response = await agent
 			.post('/admin/upload-to-blob/run')
+			.field('_csrf', csrf)
 			.attach('file', Buffer.from('{}'), 'test.geojson');
 		assert.equal(response.status, 200);
 		assert.match(response.text, /not configured/);
+	});
+
+	test('POST /admin/upload-to-blob/run rejects the upload without a CSRF token', async () => {
+		// the route is exempt from the app-level CSRF middleware (lusca can't read a token out of
+		// a multipart body), so the check runs after multer instead - a forged cross-site POST
+		// must still fail before the file reaches blob storage
+		const response = await request(authDisabledApp)
+			.post('/admin/upload-to-blob/run')
+			.attach('file', Buffer.from('{}'), 'test.geojson');
+		assert.equal(response.status, 500);
+		assert.match(response.text, /Sorry, there is a problem with the service/);
+	});
+
+	test('POST /admin/upload-to-blob/run rejects a mismatched CSRF token', async () => {
+		const agent = request.agent(authDisabledApp);
+		await agent.get('/admin/upload-to-blob');
+
+		const response = await agent
+			.post('/admin/upload-to-blob/run')
+			.field('_csrf', 'not-the-session-token')
+			.attach('file', Buffer.from('{}'), 'test.geojson');
+		assert.equal(response.status, 500);
+		assert.match(response.text, /Sorry, there is a problem with the service/);
+	});
+
+	test('POST /admin/upload-to-blob/run rejects a multipart body with no file', async () => {
+		// no file field means multer leaves req.file unset - the CSRF check still runs and
+		// fails first, before the controller's "Select a file" guard can be reached
+		const response = await request(authDisabledApp)
+			.post('/admin/upload-to-blob/run')
+			.field('_csrf', 'not-the-session-token');
+		assert.equal(response.status, 500);
+		assert.match(response.text, /Sorry, there is a problem with the service/);
+	});
+
+	// signing a session in as a real Entra user isn't possible in tests, so the MSAL token
+	// refresh is stubbed and a session account is injected - enough to exercise the group guards
+	const appWithSession = async (service: ManageService, groups: string[]) => {
+		const express = (await import('express')).default;
+		const app = express();
+		configureNunjucks().express(app);
+		app.set('view engine', 'njk');
+		app.use((req, _res, next) => {
+			req.session = {
+				id: 'admin-guard-test-session',
+				account: {
+					username: 'admin-test@example.com',
+					localAccountId: 'admin-test-oid',
+					idTokenClaims: { groups }
+				}
+			} as never;
+			next();
+		});
+		app.use(buildRouter(service));
+		return app;
+	};
+
+	for (const path of ['/admin/upload-to-blob', '/admin/import-reference-data']) {
+		test(`GET ${path} 403s when the signed-in user is not in the admin group`, async (t) => {
+			const service = createManageTestService(false);
+			t.mock.method(AuthService.prototype, 'acquireTokenSilent', async (account: object) => account);
+			const app = await appWithSession(service, ['group-id']);
+			try {
+				const response = await request(app).get(path);
+				assert.equal(response.status, 403);
+			} finally {
+				await service.db.$disconnect().catch(() => undefined);
+			}
+		});
+	}
+
+	test('GET /admin/upload-to-blob renders for a signed-in member of the admin group', async (t) => {
+		const service = createManageTestService(false);
+		t.mock.method(AuthService.prototype, 'acquireTokenSilent', async (account: object) => account);
+		const app = await appWithSession(service, ['group-id', 'admin-group-id']);
+		try {
+			const response = await request(app).get('/admin/upload-to-blob');
+			assert.equal(response.status, 200);
+			assert.match(response.text, /Upload a file to blob storage/);
+		} finally {
+			await service.db.$disconnect().catch(() => undefined);
+		}
+	});
+
+	test('GET /admin/upload-to-blob denies everyone when no admin group is configured', async (t) => {
+		const service = createManageTestService(false, {
+			auth: {
+				...buildManageTestConfig(false).auth,
+				groups: { applicationAccess: 'group-id', admin: '' }
+			}
+		});
+		service.logger = (await import('@planning-inspectorate/core/testing')).mockLogger();
+		t.mock.method(AuthService.prototype, 'acquireTokenSilent', async (account: object) => account);
+		const app = await appWithSession(service, ['group-id', 'admin-group-id']);
+		try {
+			const response = await request(app).get('/admin/upload-to-blob');
+			assert.equal(response.status, 403);
+		} finally {
+			await service.db.$disconnect().catch(() => undefined);
+		}
 	});
 
 	test('GET /components lists every GOV.UK Frontend component', async () => {

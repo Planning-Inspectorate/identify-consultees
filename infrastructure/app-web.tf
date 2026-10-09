@@ -44,6 +44,7 @@ module "app_web" {
     NODE_ENV                                   = var.apps_config.node_environment
     ENVIRONMENT                                = var.environment
     APP_HOSTNAME                               = var.web_domains.web
+    AUTH_GROUP_ADMIN                           = var.apps_config.auth.group_admin
     AUTH_GROUP_APPLICATION_ACCESS              = var.apps_config.auth.group_application_access
     AUTH_CLIENT_ID                             = var.apps_config.auth.client_id
     AUTH_CLIENT_SECRET                         = local.key_vault_refs["consultees-client-secret"]

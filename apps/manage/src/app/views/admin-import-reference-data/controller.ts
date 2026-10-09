@@ -1,4 +1,5 @@
 import type { ManageService } from '#service';
+import { auditActor } from '#util/auth.ts';
 import {
 	importCaseBoundaries,
 	importConsulteeAreas
@@ -58,16 +59,21 @@ export function buildRunImportConsulteeAreas(
 
 	return async (req, res) => {
 		const viewModel: ImportReferenceDataViewModel = { pageHeading: PAGE_HEADING };
+		const actor = auditActor(req);
 
 		try {
 			const { filePath, cleanup } = await download(CONSULTEE_AREAS_BLOB_NAME);
 			try {
 				viewModel.consulteeAreasImported = await runImport(db, filePath, REPLACE);
+				logger.info(
+					{ ...actor, blobName: CONSULTEE_AREAS_BLOB_NAME, imported: viewModel.consulteeAreasImported },
+					'admin: replaced consultee areas from blob storage'
+				);
 			} finally {
 				await cleanup();
 			}
 		} catch (error) {
-			logger.error({ error }, 'Failed to import consultee areas from blob storage');
+			logger.error({ ...actor, error }, 'Failed to import consultee areas from blob storage');
 			viewModel.error = 'Could not import consultee areas from blob storage.';
 		}
 
@@ -84,16 +90,21 @@ export function buildRunImportCaseBoundaries(
 
 	return async (req, res) => {
 		const viewModel: ImportReferenceDataViewModel = { pageHeading: PAGE_HEADING };
+		const actor = auditActor(req);
 
 		try {
 			const { filePath, cleanup } = await download(CASE_BOUNDARIES_BLOB_NAME);
 			try {
 				viewModel.caseBoundariesImported = await runImport(db, filePath, REPLACE);
+				logger.info(
+					{ ...actor, blobName: CASE_BOUNDARIES_BLOB_NAME, imported: viewModel.caseBoundariesImported },
+					'admin: replaced case boundaries from blob storage'
+				);
 			} finally {
 				await cleanup();
 			}
 		} catch (error) {
-			logger.error({ error }, 'Failed to import case boundaries from blob storage');
+			logger.error({ ...actor, error }, 'Failed to import case boundaries from blob storage');
 			viewModel.error = 'Could not import case boundaries from blob storage.';
 		}
 

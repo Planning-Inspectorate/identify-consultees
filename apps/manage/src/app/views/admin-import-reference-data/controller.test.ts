@@ -58,7 +58,8 @@ describe('admin import reference data', () => {
 			const res = newRes();
 			const download = newDownload('/tmp/consultee-areas.geojson');
 			const runImport = mock.fn(async () => 18258);
-			const run = buildRunImportConsulteeAreas({ db: countingDb(), logger: mockLogger() }, download, runImport);
+			const logger = mockLogger();
+			const run = buildRunImportConsulteeAreas({ db: countingDb(), logger }, download, runImport);
 			await run({}, res);
 
 			assert.strictEqual(download.mock.calls[0].arguments[0], CONSULTEE_AREAS_BLOB_NAME);
@@ -71,6 +72,13 @@ describe('admin import reference data', () => {
 			assert.strictEqual(consulteeAreasImported, 18258);
 			assert.strictEqual(loadedConsulteeAreas, 18_258);
 			assert.match(res.render.mock.calls[0].result, /Replaced consultee areas: imported 18258/);
+
+			// a replace-import wipes and reloads the table - the audit line must say who ran it
+			const [fields, message] = logger.info.mock.calls[0].arguments;
+			assert.strictEqual(fields.blobName, CONSULTEE_AREAS_BLOB_NAME);
+			assert.strictEqual(fields.imported, 18258);
+			assert.strictEqual(fields.username, 'unknown');
+			assert.match(message, /replaced consultee areas/);
 		});
 
 		it('renders an error when the download fails, without throwing', async () => {
@@ -108,7 +116,8 @@ describe('admin import reference data', () => {
 			const res = newRes();
 			const download = newDownload('/tmp/case-boundaries.geojson');
 			const runImport = mock.fn(async () => 433);
-			const run = buildRunImportCaseBoundaries({ db: {}, logger: mockLogger() }, download, runImport);
+			const logger = mockLogger();
+			const run = buildRunImportCaseBoundaries({ db: {}, logger }, download, runImport);
 			await run({}, res);
 
 			assert.strictEqual(download.mock.calls[0].arguments[0], CASE_BOUNDARIES_BLOB_NAME);
@@ -118,6 +127,11 @@ describe('admin import reference data', () => {
 			const { error, caseBoundariesImported } = res.render.mock.calls[0].arguments[1];
 			assert.strictEqual(error, undefined);
 			assert.strictEqual(caseBoundariesImported, 433);
+
+			const [fields, message] = logger.info.mock.calls[0].arguments;
+			assert.strictEqual(fields.blobName, CASE_BOUNDARIES_BLOB_NAME);
+			assert.strictEqual(fields.imported, 433);
+			assert.match(message, /replaced case boundaries/);
 		});
 
 		it('renders an error when the download fails, without throwing', async () => {

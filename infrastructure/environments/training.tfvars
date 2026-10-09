@@ -9,6 +9,7 @@ apps_config = {
   auth = {
     client_id                = "ec7ac3e2-72ed-4180-9341-797ce7fd2819"
     group_application_access = "1af42b0f-f33d-41a2-8a21-f71589132bb7"
+    # group_admin = "" # Entra group for /admin pages - unset denies everyone
     # groups = {
     #   inspectors    = ""
     #   team_leads    = ""

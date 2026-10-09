@@ -1,5 +1,7 @@
 import type { Configuration } from '@azure/msal-node';
 import { LogLevel } from '@azure/msal-node';
+import { getAccount } from '@planning-inspectorate/core/auth';
+import type { Request } from 'express';
 import type { Logger } from 'pino';
 import type { Config } from '../app/config.ts';
 
@@ -43,4 +45,17 @@ export function buildMsalConfig({ config, logger }: { config: Config['auth']; lo
 			}
 		}
 	};
+}
+
+/**
+ * Who is acting, for audit log lines on the /admin routes: the signed-in Entra account's
+ * username and object id, or 'unknown' when auth is disabled (local dev) or the session
+ * carries no account.
+ */
+export function auditActor(req: Request): { userId?: string; username: string } {
+	const account = getAccount(req.session);
+	if (!account) {
+		return { username: 'unknown' };
+	}
+	return { userId: account.localAccountId, username: account.username };
 }

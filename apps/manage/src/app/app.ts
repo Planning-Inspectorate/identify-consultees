@@ -34,7 +34,8 @@ export function createApp(service: ManageService): Express {
 		],
 		cspDirectives: buildContentSecurityPolicyDirectives({ isProduction }),
 		// multer needs the raw multipart body before lusca CSRF can read a token from it - see
-		// node_modules/@planning-inspectorate/core/dist/app/csrf.js
+		// node_modules/@planning-inspectorate/core/dist/app/csrf.js. The route still gets CSRF
+		// coverage: views/admin-upload-to-blob/index.ts runs the lusca check after multer.
 		multiPartFormRoutes: ['/admin/upload-to-blob/run']
 	});
 }

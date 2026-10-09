@@ -86,7 +86,7 @@ To load the full reference dataset instead, use `npm run db-import` / `npm run d
 For real Microsoft Entra sign-in locally:
 
 1. In `apps/manage/.env`, set `AUTH_DISABLED=false`
-2. Fill in `AUTH_CLIENT_ID`, `AUTH_CLIENT_SECRET`, `AUTH_GROUP_APPLICATION_ACCESS`, and confirm `AUTH_TENANT_ID` / `APP_HOSTNAME` with a teammate
+2. Fill in `AUTH_CLIENT_ID`, `AUTH_CLIENT_SECRET`, `AUTH_GROUP_APPLICATION_ACCESS` (and optionally `AUTH_GROUP_ADMIN` for the `/admin` pages), and confirm `AUTH_TENANT_ID` / `APP_HOSTNAME` with a teammate
 3. Restart the manage app
 
 ### Python function

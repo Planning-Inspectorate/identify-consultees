@@ -465,7 +465,10 @@ job:
   until the platform team grants it Storage Blob Data Reader - use the in-app import meanwhile.
 - **In-app import**: the same blobs can be imported from the manage app itself at
   `/admin/import-reference-data` (with `/admin/upload-to-blob` for getting files into the
-  container) - the app's managed identity has Storage Blob Data Contributor. This route always
+  container) - the app's managed identity has Storage Blob Data Contributor. Everything under
+  `/admin` is gated to a dedicated Entra group beyond general access (`AUTH_GROUP_ADMIN` /
+  `apps_config.auth.group_admin` in tfvars); with no group configured those pages deny
+  everyone. This route always
   **replaces** the table (same safeguards as the pipeline's `replaceExistingData`), and shows the
   rows currently loaded, so an import that outlasts Front Door's response timeout can be confirmed
   by reloading the page.

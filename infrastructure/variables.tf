@@ -19,6 +19,9 @@ variable "apps_config" {
     auth = object({
       client_id                = string
       group_application_access = string
+      # Entra group for the /admin pages (blob upload, reference-data imports). Empty by
+      # default - the app guard fails closed and denies everyone until a group is set.
+      group_admin = optional(string, "")
       # groups = object({
       #   inspectors           = string
       #   team_leads           = string
