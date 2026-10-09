@@ -1,6 +1,8 @@
 {% extends "views/layouts/main.njk" %}
 
 {% from "govuk/components/panel/macro.njk" import govukPanel %}
+{% from "govuk/components/table/macro.njk" import govukTable %}
+{% from "govuk/components/notification-banner/macro.njk" import govukNotificationBanner %}
 
 {% block pageTitle %}
 	{{ pageHeading }} - {{ config.headerTitle }}
@@ -18,4 +20,42 @@
 	<p class="govuk-body govuk-!-margin-top-6">
 		<a class="govuk-link" href="{{ downloadUrl }}">{{ downloadText }}</a>
 	</p>
+
+	{% if rulesetFailed %}
+		{% set failureHtml %}
+			<h3 class="govuk-notification-banner__heading">The ruleset could not be run</h3>
+			<p class="govuk-body">The report's consultees can't be shown because the search did not finish. <a class="govuk-notification-banner__link" href="{{ retryUrl }}">Try again</a>.</p>
+		{% endset %}
+		{{ govukNotificationBanner({ html: failureHtml }) }}
+	{% else %}
+		<h2 class="govuk-heading-l govuk-!-margin-top-8">Consultees in the report ({{ consulteeCount }})</h2>
+		<p class="govuk-body">Identified by the {{ rulesetName }} ruleset, with any you removed left out and any you added included. "Why identified" gives every reason a consultee is in the report.</p>
+
+		{% if report.length == 0 %}
+			<p class="govuk-body">No consultees are in the report.</p>
+		{% endif %}
+
+		{% for section in report %}
+			{% set rows = [] %}
+			{% for consultee in section.consultees %}
+				{# one reason per line - each item is autoescaped #}
+				{% set identifiedHtml %}{% for reason in consultee.identified %}{{ reason }}{% if not loop.last %}<br>{% endif %}{% endfor %}{% endset %}
+				{% set rows = (rows.push([
+					{ text: consultee.name },
+					{ html: identifiedHtml }
+				]), rows) %}
+			{% endfor %}
+			{# a fixed column split, so every category's table lines up #}
+			{{ govukTable({
+				caption: section.category ~ " (" ~ section.consultees.length ~ ")",
+				captionClasses: "govuk-table__caption--m",
+				firstCellIsHeader: true,
+				head: [
+					{ text: "Consultee", classes: "govuk-!-width-one-half" },
+					{ text: "Why identified", classes: "govuk-!-width-one-half" }
+				],
+				rows: rows
+			}) }}
+		{% endfor %}
+	{% endif %}
 {% endblock %}

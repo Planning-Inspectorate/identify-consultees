@@ -224,27 +224,38 @@ describe('consultee report check page', () => {
 });
 
 describe('report created page', () => {
-	function summaryDb() {
-		return {
-			$queryRaw: mock.fn(async () => [
-				{
-					id: realProjectId,
-					caseReference: 'EN010099',
-					caseName: 'Real Test Project',
-					receivedDate: null,
-					acceptance: null
-				}
-			])
-		};
-	}
+	const hospitalRow = () => ({
+		...parishMatchRow(),
+		id: '66666666-6666-6666-6666-666666666666',
+		consulteeCategory: 'Hospital',
+		consultee: 'Norfolk Hospital',
+		reasons: [
+			{ type: 'condition' as const, conditionId: 'hospital' },
+			{ type: 'nearby' as const, radiusMetres: 20_000 }
+		]
+	});
+	const parishRow = () => ({
+		...parishMatchRow(),
+		reasons: [{ type: 'condition' as const, conditionId: 'b_host_parish_comm_council' }]
+	});
 
-	it('should render the confirmation panel and the download link', async () => {
+	function createdPage(rows: ConsulteeAreaMatchRow[], rulesetRunner = rulesetRunnerReturning(rows)) {
 		const nunjucks = configureNunjucks();
 		const mockRes = {
 			status: mock.fn(() => mockRes),
 			render: mock.fn((view, data) => nunjucks.render(view, data))
 		};
-		const handler = buildReportCreatedPage({ db: summaryDb() });
+		const handler = buildReportCreatedPage({
+			db: dbReturning([[realProjectRow()]]),
+			logger: mockLogger(),
+			nearbyConsulteeRadiusMetres: 20_000,
+			rulesetRunner
+		});
+		return { handler, mockRes };
+	}
+
+	it("should render the confirmation panel, the download link and the report's consultees with why", async () => {
+		const { handler, mockRes } = createdPage([parishRow(), hospitalRow()]);
 		await handler({ params: { caseId: realProjectId }, query: {} }, mockRes);
 
 		assert.strictEqual(mockRes.render.mock.calls[0].arguments[0], 'views/consultees/report/created.njk');
@@ -253,15 +264,88 @@ describe('report created page', () => {
 		assert.strictEqual(viewModel.caseName, 'Real Test Project');
 		assert.strictEqual(viewModel.reference, 'EN010099');
 		assert.strictEqual(viewModel.backLinkUrl, `/consultees/${realProjectId}?ruleset=england-wales-post-20240430`);
+		// by category, in the check page's order (the ruleset names parishes before hospitals)
+		assert.deepStrictEqual(viewModel.report, [
+			{
+				category: 'Parish Council',
+				consultees: [
+					{
+						name: 'Little Snoring Parish Council',
+						identified: ['"B" host Parishes or Community Councils: intersects the site']
+					}
+				]
+			},
+			{
+				category: 'Hospital',
+				consultees: [
+					{
+						name: 'Norfolk Hospital',
+						identified: ['Hospitals: within 10km of the site', 'Within 20km of the site']
+					}
+				]
+			}
+		]);
+		assert.strictEqual(viewModel.consulteeCount, 2);
 
 		const html = mockRes.render.mock.calls[0].result;
 		assert.match(html, /Report created/);
 		assert.match(html, /Download Real Test Project scoping report/);
+		assert.match(html, /Consultees in the report \(2\)/);
+		assert.match(html, /Why identified/);
+		assert.match(html, /Hospitals: within 10km of the site<br>Within 20km of the site/);
+	});
+
+	it('should leave out removed consultees and include hand-added ones, with the reason given', async () => {
+		const { handler, mockRes } = createdPage([parishRow(), hospitalRow()]);
+		const add = (category: string, name: string, reason = '') => JSON.stringify({ c: category, n: name, r: reason });
+		await handler(
+			{
+				params: { caseId: realProjectId },
+				query: {
+					exclude: '55555555-5555-5555-5555-555555555555',
+					add: [add('Hospital', 'Added Hospital', 'Asked to be consulted'), add('Landowner', 'Mr Smith')]
+				}
+			},
+			mockRes
+		);
+
+		const { report, consulteeCount } = mockRes.render.mock.calls[0].arguments[1];
+		// the removed parish leaves its category empty, so it's not listed; a category only a
+		// hand-added consultee is in comes last
+		assert.deepStrictEqual(report, [
+			{
+				category: 'Hospital',
+				consultees: [
+					{ name: 'Norfolk Hospital', identified: ['Hospitals: within 10km of the site', 'Within 20km of the site'] },
+					{ name: 'Added Hospital', identified: ['Asked to be consulted'] }
+				]
+			},
+			{ category: 'Landowner', consultees: [{ name: 'Mr Smith', identified: ['Manually added'] }] }
+		]);
+		assert.strictEqual(consulteeCount, 3);
+	});
+
+	it('should say when no consultees are in the report', async () => {
+		const { handler, mockRes } = createdPage([]);
+		await handler({ params: { caseId: realProjectId }, query: {} }, mockRes);
+		assert.match(mockRes.render.mock.calls[0].result, /No consultees are in the report/);
+	});
+
+	it('should say the ruleset could not be run rather than show an empty report', async () => {
+		const { handler, mockRes } = createdPage([], failingRulesetRunner());
+		await handler({ params: { caseId: realProjectId }, query: { exclude: 'abc' } }, mockRes);
+
+		const viewModel = mockRes.render.mock.calls[0].arguments[1];
+		assert.strictEqual(viewModel.rulesetFailed, true);
+		assert.deepStrictEqual(viewModel.report, []);
+		assert.match(viewModel.retryUrl, /\/report\/created\?ruleset=england-wales-post-20240430/);
+		const html = mockRes.render.mock.calls[0].result;
+		assert.match(html, /The ruleset could not be run/);
+		assert.doesNotMatch(html, /Consultees in the report/);
 	});
 
 	it('should 404 for a present-but-unknown ruleset', async () => {
-		const mockRes = { status: mock.fn(() => mockRes), render: mock.fn() };
-		const handler = buildReportCreatedPage({ db: summaryDb() });
+		const { handler, mockRes } = createdPage([]);
 		await handler({ params: { caseId: realProjectId }, query: { ruleset: 'not-a-real-ruleset' } }, mockRes);
 		assert.strictEqual(mockRes.status.mock.calls[0].arguments[0], 404);
 	});

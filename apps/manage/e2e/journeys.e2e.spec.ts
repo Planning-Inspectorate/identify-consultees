@@ -180,6 +180,14 @@ test.describe('manage journeys', () => {
 		await expect(
 			page.getByRole('link', { name: new RegExp(`Download ${SAMPLE_CASE_NAME} scoping report`) })
 		).toBeVisible();
+		// and lists the report's consultees by category with why each is in it - the hand-added one
+		// with the reason entered for it, the removed one and the removed hand-added one left out
+		await expect(page.getByRole('heading', { level: 2, name: /Consultees in the report/ })).toBeVisible();
+		const parishTable = page.getByRole('table', { name: /^Parish Council \(/ });
+		await expect(parishTable.getByRole('columnheader', { name: 'Why identified' })).toBeVisible();
+		await expect(parishTable.getByRole('row', { name: /First Test Consultee.*Entered first/ })).toBeVisible();
+		await expect(parishTable.getByRole('rowheader', { name: 'Second Test Consultee' })).toHaveCount(0);
+		await expect(parishTable.getByRole('rowheader')).toHaveCount(parishCount - removed + 1);
 
 		// the same selection's report page still lists the matched consultees
 		await page.goto(`/consultees/${SAMPLE_CASE_ID}/results?ruleset=${SAMPLE_RULESET_ID}`);
