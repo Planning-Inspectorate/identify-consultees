@@ -9,4 +9,4 @@ Key companions:
 - [ACCESSIBILITY.md](../ACCESSIBILITY.md) — WCAG 2.2 AA policy and testing expectations
 - [CONTRIBUTING.md](../CONTRIBUTING.md) — human-facing workflow (branches, commits, local checks)
 - `.devin/skills/` — task skills, including `dependency-update-check` (green pipeline before dep updates)
-- `kt-docs/` — onboarding deep-dives (architecture, maps, testing)
+- `kt-docs/` — onboarding pack (overview, web app, maps, screening, testing, deployment, data)

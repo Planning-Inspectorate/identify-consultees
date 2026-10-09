@@ -1,58 +1,50 @@
 # Testing
 
-**Status:** Current — see also [`docs/frontend-testing.md`](../docs/frontend-testing.md).
-
 ## Layers
 
-| Layer                 | How                                 | What it proves                                                              |
-| --------------------- | ----------------------------------- | --------------------------------------------------------------------------- |
-| Unit / integration    | `node --test` in manage + packages  | Controllers, helpers, HTTP wiring (`supertest`)                             |
-| GOV.UK fixtures       | `govuk-frontend-components.test.ts` | Macro HTML still matches Frontend fixtures                                  |
-| A11y smoke            | `pages.a11y.test.ts` (axe + jsdom)  | Rendered Nunjucks pages                                                     |
-| Playwright e2e / a11y | `chromium-e2e`, `chromium-a11y`     | Real browser journeys + axe                                                 |
-| Cross-browser render  | `firefox-render`, `webkit-render`   | Pages paint chrome/content outside Chromium                                 |
-| Visual regression     | `chromium-visual` (opt-in)          | Committed screenshot baselines for every page — not in `npm test` or CI yet |
-| Coverage gate         | `npm run test:frontend-coverage`    | 100% L/F/B on manage `src` (exclusions apply)                               |
+| Layer                | Where                                                                      | What it proves                                                                              |
+| -------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| Unit and integration | `node --test`, `*.test.ts` beside the code in `apps/manage` and `packages` | Controllers, helpers, HTTP wiring (`supertest`), client JS (`public/javascripts/*.test.js`) |
+| GOV.UK fixtures      | `govuk-frontend-components.test.ts`                                        | Macro HTML still matches GOV.UK Frontend's own fixtures                                     |
+| Accessibility smoke  | `pages.a11y.test.ts` (axe and jsdom)                                       | Rendered Nunjucks pages                                                                     |
+| Browser journeys     | Playwright `chromium-e2e`, `chromium-a11y`                                 | Journeys, axe, skip link, landmarks and focus in a real browser                             |
+| Cross-browser        | `firefox-render`, `webkit-render` (`e2e/*.render.spec.ts`)                 | Pages paint their chrome and content outside Chromium                                       |
+| Visual regression    | `chromium-visual`, opt-in                                                  | Screenshot of every page against committed baselines                                        |
+| Python               | `pytest`, `ruff` in `apps/function-python`                                 | The screening engine. Database tests skip when no database is reachable                     |
 
 ## Commands
 
-```bash
-# from repo root
-npm test
-npm run test:e2e
-npm run test:frontend-coverage
-npm run playwright:install   # once per machine
-npm run test:visual          # optional
-```
-
-> **Prerequisite:** the Playwright projects (e2e / a11y / render) boot a test server on port 8091 that queries the **real local database** — the specs deep-link to rows from the dev seed (`e2e/fixtures.ts` defines `SAMPLE_CASE_ID`, `SAMPLE_RULESET_ID`). Run `npm start` first (or at least `docker compose up -d` + `npm run db-migrate-dev && npm run db-seed`) or the journey specs will fail. The unit/`node --test` layers mock or stub the DB and work without it.
-
-Lighter manage-only example:
+From the repo root:
 
 ```bash
+npm test                        # packages, the coverage gate, then Playwright
+npm run test:frontend-coverage  # apps/manage at 100% lines, functions and branches
+npm run test:e2e                # Playwright e2e, a11y and render
+npm run playwright:install      # once per machine
 npm run test --workspace identify-consultees-manage -- src/app/views/home/controller.test.ts
 ```
 
-## Coverage expectations
+The Playwright projects start a test server on port 8091 against the **real local database**: the specs deep-link to seeded rows (`SAMPLE_CASE_ID`, `SAMPLE_RULESET_ID` in `e2e/fixtures.ts`). Run `npm start` once first. In CI, `pr.yml` starts SQL Server and seeds it. The ruleset is run by a database stub there, not the function (see [Screening service](./screening-service.md#tests)).
 
-For `apps/manage/src/**`:
+## Coverage gate
 
-- **100%** line, function, and branch coverage in the frontend gate
-- Excludes typically include `server.ts`, `util/build.ts`, and `*.test.*`
+`scripts/run-frontend-coverage.mjs` holds `apps/manage/src/**` at 100% line, function and branch coverage, excluding `server.ts`, `util/build.ts` and tests. Add a branch, add a test; test through handlers and `testing/create-test-app.ts` rather than private internals.
 
-If you add a branch, add a test. Prefer testing through handlers / `create-test-app` over brittle private internals.
+A local `apps/manage/.env` changes `config.ts`'s branches. If the gate passes locally but fails in CI, move it aside and run with `CI=true`.
 
-## How to add or change tests for a route
+## Visual regression
 
-1. **Unit:** Extend or add `*.test.ts` beside the controller/router; mock `ManageService` pieces as existing tests do
-2. **HTTP wiring:** Assert status, redirect `Location`, and key body strings via `supertest` (`router.test.ts` pattern)
-3. **Template a11y:** Render the Nunjucks view in `pages.a11y.test.ts` with a representative view-model
-4. **Playwright:** Add/adjust paths in `apps/manage/e2e/*.spec.ts` (e2e, a11y, render)
-5. Run the manage coverage gate before opening the PR
+`e2e/pages.visual.spec.ts` screenshots every page in Chromium at 1280×720 with a 2% tolerance. Map regions are masked because canvas rendering isn't pixel-stable. Baselines in `pages.visual.spec.ts-snapshots/` are per platform (`*-darwin.png` locally), so Linux baselines must be generated on the CI OS before these join the pipeline. That waits until the screens are final.
 
-Auth-disabled test app helpers live under `apps/manage/src/app/testing/`.
+```bash
+npm run test:visual           # compare
+npm run test:visual:update    # after a deliberate UI change
+```
 
-## Related pages
+## Adding a route
 
-- [Accessibility and quality](./accessibility-and-quality.md)
-- [Troubleshooting](./troubleshooting.md)
+1. Unit tests beside the controller, mocking `ManageService` as the existing tests do
+2. HTTP wiring: status, redirect `Location` and key text through `supertest`
+3. Add the page to `pages.a11y.test.ts` with a representative view model
+4. Add it to the Playwright specs in `apps/manage/e2e/`
+5. Run the coverage gate before opening the PR

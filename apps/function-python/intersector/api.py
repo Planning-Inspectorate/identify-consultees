@@ -1,6 +1,6 @@
 """The run-ruleset route's JSON contract: validating the request, and the shape of the response.
 
-See kt-docs/api-and-data-contracts.md. The manage app's side is apps/manage/src/app/ruleset-runner.ts.
+See kt-docs/screening-service.md. The manage app's side is apps/manage/src/app/ruleset-runner.ts.
 """
 
 from dataclasses import dataclass

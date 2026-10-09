@@ -1,114 +1,52 @@
 # Maps
 
-**Status:** Current for the results-map pipeline and component showcase; Partial for upload-derived viewports and full GIS styling coverage.
+"The map" means the interactive Defra Interactive Map. The "static map" is the server-rendered image shown without JavaScript or when the interactive map fails. The rules (static map caching, Defra gotchas, GIS styling) are in the Maps section of [AGENTS.md](../AGENTS.md); this page explains how the project maps are built.
 
-## Architecture (PINS-data-spike pattern)
+| Mode        | How                                                                                                                                                                                                                                                                       |
+| ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Interactive | Defra bundles from `/vendor/*`, started by `public/javascripts/consultees-map.js` from the page's inline JSON config                                                                                                                                                      |
+| Static      | `/consultees/:caseId/results/static-map` (AVIF, WebP or PNG from `Accept`) or `.../static-map.svg`. Tiles are fetched and composited by the app, with ETags and long caching (`maps/serve-static-map.ts`, `static-map.ts`, `static-map-raster.ts`, `static-map-cache.ts`) |
 
-When people say **“the map”** in this project, they mean the **interactive** Defra Interactive Map (JS).
+The project page, a report category page and the results page all use the partial `views/partials/consultee-map-region.njk` and the same static map route; a category page adds `category` and `exclude` to it.
 
-**Static map** / **non-interactive map** means the server-rendered image used for noscript / progressive-enhancement failure.
+## Building the map
 
-| Mode        | Mechanism                                                                                                                                      |
-| ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
-| Interactive | Defra Interactive Map vendor bundles (`/vendor/*`) + client init from inline page config                                                       |
-| Static      | App-served `/…/static-map` — AVIF/WebP/PNG negotiated from `Accept`; `/…/static-map.svg` for the explicit SVG route, caching / ETag throughout |
+Each map page's controller does the same steps, with helpers from `views/consultees/run-ruleset.ts`:
 
-Result-page partial: `views/partials/consultee-map-region.njk`  
-Showcase pages: `views/interactive-map-examples/` under `/components/interactive-map`  
-Client behaviour: fingerprinted `javascripts/consultees-map.js` (built into `.static`); showcase init via `initAllInteractiveMapExamples` on `.app-interactive-map-example` containers
+1. Loads the case boundary (`resolveCase`).
+2. Runs the ruleset in the Python function (`runRulesetSafely`, through `service.rulesetRunner`). It returns every consultee it found, by a condition or within the nearby radius (20km), with its reasons.
+3. Builds the **search area**, the site grown by the nearby radius, and fetches display geometry for every consultee touching it (`buildSearchAreaSafely`). Areas are drawn whole and simplified by size: the larger of 25m and 1/200th of the area's width (`DISPLAY_SIMPLIFY_WIDTH_RATIO`). A parish stays at 25m and a 3,000km² county becomes about 270m, which keeps a Norwich to Tilbury page at 1.5MB rather than 3.8MB.
+4. `buildCaseMapConfig` (`maps/case-geojson.ts`) makes the config: the project, the consultees and the search area, each consultee with its category's `colour` and `fillOpacity`, so both maps colour it the same.
 
-## Source selection (results page)
+If step 3 fails the page still renders, with the project and condition matches only (capped at `MAX_SAMPLED_MAP_MATCHES`).
 
-For `/consultees/:caseId/results?ruleset=…`:
+## Layers
 
-1. Load the case boundary from `case_boundary` (`resolveCase` / `getCaseBoundaryById`)
-2. Run the ruleset in the Python function (`service.rulesetRunner` — see [Node–Python integration](./node-python-integration.md)), which returns every consultee it found — the conditions' matches and every area within the nearby radius (20km by default) — each with the reasons it was identified
-3. Build the **search area** — the site grown by the nearby radius (`bufferGeometryForDisplay`) — and fetch **display geometry** for every consultee that touches it (`getConsulteeAreaDisplayGeometries`). Areas are drawn whole, not cut at the search area, and simplified more the larger they are: the larger of 25m and 1/200th of the area's width (`DISPLAY_SIMPLIFY_WIDTH_RATIO`). A parish stays at 25m; a 3,000km² county is simplified to ~270m. That keeps whole regional areas about the size the old clipped ones were (Norwich to Tilbury: 1.5MB, against 3.8MB at a flat 25m). The search area itself isn't drawn; the map opens on it
-4. `buildCaseMapConfig` (`app/maps/case-geojson.ts`) turns the project, consultees and search area into the map config. It gives every consultee its category's colour (`colour`) and fill opacity (`fillOpacity`), so the interactive and static maps colour them the same way. It draws every consultee; only the fallback without a search area, which uses original geometry (condition matches only), caps drawn matches at `MAX_SAMPLED_MAP_MATCHES`
-5. Embed map config JSON in the page; point the static fallback at `/consultees/:caseId/results/static-map?ruleset=…`
+| Layer              | Shows                                                              | Style                                                                                                          |
+| ------------------ | ------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------- |
+| The ruleset's name | Every consultee identified, one sublayer per category with a count | Areas filled in the category colour; point categories (hospitals, harbours, generators, nuclear sites) as dots |
+| Project site       | The case boundary                                                  | Red, translucent                                                                                               |
 
-If step 3 fails, the page still renders: the map falls back to the project and matches, and the tables list every consultee.
+Regional categories (police, ambulance trusts, ICBs, counties) would hide everything else at a normal fill. A category with any area covering half or more of the search area's bounding box is filled at 6% (`REGIONAL_FILL_OPACITY`) and drawn first; local areas get 35% (`LOCAL_FILL_OPACITY`).
 
-Everything on that map comes from SQL — there is no fixture layer.
+**Category colours are interim**: a 14-colour placeholder palette (`maps/category-colours.ts`), assigned in alphabetical order per map, so a category's colour can change between projects. Consultee categories aren't in the GIS Tool Styling tables and need product and design sign-off.
 
-## Results map layers
+Clicking a feature selects it and a "Selected on the map" panel shows its name, category and region. The Defra map has no hover; selection goes through the interact plugin (`buildSelectableLayers`, `wireFeatureDetails`).
 
-Drawn bottom to top (`buildDatasets` in `javascripts/consultees-map.js`):
+## Defra map gotchas found here
 
-| Layer              | What it shows                                                                                             | Style                                                                                                                  |
-| ------------------ | --------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| The ruleset's name | Every consultee identified — by a condition or the nearby search — one sublayer per category with a count | Areas filled in the category's colour; point categories (hospitals, harbours, generators, nuclear sites) as small dots |
-| Project site       | The case boundary                                                                                         | Red, translucent fill                                                                                                  |
+- Each dataset needs an `idProperty` (`consulteeId`, or `reference` for the project). MapLibre drops string feature ids, so without it nothing can be selected and the console warns about "string native IDs".
+- Interact `layerId`s are MapLibre layer ids: `<dataset id>-<sublayer id>` (for example `consultee-areas-identified-0`), plus `-stroke` when a sublayer has both fill and outline.
+- There's no fill-opacity option; `fillOpacity` is ignored and the fill drawn solid. Put the alpha in the colour (`translucent('#55A868', 0.05)`). The map-layers demo and component examples still draw solid fills for this reason.
+- A custom `symbolSvgContent` must include `{{haloColor}}`, `{{selectedColor}}` and `{{activeColor}}`, or it isn't drawn.
+- A sublayer is drawn as points only if its style sets `symbol`.
 
-**Regional categories are only tinted.** Police forces, ambulance trusts, ICBs and counties each cover the whole search area. A dozen of them stacked at a normal fill hide everything else. So a category with any area covering half or more of the search area's bounding box is filled at `REGIONAL_FILL_OPACITY` (6%) and drawn first. Local areas such as parishes and districts are filled at `LOCAL_FILL_OPACITY` (35%).
+## Framing
 
-The static fallback opens on the same view, and draws the same project and consultees in the same colours and opacities.
+Both maps frame the search area, or the project and matches when there isn't one. If you change `buildCaseMapConfig` or the geometry helpers, check both. **Known issue:** the static image comes out much wider than the interactive map for the same centre and zoom (Hinkley Point C's spans South Wales to the south coast). Not yet investigated.
 
-> **Category colours are interim.** They're a placeholder palette of 14 (`CONSULTEE_CATEGORY_COLOURS` in `app/maps/category-colours.ts`). On each map, the ruleset's match categories are coloured in alphabetical order, so a category's colour can differ between projects. Consultee categories aren't in the GIS Tool Styling tables, so per [`AGENTS.md`](../AGENTS.md) they need product/design sign-off.
+Every input that changes the rendered static image must be part of `buildStaticMapFingerprint`'s payload, or caches serve stale images.
 
-### Selecting a consultee
+## Dev pages
 
-Clicking an area or point selects it, and a "Selected on the map" panel shows its name, category and region (or, for the project site, its name and reference). Clicking away or closing the panel clears the selection. There's no hover: the Defra map only offers selection, through the interact plugin (`buildSelectableLayers` and `wireFeatureDetails` in `javascripts/consultees-map.js`).
-
-Two things have to line up for a click to match a feature:
-
-- **Each dataset needs an `idProperty`.** MapLibre drops string feature ids, so features carry their id as a property (`consulteeId`, or `reference` for the project) and the dataset promotes it. Without it, nothing can be selected, and the console warns about "string native IDs".
-- **Interact `layerId`s are MapLibre layer ids, not dataset config ids.** The datasets plugin names a sublayer's layer `<dataset id>-<sublayer id>` (for example `consultee-areas-identified-0`), with a `-stroke` layer when it has both a fill and an outline.
-
-### Defra map styling gotchas
-
-- **There is no fill-opacity option.** A `fillOpacity` style property is silently ignored and the fill is drawn solid. Put the transparency in the colour instead (`translucent('#55A868', 0.05)` → `rgba(...)`). The map-layers demo and interactive map examples still use `fillOpacity` and draw solid fills.
-- **Custom point symbols must include the plugin's colour tokens.** A `symbolSvgContent` without `{{haloColor}}`, `{{selectedColor}}` and `{{activeColor}}` isn't drawn at all.
-- **A sublayer is only drawn as points if its style sets `symbol`.** Setting just `symbolSvgContent` isn't enough when the parent dataset has a `fill` or `stroke`.
-
-## Viewport consistency
-
-Interactive and static maps for a page should share the same centre/zoom intent derived from the same GeoJSON inputs. If you change `buildCaseMapConfig` or the geometry helpers, re-check both:
-
-- on-page interactive framing
-- `/consultees/.../results/static-map` image framing
-
-`geometry-bounds.ts` exists to derive centre/zoom from arbitrary FeatureCollections (intended for upload-style maps without hand-picked centres).
-
-On the results page, both maps frame the search area when there is one, otherwise the project and matches. **Known issue:** the static image currently comes out at a much wider zoom than the interactive map for the same centre and zoom (Hinkley Point C's spans South Wales to the south coast). Not yet investigated.
-
-## Static map requirements (do not regress)
-
-From `AGENTS.md` — summarise for Confluence:
-
-- Proxy tiles / static rendering **through our app** — do not hot-link OSM tile URLs in page HTML for the fallback
-- Long-lived `Cache-Control` and ETag; honour `If-None-Match` → 304
-- `Vary: Accept` on the negotiated raster route — the format is part of the ETag fingerprint
-- Keep upstream concurrency low; identify User-Agent
-- Only load static `<img>` when needed (`<noscript>` and/or failure path)
-
-Every new input that changes the rendered image (markers, badges, overlays, format) must join `buildStaticMapFingerprint`'s payload — see the `AGENTS.md` Maps section for the details and known sharp/`.composite()` gotcha.
-
-## GIS styling
-
-Overlay colours / hatches for recognised layer types must follow the GIS Tool Styling tables in `AGENTS.md` (geometry stage, sector, energy subtype, MOD areas, label buffers). Prefer shared constants over one-off hex values. The results map's consultee categories aren't in those tables yet, so their colours are interim — see [Results map layers](#results-map-layers).
-
-## Component showcase
-
-`/components/interactive-map` renders one page per worked Defra example (`interactive-map-examples-data.ts`): style switcher, draw tools, feature selection with a side panel, fullscreen `buttonFirst`/`hybrid` variants, and static-map parity. Each example loads only the plugin bundles it needs and reuses the shared static-map pipeline for its `<noscript>` / init-failure fallback. It's the safest place to learn the Defra component's quirks — `AGENTS.md` lists the integration gotchas (`data-*` JSON-parsing, late plugin API attachment, `hasExitButton`, `mapStyle.id`, noscript DOM visibility).
-
-## Map layers demo
-
-`/map-layers-demo` is an explicit prototype for toggling overlays (railways, roads, etc.). Safe place to experiment without coupling to the main consultees journey.
-
-## Where map data comes from
-
-| Context                     | Source                                                                                                                               |
-| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| Consultees results maps     | `case_boundary` geometry + every consultee the Python function found touching the search area, drawn whole, via `buildCaseMapConfig` |
-| Home list                   | `case_boundary` rows (no map)                                                                                                        |
-| Interactive-map showcase    | Sample GeoJSON in `interactive-map-examples-data.ts` / `sample-geojson.ts`                                                           |
-| Map layers demo             | Demo GeoJSON in `map-layers-demo-geojson.ts`                                                                                         |
-| Python consultee areas page | SQL via Python (no map UI focus yet)                                                                                                 |
-| Future uploads map          | Expected to use DB geometries + `geometry-bounds` (not wired as a route yet)                                                         |
-
-## Related pages
-
-- [GOV.UK Frontend conventions](./govuk-frontend-conventions.md)
-- [API and data contracts](./api-and-data-contracts.md)
-- [Troubleshooting](./troubleshooting.md)
+`/components/interactive-map` has worked Defra examples (style switcher, draw tools, selection panel, fullscreen variants, static parity) from `interactive-map-examples-data.ts`; it's the safest place to learn the component. `/map-layers-demo` is a layer-toggle prototype. Neither touches the database.

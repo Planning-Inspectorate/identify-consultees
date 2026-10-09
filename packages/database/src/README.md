@@ -68,12 +68,11 @@ Other things worth knowing before touching this code:
 * `STDistance` returns true great-circle **metres** for `geography` columns - don't compare raw
   WGS84 degrees as if they were a distance unit, a degree of longitude is a very different distance
   depending on latitude.
-* Ruleset checks run against `consultee_area.geometrySimplified` (each area simplified to 10m,
-  maintained on import) and a site simplified the same way - far fewer points to compare - while
-  `geometry` keeps the original for the map. Every threshold is widened to cover the simplification
-  error, so a borderline consultee is included rather than missed, and distances shown are
-  approximate. See `SIMPLIFY_TOLERANCE_METRES` and friends in
-  [geospatial/consultee-areas.ts](./geospatial/consultee-areas.ts).
+* Screening runs in the Python function against `consultee_area.geometrySimplified` (each area
+  simplified to 10m, maintained on import here), while `geometry` keeps the original. Keep
+  `SIMPLIFY_TOLERANCE_METRES` in [geospatial/consultee-areas.ts](./geospatial/consultee-areas.ts)
+  equal to the one in `apps/function-python/intersector/tolerances.py`. See
+  [kt-docs/data/data-model.md](../../../kt-docs/data/data-model.md).
 * `caseReference` on `ConsulteeArea` is a loose link by value, not an enforced foreign key - an area
   can relate to several boundary parts sharing one reference, so it isn't unique and can't be an FK
   target.
