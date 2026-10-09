@@ -21,6 +21,38 @@ Reassess only with an explicit product/architecture decision — not for conveni
 
 > **Note:** `react`, `react-dom`, `scheduler`, and `preact` in `package.json` are **not** a UI stack — they are transitive peer-dependency entries required by the Prisma CLI and the Defra interactive map so `npm ci` succeeds. See [Local setup](./local-setup.md#why-react-and-preact-appear-in-packagejson).
 
+## `@planning-inspectorate/core` — the shared PINS toolkit
+
+`@planning-inspectorate/core` (currently `1.14.x`, from [Planning-Inspectorate/core](https://github.com/Planning-Inspectorate/core)) is PINS's shared package of Node.js and Nunjucks utilities for internal services. It exists so every PINS Node service gets the same branded chrome, auth flow, monitoring endpoints, and plumbing without each team re-implementing them — using it is a large part of what makes a service "PINS-compliant" rather than merely GOV.UK-styled. The [template-service](https://github.com/Planning-Inspectorate/template-service) repo is the canonical reference for intended usage.
+
+The package is organised as subpath exports; import only what you need:
+
+| Export                                    | Contains                                                                                                                                            | Used in this service for                                                                                                |
+| ----------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| `@planning-inspectorate/core/app`         | `createBaseApp` (Express app pre-wired with logging, security headers, session and CSRF plumbing), `BaseService`, `BaseConfig`, `DatabaseConfig`    | `app.ts` builds on `createBaseApp`; `service.ts` extends `BaseService`; `config.ts` extends `BaseConfig`                |
+| `@planning-inspectorate/core/auth`        | Microsoft Entra ID (MSAL) sign-in: `createRoutesAndGuards` mounts login / redirect / signout routes and auth guards, plus auth and session services | `router.ts` mounts `createAuthRoutesAndGuards`                                                                          |
+| `@planning-inspectorate/core/controllers` | `createMonitoringRoutes` — health endpoint and HEAD-request handling                                                                                | `router.ts` mounts it before feature routes                                                                             |
+| `@planning-inspectorate/core/middleware`  | Caching (`cacheNoCacheMiddleware`), CSP, error handling, request logging                                                                            | `router.ts` applies `cacheNoCacheMiddleware` to dynamic routes                                                          |
+| `@planning-inspectorate/core/redis`       | Azure Managed Redis client                                                                                                                          | Available but not currently used here                                                                                   |
+| `@planning-inspectorate/core/testing`     | `mockLogger`, `TestServer`, custom asserts                                                                                                          | `create-test-app.ts` and the `*.test.ts` suites                                                                         |
+| `@planning-inspectorate/core/ui`          | `pinsHeader` / `pinsFooter` Nunjucks macros, `pins-header.scss` / `pins-footer.scss`, `pins-colors.scss` brand palette                              | Page chrome in `views/layouts/` and `sass/govuk-overrides.scss`                                                         |
+| `@planning-inspectorate/core/util`        | `asyncHandler` + `AsyncRequestHandler` types, `runBuild`, `MapCache`, logger, fetch/retry/timeout, session helpers                                  | The most-used export: every async controller is wrapped in `asyncHandler`; `util/build.ts` drives assets via `runBuild` |
+
+How the pieces connect in this app:
+
+- `nunjucks.ts` resolves the package's `dist` folder via `require.resolve('@planning-inspectorate/core')` and registers it as a Nunjucks template root, so templates import core macros directly (`{% from "ui/header/pins-header.njk" import pinsHeader %}`).
+- `views/layouts/components/header.njk` wraps `pinsHeader({ isExternal: false })` in a `pinsServiceHeader` macro — the internal-service variant.
+- `views/layouts/components/footer.njk` reuses the `pinsFooter` markup minus `target="_blank"`, per GDS link guidance.
+- `sass/govuk-overrides.scss` pulls in the header/footer styles with `@use 'node_modules/@planning-inspectorate/core/dist/ui/...'`.
+
+Why it matters for new developers on a PINS project:
+
+- **Correct chrome for free** — GOV.UK Frontend 6 reserves `govukHeader`/`govukFooter` for services hosted on GOV.UK; PINS services use the core `pinsHeader`/`pinsFooter` instead. Reaching for the GOV.UK macros here produces non-compliant branding.
+- **Shared platform behaviour** — Entra ID auth, health/monitoring routes, security headers, and error handling behave the same across PINS Node services, so reviewers and assessors see a consistent posture.
+- **Safer async Express** — `asyncHandler` forwards async controller rejections to Express error middleware instead of crashing or hanging; follow the existing controllers.
+- **Transferable patterns** — the same package underpins other PINS services (see template-service), so structure learned here carries over.
+- **Versioned upgrades** — releases are automated (semantic-release on merge to `main`); Dependabot bumps it in the `deps` group, so check the upstream changelog when the major moves.
+
 ## Page layout
 
 `views/layouts/main.njk` extends `govuk/template.njk` and provides:

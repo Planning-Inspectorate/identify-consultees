@@ -31,7 +31,7 @@ Used at the top of each page:
 3. [Local setup](./local-setup.md) — Node, npm, Python, env, start the web app
 4. [Application structure](./application-structure.md) — tour of `apps/manage`
 5. [Routes and user journeys](./routes-and-user-journeys.md) — homepage through maps and optional journeys
-6. [GOV.UK Frontend conventions](./govuk-frontend-conventions.md) — macros, layout, progressive enhancement
+6. [GOV.UK Frontend conventions](./govuk-frontend-conventions.md) — macros, layout, progressive enhancement, the `@planning-inspectorate/core` package
 7. [Search and filtering](./search-and-filtering.md) — homepage search over `case_boundary` (maps conceptual `/filter` wording)
 8. [Case and dataset pages](./case-and-dataset-pages.md) — case routing and the ruleset-driven results page
 9. [Maps](./maps.md) — Defra Interactive Map and static-map fallback
