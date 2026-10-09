@@ -13,7 +13,7 @@ import {
 	RULESETS
 } from './rulesets.ts';
 
-// running a ruleset is the Python function's job now - see apps/function-python/querying/test_rulesets.py
+// running a ruleset is the Python function's job now - see apps/function-python/intersector/test_screening.py
 
 describe('parseRulesetCsv', () => {
 	const header =

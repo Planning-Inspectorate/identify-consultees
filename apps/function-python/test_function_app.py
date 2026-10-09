@@ -5,7 +5,13 @@ import azure.functions as func
 import pytest
 
 from function_app import consultee_areas, health, run_ruleset_route
-from querying.rulesets import AreaMatch, RuleCondition, RunRulesetResult
+from intersector.models import (
+    ConditionReason,
+    Consultee,
+    ConsulteeArea,
+    NearbyReason,
+    RuleCondition,
+)
 
 API_KEY = "test-shared-key"
 
@@ -102,12 +108,14 @@ def test_run_ruleset_runs_the_posted_conditions_and_returns_each_consultee_with_
     area = {"id": "a", "properties": {"consulteeCategory": "Hospital", "consultee": "Example"}}
     nearby_only = {"id": "b", "properties": {"consulteeCategory": "Interconnector", "consultee": "Other"}}
     reasons = [{"type": "condition", "conditionId": "hospital"}, {"type": "nearby", "radiusMetres": 20_000}]
-    result = RunRulesetResult(
-        consultees=[
-            AreaMatch({**area, "geometryWkt": "POINT (0 0)"}, 12.5, reasons),
-            AreaMatch(nearby_only, 900.0, [{"type": "nearby", "radiusMetres": 20_000}]),
-        ]
-    )
+    result = [
+        Consultee(
+            ConsulteeArea("a", area["properties"], geometry_wkt="POINT (0 0)"),
+            12.5,
+            [ConditionReason("hospital"), NearbyReason(20_000)],
+        ),
+        Consultee(ConsulteeArea("b", nearby_only["properties"]), 900.0, [NearbyReason(20_000)]),
+    ]
     params = object()
     with (
         patch.dict("os.environ", {"CONSULTEE_AREAS_API_KEY": API_KEY}),

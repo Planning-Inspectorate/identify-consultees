@@ -49,19 +49,25 @@ def connection_params_from_env() -> ConnectionParams:
     return parse_connection_string(connection_string)
 
 
+def connect(params: ConnectionParams, *, as_dict: bool = False) -> pymssql.Connection:
+    """Open a connection to the database. `as_dict` makes cursors return rows as dicts."""
+    return pymssql.connect(
+        server=params.server,
+        port=params.port,
+        database=params.database,
+        user=params.user,
+        password=params.password,
+        as_dict=as_dict,
+    )
+
+
 def check_connection(params: ConnectionParams) -> None:
     """Open a connection and run a trivial query, raising if either fails.
 
     Used by the health check route - proves the function can actually reach
     the database, not just that a connection string is configured.
     """
-    connection = pymssql.connect(
-        server=params.server,
-        port=params.port,
-        database=params.database,
-        user=params.user,
-        password=params.password,
-    )
+    connection = connect(params)
     try:
         with connection.cursor() as cursor:
             cursor.execute("SELECT 1")

@@ -4,16 +4,16 @@
 
 ## What exists today
 
-| Piece                                                     | State                                                                                                                                                                         |
-| --------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| In-app upload wizard for users (file → validate → screen) | **Not implemented** as manage routes                                                                                                                                          |
-| Admin upload to blob storage                              | **Yes** — `GET/POST /admin/upload-to-blob` (multer, managed identity, `BLOB_STORE_*` config)                                                                                  |
-| Admin import of reference data into SQL                   | **Yes** — `GET/POST /admin/import-reference-data` for the two known blobs (consultee areas + case boundaries)                                                                 |
-| Real ruleset screening                                    | **Yes** — `run_ruleset` in `apps/function-python/querying/rulesets.py` runs `STIntersects`/`STDistance`/bordering queries; `/consultees/:caseId/results` presents the matches |
-| Pipeline equivalent                                       | DB Seed pipeline `loadFullReferenceData` option → `npm run import-from-blob`; CLI: `npm run db-import` for local files                                                        |
-| External shapefile packaging / Astun GIS report process   | Documented in `docs/gis-shapefile-upload-and-report.md`                                                                                                                       |
-| Helpers anticipating uploads maps                         | `geometry-bounds.ts` (fit viewport from GeoJSON)                                                                                                                              |
-| Python directories for write / intersect / orchestrate    | Referenced as future mirrors of PINS-data-spike in `apps/function-python/README.md` — not all present                                                                         |
+| Piece                                                     | State                                                                                                                                                                                  |
+| --------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| In-app upload wizard for users (file → validate → screen) | **Not implemented** as manage routes                                                                                                                                                   |
+| Admin upload to blob storage                              | **Yes** — `GET/POST /admin/upload-to-blob` (multer, managed identity, `BLOB_STORE_*` config)                                                                                           |
+| Admin import of reference data into SQL                   | **Yes** — `GET/POST /admin/import-reference-data` for the two known blobs (consultee areas + case boundaries)                                                                          |
+| Real ruleset screening                                    | **Yes** — `run_ruleset` in `apps/function-python/intersector/` (`screening.py`) runs `STIntersects`/`STDistance`/bordering queries; `/consultees/:caseId/results` presents the matches |
+| Pipeline equivalent                                       | DB Seed pipeline `loadFullReferenceData` option → `npm run import-from-blob`; CLI: `npm run db-import` for local files                                                                 |
+| External shapefile packaging / Astun GIS report process   | Documented in `docs/gis-shapefile-upload-and-report.md`                                                                                                                                |
+| Helpers anticipating uploads maps                         | `geometry-bounds.ts` (fit viewport from GeoJSON)                                                                                                                                       |
+| Python directories for write / intersect / orchestrate    | Referenced as future mirrors of PINS-data-spike in `apps/function-python/README.md` — not all present                                                                                  |
 
 ## Intended end-user journey (target sketch)
 

@@ -61,7 +61,7 @@ Details: [Maps](./maps.md).
 There is no end-user upload wizard route in `apps/manage` yet. What exists:
 
 - **Admin data loading**: `/admin/upload-to-blob` (file → app's blob container) and `/admin/import-reference-data` (known blobs → `consultee_area` / `case_boundary`). These back the DB Seed pipeline's `loadFullReferenceData` flow.
-- **Screening**: the Python function (`POST /api/run-ruleset`, `apps/function-python/querying/rulesets.py`) runs the chosen ruleset's conditions as real spatial queries for every results page; the definitions come from `packages/database/src/geospatial/rulesets.ts`.
+- **Screening**: the Python function (`POST /api/run-ruleset`, `apps/function-python/intersector/` (`screening.py`)) runs the chosen ruleset's conditions as real spatial queries for every results page; the definitions come from `packages/database/src/geospatial/rulesets.ts`.
 - External shapefile packaging remains documented in `docs/gis-shapefile-upload-and-report.md`.
 
 ## Journeys by dependency

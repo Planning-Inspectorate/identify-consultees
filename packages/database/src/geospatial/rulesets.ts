@@ -8,7 +8,7 @@ import type { Geometry } from './wkt.ts';
  * One condition within a ruleset (one row of a ruleset export - see loadRulesets below).
  * A ruleset is made up of many of these; running the ruleset means running every one of its
  * conditions and combining the results - which the Python function does (apps/function-python,
- * querying/rulesets.py; the manage app sends it these definitions) - a single condition on its own (e.g.
+ * intersector/screening.py; the manage app sends it these definitions) - a single condition on its own (e.g.
  * "district council hosting the site") routinely matches nothing for a *specific* project (e.g.
  * one that sits in a unitary-authority area, which has no district council at all) without that
  * being a bug - it's only the combined result across every condition that means anything.

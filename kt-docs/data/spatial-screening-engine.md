@@ -1,6 +1,6 @@
 # Spatial screening engine
 
-**Status:** Current — the engine runs in the Python function (`apps/function-python/querying/rulesets.py`, `POST /api/run-ruleset`); ruleset definitions stay in `packages/database/src/geospatial/rulesets.ts`. October 2026.
+**Status:** Current — the engine runs in the Python function (`apps/function-python/intersector/` (`screening.py`), `POST /api/run-ruleset`); ruleset definitions stay in `packages/database/src/geospatial/rulesets.ts`. October 2026.
 
 ## What it does
 
@@ -27,7 +27,7 @@ The ruleset has 27 conditions: 7 that must touch the site, 16 within a distance 
 
 ## How a run works
 
-The manage app posts the site (as WKT), the nearby radius and the ruleset's conditions to the Python function's `POST /api/run-ruleset`; `run_ruleset` in `querying/rulesets.py` runs them over pymssql. The geometry maths runs inside SQL Server (`geography` methods against its spatial index); Python decides which queries to run and combines what comes back.
+The manage app posts the site (as WKT), the nearby radius and the ruleset's conditions to the Python function's `POST /api/run-ruleset`; `run_ruleset` in `intersector/screening.py` runs them over pymssql. The geometry maths runs inside SQL Server (`geography` methods against its spatial index); Python decides which queries to run and combines what comes back.
 
 1. **Simplify the site** to 10m, once. Detailed boundaries are the main cost: Silvertown Tunnel goes from 2,536 points to 66.
 2. **Fetch everything nearby, once.** One query finds every consultee area within 20km of the site, in any category except Railway. This answers the 20 conditions with a distance of 20km or less, which are filtered from it in memory, and every consultee it finds is returned with a `nearby` reason, whether or not a condition also matched it. The radius comes from `NEARBY_CONSULTEE_RADIUS_KM` (default 20).
@@ -65,11 +65,11 @@ If building the search area fails, the page still renders, with the project and 
 
 All screening runs on simplified shapes (`geometrySimplified`, and the simplified site). Simplifying both sides can shift a distance by up to 20m, so every threshold is widened beyond that:
 
-| Constant (`querying/rulesets.py`) | Value | Meaning                                                                                                                                             |
-| --------------------------------- | ----: | --------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `SIMPLIFY_TOLERANCE_METRES`       |   10m | Every point of a simplified shape is within this of the original                                                                                    |
-| `DISTANCE_MARGIN_METRES`          |   30m | Added to every distance threshold, including "must touch" (0km → 30m) and the 20km nearby fetch. Also how close an area must be to count as a host  |
-| `BORDERING_TOLERANCE_METRES`      |   50m | How close two areas must be to count as bordering. Covers the simplification error, plus small gaps between boundaries drawn from different sources |
+| Constant (`intersector/screening.py`) | Value | Meaning                                                                                                                                             |
+| ------------------------------------- | ----: | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `SIMPLIFY_TOLERANCE_METRES`           |   10m | Every point of a simplified shape is within this of the original                                                                                    |
+| `DISTANCE_MARGIN_METRES`              |   30m | Added to every distance threshold, including "must touch" (0km → 30m) and the 20km nearby fetch. Also how close an area must be to count as a host  |
+| `BORDERING_TOLERANCE_METRES`          |   50m | How close two areas must be to count as bordering. Covers the simplification error, plus small gaps between boundaries drawn from different sources |
 
 `SIMPLIFY_TOLERANCE_METRES` must also match the migration that built `geometrySimplified` and the Node loader that maintains it (`consultee-areas.ts`) — keep them equal. The margins live only in Python: the function says which conditions each consultee met, so the manage app never re-derives it.
 
@@ -129,7 +129,7 @@ Large linear schemes are the slowest by far. Azure SQL tiers are slower than a l
 
 | Check                                                                                              | Where                                                                                                                                                                                                                                                                                                     |
 | -------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Tests for each condition type, de-duplication, tolerances, failures and request validation         | `apps/function-python/querying/test_rulesets.py`, `test_function_app.py` (pytest, CI); the manage app's client in `ruleset-runner.test.ts`                                                                                                                                                                |
+| Tests for each condition type, de-duplication, tolerances, failures and request validation         | `apps/function-python/intersector/test_screening.py`, `test_function_app.py` (pytest, CI); the manage app's client in `ruleset-runner.test.ts`                                                                                                                                                            |
 | **Golden tests**: five real projects (London, Somerset coast/nuclear, Wales, offshore wind, Luton) | `apps/manage/src/app/ruleset-runner.golden.test.ts` with `ruleset-golden-cases.json`, end to end through the running function. They need the full dataset and the function, so they run locally and skip in CI                                                                                            |
 | Port parity                                                                                        | When the engine moved from Node to Python, both were run over all 283 local case boundaries: identical matches, order and nearby lists (distances within 10⁻⁹m)                                                                                                                                           |
 | Independent check                                                                                  | The golden results came from a separate Python/shapely calculation over the raw GeoJSON, sharing no code with the app. Each case lists `mustInclude` (an exact calculation) and `mayAlsoInclude` (a deliberately generous one); the app must return every exact match and nothing beyond the generous set |
@@ -143,7 +143,7 @@ Large linear schemes are the slowest by far. Azure SQL tiers are slower than a l
 
 ## What screening needs from the data
 
-The data processing is being redeveloped with new ids and a new schema. For the intersection logic to keep working, the new data needs to provide the following. The screening SQL is all in `apps/function-python/querying/rulesets.py`; the manage app's own SQL (case boundaries, and map display geometry) is in `consultee-areas.ts` and `case-boundaries.ts`. Repointing at new tables is contained to those three files.
+The data processing is being redeveloped with new ids and a new schema. For the intersection logic to keep working, the new data needs to provide the following. The screening SQL is all in `apps/function-python/intersector/queries.py`; the manage app's own SQL (case boundaries, and map display geometry) is in `consultee-areas.ts` and `case-boundaries.ts`. Repointing at new tables is contained to those three files.
 
 | Need                                                                | Why                                                                                                                        | Today                                                                                     |
 | ------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
