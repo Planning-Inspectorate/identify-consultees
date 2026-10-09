@@ -28,7 +28,10 @@ export function createApp(service: ManageService): Express {
 		service,
 		configureNunjucks,
 		router,
-		middlewares: [createStaticAssetsMiddleware(service.assetsStaticDir), addLocalsConfiguration()],
+		middlewares: [
+			createStaticAssetsMiddleware(service.assetsStaticDir),
+			addLocalsConfiguration({ devPagesEnabled: service.devPagesEnabled })
+		],
 		cspDirectives: buildContentSecurityPolicyDirectives({ isProduction }),
 		// multer needs the raw multipart body before lusca CSRF can read a token from it - see
 		// node_modules/@planning-inspectorate/core/dist/app/csrf.js

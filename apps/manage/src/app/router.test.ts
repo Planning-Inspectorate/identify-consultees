@@ -469,6 +469,34 @@ describe('manage router wiring', () => {
 		assert.match(withFlag.text, /href="\/components\/button\?components=true"/);
 	});
 
+	test('prototype/debug pages are not mounted when devPagesEnabled is false', async () => {
+		const service = createManageTestService(true, { devPagesEnabled: false });
+		const app = createManageTestApp(service);
+		try {
+			for (const path of [
+				'/items',
+				'/map-layers-demo',
+				'/components',
+				'/components/interactive-map/basic',
+				'/consultee-areas-python',
+				'/consultee-areas-direct'
+			]) {
+				const response = await request(app).get(path);
+				assert.equal(response.status, 404, `expected ${path} to 404 with dev pages disabled`);
+			}
+
+			// the nav link must not appear either - it would just 404
+			const home = await request(app).get('/?components=true');
+			assert.doesNotMatch(home.text, />\s*Components\s*<\/a>/);
+
+			// and the real service routes still work
+			const home2 = await request(app).get('/');
+			assert.equal(home2.status, 200);
+		} finally {
+			await service.db.$disconnect().catch(() => undefined);
+		}
+	});
+
 	test('GET /consultees/:id/results/static-map returns a cached image', async () => {
 		const originalFetch = globalThis.fetch;
 		globalThis.fetch = async () =>

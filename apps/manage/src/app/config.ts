@@ -27,6 +27,11 @@ export interface Config extends BaseConfig {
 	// packages/database/src/geospatial/rulesets.ts. Tunable via NEARBY_CONSULTEE_RADIUS_KM so this
 	// can change without a code deploy; defaults to the package's own default if unset.
 	nearbyConsulteeRadiusMetres: number;
+	// whether the prototype/debug pages are mounted (/items, /map-layers-demo, /components,
+	// /consultee-areas-python, /consultee-areas-direct). On by default outside production; set
+	// ENABLE_DEV_PAGES=true to enable them on a deployed environment running NODE_ENV=production
+	// (e.g. reviewing component examples on test/training).
+	devPagesEnabled: boolean;
 	auth: {
 		authority: string;
 		clientId: string;
@@ -85,6 +90,7 @@ export function loadConfig(): Config {
 		BLOB_STORE_HOST,
 		BLOB_STORE_CONTAINER,
 		CACHE_CONTROL_MAX_AGE,
+		ENABLE_DEV_PAGES,
 		GIT_SHA,
 		LOG_LEVEL,
 		NEARBY_CONSULTEE_RADIUS_KM,
@@ -148,6 +154,7 @@ export function loadConfig(): Config {
 		blobStore:
 			BLOB_STORE_HOST && BLOB_STORE_CONTAINER ? { host: BLOB_STORE_HOST, container: BLOB_STORE_CONTAINER } : undefined,
 		nearbyConsulteeRadiusMetres,
+		devPagesEnabled: !isProduction || ENABLE_DEV_PAGES === 'true',
 		auth: {
 			authority: `https://login.microsoftonline.com/${AUTH_TENANT_ID}`,
 			clientId: AUTH_CLIENT_ID || '',

@@ -19,7 +19,7 @@ export type CreateManageTestAppOptions = {
 	authRateLimiter?: ReturnType<typeof buildAuthRateLimiter>;
 };
 
-export function buildManageTestConfig(authDisabled = true): Config {
+export function buildManageTestConfig(authDisabled = true, overrides: Partial<Config> = {}): Config {
 	const buildConfig = loadBuildConfig();
 	return {
 		appHostname: 'localhost',
@@ -27,6 +27,7 @@ export function buildManageTestConfig(authDisabled = true): Config {
 		pythonFunctionApiKey: 'test-function-api-key',
 		blobStore: undefined,
 		nearbyConsulteeRadiusMetres: 20_000,
+		devPagesEnabled: true,
 		auth: {
 			authority: 'https://login.microsoftonline.com/tenant-id',
 			clientId: 'client-id',
@@ -59,7 +60,8 @@ export function buildManageTestConfig(authDisabled = true): Config {
 			redis: undefined,
 			secret: 'test-session-secret-at-least-32-chars'
 		},
-		staticDir: buildConfig.staticDir
+		staticDir: buildConfig.staticDir,
+		...overrides
 	};
 }
 
@@ -70,7 +72,10 @@ export function createManageTestApp(service: ManageService, options: CreateManag
 		service,
 		configureNunjucks,
 		router: buildRouter(service, { authRateLimiter }),
-		middlewares: [createStaticAssetsMiddleware(service.assetsStaticDir), addLocalsConfiguration()],
+		middlewares: [
+			createStaticAssetsMiddleware(service.assetsStaticDir),
+			addLocalsConfiguration({ devPagesEnabled: service.devPagesEnabled })
+		],
 		multiPartFormRoutes: ['/admin/upload-to-blob/run']
 	});
 }
@@ -79,9 +84,9 @@ export function createManageTestApp(service: ManageService, options: CreateManag
  * The ruleset runs against the seeded data through a simple database-backed stand-in, since the
  * Python function that really runs it isn't part of these tests - see buildDatabaseRulesetRunner.
  */
-export function createManageTestService(authDisabled = true): ManageService {
+export function createManageTestService(authDisabled = true, overrides: Partial<Config> = {}): ManageService {
 	const service: ManageService = new ManageService(
-		buildManageTestConfig(authDisabled),
+		buildManageTestConfig(authDisabled, overrides),
 		buildDatabaseRulesetRunner(() => service.db)
 	);
 	return service;

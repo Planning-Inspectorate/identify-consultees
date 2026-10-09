@@ -112,11 +112,15 @@ export function buildRouter(service: ManageService, options: BuildRouterOptions 
 
 	router.use('/', homeRoutes);
 	router.use('/consultees', consulteeRoutes);
-	router.use('/map-layers-demo', mapLayersDemoRoutes);
-	router.use('/components', componentRoutes);
-	router.use('/items', itemsRoutes);
-	router.use('/consultee-areas-python', consulteeAreasPythonRoutes);
-	router.use('/consultee-areas-direct', consulteeAreasDirectRoutes);
+	// prototype/debug pages - not part of the service; only mounted when enabled
+	// (dev builds by default, deployed envs via ENABLE_DEV_PAGES - see config.ts)
+	if (service.devPagesEnabled) {
+		router.use('/map-layers-demo', mapLayersDemoRoutes);
+		router.use('/components', componentRoutes);
+		router.use('/items', itemsRoutes);
+		router.use('/consultee-areas-python', consulteeAreasPythonRoutes);
+		router.use('/consultee-areas-direct', consulteeAreasDirectRoutes);
+	}
 	router.use('/admin/upload-to-blob', adminUploadToBlobRoutes);
 	router.use('/admin/import-reference-data', adminImportReferenceDataRoutes);
 	router.use('/error', createErrorRoutes(service));

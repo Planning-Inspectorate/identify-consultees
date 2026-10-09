@@ -4,7 +4,7 @@ import type { Handler } from 'express';
  * Add configuration values to locals.
  * Asset filenames are rewritten by `npm run build` (content hash + Brotli pipeline).
  */
-export function addLocalsConfiguration(): Handler {
+export function addLocalsConfiguration(options: { devPagesEnabled?: boolean } = {}): Handler {
 	return (req, res, next) => {
 		res.locals.config = {
 			styleFile: 'style-245b70cd.css',
@@ -38,8 +38,9 @@ export function addLocalsConfiguration(): Handler {
 				{ text: 'Contact', link: '/contact' }
 			]
 		};
-		// the "Components" nav item (component showcase) is only shown when ?components=true is in the URL
-		res.locals.showComponentsNav = req.query.components === 'true';
+		// the "Components" nav item (component showcase) is only shown when ?components=true is in the URL,
+		// and only exists at all while the dev pages are mounted (see config.ts devPagesEnabled)
+		res.locals.showComponentsNav = (options.devPagesEnabled ?? true) && req.query.components === 'true';
 		next();
 	};
 }
