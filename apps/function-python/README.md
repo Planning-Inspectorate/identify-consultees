@@ -1,8 +1,7 @@
 # Function (Python)
 
-A Python Azure Function app, kept separate from [apps/function](../function) (Node/TypeScript)
-because a single Function App runs one language worker - Node and Python functions can't live in
-the same app.
+A Python Azure Function app - the `pins-func-consultees-orchestrator-*` Function App
+(`infrastructure/app-function.tf`).
 
 `consultee-areas` runs a real SQL query against the `consultee_area` table (see
 [packages/database/src/schema.prisma](../../packages/database/src/schema.prisma)) using
