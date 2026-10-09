@@ -4,7 +4,7 @@ from unittest.mock import MagicMock, patch
 import azure.functions as func
 import pytest
 
-from function_app import consultee_areas, health, run_ruleset_route
+from function_app import cbos_health, consultee_areas, health, run_ruleset_route
 from intersector.models import (
     ConditionReason,
     Consultee,
@@ -214,3 +214,33 @@ def test_health_reports_error_database_when_connection_fails():
 
     assert response.status_code == 200
     assert json.loads(response.get_body()) == {"status": "OK", "database": "ERROR"}
+
+
+def test_cbos_health_requires_the_api_key():
+    with patch.dict("os.environ", {"CONSULTEE_AREAS_API_KEY": API_KEY}):
+        response = cbos_health(_request())
+
+    assert response.status_code == 401
+
+
+def test_cbos_health_names_missing_settings():
+    with patch.dict("os.environ", {"CONSULTEE_AREAS_API_KEY": API_KEY}, clear=True):
+        response = cbos_health(_request({"x-api-key": API_KEY}))
+
+    assert response.status_code == 500
+    assert "IDAS_BACK_OFFICE_DATABASE_SERVER" in json.loads(response.get_body())["error"]
+
+
+@pytest.mark.parametrize(("status", "status_code"), [("OK", 200), ("ERROR", 503)])
+def test_cbos_health_returns_the_check_result(status, status_code):
+    result = {"status": status, "database": {}, "storage": {}}
+    with (
+        patch.dict("os.environ", {"CONSULTEE_AREAS_API_KEY": API_KEY}),
+        patch("function_app.cbos_config_from_env", return_value=object()),
+        patch("function_app.default_credential", return_value=object()),
+        patch("function_app.check_cbos", return_value=result),
+    ):
+        response = cbos_health(_request({"x-api-key": API_KEY}))
+
+    assert response.status_code == status_code
+    assert json.loads(response.get_body()) == result
