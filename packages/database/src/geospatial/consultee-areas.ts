@@ -49,11 +49,6 @@ export interface ConsulteeAreaSummary {
 	properties: ConsulteeAreaProperties;
 }
 
-export interface ConsulteeAreaSummaryMatch {
-	feature: ConsulteeAreaSummary;
-	distanceMetres: number;
-}
-
 interface ConsulteeAreaSummaryRow {
 	id: string;
 	geometryType: string;
