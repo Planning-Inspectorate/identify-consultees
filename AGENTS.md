@@ -451,7 +451,9 @@ job:
   `replaceExistingData=true` to clear each table first when the source's ids or areas changed -
   otherwise old rows stay as stale or duplicate consultees. Each table is cleared only once its
   blob has downloaded and parsed with features. The pipeline reads the blobs as its own identity,
-  which `storage_pipeline_read` (`infrastructure/storage.tf`) grants Storage Blob Data Reader.
+  which has no data-plane role on the container (Terraform can't grant one: the pipeline identity's
+  role-assignment rights carry an ABAC condition that refuses it), so this route fails with 403
+  until the platform team grants it Storage Blob Data Reader - use the in-app import meanwhile.
 - **In-app import**: the same blobs can be imported from the manage app itself at
   `/admin/import-reference-data` (with `/admin/upload-to-blob` for getting files into the
   container) - the app's managed identity has Storage Blob Data Contributor. This route always

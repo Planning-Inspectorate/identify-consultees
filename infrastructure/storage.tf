@@ -67,13 +67,3 @@ resource "azurerm_role_assignment" "storage_app" {
   role_definition_name = "Storage Blob Data Contributor"
   principal_id         = module.app_web.principal_id
 }
-# The DB Seed pipeline (.azure/pipelines/db-seed.yml, loadFullReferenceData) downloads the full
-# reference datasets from this container as the pipeline's own identity - the same identity this
-# Terraform runs as. Without a data-plane role it's refused with 403 AuthorizationPermissionMismatch
-# (management-plane roles don't grant blob reads). Read-only: uploading stays with the app
-# (/admin/upload-to-blob, storage_app above).
-resource "azurerm_role_assignment" "storage_pipeline_read" {
-  scope                = azurerm_storage_container.data.id
-  role_definition_name = "Storage Blob Data Reader"
-  principal_id         = data.azurerm_client_config.current.object_id
-}
