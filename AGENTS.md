@@ -126,6 +126,7 @@ Azure jobs use PINS `node_script.yml` with `nodeVersion: 24` (see `.azure/pipeli
 - Keep root `optionalDependencies` on `react@19.3.0`, `react-dom@19.3.0`, and `scheduler@0.28.0`. They are not used by app code; they satisfy Prisma Studio / Radix peers so Azure `npm ci` does not fail with “Missing: react@… from lock file” (see PR #53 / commit `2e4f99d`). Never remove those entries or the matching `node_modules/react` (etc.) lockfile packages without replacing the guard.
 - `.npmrc` sets `engine-strict=true` and `legacy-peer-deps=false` (Azure default). Do not enable `legacy-peer-deps` locally — it hides the `preact` 8 vs 10 peer conflict (`accessible-autocomplete` vs `@defra/interactive-map`) that breaks Azure `npm ci`.
 - Keep the root `overrides.preact` on `^10.29.8` so that conflict resolves to Defra’s preact 10 line in the lockfile.
+- Keep `prisma` (the CLI dev-dependency) and the `@prisma/*` runtime packages on the **same major** — the `prisma` Dependabot group in `.github/dependabot.yml` exists to move them together. Do not bump the CLI alone, and do not take prerelease (`-rc`, `-next`) versions: Prisma 8 rewrites the CLI surface (`migrate dev`/`migrate deploy`, `generate`, `db seed` no longer exist), which breaks `db-migrate-dev`/`db-migrate-prod` locally and the `npm run db-migrate-prod` steps in `.azure/pipelines/pr.yml`. A major Prisma bump needs the scripts and docs updated in the same change.
 - Emergency bypass only: `SKIP_TOOLCHAIN_CHECK=1` (do not use for normal PR work).
 
 ### Why React and Preact appear in `package.json`
