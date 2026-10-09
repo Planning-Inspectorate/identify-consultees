@@ -1,6 +1,16 @@
 import assert from 'node:assert/strict';
-import { describe, test } from 'node:test';
-import { deterministicId, toCaseBoundary, toConsulteeArea } from './geojson-import.ts';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
+import { describe, mock, test } from 'node:test';
+import type { PrismaClient } from '../client/client.ts';
+import {
+	clearExistingRows,
+	deterministicId,
+	importConsulteeAreas,
+	toCaseBoundary,
+	toConsulteeArea
+} from './geojson-import.ts';
 
 describe('deterministicId', () => {
 	test('returns a stable UNIQUEIDENTIFIER-shaped id for the same seed', () => {
@@ -89,5 +99,62 @@ describe('toCaseBoundary', () => {
 		assert.equal(first.properties.caseName, 'Example');
 		assert.equal(first.properties.fileName, 'v1.zip');
 		assert.ok(first.properties.receivedDate instanceof Date);
+	});
+});
+
+/** A stand-in client whose deletes report `batches` in turn, recording the SQL it was sent. */
+function deletingClient(batches: number[]) {
+	const statements: string[] = [];
+	const $executeRaw = mock.fn(async (sql: TemplateStringsArray) => {
+		statements.push(sql.join('?'));
+		return batches.shift() ?? 0;
+	});
+	return { client: { $executeRaw } as unknown as PrismaClient, statements, $executeRaw };
+}
+
+describe('clearExistingRows', () => {
+	test('deletes a batch at a time until a batch comes back short', async () => {
+		const { client, statements } = deletingClient([500, 500, 120]);
+		assert.equal(await clearExistingRows(client, 'consultee-areas'), 1_120);
+		assert.equal(statements.length, 3);
+		assert.ok(statements.every((sql) => sql.includes('FROM consultee_area')));
+	});
+
+	test('clears case boundaries from their own table', async () => {
+		const { client, statements } = deletingClient([0]);
+		assert.equal(await clearExistingRows(client, 'case-boundaries'), 0);
+		assert.match(statements[0], /FROM case_boundary/);
+	});
+});
+
+describe('importConsulteeAreas with replace', () => {
+	async function withFile(contents: string, fn: (filePath: string) => Promise<void>) {
+		const dir = await mkdtemp(path.join(tmpdir(), 'geojson-import-test-'));
+		try {
+			const filePath = path.join(dir, 'data.geojson');
+			await writeFile(filePath, contents);
+			await fn(filePath);
+		} finally {
+			await rm(dir, { recursive: true, force: true });
+		}
+	}
+
+	test('refuses to clear the table for a file with no features', async () => {
+		const { client, $executeRaw } = deletingClient([]);
+		await withFile(JSON.stringify({ type: 'FeatureCollection', features: [] }), async (filePath) => {
+			await assert.rejects(
+				() => importConsulteeAreas(client, filePath, { replace: true }),
+				/Refusing to replace consultee-areas with a file holding no features/
+			);
+		});
+		assert.equal($executeRaw.mock.callCount(), 0);
+	});
+
+	test('does not clear anything when the file does not parse', async () => {
+		const { client, $executeRaw } = deletingClient([]);
+		await withFile('{ not json', async (filePath) => {
+			await assert.rejects(() => importConsulteeAreas(client, filePath, { replace: true }));
+		});
+		assert.equal($executeRaw.mock.callCount(), 0);
 	});
 });

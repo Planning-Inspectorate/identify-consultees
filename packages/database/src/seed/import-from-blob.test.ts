@@ -7,8 +7,13 @@ describe('parseArgs', () => {
 		assert.deepEqual(parseArgs(['--type=consultee-areas', '--blob=combined_reference_data_v1.geojson']), {
 			type: 'consultee-areas',
 			blob: 'combined_reference_data_v1.geojson',
-			batchSize: undefined
+			batchSize: undefined,
+			replace: false
 		});
+	});
+
+	test('parses --replace as a bare flag', () => {
+		assert.equal(parseArgs(['--type=consultee-areas', '--blob=a.geojson', '--replace']).replace, true);
 	});
 
 	test('parses an optional positive batch size', () => {
@@ -17,7 +22,8 @@ describe('parseArgs', () => {
 			{
 				type: 'case-boundaries',
 				blob: 'all-project-boundaries.geojson',
-				batchSize: 25
+				batchSize: 25,
+				replace: false
 			}
 		);
 	});

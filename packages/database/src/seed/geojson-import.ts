@@ -96,9 +96,56 @@ export function toCaseBoundary(feature: RawFeature): CaseBoundaryFeature {
 	};
 }
 
+export type ImportType = 'consultee-areas' | 'case-boundaries';
+
+// small enough that each delete is a short transaction on Azure SQL - a single DELETE of every row
+// (some carry whole county or national-scale geometry) is one long, log-heavy transaction
+const CLEAR_BATCH_SIZE = 500;
+
+/**
+ * Delete every row from `type`'s table, a batch at a time - so an import can replace a dataset
+ * rather than merge into it. The loaders upsert by id and never delete, so without this, a source
+ * whose ids changed, or that dropped areas, leaves the old rows behind as duplicates or stale
+ * consultees. Neither table has foreign keys, so nothing else needs clearing with it.
+ */
+export async function clearExistingRows(dbClient: PrismaClient, type: ImportType): Promise<number> {
+	let total = 0;
+	for (;;) {
+		const deleted =
+			type === 'consultee-areas'
+				? await dbClient.$executeRaw`DELETE TOP (${CLEAR_BATCH_SIZE}) FROM consultee_area`
+				: await dbClient.$executeRaw`DELETE TOP (${CLEAR_BATCH_SIZE}) FROM case_boundary`;
+		total += deleted;
+		if (deleted < CLEAR_BATCH_SIZE) {
+			return total;
+		}
+	}
+}
+
 export interface ImportOptions {
 	batchSize?: number;
 	onProgress?: (loaded: number, total: number) => void;
+	/**
+	 * Clear the table before loading (see clearExistingRows) - only once the file has parsed and
+	 * holds at least one feature, so a bad or empty file can't leave the table empty.
+	 */
+	replace?: boolean;
+}
+
+async function clearIfReplacing(
+	dbClient: PrismaClient,
+	type: ImportType,
+	featureCount: number,
+	options: ImportOptions
+): Promise<void> {
+	if (!options.replace) {
+		return;
+	}
+	if (featureCount === 0) {
+		throw new Error(`Refusing to replace ${type} with a file holding no features`);
+	}
+	const deleted = await clearExistingRows(dbClient, type);
+	console.log(`Cleared ${deleted} existing ${type} rows`);
 }
 
 /**
@@ -116,6 +163,7 @@ export async function importConsulteeAreas(
 		type: 'FeatureCollection',
 		features: rawFeatures.map(toConsulteeArea)
 	};
+	await clearIfReplacing(dbClient, 'consultee-areas', featureCollection.features.length, options);
 	return loadConsulteeAreas(dbClient, featureCollection, options);
 }
 
@@ -134,5 +182,6 @@ export async function importCaseBoundaries(
 		type: 'FeatureCollection',
 		features: rawFeatures.map(toCaseBoundary)
 	};
+	await clearIfReplacing(dbClient, 'case-boundaries', featureCollection.features.length, options);
 	return loadCaseBoundaries(dbClient, featureCollection, options);
 }

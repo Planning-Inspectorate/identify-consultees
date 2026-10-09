@@ -6,13 +6,13 @@
 
 ## Three ways to load
 
-| Route                         | Use it for                                  | How                                                                                                                                                                                                                                   |
-| ----------------------------- | ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Admin pages in the manage app | Loading full data into an Azure environment | 1. `/admin/upload-to-blob` — upload the GeoJSON file to the environment's blob container. 2. `/admin/import-reference-data` — import a known blob into SQL. Both run as the app's managed identity                                    |
-| DB Seed pipeline              | Seeding an Azure environment                | Run with `environment` and `loadFullReferenceData`. `false` loads the small sample from the repo; `true` imports `combined_reference_data_v1.geojson` and `all-project-boundaries.geojson` from blob storage (Dev/Test/Training only) |
-| `db-import` CLI               | Local development                           | `npm run db-import -- --type=consultee-areas --file=<path>` (or `--type=case-boundaries`); optional `--batch-size=<n>`                                                                                                                |
+| Route                         | Use it for                                  | How                                                                                                                                                                                                                                                                                                    |
+| ----------------------------- | ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Admin pages in the manage app | Loading full data into an Azure environment | 1. `/admin/upload-to-blob` — upload the GeoJSON file to the environment's blob container. 2. `/admin/import-reference-data` — import a known blob into SQL. Both run as the app's managed identity                                                                                                     |
+| DB Seed pipeline              | Seeding an Azure environment                | Run with `environment` and `loadFullReferenceData`. `false` loads the small sample from the repo; `true` imports `combined_reference_data_v1.geojson` and `all-project-boundaries.geojson` from blob storage (Dev/Test/Training only). Add `replaceExistingData` to clear each table first (see below) |
+| `db-import` CLI               | Local development                           | `npm run db-import -- --type=consultee-areas --file=<path>` (or `--type=case-boundaries`); optional `--batch-size=<n>`                                                                                                                                                                                 |
 
-> **Permissions gotcha:** the blob container is private and accepts managed identities only. The apps' identities can read and write it. When this was set up, the DB Seed pipeline's own identity had no access and failed with `AuthorizationPermissionMismatch` (403) — which is why the admin import page exists. Check the pipeline identity's access before relying on the pipeline route.
+> **Permissions:** the blob container is private and accepts Entra identities only. The app's identity can read and write it. The DB Seed pipeline's identity used to have no access and failed with `AuthorizationPermissionMismatch` (403); `storage_pipeline_read` (`infrastructure/storage.tf`) now grants it Storage Blob Data Reader. The grant takes effect once Infrastructure CD has applied it to the environment.
 
 ## What an import does
 
@@ -25,6 +25,12 @@
 5. **Validate and simplify** in SQL: `MakeValid()` on every geometry, and, for consultee areas, `geometrySimplified = Reduce(10).MakeValid()`.
 
 Imports are safe to re-run: matching ids are updated in place and `lastUpdated` is refreshed.
+
+### Merge or replace
+
+By default an import **merges**: it never deletes. Rows whose ids aren't in the new file stay, so a source whose ids changed, or that dropped areas, leaves stale or duplicate consultees behind.
+
+To **replace** a dataset instead, run the DB Seed pipeline with `replaceExistingData=true` (or `npm run db-import-from-blob -- ... --replace`). Each table is cleared in batches of 500 before loading, but only once its file has downloaded and parsed with at least one feature, so a missing blob or a bad file leaves the data as it was. The clear and the load aren't one transaction: if the load itself fails partway, the table is left partly loaded. Re-run the import to finish. The admin import page merges only.
 
 ## Timings
 
