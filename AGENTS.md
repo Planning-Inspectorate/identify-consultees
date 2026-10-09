@@ -416,12 +416,12 @@ The manage app follows the PINS-data-spike pattern: **Defra Interactive Map** wh
 
 Non-JS / fallback maps are **not always SVG**. Depending on configuration they may be:
 
-| Format                | Typical source                                                                                             |
-| --------------------- | ---------------------------------------------------------------------------------------------------------- |
-| `image/avif`          | Default OSM-tile path composited with `sharp` and encoded as AVIF when the client accepts it               |
-| `image/webp`          | Same composited raster, encoded as WebP when AVIF is not accepted                                          |
-| `image/png` (or JPEG) | Composited raster fallback for older clients, or Google Maps Static API when configured                    |
-| `image/svg+xml`       | Local SVG that embeds OpenStreetMap (or similar) **raster tiles** as PNG data URIs (explicit `.svg` route) |
+| Format                | Typical source                                                                                                                   |
+| --------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| `image/avif`          | Default OSM-tile path composited with `sharp` and encoded as AVIF when the client accepts it                                     |
+| `image/webp`          | Same composited raster, encoded as WebP when AVIF is not accepted                                                                |
+| `image/png` (or JPEG) | Composited raster fallback for older clients, or Google Maps Static API when configured                                          |
+| `image/svg+xml`       | SVG with a single compressed basemap embedded (`renderSvgBasemapImage` — JPEG data URI) + vector overlay (explicit `.svg` route) |
 
 The default `/…/static-map` route negotiates AVIF → WebP → PNG from the request `Accept` header, so it must send `Vary: Accept`, and the negotiated format is part of the ETag fingerprint (`buildStaticMapFingerprint`). The `/…/static-map.svg` route always returns SVG.
 
@@ -436,6 +436,7 @@ OpenStreetMap tile servers and commercial static-map APIs rate-limit and block a
 3. **Keep concurrency low** when fetching tiles (small batches; identifying `User-Agent` naming this service and repo).
 4. **Only load static `<img>` when needed** — put the image in `<noscript>` and/or inject it after interactive-map failure; never eager-load static images for JS-capable users who will use the interactive map. Pass fallback details via the page's `<script type="application/json">` config block, not `data-*` attributes on the map container (see the `data-*` hazard below).
 5. **Do not invent uncached polling or prefetch** of static maps or tiles (e.g. pre-warming every section on every page view without cache).
+6. **Keep every static-map response inside the size budget** — target ≤100KB and never exceed ~200KB; this service prioritises frontend performance and low data download. An SVG variant is only acceptable when compression keeps it inside that budget: never embed raw raster tiles (base64 PNG tiles produce ~900KB documents), embed a single compressed basemap instead (`renderSvgBasemapImage`), and don't repeat the data URI in a deprecated `xlink:href` attribute — it doubles the payload. If a variant cannot be brought inside budget, serve negotiated raster only.
 
 When changing static-map code, preserve ETag fingerprinting of framing + geometry so validators continue to avoid unnecessary upstream work. Every new input that affects the rendered image (markers, numbered badges, overlays, format) must be added to `buildStaticMapFingerprint`'s payload — otherwise stale cached variants keep serving after the config changes.
 

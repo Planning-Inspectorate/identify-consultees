@@ -3,9 +3,10 @@
  *
  * Raster path (default): negotiate AVIF → WebP → PNG from `Accept`, composite
  * OSM tiles + vector overlay via sharp (or transcode a Google Static Maps PNG).
- * `forceSvg` keeps the SVG+embedded-tiles output for the explicit `.svg` route.
+ * `forceSvg` keeps the SVG+embedded-basemap output for the explicit `.svg` route.
  */
 
+import { fetchWithTimeout } from '@planning-inspectorate/core/util';
 import type { Response } from 'express';
 import {
 	STATIC_MAP_CACHE_CONTROL,
@@ -19,6 +20,7 @@ import {
 	STATIC_MAP_CONTENT_TYPES,
 	negotiateStaticMapFormat,
 	renderStaticMapRaster,
+	renderSvgBasemapImage,
 	type StaticMapFormat
 } from './static-map-raster.ts';
 import {
@@ -32,6 +34,8 @@ import {
 const SVG_CONTENT_TYPE = 'image/svg+xml; charset=utf-8';
 /** Raster variants share one URL — caches must key on the Accept header. */
 const VARY_ACCEPT = 'Accept';
+// a slow Google Static Maps upstream must not stall the page render - the OSM fallback covers it
+const GOOGLE_BASEMAP_FETCH_TIMEOUT_MS = 10_000;
 
 export type StaticMapResponseBody = {
 	status: number;
@@ -67,7 +71,6 @@ export type BuildConsulteeStaticMapOptions = {
 	map: StaticMapBuildOptions;
 	forceSvg?: boolean;
 	googleMapsApiKey?: string;
-	fetchImpl?: typeof fetch;
 	ifNoneMatch?: string;
 	accept?: string;
 	/**
@@ -80,9 +83,9 @@ export type BuildConsulteeStaticMapOptions = {
 	sharedCache?: boolean;
 };
 
-async function fetchGoogleBasemap(url: string, fetchImpl: typeof fetch): Promise<Buffer | undefined> {
+async function fetchGoogleBasemap(url: string): Promise<Buffer | undefined> {
 	try {
-		const response = await fetchImpl(url);
+		const response = await fetchWithTimeout(url, { timeoutMs: GOOGLE_BASEMAP_FETCH_TIMEOUT_MS });
 		if (response.ok) {
 			return Buffer.from(await response.arrayBuffer());
 		}
@@ -95,9 +98,8 @@ async function fetchGoogleBasemap(url: string, fetchImpl: typeof fetch): Promise
 export async function buildConsulteeStaticMapResponse(
 	options: BuildConsulteeStaticMapOptions
 ): Promise<StaticMapResponseBody> {
-	const fetchImpl = options.fetchImpl ?? fetch;
-	const googleMapsApiKey = options.googleMapsApiKey ?? googleMapsApiKeyFromEnv();
 	const forceSvg = options.forceSvg === true;
+	const googleMapsApiKey = options.googleMapsApiKey ?? googleMapsApiKeyFromEnv();
 	const format: StaticMapFormat | 'svg' = forceSvg ? 'svg' : negotiateStaticMapFormat(options.accept);
 	const preferGoogle = !forceSvg && Boolean(googleMapsApiKey);
 	const width = options.map.width ?? 960;
@@ -145,8 +147,9 @@ export async function buildConsulteeStaticMapResponse(
 	};
 
 	if (format === 'svg') {
-		const basemapTiles = await fetchOsmBasemapTiles(buildOptions, fetchImpl);
-		const svg = renderStaticMapSvg(buildOptions, basemapTiles);
+		const basemapTiles = await fetchOsmBasemapTiles(buildOptions);
+		const basemapImage = await renderSvgBasemapImage(buildOptions, basemapTiles);
+		const svg = renderStaticMapSvg(buildOptions, basemapImage);
 		return {
 			status: 200,
 			body: svg,
@@ -157,8 +160,8 @@ export async function buildConsulteeStaticMapResponse(
 	}
 
 	const googleUrl = preferGoogle ? buildGoogleStaticMapUrl(buildOptions) : undefined;
-	const basemapPng = googleUrl ? await fetchGoogleBasemap(googleUrl, fetchImpl) : undefined;
-	const basemapTiles = basemapPng ? [] : await fetchOsmBasemapTiles(buildOptions, fetchImpl);
+	const basemapPng = googleUrl ? await fetchGoogleBasemap(googleUrl) : undefined;
+	const basemapTiles = basemapPng ? [] : await fetchOsmBasemapTiles(buildOptions);
 	const raster = await renderStaticMapRaster(buildOptions, format, basemapTiles, basemapPng);
 
 	return {

@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { afterEach, describe, test } from 'node:test';
 import type { GeoJsonFeatureCollection } from './sample-geojson.ts';
 import {
+	ageOsmTileCacheForTests,
 	buildGoogleStaticMapUrl,
 	buildStaticMapSvg,
 	centroidOfGeometry,
@@ -47,8 +48,11 @@ const square: GeoJsonFeatureCollection = {
 	]
 };
 
+const originalFetch = globalThis.fetch;
+
 afterEach(() => {
 	clearOsmTileCacheForTests();
+	globalThis.fetch = originalFetch;
 });
 
 describe('static-map helpers', () => {
@@ -74,7 +78,7 @@ describe('static-map helpers', () => {
 		assert.equal(escapeXml('a&b<c>"d"\'e'), 'a&amp;b&lt;c&gt;&quot;d&quot;&apos;e');
 	});
 
-	test('renderStaticMapSvg draws polygons and optional basemap tiles', () => {
+	test('renderStaticMapSvg draws polygons and an optional basemap image', () => {
 		const svg = renderStaticMapSvg(
 			{
 				center: [-1.75, 50.65],
@@ -84,13 +88,13 @@ describe('static-map helpers', () => {
 				title: 'Title & more',
 				description: 'Desc <tag>'
 			},
-			[{ tileX: 0, tileY: 0, x: 0, y: 0, png: tinyPng }]
+			tinyPng
 		);
 
 		assert.match(svg, /<svg/);
 		assert.match(svg, /Title &amp; more/);
 		assert.match(svg, /Desc &lt;tag&gt;/);
-		assert.match(svg, /data:image\/png;base64,/);
+		assert.match(svg, /data:image\/jpeg;base64,/);
 		assert.match(svg, /<path /);
 	});
 
@@ -384,38 +388,37 @@ describe('static-map helpers', () => {
 
 	test('fetchOsmBasemapTiles caches successful responses and skips failures', async () => {
 		let calls = 0;
-		const successFetch: typeof fetch = async () => {
+		globalThis.fetch = async () => {
 			calls += 1;
 			return new Response(tinyPng, { status: 200, headers: { 'content-type': 'image/png' } });
 		};
 
-		const first = await fetchOsmBasemapTiles({ center: [0, 0], zoom: 2, width: 128, height: 128 }, successFetch);
+		const first = await fetchOsmBasemapTiles({ center: [0, 0], zoom: 2, width: 128, height: 128 });
 		assert.ok(first.length >= 1);
 		assert.equal(osmTileCacheSizeForTests(), first.length);
 
 		const afterWarm = calls;
-		const second = await fetchOsmBasemapTiles({ center: [0, 0], zoom: 2, width: 128, height: 128 }, successFetch);
+		const second = await fetchOsmBasemapTiles({ center: [0, 0], zoom: 2, width: 128, height: 128 });
 		assert.equal(second.length, first.length);
 		assert.equal(calls, afterWarm);
 
-		const failingFetch: typeof fetch = async () => new Response('nope', { status: 500 });
+		globalThis.fetch = async () => new Response('nope', { status: 500 });
 		clearOsmTileCacheForTests();
-		const failed = await fetchOsmBasemapTiles({ center: [0, 0], zoom: 2, width: 128, height: 128 }, failingFetch);
+		const failed = await fetchOsmBasemapTiles({ center: [0, 0], zoom: 2, width: 128, height: 128 });
 		assert.equal(failed.length, 0);
 	});
 
 	test('fetchOsmBasemapTiles treats network errors as missing tiles', async () => {
-		const fetchImpl: typeof fetch = async () => {
+		globalThis.fetch = async () => {
 			throw new Error('network');
 		};
-		const tiles = await fetchOsmBasemapTiles({ center: [0, 0], zoom: 2, width: 128, height: 128 }, fetchImpl);
+		const tiles = await fetchOsmBasemapTiles({ center: [0, 0], zoom: 2, width: 128, height: 128 });
 		assert.equal(tiles.length, 0);
 	});
 
 	test('fetchOsmBasemapTiles uses MAP_VIEWPORT defaults when size is omitted', async () => {
-		const fetchImpl: typeof fetch = async () =>
-			new Response(tinyPng, { status: 200, headers: { 'content-type': 'image/png' } });
-		const tiles = await fetchOsmBasemapTiles({ center: [0, 0], zoom: 2 }, fetchImpl);
+		globalThis.fetch = async () => new Response(tinyPng, { status: 200, headers: { 'content-type': 'image/png' } });
+		const tiles = await fetchOsmBasemapTiles({ center: [0, 0], zoom: 2 });
 		assert.ok(tiles.length > 0);
 	});
 
@@ -605,22 +608,17 @@ describe('static-map helpers', () => {
 
 	test('fetchOsmBasemapTiles expires stale cache entries', async () => {
 		let calls = 0;
-		const fetchImpl: typeof fetch = async () => {
+		globalThis.fetch = async () => {
 			calls += 1;
 			return new Response(tinyPng, { status: 200, headers: { 'content-type': 'image/png' } });
 		};
 
-		await fetchOsmBasemapTiles({ center: [0, 0], zoom: 2, width: 256, height: 256 }, fetchImpl);
+		await fetchOsmBasemapTiles({ center: [0, 0], zoom: 2, width: 256, height: 256 });
 		assert.ok(osmTileCacheSizeForTests() > 0);
 		const afterWarm = calls;
 
-		const realNow = Date.now;
-		Date.now = () => realNow() + 25 * 60 * 60 * 1000;
-		try {
-			await fetchOsmBasemapTiles({ center: [0, 0], zoom: 2, width: 256, height: 256 }, fetchImpl);
-			assert.ok(calls > afterWarm);
-		} finally {
-			Date.now = realNow;
-		}
+		ageOsmTileCacheForTests();
+		await fetchOsmBasemapTiles({ center: [0, 0], zoom: 2, width: 256, height: 256 });
+		assert.ok(calls > afterWarm);
 	});
 });
