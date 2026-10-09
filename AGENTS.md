@@ -432,6 +432,14 @@ The static fallback should carry the same feature information as the interactive
 - **Orphaned dev server:** if a restart attempt crashes with `EADDRINUSE` (an old `node src/server.ts` still holds `:8090`), nodemon leaves the stale process serving old code and hash manifest. Check `lsof -nP -iTCP:8090 -sTCP:LISTEN`, kill the orphan, and nodemon respawns on the next file change.
 - **Playwright e2e uses `reuseExistingServer: !CI`**, so a stale `e2e-server.mjs` left listening on `:8091` serves old code and produces confusing render failures. Kill it before re-running e2e after source changes.
 
+## Overlapping deploys
+
+Merging to `main` triggers Build and then Deploy on their own, so merges close together start overlapping Deploy runs, and Infrastructure CD can run at the same time. Both deploy into the same Azure DevOps environments (Dev, Test, Training, Prod). Without a lock this went wrong on 9 Oct 2026: an older Deploy swapped Dev's slots after a newer one, leaving Dev a commit behind `main`, and Terraform's app-settings update failed with `409 Conflict` because a slot was mid-swap.
+
+- `deploy.yml` and `infrastructure/pipelines/terraform-cd.yaml` set `lockBehavior: runLatest`: only the newest waiting run takes an environment's lock and older queued runs are cancelled, so the latest commit lands last.
+- **It only takes effect once each environment has an "Exclusive lock" check** (Azure DevOps → Pipelines → Environments → the environment → Approvals and checks → Exclusive lock). That's a one-off admin step per environment.
+- Until then, don't queue Deploy by hand right after a merge - it already starts on its own - and check Dev's `/health` commit after a burst of merges.
+
 ## Database operations without redeploying the app
 
 Schema migrations and data changes for a real environment (Dev/Test/Training/Prod) don't require
