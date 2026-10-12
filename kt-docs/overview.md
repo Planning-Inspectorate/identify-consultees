@@ -108,6 +108,13 @@ class node_sql,node_casegeo,node_areas,node_rulesets,node_import toneMint
 class node_maps,node_staticmap,node_examples toneRose
 ```
 
+<details>
+<summary>Static image of the diagram, for viewers that don't render mermaid (such as Confluence)</summary>
+
+![Code-level architecture: the service user uses the Express web app, whose search, boundary review, results and report controllers read case boundaries, build maps and static map images, and call the screening client. The client calls the Python HTTP function, which runs intersection screening through its queries and database access against SQL Server. Case boundaries, consultee areas and ruleset definitions read from SQL Server, and the reference data import loads boundaries and areas.](./images/architecture-diagram.png)
+
+</details>
+
 | Path                   | What it is                                                                                                                                       |
 | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `apps/manage`          | The web app: Express, Nunjucks, GOV.UK Frontend, vanilla JS. Search, project map, report journey, admin data import. See [Web app](./web-app.md) |
