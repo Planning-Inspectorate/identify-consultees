@@ -66,11 +66,12 @@ Spatial indexes (`GEOGRAPHY_AUTO_GRID`): `consultee_area_geometry_simplified_sid
 
 ## Loading
 
-| Route            | For                                  | How                                                                                                                                |
-| ---------------- | ------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------- |
-| Admin pages      | An Azure environment                 | `/admin/upload-to-blob`, then `/admin/import-reference-data`. Always **replaces** the table. Shows current row counts              |
-| DB Seed pipeline | An Azure environment                 | `loadFullReferenceData=false` loads the sample; `true` imports the two blobs (not Prod). Add `replaceExistingData=true` to replace |
-| CLI              | Local, or any database you can reach | `npm run db-import -- --type=consultee-areas --file=<path>` (or `case-boundaries`; `--batch-size=<n>`)                             |
+| Route            | For                                        | How                                                                                                                                |
+| ---------------- | ------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------- |
+| Admin pages      | An Azure environment                       | `/admin/upload-to-blob`, then `/admin/import-reference-data`. Always **replaces** the table. Shows current row counts              |
+| DB Seed pipeline | An Azure environment                       | `loadFullReferenceData=false` loads the sample; `true` imports the two blobs (not Prod). Add `replaceExistingData=true` to replace |
+| CLI              | Local, or any database you can reach       | `npm run db-import -- --type=consultee-areas --file=<path>` (or `case-boundaries`; `--batch-size=<n>`)                             |
+| From CBOS        | Case boundaries, any connected environment | `/admin/import-from-cbos`. Merges; see below                                                                                       |
 
 **Permissions:** the DB Seed pipeline's identity has no data-plane role on the container, so its full-data import fails with 403. Terraform can't grant one (an ABAC condition on the pipeline identity refuses it). Until the platform team grants Storage Blob Data Reader, use the admin pages.
 
@@ -84,7 +85,20 @@ An import (`loadConsulteeAreas`, `loadCaseBoundaries` in `packages/database/src/
 
 **Merge or replace.** A merge never deletes, so a source whose ids changed or that dropped areas leaves stale or duplicate consultees. Replace clears each table in batches of 500 first, but only once its file has downloaded and parsed with at least one feature, so a missing or bad file leaves the data as it was. Clear and load aren't one transaction: if the load fails partway, re-run it. A full import can outlast Front Door's timeout: the browser shows an error while the import carries on, so reload the admin page and check the counts rather than submitting again.
 
-## Changing the schema
+## Case boundaries from CBOS
+
+CBOS (the IDAS back office) is PINS's system of record for cases. A case officer uploads a project's boundary as a shapefile ZIP to the case's "GIS Shapefiles" folder, and CBOS's own `process-shapefile` job converts it to WGS84 GeoJSON, stores it next to the ZIP and records it as the document's next version (`application/geo+json`). Each feature carries `caseReference`, `projectName`, `fileName` and `receivedDate`, the properties the file import reads.
+
+`/admin/import-from-cbos` asks the Python function (the only app with CBOS access, as its managed identity) for the latest GeoJSON version of every live file in those folders, then saves each file as one `case_boundary` row:
+
+- The id is the file import's (case reference and file name), so a boundary already loaded from a file is updated, not duplicated.
+- A file's features (a site and its access routes, say) become one MultiPolygon. The loader corrects winding and runs `MakeValid()` as for any import.
+- The project name is CBOS's current case title, not the one stamped on the GeoJSON.
+- A file whose coordinates aren't longitude and latitude is turned away. CBOS only reprojects when the ZIP has a `.prj` file, and accepts one without.
+- `metadata` records `source: "cbos"` and the CBOS document id and version.
+- It merges and never deletes. A file that can't be read is listed on the page and skipped.
+
+Nothing else is done to the geometry: screening simplifies the site to 10m when it runs, as for any boundary.
 
 1. Edit `schema.prisma`, then run `npx prisma migrate dev --create-only` in `packages/database`.
 2. Hand-add what Prisma can't express: spatial indexes, `CHECK` constraints, backfills. A new column can't be referenced in the batch that adds it, so wrap later statements in `EXEC('...')` (see the simplified-geometry migration).

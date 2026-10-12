@@ -717,6 +717,39 @@ describe('manage page accessibility smoke', () => {
 		await assertNoSeriousA11yViolations(html);
 	});
 
+	test('admin import from CBOS page has no serious a11y violations', async () => {
+		const html = nunjucks.render('views/admin-import-from-cbos/view.njk', {
+			...pageLocals,
+			pageHeading: 'Import case boundaries from CBOS',
+			_csrf: 'test-csrf',
+			loadedCaseBoundaries: 300,
+			loadedFromCbos: 120
+		});
+		await assertNoSeriousA11yViolations(html);
+	});
+
+	test('admin import from CBOS page with a result has no serious a11y violations', async () => {
+		const html = nunjucks.render('views/admin-import-from-cbos/view.njk', {
+			...pageLocals,
+			pageHeading: 'Import case boundaries from CBOS',
+			_csrf: 'test-csrf',
+			filesFound: 3,
+			imported: 2,
+			failures: [{ caseReference: 'EN010001', fileName: 'broken.geojson', reason: 'status 500' }]
+		});
+		await assertNoSeriousA11yViolations(html);
+	});
+
+	test('admin import from CBOS page with an error has no serious a11y violations', async () => {
+		const html = nunjucks.render('views/admin-import-from-cbos/view.njk', {
+			...pageLocals,
+			pageHeading: 'Import case boundaries from CBOS',
+			_csrf: 'test-csrf',
+			error: 'Could not import case boundaries from CBOS.'
+		});
+		await assertNoSeriousA11yViolations(html);
+	});
+
 	test('admin CBOS connection page has no serious a11y violations', async () => {
 		const html = nunjucks.render('views/admin-cbos-connection/view.njk', {
 			...pageLocals,

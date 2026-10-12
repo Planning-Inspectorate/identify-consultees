@@ -1,0 +1,69 @@
+{% extends "views/layouts/main.njk" %}
+
+{% from "govuk/components/button/macro.njk" import govukButton %}
+{% from "govuk/components/error-message/macro.njk" import govukErrorMessage %}
+{% from "govuk/components/notification-banner/macro.njk" import govukNotificationBanner %}
+{% from "govuk/components/summary-list/macro.njk" import govukSummaryList %}
+{% from "govuk/components/table/macro.njk" import govukTable %}
+
+{% block pageTitle %}
+    {{ pageHeading }} - {{ config.headerTitle }}
+{% endblock %}
+
+{% block pageContent %}
+    <h1 class="govuk-heading-l">{{ pageHeading }}</h1>
+
+    <p class="govuk-body">
+        Internal tool - reads every boundary file in CBOS's "GIS Shapefiles" folders, as CBOS
+        converted it to GeoJSON, and saves each one as a case boundary. Boundaries already here
+        are updated, and nothing is deleted.
+    </p>
+
+    <p class="govuk-body">
+        It can take several minutes. If the page times out, the import carries on - wait a few
+        minutes, then reload this page and check the counts below rather than submitting again.
+    </p>
+
+    {% if loadedCaseBoundaries != undefined %}
+        <h2 class="govuk-heading-m">Currently loaded</h2>
+        {{ govukSummaryList({
+            rows: [
+                { key: { text: "Case boundaries" }, value: { text: loadedCaseBoundaries } },
+                { key: { text: "From CBOS" }, value: { text: loadedFromCbos } }
+            ]
+        }) }}
+    {% endif %}
+
+    {% if error %}
+        {{ govukErrorMessage({ text: error }) }}
+    {% endif %}
+
+    {% if imported != undefined %}
+        {{ govukNotificationBanner({
+            type: "success",
+            titleText: "Success",
+            text: "Imported " ~ imported ~ " of " ~ filesFound ~ " CBOS boundary files."
+        }) }}
+    {% endif %}
+
+    {% if failures and failures.length > 0 %}
+        <h2 class="govuk-heading-m">Files not imported</h2>
+        {% set failureRows = [] %}
+        {% for failure in failures %}
+            {% set failureRows = (failureRows.push([
+                { text: failure.caseReference },
+                { text: failure.fileName | default("") },
+                { text: failure.reason }
+            ]), failureRows) %}
+        {% endfor %}
+        {{ govukTable({
+            head: [{ text: "Case reference" }, { text: "File" }, { text: "Reason" }],
+            rows: failureRows
+        }) }}
+    {% endif %}
+
+    <form method="post" action="/admin/import-from-cbos/run" novalidate>
+        <input type="hidden" name="_csrf" value="{{ _csrf }}">
+        {{ govukButton({ text: "Import case boundaries" }) }}
+    </form>
+{% endblock %}

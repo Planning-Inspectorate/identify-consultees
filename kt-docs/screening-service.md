@@ -62,10 +62,13 @@ Response (200):
 
 ## Other routes
 
-| Route                      | What it does                                                                                                                                                                                             |
-| -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `GET /api/health`          | Checks the database is reachable. No key                                                                                                                                                                 |
-| `GET /api/consultee-areas` | Nearby `consultee_area` rows as WKT. Used by the `/consultee-areas-python` dev page; `/consultee-areas-direct` runs the same query from Node, to tell "the function is down" from "the database is down" |
+| Route                                           | What it does                                                                                                                                                                                             |
+| ----------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET /api/health`                               | Checks the database is reachable. No key                                                                                                                                                                 |
+| `GET /api/cbos/health`                          | Signs in to CBOS's database and document storage as the app's identity and reports each. Used by `/admin/cbos-connection`                                                                                |
+| `GET /api/cbos/boundary-files`                  | Every case boundary file CBOS has converted to GeoJSON (see [Data model and loading](./data/data-model.md#case-boundaries-from-cbos))                                                                    |
+| `GET /api/cbos/boundary-files/{guid}/{version}` | One file's GeoJSON. The blob path comes from CBOS's database, never the caller                                                                                                                           |
+| `GET /api/consultee-areas`                      | Nearby `consultee_area` rows as WKT. Used by the `/consultee-areas-python` dev page; `/consultee-areas-direct` runs the same query from Node, to tell "the function is down" from "the database is down" |
 
 ## Security
 
