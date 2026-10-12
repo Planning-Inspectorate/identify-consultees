@@ -297,9 +297,12 @@ export interface SearchResult {
 }
 
 /**
- * Search case boundaries by name/reference (case-insensitive substring match), paginated.
- * Fetches the matching page and the total match count in a single round trip via
- * `COUNT(*) OVER()`, rather than a separate COUNT(*) query. Returns summaries, not full features
+ * Search cases by name/reference (case-insensitive substring match), paginated - one result per
+ * case. A case can have several boundary submissions (rows sharing a caseReference); the result is
+ * its most recent, in the same order the project page lists them (listCaseBoundaryFiles), and that
+ * page shows the rest. A case matches if any of its submissions does, so a renamed case is still
+ * found by its old name. Fetches the matching page and the total count of matching cases in a
+ * single round trip via `COUNT(*) OVER()`, rather than a separate COUNT(*) query. Returns summaries, not full features
  * with geometry - see {@link CaseBoundarySummary} - since every current caller is a results list
  * that never renders a boundary's shape.
  *
@@ -321,10 +324,18 @@ export async function searchCaseBoundaries(dbClient: PrismaClient, options: Sear
 				totalCount: bigint;
 			}[]
 		>`
+			WITH ranked AS (
+				SELECT ${summaryColumns},
+					ROW_NUMBER() OVER (PARTITION BY caseReference ORDER BY receivedDate DESC, id) AS newest
+				FROM case_boundary
+			)
 			SELECT ${summaryColumns}, COUNT(*) OVER() AS totalCount
-			FROM case_boundary
-			WHERE caseName LIKE ${likePattern} OR caseReference LIKE ${likePattern}
-			ORDER BY caseName
+			FROM ranked
+			WHERE newest = 1 AND caseReference IN (
+				SELECT caseReference FROM case_boundary
+				WHERE caseName LIKE ${likePattern} OR caseReference LIKE ${likePattern}
+			)
+			ORDER BY caseName, caseReference
 			OFFSET ${offset} ROWS FETCH NEXT ${limit} ROWS ONLY
 		`
 	);
@@ -336,7 +347,7 @@ export async function searchCaseBoundaries(dbClient: PrismaClient, options: Sear
 	if (total === 0 && offset > 0) {
 		const countRows = await withDeadlockRetry(
 			() => dbClient.$queryRaw<{ total: bigint }[]>`
-				SELECT COUNT(*) AS total FROM case_boundary
+				SELECT COUNT(DISTINCT caseReference) AS total FROM case_boundary
 				WHERE caseName LIKE ${likePattern} OR caseReference LIKE ${likePattern}
 			`
 		);

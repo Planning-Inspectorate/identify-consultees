@@ -209,6 +209,54 @@ describe('case boundaries (requires a local SQL Server - see docker-compose.yml)
 		}
 	});
 
+	test('searchCaseBoundaries returns one result per case - its newest submission', async (t) => {
+		if (!dbAvailable) return t.skip('SQL Server database not available');
+
+		const olderId = '22222222-2222-2222-2222-222222222224';
+		const undatedId = '22222222-2222-2222-2222-222222222225';
+		const cleanupFiles = async () => {
+			await dbClient.$executeRaw`DELETE FROM case_boundary WHERE id IN (${testBoundaryId}, ${olderId}, ${undatedId})`;
+		};
+		const submission = (id: string, caseName: string, receivedDate: Date | null, fileName: string) => ({
+			id,
+			type: 'Feature' as const,
+			geometry: { type: 'Point' as const, coordinates: [0, 0] as [number, number] },
+			properties: { caseReference: 'ZZ999998', caseName, fileName, receivedDate }
+		});
+
+		await cleanupFiles();
+		try {
+			await loadCaseBoundaries(dbClient, {
+				type: 'FeatureCollection',
+				features: [
+					submission(olderId, 'Oldname Solar Farm', new Date('2025-01-01T00:00:00Z'), 'old.geojson'),
+					submission(testBoundaryId, 'Twice Submitted Solar Farm', new Date('2026-01-01T00:00:00Z'), 'new.geojson'),
+					submission(undatedId, 'Twice Submitted Solar Farm', null, 'undated.geojson')
+				]
+			});
+
+			const byReference = await searchCaseBoundaries(dbClient, { query: 'ZZ999998' });
+			assert.deepEqual(
+				byReference.features.map((feature) => feature.id),
+				[testBoundaryId]
+			);
+			assert.equal(byReference.total, 1);
+
+			// a match on an older submission's name still finds the case, as its newest submission
+			const byOldName = await searchCaseBoundaries(dbClient, { query: 'Oldname Solar' });
+			assert.deepEqual(
+				byOldName.features.map((feature) => [feature.id, feature.caseName]),
+				[[testBoundaryId, 'Twice Submitted Solar Farm']]
+			);
+
+			// an out-of-range page counts cases, not submissions
+			const outOfRange = await searchCaseBoundaries(dbClient, { query: 'ZZ999998', offset: 1000 });
+			assert.equal(outOfRange.total, 1);
+		} finally {
+			await cleanupFiles();
+		}
+	});
+
 	test('listCaseBoundaryFiles returns every file for a caseReference, newest first', async (t) => {
 		if (!dbAvailable) return t.skip('SQL Server database not available');
 
