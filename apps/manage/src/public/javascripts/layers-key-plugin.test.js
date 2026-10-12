@@ -37,6 +37,18 @@ afterEach(() => {
 
 const flushEffects = () => new Promise((resolve) => setTimeout(resolve, 10));
 
+/**
+ * Wait until `predicate` holds rather than for a fixed delay: the panel's useEffect runs
+ * several event-loop hops after mount (schedule → effect → setState → re-render), so a
+ * fixed sleep can still win the race on a slow or loaded machine and see pre-effect DOM.
+ */
+const waitFor = async (predicate, timeoutMs = 1000) => {
+	const deadline = Date.now() + timeoutMs;
+	while (!predicate() && Date.now() < deadline) {
+		await new Promise((resolve) => setTimeout(resolve, 5));
+	}
+};
+
 function fakeEventBus() {
 	const handlers = {};
 	const onceHandlers = {};
@@ -411,6 +423,9 @@ describe('LayersKeyPanel component', () => {
 			services: fakeServices({ eventBus })
 		});
 
+		// the registry request is sent from useEffect, which settles a few event-loop
+		// hops after mount - wait for the request rather than a fixed flush
+		await waitFor(() => eventBus.requestOnce.mock.calls.length > 0);
 		assert.ok(eventBus.requestOnce.mock.calls.some((call) => call.arguments[0] === 'datasets:registry'));
 		assert.equal(
 			eventBus.on.mock.calls.some((call) => call.arguments[0] === 'datasets:changed'),
@@ -478,6 +493,10 @@ describe('LayersKeyPanel component', () => {
 			mapState: {},
 			services: fakeServices({ eventBus })
 		});
+
+		// getDataset is only read during a render that has the registry - it being called
+		// proves the effect delivered the registry and the re-render landed
+		await waitFor(() => registry.getDataset.mock.calls.length > 0);
 
 		// isLocallyVisible drives the checkbox; a not-visible layer dims the row
 		const input = container.querySelector('input[type="checkbox"]');
