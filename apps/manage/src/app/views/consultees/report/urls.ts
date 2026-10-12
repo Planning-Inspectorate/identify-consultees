@@ -188,7 +188,7 @@ export function consulteesUrl(
 	);
 }
 
-/** The "Select a consultee" form on a category page - posts back to the same URL. */
+/** The "Add consultee" form on a category page - posts back to the same URL. */
 export function addConsulteeUrl(
 	caseId: string,
 	rulesetId: string,

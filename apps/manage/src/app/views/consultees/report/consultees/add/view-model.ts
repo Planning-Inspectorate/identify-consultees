@@ -1,5 +1,5 @@
 export interface AddConsulteeViewModel {
-	/** "Select a consultee" - the input's label is the page heading (one thing per page). */
+	/** "Add consultee" - the heading above the name input and reason form. */
 	pageHeading: string;
 	/** The category being added to - the caption above the heading. */
 	pageCaption: string;
@@ -12,6 +12,8 @@ export interface AddConsulteeViewModel {
 	reasonValue: string;
 	/** govukInput's errorMessage param - present only when the name was missing. */
 	nameError?: { text: string };
-	/** The layout's error summary - present only on a failed submit. */
+	/** govukTextarea's errorMessage param - present only when the reason was missing. */
+	reasonError?: { text: string };
+	/** The layout's error summary - present only on a failed submit, one entry per missing field. */
 	errorSummary?: { text: string; href: string }[];
 }

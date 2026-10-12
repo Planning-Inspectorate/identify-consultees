@@ -207,14 +207,14 @@ describe('manage router wiring', () => {
 		assert.equal(response.status, 404);
 	});
 
-	test('GET /consultees/:id/report/consultees/add renders the select-a-consultee form', async () => {
+	test('GET /consultees/:id/report/consultees/add renders the add-consultee form', async () => {
 		const response = await request(authDisabledApp).get(
 			`/consultees/${homePageTestCaseId}/report/consultees/add?ruleset=england-wales-post-20240430&category=Parish%20Council`
 		);
 		assert.equal(response.status, 200);
-		assert.match(response.text, /Select a consultee/);
+		assert.match(response.text, /Add consultee/);
 		assert.match(response.text, /Name of consultee/);
-		assert.match(response.text, /Reason for identification/);
+		assert.match(response.text, /Reason for adding/);
 	});
 
 	test('POST /consultees/:id/report/consultees/add adds the consultee and lists it on the category page', async () => {
@@ -258,6 +258,25 @@ describe('manage router wiring', () => {
 		assert.equal(response.status, 200);
 		assert.match(response.text, /There is a problem/);
 		assert.match(response.text, /Enter the consultee name/);
+	});
+
+	test('POST /consultees/:id/report/consultees/add re-renders with an error when the reason is blank', async () => {
+		const agent = request.agent(authDisabledApp);
+		const page = await agent.get(
+			`/consultees/${homePageTestCaseId}/report/consultees/add?ruleset=england-wales-post-20240430&category=Parish%20Council`
+		);
+		const csrf = /name="_csrf" value="([^"]+)"/.exec(page.text)?.[1];
+		assert.ok(csrf, 'expected the add form to carry a CSRF token');
+
+		const response = await agent
+			.post(
+				`/consultees/${homePageTestCaseId}/report/consultees/add?ruleset=england-wales-post-20240430&category=Parish%20Council`
+			)
+			.type('form')
+			.send({ _csrf: csrf, name: 'Router Test Consultee', reason: '' });
+		assert.equal(response.status, 200);
+		assert.match(response.text, /There is a problem/);
+		assert.match(response.text, /Enter a reason for adding/);
 	});
 
 	test('POST /consultees/:id/report/consultees/remove records the reason and lists the removal', async () => {
@@ -311,7 +330,7 @@ describe('manage router wiring', () => {
 				`/consultees/${homePageTestCaseId}/report/consultees/add?ruleset=england-wales-post-20240430&category=Parish%20Council`
 			)
 			.type('form')
-			.send({ _csrf: csrf, name: 'Router Test Consultee', reason: '' });
+			.send({ _csrf: csrf, name: 'Router Test Consultee', reason: 'Adjacent landowner' });
 		const removeUrl = added.headers.location.replace('/report/consultees?', '/report/consultees/remove?') + '&added=0';
 
 		const response = await agent.post(removeUrl).type('form').send({ _csrf: csrf, reason: '' });
