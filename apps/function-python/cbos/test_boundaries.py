@@ -18,7 +18,7 @@ CONFIG = CbosConfig("sql.example.net", "back-office", "https://docs.example.net/
 CREDENTIAL = object()
 GUID = "0f8fad5b-d9cb-469f-a165-70867728950e"
 # naive, as SQL Server returns it
-CREATED = datetime(2026, 5, 1, 9, 30)  # noqa: DTZ001
+CREATED = datetime(2026, 5, 1, 9, 30)
 
 
 def _row(container="document-service-uploads", path="/application/EN010001/doc/v2/site.geojson"):

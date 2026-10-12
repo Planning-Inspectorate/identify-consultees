@@ -1,0 +1,3 @@
+# CI lints and tests on the agent's own Python 3.10 (see .azure/pipelines/pr.yml's Python job), while
+# the Function App runs 3.12 - so rules must not suggest syntax newer than 3.10, such as datetime.UTC
+target-version = "py310"
