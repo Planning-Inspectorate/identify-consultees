@@ -3,7 +3,12 @@
  *
  * Uses datasetsPlugin + mapKeyPlugin so UX can try the built-in Layers / Key panels
  * without leaving the Defra component.
+ *
+ * The demo has no static image, so the static-map plugin's no-src path provides
+ * the failure message (and the same `.im-c-error` watching as the real maps).
  */
+
+import { createStaticMapPlugin } from './static-map-plugin.mjs';
 
 /**
  * @param {string} mapId
@@ -20,20 +25,6 @@ export function readMapConfig(mapId) {
 	} catch {
 		return null;
 	}
-}
-
-/**
- * @param {HTMLElement} container
- */
-export function showMapUnavailable(container) {
-	container.replaceChildren();
-	container.classList.remove('app-case-map-interactive');
-
-	const message = document.createElement('p');
-	message.className = 'govuk-body';
-	message.textContent =
-		'The interactive map could not load. Layer toggles need JavaScript and the Defra Interactive Map scripts.';
-	container.append(message);
 }
 
 /**
@@ -128,9 +119,15 @@ export function initMapLayersDemo(mapId) {
 		return;
 	}
 
+	const staticMapPlugin = createStaticMapPlugin({
+		container,
+		unavailableText:
+			'The interactive map could not load. Layer toggles need JavaScript and the Defra Interactive Map scripts.'
+	});
+
 	const defra = window.defra;
 	if (!config || !defra?.InteractiveMap || !defra.maplibreProvider) {
-		showMapUnavailable(container);
+		staticMapPlugin.showFallback();
 		return;
 	}
 
@@ -153,10 +150,10 @@ export function initMapLayersDemo(mapId) {
 			zoom: config.zoom,
 			containerHeight: `${config.height ?? 516}px`,
 			mapLabel: config.mapLabel,
-			plugins: [datasetsPlugin, mapKeyPlugin]
+			plugins: [datasetsPlugin, mapKeyPlugin, staticMapPlugin]
 		});
 	} catch {
-		showMapUnavailable(container);
+		staticMapPlugin.showFallback();
 	}
 }
 
