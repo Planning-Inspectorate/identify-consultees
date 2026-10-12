@@ -5,12 +5,14 @@
  * - datasetsPlugin (its own Layers menu hidden) + layers-key-plugin for a combined
  *   layers/legend panel
  * - OpenFreeMap Liberty basemap
- * - Static map fallback (PNG or SVG) via `config.fallback` when interactive init fails.
- *   Fallback details travel in the page's JSON config, not data-* attributes - the
- *   InteractiveMap constructor JSON.parses every data-* attribute on its container.
+ * - Static map fallback (PNG or SVG) via `config.fallback` when interactive init fails,
+ *   owned by static-map-plugin.mjs. Fallback details travel in the page's JSON
+ *   config, not data-* attributes - the InteractiveMap constructor JSON.parses
+ *   every data-* attribute on its container.
  */
 
 import { createLayersKeyPlugin } from './layers-key-plugin.mjs';
+import { createStaticMapPlugin } from './static-map-plugin.mjs';
 
 // consultee features carry their category colour (`colour`), assigned server-side so the static map
 // matches - see app/maps/category-colours.ts. This is only for features without one
@@ -103,43 +105,6 @@ export function readMapConfig(mapId) {
 	} catch {
 		return null;
 	}
-}
-
-/**
- * @param {HTMLElement} container
- * @param {object | undefined} fallback - `config.fallback` from the JSON block
- */
-export function showStaticMapFallback(container, fallback) {
-	if (container.querySelector('.app-case-map-static')) {
-		return;
-	}
-
-	if (!fallback?.src) {
-		container.textContent =
-			'The interactive map could not load. See the consultee list below for the identified organisations.';
-		return;
-	}
-
-	const src = fallback.src;
-	const alt = fallback.alt ?? '';
-	const width = fallback.width || 960;
-	const height = fallback.height || 516;
-
-	const img = document.createElement('img');
-	img.className = 'app-case-map-static';
-	img.src = src;
-	img.alt = alt;
-	img.width = width;
-	img.height = height;
-
-	const hint = document.createElement('p');
-	hint.className = 'govuk-body app-case-map-js-hint';
-	hint.textContent =
-		'The interactive map could not load. A static map of the same project site and consultee areas is shown instead.';
-
-	container.replaceChildren(img);
-	container.classList.remove('app-case-map-interactive');
-	container.insertAdjacentElement('afterend', hint);
 }
 
 /**
@@ -325,9 +290,18 @@ export function initConsulteeMap(mapId) {
 		return;
 	}
 
+	const staticMapPlugin = createStaticMapPlugin({
+		container,
+		fallback: config?.fallback,
+		hintText:
+			'The interactive map could not load. A static map of the same project site and consultee areas is shown instead.',
+		unavailableText:
+			'The interactive map could not load. See the consultee list below for the identified organisations.'
+	});
+
 	const defra = window.defra;
 	if (!config || !defra?.InteractiveMap || !defra.maplibreProvider) {
-		showStaticMapFallback(container, config?.fallback);
+		staticMapPlugin.showFallback();
 		return;
 	}
 
@@ -358,13 +332,13 @@ export function initConsulteeMap(mapId) {
 			zoom: config.zoom,
 			containerHeight: `${config.height ?? 516}px`,
 			mapLabel: config.mapLabel,
-			plugins: [datasetsPlugin, layersKeyPlugin, ...(interactPlugin ? [interactPlugin] : [])]
+			plugins: [datasetsPlugin, layersKeyPlugin, staticMapPlugin, ...(interactPlugin ? [interactPlugin] : [])]
 		});
 		if (interactPlugin) {
 			wireFeatureDetails(map, interactPlugin);
 		}
 	} catch {
-		showStaticMapFallback(container, config.fallback);
+		staticMapPlugin.showFallback();
 	}
 }
 

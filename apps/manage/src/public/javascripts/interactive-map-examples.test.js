@@ -6,8 +6,7 @@ import {
 	initAllInteractiveMapExamples,
 	initInteractiveMapExample,
 	readMapConfig,
-	registerInteractiveMapExamples,
-	showStaticMapFallback
+	registerInteractiveMapExamples
 } from './interactive-map-examples.js';
 
 function installDom(html = '<!DOCTYPE html><html><body></body></html>') {
@@ -16,6 +15,7 @@ function installDom(html = '<!DOCTYPE html><html><body></body></html>') {
 	globalThis.document = dom.window.document;
 	globalThis.HTMLElement = dom.window.HTMLElement;
 	globalThis.HTMLScriptElement = dom.window.HTMLScriptElement;
+	globalThis.MutationObserver = dom.window.MutationObserver;
 	return dom;
 }
 
@@ -24,6 +24,7 @@ afterEach(() => {
 	delete globalThis.document;
 	delete globalThis.HTMLElement;
 	delete globalThis.HTMLScriptElement;
+	delete globalThis.MutationObserver;
 	delete globalThis.defra;
 });
 
@@ -218,7 +219,9 @@ describe('interactive-map-examples client helpers', () => {
 		assert.equal(options.behaviour, 'inline');
 		assert.equal(options.mapStyle.url, 'u');
 		assert.equal(options.containerHeight, '500px');
-		assert.equal(options.plugins.length, 2);
+		// datasets + mapKey + the always-registered static-map fallback plugin
+		assert.equal(options.plugins.length, 3);
+		assert.ok(options.plugins.some((plugin) => plugin.id === 'staticMap'));
 	});
 
 	test('hasExitButton passes through to the map config, defaulting to false', () => {
@@ -388,7 +391,9 @@ describe('interactive-map-examples client helpers', () => {
 
 		initInteractiveMapExample('demo-map');
 		const options = defra.InteractiveMap.mock.calls[0].arguments[1];
-		assert.equal(options.plugins.length, 0);
+		// only the static-map fallback plugin survives when no factories exist
+		assert.equal(options.plugins.length, 1);
+		assert.equal(options.plugins[0].id, 'staticMap');
 		// mapStyles wins over mapStyle when both are present (style-switcher convention)
 		assert.equal(options.mapStyle.id, 's');
 
@@ -545,34 +550,6 @@ describe('interactive-map-examples client helpers', () => {
 
 		initInteractiveMapExample('demo-map');
 		assert.ok(document.querySelector('#demo-map img.app-case-map-static'));
-	});
-
-	test('showStaticMapFallback is idempotent and works without a src', () => {
-		const dom = installDom(
-			'<!DOCTYPE html><html><body><div id="a" class="app-interactive-map-example"><img class="app-case-map-static"></div><div id="b"></div><div id="c"></div></body></html>'
-		);
-		const withImg = dom.window.document.getElementById('a');
-		showStaticMapFallback(withImg, { src: '/s' });
-		assert.equal(withImg.querySelectorAll('img').length, 1);
-
-		const noSrc = dom.window.document.getElementById('b');
-		showStaticMapFallback(noSrc);
-		assert.match(noSrc.textContent, /could not load/);
-
-		// the hidden feature list is revealed whenever the fallback shows
-		const dom2 = installDom(
-			'<!DOCTYPE html><html><body><div id="d" class="app-interactive-map-example"></div><div id="d-fallback" hidden><p>listed</p></div></body></html>'
-		);
-		showStaticMapFallback(dom2.window.document.getElementById('d'), { src: '/s' });
-		assert.equal(dom2.window.document.getElementById('d-fallback').hidden, false);
-
-		// a src with no alt/width/height falls back to safe defaults
-		const bare = dom.window.document.getElementById('c');
-		showStaticMapFallback(bare, { src: '/s' });
-		const img = bare.querySelector('img.app-case-map-static');
-		assert.equal(img.getAttribute('src'), '/s');
-		assert.equal(img.getAttribute('alt'), '');
-		assert.equal(img.getAttribute('width'), '960');
 	});
 
 	test('initAllInteractiveMapExamples covers every container; register handles readyState', () => {

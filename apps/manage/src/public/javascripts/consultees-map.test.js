@@ -10,7 +10,6 @@ import {
 	initConsulteeMap,
 	readMapConfig,
 	registerConsulteeMaps,
-	showStaticMapFallback,
 	translucent
 } from './consultees-map.js';
 
@@ -20,6 +19,7 @@ function installDom(html = '<!DOCTYPE html><html><body></body></html>') {
 	globalThis.document = dom.window.document;
 	globalThis.HTMLElement = dom.window.HTMLElement;
 	globalThis.HTMLScriptElement = dom.window.HTMLScriptElement;
+	globalThis.MutationObserver = dom.window.MutationObserver;
 	return dom;
 }
 
@@ -28,6 +28,7 @@ afterEach(() => {
 	delete globalThis.document;
 	delete globalThis.HTMLElement;
 	delete globalThis.HTMLScriptElement;
+	delete globalThis.MutationObserver;
 	delete globalThis.defra;
 });
 
@@ -239,28 +240,6 @@ describe('consultees-map client helpers', () => {
 		);
 	});
 
-	test('showStaticMapFallback inserts an image when a static src is available', () => {
-		const dom = installDom(
-			'<!DOCTYPE html><html><body><div id="map" class="app-case-map-interactive"></div></body></html>'
-		);
-		const container = dom.window.document.getElementById('map');
-		const fallback = { src: '/static.png', alt: 'Alt', width: 320, height: 200 };
-		showStaticMapFallback(container, fallback);
-		assert.ok(container.querySelector('img.app-case-map-static'));
-		assert.equal(container.classList.contains('app-case-map-interactive'), false);
-		assert.match(container.nextElementSibling?.textContent || '', /static map/i);
-
-		showStaticMapFallback(container, fallback);
-		assert.equal(container.querySelectorAll('img.app-case-map-static').length, 1);
-	});
-
-	test('showStaticMapFallback shows text when no static src is available', () => {
-		const dom = installDom('<!DOCTYPE html><html><body><div id="map"></div></body></html>');
-		const container = dom.window.document.getElementById('map');
-		showStaticMapFallback(container, undefined);
-		assert.match(container.textContent || '', /could not load/i);
-	});
-
 	test('initConsulteeMap falls back when Defra is unavailable', () => {
 		const dom = installDom(
 			`<!DOCTYPE html><html><body>
@@ -293,6 +272,13 @@ describe('consultees-map client helpers', () => {
 
 		initConsulteeMap('map-2');
 		assert.equal(InteractiveMap.mock.callCount(), 1);
+
+		// the static-map fallback is registered as a plugin, carrying the page's
+		// fallback config for the failure paths the map can't reach itself
+		const plugins = InteractiveMap.mock.calls[0].arguments[1].plugins;
+		const staticMap = plugins.find((plugin) => plugin.id === 'staticMap');
+		assert.ok(staticMap);
+		assert.equal(typeof staticMap.load, 'function');
 	});
 
 	test('buildSelectableLayers lists the MapLibre layers of each consultee sublayer and the project site', () => {

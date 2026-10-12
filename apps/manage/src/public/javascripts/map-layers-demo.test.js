@@ -6,8 +6,7 @@ import {
 	initAllMapLayersDemos,
 	initMapLayersDemo,
 	readMapConfig,
-	registerMapLayersDemo,
-	showMapUnavailable
+	registerMapLayersDemo
 } from './map-layers-demo.js';
 
 function installDom(html = '<!DOCTYPE html><html><body></body></html>') {
@@ -16,6 +15,7 @@ function installDom(html = '<!DOCTYPE html><html><body></body></html>') {
 	globalThis.document = dom.window.document;
 	globalThis.HTMLElement = dom.window.HTMLElement;
 	globalThis.HTMLScriptElement = dom.window.HTMLScriptElement;
+	globalThis.MutationObserver = dom.window.MutationObserver;
 	return dom;
 }
 
@@ -24,6 +24,7 @@ afterEach(() => {
 	delete globalThis.document;
 	delete globalThis.HTMLElement;
 	delete globalThis.HTMLScriptElement;
+	delete globalThis.MutationObserver;
 	delete globalThis.defra;
 });
 
@@ -109,26 +110,18 @@ describe('map-layers-demo client helpers', () => {
 		assert.equal(readMapConfig('demo-empty'), null);
 	});
 
-	test('showMapUnavailable replaces the container contents', () => {
-		const dom = installDom(
-			'<!DOCTYPE html><html><body><div id="demo" class="app-case-map-interactive">x</div></body></html>'
-		);
-		const container = dom.window.document.getElementById('demo');
-		showMapUnavailable(container);
-		assert.equal(container.classList.contains('app-case-map-interactive'), false);
-		assert.match(container.textContent || '', /could not load/i);
-	});
-
 	test('initMapLayersDemo falls back without Defra and constructs a map when available', () => {
 		const dom = installDom(
 			`<!DOCTYPE html><html><body>
-				<div id="demo-1" class="app-map-layers-demo"></div>
+				<div id="demo-1" class="app-map-layers-demo app-case-map-interactive">x</div>
 				<script id="demo-1-data" type="application/json">{"center":[0,0],"zoom":8,"projectGeojson":{"features":[{"type":"Feature"}]}}</script>
 			</body></html>`
 		);
 		initMapLayersDemo('missing');
 		initMapLayersDemo('demo-1');
-		assert.match(dom.window.document.getElementById('demo-1')?.textContent || '', /could not load/i);
+		const demo1 = dom.window.document.getElementById('demo-1');
+		assert.equal(demo1.classList.contains('app-case-map-interactive'), false);
+		assert.match(demo1.textContent || '', /could not load/i);
 
 		installDom(
 			`<!DOCTYPE html><html><body>
@@ -147,6 +140,7 @@ describe('map-layers-demo client helpers', () => {
 		globalThis.window.defra = defra;
 		initMapLayersDemo('demo-2');
 		assert.equal(InteractiveMap.mock.callCount(), 1);
+		assert.ok(InteractiveMap.mock.calls[0].arguments[1].plugins.some((plugin) => plugin.id === 'staticMap'));
 
 		installDom(
 			`<!DOCTYPE html><html><body>

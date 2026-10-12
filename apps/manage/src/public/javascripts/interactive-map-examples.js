@@ -7,12 +7,13 @@
  * they need; `kind` selects the example-specific event wiring.
  *
  * Progressive enhancement: if the Defra bundles did not load or init throws,
- * the server-rendered static map (from `config.fallback`) is injected — the
- * same image the <noscript> fallback shows. The static image is only requested
- * on that failure path; a working map never downloads it.
+ * the static-map plugin injects the server-rendered static map (from
+ * `config.fallback`) — the same image the <noscript> fallback shows. The static
+ * image is only requested on that failure path; a working map never downloads it.
  */
 
 import { createLayersKeyPlugin } from './layers-key-plugin.mjs';
+import { createStaticMapPlugin } from './static-map-plugin.mjs';
 
 /**
  * @param {string} mapId
@@ -29,50 +30,6 @@ export function readMapConfig(mapId) {
 	} catch {
 		return null;
 	}
-}
-
-/**
- * Inject the cached server-rendered static map when the interactive map
- * cannot start (missing bundles, init error). Fallback details come from
- * the page's JSON config — data-* attributes can't be used because the
- * InteractiveMap constructor JSON.parses every one it finds.
- *
- * @param {HTMLElement} container
- * @param {object | undefined} fallback - `config.fallback` from the JSON block
- */
-export function showStaticMapFallback(container, fallback) {
-	// the server-rendered feature list is hidden while the interactive map is
-	// expected to work — reveal it whenever we fall back to the static image
-	document.getElementById(`${container.id}-fallback`)?.removeAttribute('hidden');
-
-	if (container.querySelector('.app-case-map-static')) {
-		return;
-	}
-
-	if (!fallback?.src) {
-		container.textContent = 'The interactive map could not load.';
-		return;
-	}
-
-	const src = fallback.src;
-	const alt = fallback.alt ?? '';
-	const width = fallback.width || 960;
-	const height = fallback.height || 516;
-
-	const img = document.createElement('img');
-	img.className = 'app-case-map-static';
-	img.src = src;
-	img.alt = alt;
-	img.width = width;
-	img.height = height;
-
-	const hint = document.createElement('p');
-	hint.className = 'govuk-body app-case-map-js-hint';
-	hint.textContent = 'The interactive map could not load. A static map of the same area is shown instead.';
-
-	container.replaceChildren(img);
-	container.classList.remove('app-case-map-interactive');
-	container.insertAdjacentElement('afterend', hint);
 }
 
 /**
@@ -243,9 +200,17 @@ export function initInteractiveMapExample(mapId) {
 		return;
 	}
 
+	const staticMapPlugin = createStaticMapPlugin({
+		container,
+		fallback: config?.fallback,
+		revealId: `${mapId}-fallback`,
+		hintText: 'The interactive map could not load. A static map of the same area is shown instead.',
+		unavailableText: 'The interactive map could not load.'
+	});
+
 	const defra = window.defra;
 	if (!config || !defra?.InteractiveMap || !defra.maplibreProvider) {
-		showStaticMapFallback(container, config?.fallback);
+		staticMapPlugin.showFallback();
 		return;
 	}
 
@@ -254,6 +219,7 @@ export function initInteractiveMapExample(mapId) {
 
 	try {
 		const { plugins, interact: interactPlugin, draw: drawPlugin } = buildPlugins(defra, config);
+		plugins.push(staticMapPlugin);
 
 		const mapStyle = config.mapStyles?.length ? config.mapStyles[0] : config.mapStyle;
 
@@ -283,7 +249,7 @@ export function initInteractiveMapExample(mapId) {
 
 		wireExampleBehaviour(map, config, interactPlugin, drawPlugin);
 	} catch {
-		showStaticMapFallback(container, config.fallback);
+		staticMapPlugin.showFallback();
 	}
 }
 
