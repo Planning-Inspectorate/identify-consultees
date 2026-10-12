@@ -7,10 +7,10 @@ results carry no case data: a row count of SELECT 1, and how many blob names a f
 from dataclasses import dataclass
 
 from cbos.config import CbosConfig
+from cbos.database import connect
 
 # enough to prove the listing works without walking a container that holds every CBOS upload
 BLOB_SAMPLE_SIZE = 5
-LOGIN_TIMEOUT_SECONDS = 15
 
 
 @dataclass(frozen=True)
@@ -37,15 +37,7 @@ def _describe(error: Exception) -> str:
 
 def check_database(config: CbosConfig, credential) -> CheckResult:
     try:
-        # mssql-python bundles its own ODBC driver and takes an azure-identity credential, which
-        # pymssql (used for our own database) can't - so CBOS gets its own driver
-        import mssql_python
-
-        connection = mssql_python.connect(
-            f"Server={config.database_server};Database={config.database_name};Encrypt=yes",
-            token_provider=credential,
-            timeout=LOGIN_TIMEOUT_SECONDS,
-        )
+        connection = connect(config, credential)
         try:
             cursor = connection.cursor()
             cursor.execute("SELECT 1")
