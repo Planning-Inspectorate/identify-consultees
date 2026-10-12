@@ -1,6 +1,7 @@
 /**
  * Build the map config for the project boundary page: one dataset per shapefile the case holds,
- * grouped under "GIS shapefiles" in the map's Layers menu so each file can be toggled on or off.
+ * grouped under "GIS shapefiles" in the map's Layers menu so each file can be toggled on or off,
+ * each in its own style - the most recent red (see boundary-map-styles.yaml).
  * Only the file carried forward (the current selection) starts visible - the rest are unchecked,
  * matching the radios below the map.
  */
@@ -10,6 +11,8 @@ import { computeMapView } from './geometry-bounds.ts';
 import type { GeoJsonFeature, GeoJsonFeatureCollection } from './sample-geojson.ts';
 import { MAP_VIEWPORT } from './sample-geojson.ts';
 
+import type { BoundaryDatasetStyle } from './boundary-map-styles.ts';
+import { recencyRanks, styleForRank, toDatasetStyle } from './boundary-map-styles.ts';
 import type { StaticMapFallbackConfig } from './case-geojson.ts';
 
 // ~1m - plenty for drawing, and coordinates are most of the layer's size (same as case-geojson.ts)
@@ -36,6 +39,8 @@ export interface BoundaryMapFile {
 	label: string;
 	/** True for the file carried into the report - it starts checked in the Layers menu. */
 	checked: boolean;
+	/** When the file was received - the most recent is drawn red (see boundary-map-styles.yaml). */
+	receivedDate: Date | null;
 	geometry: Geometry;
 }
 
@@ -52,6 +57,8 @@ export interface BoundaryMapConfig {
 		id: string;
 		label: string;
 		checked: boolean;
+		/** The file's style, by how recent it is - see boundary-map-styles.yaml. */
+		style: BoundaryDatasetStyle;
 		geojson: GeoJsonFeatureCollection;
 	}[];
 	/** The JS init-failure fallback's static-map image - see CaseMapConfig.fallback. */
@@ -78,10 +85,12 @@ export function buildBoundaryMapConfig(
 	files: BoundaryMapFile[],
 	fallback?: { src: string; alt: string }
 ): BoundaryMapConfig {
-	const datasets = files.map((file) => ({
+	const ranks = recencyRanks(files.map((file) => file.receivedDate));
+	const datasets = files.map((file, index) => ({
 		id: `shapefile-${file.id}`,
 		label: file.label,
 		checked: file.checked,
+		style: toDatasetStyle(styleForRank(ranks[index])),
 		geojson: toGeojson(file, caseReference)
 	}));
 	const view = computeMapView({ features: datasets.flatMap((dataset) => dataset.geojson.features) });

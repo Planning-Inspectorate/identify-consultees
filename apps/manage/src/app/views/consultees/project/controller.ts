@@ -5,6 +5,7 @@ import {
 	listCaseBoundaryFiles
 } from '@pins/identify-consultees-database/src/geospatial/case-boundaries.ts';
 import type { AsyncRequestHandler, AsyncRequestHandlerWithBody } from '@planning-inspectorate/core/util';
+import { recencyRanks, styleForRank } from '../../../maps/boundary-map-styles.ts';
 import type { BoundaryMapFile } from '../../../maps/boundary-map.ts';
 import { buildBoundaryMapConfig } from '../../../maps/boundary-map.ts';
 import { buildProjectGeojson } from '../../../maps/case-geojson.ts';
@@ -42,6 +43,7 @@ async function mapFiles(
 				id: option.id,
 				label: option.label,
 				checked: option.checked,
+				receivedDate: option.receivedDate,
 				geometry: option.mock ? scaledGeometry(geometry) : geometry
 			}
 		];
@@ -140,6 +142,28 @@ export function buildBoundarySubmit(service: ManageService): AsyncRequestHandler
  * The boundary page's noscript/init-failure static map: the current file's boundary alone,
  * matching what the interactive map draws first (other files stay unchecked in its Layers menu).
  */
+/**
+ * The opened file's colour on the static map, by how recent it is among the case's files - the
+ * same style the interactive map draws it in (see boundary-map-styles.yaml).
+ */
+async function withBoundaryFileStyle(
+	db: ManageService['db'],
+	project: NonNullable<Awaited<ReturnType<typeof resolveCase>>>,
+	geojson: ReturnType<typeof buildProjectGeojson>
+): Promise<ReturnType<typeof buildProjectGeojson>> {
+	const files = await listCaseBoundaryFiles(db, project.properties.caseReference);
+	const ranks = recencyRanks(files.map((file) => file.receivedDate));
+	const index = files.findIndex((file) => file.id === project.id);
+	const style = styleForRank(index >= 0 ? ranks[index] : 0);
+	return {
+		...geojson,
+		features: geojson.features.map((feature) => ({
+			...feature,
+			properties: { ...feature.properties, colour: style.colour, fillOpacity: String(style.fillOpacity) }
+		}))
+	};
+}
+
 export function buildBoundaryStaticMap(service: ManageService, forceSvg = false): AsyncRequestHandler {
 	const { db } = service;
 
@@ -151,7 +175,7 @@ export function buildBoundaryStaticMap(service: ManageService, forceSvg = false)
 			return;
 		}
 
-		const projectGeojson = buildProjectGeojson(project);
+		const projectGeojson = await withBoundaryFileStyle(db, project, buildProjectGeojson(project));
 		const view = computeMapView(projectGeojson);
 		const image = await buildConsulteeStaticMapResponse({
 			geometryId: project.id,

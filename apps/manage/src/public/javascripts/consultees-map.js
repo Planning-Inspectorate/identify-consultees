@@ -150,7 +150,8 @@ export function buildDatasets(config) {
 	const datasets = [];
 
 	// the boundary page's shapefiles: one dataset each, grouped under the same Layers-menu
-	// heading - only the confirmed file starts visible (checked), the rest are toggled on
+	// heading - only the confirmed file starts visible (checked), the rest are toggled on. Each
+	// carries its own style, by how recent it is (boundary-map-styles.yaml); red if it doesn't
 	for (const file of config.shapefileDatasets ?? []) {
 		if (file.geojson?.features?.length > 0) {
 			datasets.push({
@@ -164,7 +165,7 @@ export function buildDatasets(config) {
 				visible: file.checked !== false,
 				showInKey: true,
 				showInMenu: true,
-				style: {
+				style: file.style ?? {
 					stroke: '#C44E52',
 					strokeWidth: 2,
 					fill: translucent('#C44E52', 0.45)

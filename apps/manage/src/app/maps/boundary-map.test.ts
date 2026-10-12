@@ -1,13 +1,15 @@
 import assert from 'node:assert';
 import { describe, it } from 'node:test';
+import { BOUNDARY_MAP_STYLES } from './boundary-map-styles.ts';
 import { buildBoundaryMapConfig } from './boundary-map.ts';
 import { MAP_VIEWPORT } from './sample-geojson.ts';
 
-function boundaryFile(id: string, checked = false) {
+function boundaryFile(id: string, checked = false, receivedDate: Date | null = null) {
 	return {
 		id,
 		label: `${id}.geojson`,
 		checked,
+		receivedDate,
 		geometry: {
 			type: 'Polygon' as const,
 			coordinates: [
@@ -48,6 +50,20 @@ describe('buildBoundaryMapConfig', () => {
 		assert.strictEqual(config.width, MAP_VIEWPORT.width);
 		assert.strictEqual(config.height, MAP_VIEWPORT.height);
 		assert.match(config.mapLabel, /Test Project \(EN010099\)/);
+	});
+
+	it('should draw each file in its own style, the most recent red whichever is checked', () => {
+		const config = buildBoundaryMapConfig('Test Project', 'EN010099', [
+			boundaryFile('older', true, new Date('2025-11-01')),
+			boundaryFile('newest', false, new Date('2026-04-01')),
+			boundaryFile('undated')
+		]);
+
+		const [older, newest, undated] = config.shapefileDatasets.map((dataset) => dataset.style);
+		assert.strictEqual(newest.stroke, BOUNDARY_MAP_STYLES.mostRecent.colour);
+		assert.strictEqual(older.stroke, BOUNDARY_MAP_STYLES.earlier[0].colour);
+		assert.strictEqual(undated.stroke, BOUNDARY_MAP_STYLES.earlier[1].colour);
+		assert.strictEqual(new Set([older.stroke, newest.stroke, undated.stroke]).size, 3);
 	});
 
 	it('should round each member of a geometry collection', () => {

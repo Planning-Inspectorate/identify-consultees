@@ -206,6 +206,19 @@ describe('consultees-map client helpers', () => {
 		assert.equal(datasets[0].groupLabel, 'Boundary submissions');
 	});
 
+	test('buildDatasets draws each shapefile in the style the page gives it, red without one', () => {
+		const style = { stroke: '#1d70b8', strokeWidth: 2, strokeDashArray: [4, 2], fill: 'rgba(29, 112, 184, 0.15)' };
+		const datasets = buildDatasets({
+			shapefileDatasets: [
+				{ id: 'file-a', label: 'a.geojson', checked: true, style, geojson: { features: [{ type: 'Feature' }] } },
+				{ id: 'file-b', label: 'b.geojson', checked: false, geojson: { features: [{ type: 'Feature' }] } }
+			]
+		});
+
+		assert.deepEqual(datasets[0].style, style);
+		assert.equal(datasets[1].style.stroke, '#C44E52');
+	});
+
 	test('buildSelectableLayers lists each shapefile dataset as selectable', () => {
 		const layers = buildSelectableLayers(
 			buildDatasets({
