@@ -43,7 +43,7 @@ Without the function, the app still runs but project pages say "The ruleset coul
 
 ## Where to read next
 
-- [`kt-docs/`](./kt-docs/README.md): how the service works and how to work on it
+- [`kt-docs/`](./kt-docs/README.md): how the service works and how to work on it — start with the [overview](./kt-docs/overview.md), which includes the architecture diagram
 - [CONTRIBUTING.md](./CONTRIBUTING.md): branches, commits and PRs
 - [AGENTS.md](./AGENTS.md): GDS, maps, toolchain and PR rules (for agents and people)
 - [ACCESSIBILITY.md](./ACCESSIBILITY.md), [SECURITY.md](./SECURITY.md)
