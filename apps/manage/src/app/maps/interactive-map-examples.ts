@@ -27,6 +27,7 @@ export type InteractiveMapExampleKind =
 	| 'button-first'
 	| 'polygons'
 	| 'symbols'
+	| 'layers-key'
 	| 'marker-panel'
 	| 'marker-label'
 	| 'place-marker'
@@ -52,6 +53,8 @@ export interface InteractiveMapExampleConfig {
 	interact?: Record<string, unknown>;
 	draw?: Record<string, unknown>;
 	mapKey?: boolean;
+	/** Use the local layers-key plugin: one panel combining the Layers toggles and key symbols. */
+	layersKey?: boolean;
 	mapStyles?: Record<string, unknown>[];
 	marker?: Record<string, unknown>;
 	markers?: Record<string, unknown>[];
@@ -282,6 +285,74 @@ export const INTERACTIVE_MAP_EXAMPLES: readonly InteractiveMapExample[] = [
 					capitalise(String(feature.properties.category))
 				])
 			}
+		}
+	},
+	{
+		id: 'layers-key',
+		title: 'Combined layers and key',
+		summary:
+			'The local layers-key plugin replaces the separate Layers and Key panels with a single Layers ' +
+			"panel: every toggle row shows the layer's key symbol between the checkbox and its label. The " +
+			'datasets plugin still renders the layers — only its built-in menu is hidden (`hasMenu: false`).',
+		interaction: 'Open the Layers panel — each row shows its symbol beside the checkbox that toggles it.',
+		plugins: ['datasets'],
+		clientConfig: {
+			kind: 'layers-key',
+			behaviour: 'inline',
+			center: AMBLESIDE_CENTER,
+			zoom: 14,
+			height: DEFAULT_HEIGHT,
+			mapLabel: 'Map showing field parcels and historic monuments near Ambleside',
+			layersKey: true,
+			datasets: [
+				FIELD_PARCELS_DATASET,
+				{
+					id: 'ambleside-roads',
+					label: 'Roads (demo)',
+					geojson: {
+						type: 'FeatureCollection',
+						features: [
+							{
+								type: 'Feature',
+								properties: {},
+								geometry: {
+									type: 'LineString',
+									coordinates: [
+										[-2.472, 54.552],
+										[-2.468, 54.556],
+										[-2.464, 54.56],
+										[-2.46, 54.564]
+									]
+								}
+							}
+						]
+					},
+					minZoom: 0,
+					maxZoom: 24,
+					showInKey: true,
+					showInMenu: true,
+					style: { stroke: '#f47738', strokeWidth: 3, strokeDashArray: [2, 2] }
+				},
+				{
+					id: 'historic-monuments',
+					label: 'Historic monuments',
+					geojson: HISTORIC_MONUMENTS_GEOJSON,
+					minZoom: 0,
+					maxZoom: 24,
+					showInKey: true,
+					showInMenu: true,
+					sublayers: monumentSublayers()
+				}
+			]
+		},
+		staticMap: {
+			projectGeojson: FIELD_PARCELS_GEOJSON,
+			consulteeGeojson: EMPTY_COLLECTION,
+			alt: 'Static map of field parcel polygons and monument points near Ambleside.',
+			featureBadges: numberedBadges(
+				HISTORIC_MONUMENTS_GEOJSON.features,
+				(feature) => MONUMENT_SUBLAYER_COLOURS[String(feature.properties.category)]
+			)
 		}
 	},
 	{
