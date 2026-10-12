@@ -14,40 +14,34 @@ import { MAP_VIEWPORT } from '../../../maps/sample-geojson.ts';
 import { buildConsulteeStaticMapResponse, sendStaticMapResponse } from '../../../maps/serve-static-map.ts';
 import { resolveCase, resolveCaseSummary } from '../resolve-case.ts';
 import { firstQueryValue } from '../run-ruleset.ts';
-import { boundaryFileOptions, scaledGeometry } from './boundary-files.ts';
+import { boundaryFileOptions } from './boundary-files.ts';
 import { formatUploadedAt } from './format-uploaded.ts';
 import type { BoundaryFileRadio, ConsulteeProjectViewModel } from './view-model.ts';
 
 /**
- * The boundary page's geometry for each file option: real files' stored boundaries, and the
- * stand-in file's scaled copy of the real boundary it stands in for (see boundary-files.ts).
- * Geometry lookups are per case_boundary id - the page's own row is already loaded, so only
- * sibling submissions need a round trip each (never more than a handful).
+ * The boundary page's geometry for each file option. Geometry lookups are per case_boundary id -
+ * the page's own row is already loaded, so only sibling submissions need a round trip each (never
+ * more than a handful).
  */
 async function mapFiles(
 	db: ManageService['db'],
 	project: NonNullable<Awaited<ReturnType<typeof resolveCase>>>,
 	options: ReturnType<typeof boundaryFileOptions>
 ): Promise<BoundaryMapFile[]> {
-	const geometries = new Map<string, Awaited<ReturnType<typeof getCaseBoundaryById>>>();
-	for (const targetId of [...new Set(options.map((option) => option.targetId))]) {
-		geometries.set(targetId, targetId === project.id ? project : await getCaseBoundaryById(db, targetId));
-	}
-	return options.flatMap((option) => {
-		const geometry = geometries.get(option.targetId)?.geometry;
-		if (!geometry) {
-			return [];
-		}
-		return [
-			{
+	const files: BoundaryMapFile[] = [];
+	for (const option of options) {
+		const geometry = (option.id === project.id ? project : await getCaseBoundaryById(db, option.id))?.geometry;
+		if (geometry) {
+			files.push({
 				id: option.id,
 				label: option.label,
 				checked: option.checked,
 				receivedDate: option.receivedDate,
-				geometry: option.mock ? scaledGeometry(geometry) : geometry
-			}
-		];
-	});
+				geometry
+			});
+		}
+	}
+	return files;
 }
 
 /**
@@ -71,7 +65,7 @@ export function buildConsulteeProjectPage(service: ManageService): AsyncRequestH
 		logger.info({ caseId, reference: project.properties.caseReference }, 'consultee project boundary page');
 
 		const files = await listCaseBoundaryFiles(db, project.properties.caseReference);
-		const options = boundaryFileOptions(files, project.id, project.properties.caseName);
+		const options = boundaryFileOptions(files, project.id);
 		const map = buildBoundaryMapConfig(
 			project.properties.caseName,
 			project.properties.caseReference,
@@ -112,8 +106,7 @@ export function buildConsulteeProjectPage(service: ManageService): AsyncRequestH
 
 /**
  * "Continue" on the boundary page: the chosen file must be one of this project's options -
- * anything else (or a missing selection) just returns to the page unchanged. The stand-in file
- * leads on with the real boundary it stands in for (its targetId).
+ * anything else (or a missing selection) just returns to the page unchanged.
  */
 export function buildBoundarySubmit(service: ManageService): AsyncRequestHandlerWithBody<{ shapefile?: unknown }> {
 	const { db } = service;
@@ -127,14 +120,14 @@ export function buildBoundarySubmit(service: ManageService): AsyncRequestHandler
 		}
 
 		const files = await listCaseBoundaryFiles(db, project.reference);
-		const options = boundaryFileOptions(files, project.id, project.caseName);
+		const options = boundaryFileOptions(files, project.id);
 		const chosen = options.find((option) => option.id === firstQueryValue(req.body?.shapefile));
 		if (!chosen) {
 			res.redirect(`/consultees/${encodeURIComponent(project.id)}`);
 			return;
 		}
 
-		res.redirect(`/consultees/${encodeURIComponent(chosen.targetId)}/ruleset`);
+		res.redirect(`/consultees/${encodeURIComponent(chosen.id)}/ruleset`);
 	};
 }
 

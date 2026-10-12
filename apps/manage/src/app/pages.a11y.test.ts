@@ -191,8 +191,8 @@ describe('manage page accessibility smoke', () => {
 					checked: true
 				},
 				{
-					value: '11111111-1111-1111-1111-111111111111:placeholder',
-					text: 'Longfield-solar-farm-shapefile.geojson',
+					value: '22222222-2222-2222-2222-222222222222',
+					text: 'EN0110007-acceptance.geojson',
 					hint: { text: 'Uploaded: 12:16, 29 Jul 2026' },
 					checked: false
 				}

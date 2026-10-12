@@ -80,11 +80,11 @@ test.describe('manage journeys', () => {
 		await page.locator(`a[href="/consultees/${SAMPLE_CASE_ID}"]`).click();
 
 		// the boundary page maps the case's shapefiles; the radios below confirm the single file
-		// carried forward (a stand-in second file fills in when the case only holds one)
+		// carried forward
 		await expect(page.getByRole('heading', { level: 1 })).toContainText('Project boundary');
 		await expect(page.getByText(SAMPLE_CASE_NAME).first()).toBeVisible();
 		const shapefileRadios = page.getByRole('radio');
-		expect(await shapefileRadios.count()).toBeGreaterThanOrEqual(2);
+		expect(await shapefileRadios.count()).toBeGreaterThanOrEqual(1);
 		await page.getByRole('button', { name: 'Continue' }).click();
 
 		// the ruleset page picks the ruleset the report is generated with
@@ -227,8 +227,8 @@ test.describe('manage journeys', () => {
 		await expect(page.getByText('Confirm shapefile for report')).toBeVisible();
 
 		const radios = page.getByRole('radio');
-		// a single-file case gets a stand-in second file; a multi-file case lists them all
-		expect(await radios.count()).toBeGreaterThanOrEqual(2);
+		// one radio per stored boundary file
+		expect(await radios.count()).toBeGreaterThanOrEqual(1);
 		await radios.first().check();
 		await page.getByRole('button', { name: 'Continue' }).click();
 		await expect(page).toHaveURL(/\/consultees\/[0-9a-f-]{36}\/ruleset/);

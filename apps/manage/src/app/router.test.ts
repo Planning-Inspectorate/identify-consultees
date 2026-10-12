@@ -117,9 +117,9 @@ describe('manage router wiring', () => {
 		assert.match(response.text, /Confirm shapefile for report/);
 		assert.match(response.text, /Continue/);
 		assert.match(response.text, /app-consultee-map/);
-		// the single stored file plus the stand-in second file the page adds for the file toggle
+		// the single stored file, and nothing else
 		assert.match(response.text, /type="radio"[^>]*value="33333333-3333-3333-3333-333333333333"/);
-		assert.match(response.text, /type="radio"[^>]*value="33333333-3333-3333-3333-333333333333:placeholder"/);
+		assert.doesNotMatch(response.text, /:placeholder/);
 	});
 
 	test('GET /consultees/:id/ruleset renders the ruleset radios', async () => {
