@@ -1,10 +1,14 @@
 import assert from 'node:assert/strict';
-import { describe, test } from 'node:test';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { describe, mock, test } from 'node:test';
 import {
 	PATCHED_REMOVE_ATTRIBUTES,
 	VULNERABLE_REMOVE_ATTRIBUTES,
 	applyMaplibreSanitizePatch,
-	defraMaplibreFrameworkPath
+	defraMaplibreFrameworkPath,
+	patchDefraMaplibreFrameworkFile
 } from './patch-maplibre-sanitize.ts';
 
 describe('applyMaplibreSanitizePatch', () => {
@@ -39,5 +43,46 @@ describe('defraMaplibreFrameworkPath', () => {
 			defraMaplibreFrameworkPath('/repo'),
 			/\/repo\/node_modules\/@defra\/interactive-map\/providers\/maplibre\/dist\/umd\/im-maplibre-framework\.js$/
 		);
+	});
+});
+
+describe('patchDefraMaplibreFrameworkFile', () => {
+	function withBundle(contents: string, fn: (filePath: string) => void) {
+		const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'maplibre-sanitize-test-'));
+		try {
+			const filePath = path.join(dir, 'im-maplibre-framework.js');
+			fs.writeFileSync(filePath, contents);
+			fn(filePath);
+		} finally {
+			fs.rmSync(dir, { recursive: true, force: true });
+		}
+	}
+
+	test('rewrites a vulnerable bundle on disk, logging when asked', () => {
+		const log = mock.method(console, 'log', () => {});
+		try {
+			withBundle(`prefix;${VULNERABLE_REMOVE_ATTRIBUTES};suffix`, (filePath) => {
+				assert.equal(patchDefraMaplibreFrameworkFile(filePath, { log: true }), true);
+				assert.equal(fs.readFileSync(filePath, 'utf8'), `prefix;${PATCHED_REMOVE_ATTRIBUTES};suffix`);
+			});
+			assert.equal(log.mock.callCount(), 1);
+			assert.match(log.mock.calls[0].arguments[0], /Patched MapLibre sanitize/);
+		} finally {
+			log.mock.restore();
+		}
+	});
+
+	test('leaves an already-patched bundle alone, logging when asked', () => {
+		const log = mock.method(console, 'log', () => {});
+		try {
+			withBundle(`prefix;${PATCHED_REMOVE_ATTRIBUTES};suffix`, (filePath) => {
+				assert.equal(patchDefraMaplibreFrameworkFile(filePath, { log: true }), false);
+				assert.equal(fs.readFileSync(filePath, 'utf8'), `prefix;${PATCHED_REMOVE_ATTRIBUTES};suffix`);
+			});
+			assert.equal(log.mock.callCount(), 1);
+			assert.match(log.mock.calls[0].arguments[0], /already patched/);
+		} finally {
+			log.mock.restore();
+		}
 	});
 });

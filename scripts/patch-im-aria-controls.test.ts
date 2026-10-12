@@ -1,8 +1,12 @@
 import assert from 'node:assert/strict';
-import { describe, test } from 'node:test';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { describe, mock, test } from 'node:test';
 import {
 	applyImAriaControlsPatch,
 	defraImCorePaths,
+	patchDefraImCoreFile,
 	PATCHED_ARIA_CONTROLS,
 	VULNERABLE_ARIA_CONTROLS
 } from './patch-im-aria-controls.ts';
@@ -55,5 +59,46 @@ describe('defraImCorePaths', () => {
 		assert.equal(paths.length, 2);
 		assert.match(paths[0], /\/repo\/node_modules\/@defra\/interactive-map\/dist\/umd\/im-core\.js$/);
 		assert.match(paths[1], /\/repo\/node_modules\/@defra\/interactive-map\/dist\/esm\/im-core\.js$/);
+	});
+});
+
+describe('patchDefraImCoreFile', () => {
+	function withBundle(contents: string, fn: (filePath: string) => void) {
+		const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'im-aria-controls-test-'));
+		try {
+			const filePath = path.join(dir, 'im-core.js');
+			fs.writeFileSync(filePath, contents);
+			fn(filePath);
+		} finally {
+			fs.rmSync(dir, { recursive: true, force: true });
+		}
+	}
+
+	test('rewrites a vulnerable bundle on disk, logging when asked', () => {
+		const log = mock.method(console, 'log', () => {});
+		try {
+			withBundle(`prefix;${VULNERABLE_SNIPPET};suffix`, (filePath) => {
+				assert.equal(patchDefraImCoreFile(filePath, { log: true }), true);
+				assert.equal(fs.readFileSync(filePath, 'utf8'), `prefix;${PATCHED_SNIPPET};suffix`);
+			});
+			assert.equal(log.mock.callCount(), 1);
+			assert.match(log.mock.calls[0].arguments[0], /Patched viewport aria-controls/);
+		} finally {
+			log.mock.restore();
+		}
+	});
+
+	test('leaves an already-patched bundle alone, logging when asked', () => {
+		const log = mock.method(console, 'log', () => {});
+		try {
+			withBundle(`prefix;${PATCHED_SNIPPET};suffix`, (filePath) => {
+				assert.equal(patchDefraImCoreFile(filePath, { log: true }), false);
+				assert.equal(fs.readFileSync(filePath, 'utf8'), `prefix;${PATCHED_SNIPPET};suffix`);
+			});
+			assert.equal(log.mock.callCount(), 1);
+			assert.match(log.mock.calls[0].arguments[0], /already patched/);
+		} finally {
+			log.mock.restore();
+		}
 	});
 });
