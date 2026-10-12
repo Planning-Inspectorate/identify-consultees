@@ -1,0 +1,52 @@
+# Boundary map styles: the project boundary page, the first map in the journey. Read when the app
+# starts (maps/boundary-map-styles.ts), which refuses to start if a value here is invalid - so a
+# change is checked by `npm test` and takes effect on the next deploy.
+#
+# The map draws one layer per boundary file the case holds, under "GIS shapefiles" in the Layers
+# menu, each in its own style. "Most recent" is the file with the latest received date; files with
+# no date count as oldest.
+#
+# Each style:
+#   colour        - a 6-digit hex colour, e.g. '#C44E52'. Quote it: YAML treats # as a comment.
+#   fillOpacity   - 0 (no fill) to 1 (solid). The Defra map has no fill-opacity setting, so the app
+#                   turns colour + fillOpacity into an rgba() fill.
+#   strokeWidth   - outline width in pixels.
+#   strokeDash    - optional dash pattern for the outline, as [dash, gap] in line widths, e.g.
+#                   [4, 2]. Leave it out for a solid line. It means files differ by more than
+#                   colour (GDS: don't rely on colour alone).
+#   description   - how the style looks, in words, read out by screen readers in the map key.
+#
+# The consultee maps will have their own file: consultee-map-styles.example.yaml.
+
+version: 1
+
+# Always the newest submission.
+mostRecent:
+  colour: '#C44E52'
+  fillOpacity: 0.45
+  strokeWidth: 3
+  description: red, solid outline
+
+# Earlier files, newest first: the second-newest file gets the first style, and so on. When there
+# are more files than styles, the list repeats.
+earlier:
+  - colour: '#1d70b8'
+    fillOpacity: 0.15
+    strokeWidth: 2
+    strokeDash: [4, 2]
+    description: blue, dashed outline
+  - colour: '#f47738'
+    fillOpacity: 0.15
+    strokeWidth: 2
+    strokeDash: [4, 2]
+    description: orange, dashed outline
+  - colour: '#912b88'
+    fillOpacity: 0.15
+    strokeWidth: 2
+    strokeDash: [4, 2]
+    description: purple, dashed outline
+  - colour: '#00703c'
+    fillOpacity: 0.15
+    strokeWidth: 2
+    strokeDash: [4, 2]
+    description: green, dashed outline

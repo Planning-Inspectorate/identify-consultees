@@ -1,0 +1,173 @@
+# Consultee map styles: every map showing identified consultees (the ruleset results and the
+# report's category pages). The project boundary page has its own file:
+# boundary-map-styles.yaml.
+#
+# EXAMPLE - not read by the app yet. Colours are placeholders: consultee categories aren't in the
+# GIS Tool Styling tables (AGENTS.md), so they need product and design sign-off.
+#
+# Each style can set:
+#   colour        - a 6-digit hex colour, e.g. '#1d70b8'. Quote it: YAML treats # as a comment.
+#   fillOpacity   - 0 (no fill) to 1 (solid). The Defra map has no fill-opacity setting, so the app
+#                   turns colour + fillOpacity into an rgba() fill.
+#   strokeWidth   - outline width in pixels.
+#   strokeDash    - optional dash pattern for the outline, as [dash, gap] in line widths. Leave it
+#                   out for a solid line.
+#
+# Point categories (Hospital, Dock or Harbour, Electricity Generator, ONR Site) are drawn as small
+# dots in `colour`; the outline and dash settings don't apply to them.
+#
+# Sub-categories key on the consultee sub-category column the data redevelopment is adding to
+# consultee_area. Until it lands, the sub-category values below are illustrative - taken from
+# attributes in today's source files - and will be replaced with the column's real values.
+
+version: 1
+
+# The project site, drawn on top of the consultee areas.
+projectSite:
+  colour: '#C44E52' # red - no category should use it
+  fillOpacity: 0.45
+  strokeWidth: 2
+
+# How a consultee is drawn depends on why it was identified:
+#   identified - it met at least one ruleset condition (the intersection logic)
+#   nearbyOnly - it was only found by the nearby search (within 20km), with no condition met
+# These are the defaults; a category below can override any value.
+defaults:
+  identified:
+    fillOpacity: 0.35
+    strokeWidth: 2
+  nearbyOnly:
+    fillOpacity: 0.1 # fainter, so condition matches stand out
+    strokeWidth: 1
+    strokeDash: [2, 2]
+
+# One entry per category. Names must match consultee_area.consulteeCategory exactly (see
+# kt-docs/data/reference-data.md). Only `colour` is required; anything else overrides `defaults`.
+#
+# Regional categories cover the whole search area, so they're only tinted - otherwise a dozen of
+# them stacked at the default opacity would hide everything else.
+categories:
+  # --- Local government
+  Parish Council:
+    colour: '#28a197'
+  Lower Tier Authority:
+    colour: '#1d70b8'
+  Unitary Authority:
+    colour: '#5694ca'
+  Upper Tier Authority: # regional
+    colour: '#003078'
+    identified: { fillOpacity: 0.06 }
+    nearbyOnly: { fillOpacity: 0.03 }
+  Greater London Authority: # regional
+    colour: '#2b4c80'
+    identified: { fillOpacity: 0.06 }
+    nearbyOnly: { fillOpacity: 0.03 }
+  Corporate Joint Committee: # regional
+    colour: '#6f72af'
+    identified: { fillOpacity: 0.06 }
+    nearbyOnly: { fillOpacity: 0.03 }
+
+  # --- Health
+  Hospital: # points
+    colour: '#d53880'
+  ICB: # regional
+    colour: '#912b88'
+    identified: { fillOpacity: 0.06 }
+    nearbyOnly: { fillOpacity: 0.03 }
+  Local Health Board: # regional
+    colour: '#b5307a'
+    identified: { fillOpacity: 0.06 }
+    nearbyOnly: { fillOpacity: 0.03 }
+  Ambulance Trust: # regional
+    colour: '#f499be'
+    identified: { fillOpacity: 0.06 }
+    nearbyOnly: { fillOpacity: 0.03 }
+
+  # --- Emergency services and resilience
+  Police: # regional
+    colour: '#4c2c92'
+    identified: { fillOpacity: 0.06 }
+    nearbyOnly: { fillOpacity: 0.03 }
+  police_crime_commissioner: # regional
+    colour: '#6b4fae'
+    identified: { fillOpacity: 0.06 }
+    nearbyOnly: { fillOpacity: 0.03 }
+  Fire and Rescue Authority: # regional
+    colour: '#f47738'
+    identified: { fillOpacity: 0.06 }
+    nearbyOnly: { fillOpacity: 0.03 }
+  Local Resilience Forum: # regional
+    colour: '#b58840'
+    identified: { fillOpacity: 0.06 }
+    nearbyOnly: { fillOpacity: 0.03 }
+
+  # --- Landscape and water
+  National Park:
+    colour: '#00703c'
+  National Landscape:
+    colour: '#85994b'
+  Internal Drainage Board:
+    colour: '#0f7a8a'
+  Internal Drainage District:
+    colour: '#3e8ede'
+
+  # --- Transport
+  Dock or Harbour: # points
+    colour: '#003a69'
+  Integrated Transport Authority: # regional
+    colour: '#505a5f'
+    identified: { fillOpacity: 0.06 }
+    nearbyOnly: { fillOpacity: 0.03 }
+  Passenger Transport Executive: # regional
+    colour: '#6f777b'
+    identified: { fillOpacity: 0.06 }
+    nearbyOnly: { fillOpacity: 0.03 }
+
+  # --- Energy
+  Electricity Generator: # points
+    colour: '#ffdd00'
+  ONR Site: # points
+    colour: '#a05b00'
+  DNO: # regional
+    colour: '#c9a400'
+    identified: { fillOpacity: 0.06 }
+    nearbyOnly: { fillOpacity: 0.03 }
+    # Sub-categories: one entry per value of the area's sub-category, each taking the same settings
+    # as a category (only `colour` is required). A sub-category not listed keeps its category's
+    # style. The values here are illustrative, from today's data; see the note at the top.
+    subCategories: # the six network operators
+      ENWL: { colour: '#c9a400' }
+      NGED: { colour: '#a68a00' }
+      NPG: { colour: '#e0b400' }
+      SPEN: { colour: '#8a7300' }
+      SSEN: { colour: '#f0c800' }
+      UKPN: { colour: '#6e5c00' }
+  Interconnector:
+    colour: '#7d4e9e'
+    subCategories: # darkest = most advanced
+      Built: { colour: '#4f2f66' }
+      Proposed: { colour: '#7d4e9e' }
+      Scoping: { colour: '#c3a6d9', nearbyOnly: { fillOpacity: 0.05 } }
+  Offshore Wind Site:
+    colour: '#00a2b4'
+    subCategories: # darkest = most advanced
+      Active/In Operation: { colour: '#005a63' }
+      Under Construction: { colour: '#007d8a' }
+      Consented: { colour: '#00a2b4' }
+      In Planning: { colour: '#33b5c3' }
+      Government Support on Offer: { colour: '#66c7d2' }
+      Pre-planning Application: { colour: '#99dae1' }
+  Offshore Wind Export Cable:
+    colour: '#4fb3bf'
+
+# Any category not listed above (for example a new one in the data) takes the next unused colour
+# from this palette, in alphabetical order, with the default opacities.
+palette:
+  - '#1d70b8'
+  - '#f47738'
+  - '#912b88'
+  - '#28a197'
+  - '#b58840'
+  - '#d53880'
+  - '#85994b'
+  - '#6f72af'

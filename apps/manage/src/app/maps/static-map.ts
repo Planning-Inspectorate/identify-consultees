@@ -64,16 +64,16 @@ const CONSULTEE_COLOUR: FeatureColours = {
 };
 
 /**
- * A consultee's own category colour and fill opacity (its `colour` and `fillOpacity` properties),
- * or the default consultee green.
+ * A feature's own colour and fill opacity (its `colour` and `fillOpacity` properties), or
+ * `fallback` when it has no valid colour.
  */
-export function consulteeColours(feature: GeoJsonFeature): FeatureColours {
+function featureColours(feature: GeoJsonFeature, fallback: FeatureColours): FeatureColours {
 	const colour = feature.properties.colour;
 	if (typeof colour !== 'string' || !/^#[0-9a-f]{6}$/i.test(colour)) {
-		return CONSULTEE_COLOUR;
+		return fallback;
 	}
 	const opacity = Number(feature.properties.fillOpacity);
-	const fillOpacity = opacity > 0 && opacity <= 1 ? opacity : CONSULTEE_COLOUR.fillOpacity;
+	const fillOpacity = opacity > 0 && opacity <= 1 ? opacity : fallback.fillOpacity;
 	const google = `0x${colour.slice(1).toUpperCase()}`;
 	const googleAlpha = Math.round(fillOpacity * 255)
 		.toString(16)
@@ -86,6 +86,19 @@ export function consulteeColours(feature: GeoJsonFeature): FeatureColours {
 		googleFill: `${google}${googleAlpha}`,
 		googleStroke: `${google}FF`
 	};
+}
+
+/** A consultee's own category colour and fill opacity, or the default consultee green. */
+export function consulteeColours(feature: GeoJsonFeature): FeatureColours {
+	return featureColours(feature, CONSULTEE_COLOUR);
+}
+
+/**
+ * The project's own colour and fill opacity, or red - the boundary page sets the opened file's
+ * colour (see boundary-map-styles.yaml) so the image matches the interactive map.
+ */
+export function projectColours(feature: GeoJsonFeature): FeatureColours {
+	return featureColours(feature, PROJECT_COLOUR);
 }
 
 // tiles keep for a day - core's MapCache is the TTL map this needs
@@ -324,7 +337,7 @@ export function buildGoogleStaticMapUrl(options: StaticMapBuildOptions): string 
 		appendGooglePath(params, feature, consulteeColours(feature));
 	}
 	for (const feature of options.projectGeojson.features) {
-		appendGooglePath(params, feature, PROJECT_COLOUR);
+		appendGooglePath(params, feature, projectColours(feature));
 	}
 
 	const url = `https://maps.googleapis.com/maps/api/staticmap?${params.toString()}`;
@@ -434,7 +447,7 @@ export function renderStaticMapOverlaySvg(options: StaticMapBuildOptions): strin
 		.filter(Boolean)
 		.join('\n');
 	const projectPaths = options.projectGeojson.features
-		.map((feature) => pathForFeature(feature, project, PROJECT_COLOUR))
+		.map((feature) => pathForFeature(feature, project, projectColours(feature)))
 		.filter(Boolean)
 		.join('\n');
 

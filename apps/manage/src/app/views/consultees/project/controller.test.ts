@@ -1,6 +1,7 @@
 import { mockLogger } from '@planning-inspectorate/core/testing';
 import assert from 'node:assert';
 import { describe, it, mock } from 'node:test';
+import { BOUNDARY_MAP_STYLES } from '../../../maps/boundary-map-styles.ts';
 import { configureNunjucks } from '../../../nunjucks.ts';
 import { buildBoundaryStaticMap, buildBoundarySubmit, buildConsulteeProjectPage } from './controller.ts';
 
@@ -267,6 +268,41 @@ describe('project boundary static map', () => {
 			assert.strictEqual(mockRes.status.mock.calls[0].arguments[0], 200);
 			assert.match(String(mockRes.type.mock.calls[0].arguments[0]), /image\/svg\+xml/);
 			assert.match(String(mockRes.send.mock.calls[0].arguments[0]), /<svg/);
+		} finally {
+			globalThis.fetch = originalFetch;
+		}
+	});
+
+	it("should draw the opened file in its own style - an earlier file's colour, else red", async () => {
+		const originalFetch = globalThis.fetch;
+		globalThis.fetch = async () => new Response(null, { status: 503 });
+		const svgFor = async (files: ReturnType<typeof boundaryFile>[]) => {
+			const mockRes = {
+				status: mock.fn(() => mockRes),
+				type: mock.fn(() => mockRes),
+				set: mock.fn(() => mockRes),
+				send: mock.fn(),
+				end: mock.fn()
+			};
+			const handler = buildBoundaryStaticMap(
+				{ db: dbReturning([[realProjectRow()], files]), logger: mockLogger() },
+				true
+			);
+			await handler({ params: { caseId: realProjectId }, query: {}, headers: {} }, mockRes);
+			return String(mockRes.send.mock.calls[0].arguments[0]);
+		};
+		try {
+			// a newer sibling makes the opened file an earlier one
+			const older = await svgFor([boundaryFile(siblingProjectRow()), boundaryFile(realProjectRow())]);
+			assert.match(older, new RegExp(BOUNDARY_MAP_STYLES.earlier[0].colour, 'i'));
+			assert.doesNotMatch(older, new RegExp(BOUNDARY_MAP_STYLES.mostRecent.colour, 'i'));
+
+			// the newest file, or one missing from the list, is red
+			assert.match(
+				await svgFor([boundaryFile(realProjectRow())]),
+				new RegExp(BOUNDARY_MAP_STYLES.mostRecent.colour, 'i')
+			);
+			assert.match(await svgFor([]), new RegExp(BOUNDARY_MAP_STYLES.mostRecent.colour, 'i'));
 		} finally {
 			globalThis.fetch = originalFetch;
 		}
