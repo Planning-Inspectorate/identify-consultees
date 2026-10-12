@@ -19,6 +19,34 @@ describe('geometryToWkt', () => {
 		assert.equal(geometryToWkt(geometry), 'LINESTRING(0 0, 1 1)');
 	});
 
+	test('converts a MultiPoint', () => {
+		const geometry: Geometry = {
+			type: 'MultiPoint',
+			coordinates: [
+				[0, 0],
+				[1, 1]
+			]
+		};
+		assert.equal(geometryToWkt(geometry), 'MULTIPOINT((0 0), (1 1))');
+	});
+
+	test('converts a MultiLineString', () => {
+		const geometry: Geometry = {
+			type: 'MultiLineString',
+			coordinates: [
+				[
+					[0, 0],
+					[1, 1]
+				],
+				[
+					[2, 2],
+					[3, 3]
+				]
+			]
+		};
+		assert.equal(geometryToWkt(geometry), 'MULTILINESTRING((0 0, 1 1), (2 2, 3 3))');
+	});
+
 	test('converts a Polygon with a correctly-wound exterior ring unchanged', () => {
 		// counter-clockwise square
 		const geometry: PolygonGeometry = {
@@ -237,7 +265,47 @@ describe('wktToGeometry', () => {
 		assert.deepEqual(wktToGeometry(geometryToWkt(geometry)), geometry);
 	});
 
+	test('parses a parenthesised MULTIPOINT', () => {
+		assert.deepEqual(wktToGeometry('MULTIPOINT((0 0), (1 1))'), {
+			type: 'MultiPoint',
+			coordinates: [
+				[0, 0],
+				[1, 1]
+			]
+		});
+	});
+
+	test('parses an unparenthesised MULTIPOINT', () => {
+		assert.deepEqual(wktToGeometry('MULTIPOINT(0 0, 1 1)'), {
+			type: 'MultiPoint',
+			coordinates: [
+				[0, 0],
+				[1, 1]
+			]
+		});
+	});
+
+	test('parses a MULTILINESTRING', () => {
+		assert.deepEqual(wktToGeometry('MULTILINESTRING((0 0, 1 1), (2 2, 3 3))'), {
+			type: 'MultiLineString',
+			coordinates: [
+				[
+					[0, 0],
+					[1, 1]
+				],
+				[
+					[2, 2],
+					[3, 3]
+				]
+			]
+		});
+	});
+
 	test('throws on unrecognised WKT', () => {
 		assert.throws(() => wktToGeometry('NOT WKT'), /Unrecognised WKT/);
+	});
+
+	test('throws on a recognised-looking but unsupported WKT type', () => {
+		assert.throws(() => wktToGeometry('CIRCULARSTRING(0 0, 1 1, 2 0)'), /Unsupported WKT type/);
 	});
 });

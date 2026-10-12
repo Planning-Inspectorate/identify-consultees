@@ -8,6 +8,8 @@ import {
 	bufferGeometryForDisplay,
 	getConsulteeAreaById,
 	getConsulteeAreaDisplayGeometries,
+	listConsulteeAreas,
+	listConsulteeCategories,
 	loadConsulteeAreas
 } from './consultee-areas.ts';
 
@@ -89,6 +91,24 @@ describe('consultee areas (requires a local SQL Server - see docker-compose.yml)
 				FROM consultee_area WHERE id = ${testAreaId}
 			`;
 			assert.equal(simplifiedRow.simplified, 1);
+
+			// the whole-table listing finds the test row wherever it lands, while a real
+			// (or previously-imported) dataset sharing the database could push it past any
+			// fixed page - so the paginated branch is checked on shape, not contents
+			const listed = await listConsulteeAreas(dbClient);
+			assert.equal(listed.type, 'FeatureCollection');
+			assert.ok(
+				listed.features.some((feature) => feature.id === testAreaId),
+				'expected the loaded area in listConsulteeAreas'
+			);
+			const page = await listConsulteeAreas(dbClient, { limit: 1, offset: 0 });
+			assert.equal(page.type, 'FeatureCollection');
+			assert.equal(page.features.length, 1);
+
+			// every stored category, alphabetically - the test row's must be in there
+			const categories = await listConsulteeCategories(dbClient);
+			assert.ok(categories.includes('Environment Agency'));
+			assert.deepEqual(categories, [...categories].sort());
 
 			// an area touching the window is drawn whole, not clipped to it
 			const window = {

@@ -7,6 +7,7 @@ import type { PrismaClient } from '../client/client.ts';
 import {
 	clearExistingRows,
 	deterministicId,
+	importCaseBoundaries,
 	importConsulteeAreas,
 	toCaseBoundary,
 	toConsulteeArea
@@ -127,18 +128,18 @@ describe('clearExistingRows', () => {
 	});
 });
 
-describe('importConsulteeAreas with replace', () => {
-	async function withFile(contents: string, fn: (filePath: string) => Promise<void>) {
-		const dir = await mkdtemp(path.join(tmpdir(), 'geojson-import-test-'));
-		try {
-			const filePath = path.join(dir, 'data.geojson');
-			await writeFile(filePath, contents);
-			await fn(filePath);
-		} finally {
-			await rm(dir, { recursive: true, force: true });
-		}
+async function withFile(contents: string, fn: (filePath: string) => Promise<void>) {
+	const dir = await mkdtemp(path.join(tmpdir(), 'geojson-import-test-'));
+	try {
+		const filePath = path.join(dir, 'data.geojson');
+		await writeFile(filePath, contents);
+		await fn(filePath);
+	} finally {
+		await rm(dir, { recursive: true, force: true });
 	}
+}
 
+describe('importConsulteeAreas with replace', () => {
 	test('refuses to clear the table for a file with no features', async () => {
 		const { client, $executeRaw } = deletingClient([]);
 		await withFile(JSON.stringify({ type: 'FeatureCollection', features: [] }), async (filePath) => {
@@ -156,5 +157,72 @@ describe('importConsulteeAreas with replace', () => {
 			await assert.rejects(() => importConsulteeAreas(client, filePath, { replace: true }));
 		});
 		assert.equal($executeRaw.mock.callCount(), 0);
+	});
+});
+
+describe('imports without replace', () => {
+	// the loaders write with $executeRaw MERGE batches, so a stand-in client whose $executeRaw
+	// resolves exercises the whole read-file -> map -> load path without a real database
+	function loadingClient() {
+		const $executeRaw = mock.fn(async () => 1);
+		return { client: { $executeRaw } as unknown as PrismaClient, $executeRaw };
+	}
+
+	test('importConsulteeAreas loads the file rows without clearing anything', async () => {
+		const { client, $executeRaw } = loadingClient();
+		const file = {
+			type: 'FeatureCollection',
+			features: [
+				{
+					geometry: { type: 'Point', coordinates: [0, 0] },
+					properties: { id: 'src-1', consultee: 'Example Trust', consulteeCategory: 'Ambulance Trust' }
+				}
+			]
+		};
+		await withFile(JSON.stringify(file), async (filePath) => {
+			assert.equal(await importConsulteeAreas(client, filePath), 1);
+		});
+		assert.equal($executeRaw.mock.callCount(), 1);
+	});
+
+	test('importCaseBoundaries loads the file rows into case_boundary', async () => {
+		const { client, $executeRaw } = loadingClient();
+		const file = {
+			type: 'FeatureCollection',
+			features: [
+				{
+					geometry: { type: 'Point', coordinates: [0, 0] },
+					properties: {
+						caseReference: 'EN010099',
+						projectName: 'Example',
+						fileName: 'v1.zip',
+						receivedDate: '2024-06-01T00:00:00.000Z'
+					}
+				}
+			]
+		};
+		await withFile(JSON.stringify(file), async (filePath) => {
+			assert.equal(await importCaseBoundaries(client, filePath), 1);
+		});
+		assert.equal($executeRaw.mock.callCount(), 1);
+	});
+
+	test('importConsulteeAreas with replace clears the table once the file has parsed', async () => {
+		const { client, $executeRaw } = loadingClient();
+		const file = {
+			type: 'FeatureCollection',
+			features: [
+				{
+					geometry: { type: 'Point', coordinates: [0, 0] },
+					properties: { id: 'src-1', consultee: 'Example Trust' }
+				}
+			]
+		};
+		await withFile(JSON.stringify(file), async (filePath) => {
+			assert.equal(await importConsulteeAreas(client, filePath, { replace: true }), 1);
+		});
+		// one batch delete that comes back short, then one MERGE batch
+		assert.equal($executeRaw.mock.callCount(), 2);
+		assert.match($executeRaw.mock.calls[0].arguments[0].join('?'), /FROM consultee_area/);
 	});
 });
