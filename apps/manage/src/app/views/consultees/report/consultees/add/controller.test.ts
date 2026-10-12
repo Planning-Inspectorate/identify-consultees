@@ -36,7 +36,7 @@ const addParam = (name: string, reason = '', category = 'Parish Council') =>
 const parishQuery = { ruleset: 'england-wales-post-20240430', category: 'Parish Council' };
 
 describe('report consultee add page', () => {
-	it('should render the select-a-consultee form for a valid case/ruleset/category', async () => {
+	it('should render the add-consultee form for a valid case/ruleset/category', async () => {
 		const nunjucks = configureNunjucks();
 		const mockRes = {
 			status: mock.fn(() => mockRes),
@@ -49,7 +49,7 @@ describe('report consultee add page', () => {
 
 		assert.strictEqual(mockRes.render.mock.calls[0].arguments[0], 'views/consultees/report/consultees/add/view.njk');
 		const viewModel = mockRes.render.mock.calls[0].arguments[1];
-		assert.strictEqual(viewModel.pageHeading, 'Select a consultee');
+		assert.strictEqual(viewModel.pageHeading, 'Add consultee');
 		assert.strictEqual(viewModel.pageCaption, 'Parish Council');
 		assert.strictEqual(
 			viewModel.backLinkUrl,
@@ -63,12 +63,12 @@ describe('report consultee add page', () => {
 		const html = mockRes.render.mock.calls[0].result;
 		assert.match(
 			html,
-			/<h1 class="govuk-heading-xl">\s*<span class="govuk-caption-xl">Parish Council<\/span>\s*Select a consultee/
+			/<h1 class="govuk-heading-xl">\s*<span class="govuk-caption-xl">Parish Council<\/span>\s*Add consultee/
 		);
 		assert.match(html, /Name of consultee/);
 		assert.match(html, /<input[^>]*name="name"/);
 		assert.match(html, /<textarea[^>]*name="reason"/);
-		assert.match(html, /Reason for identification/);
+		assert.match(html, /Reason for adding/);
 		assert.match(html, /Add consultee/);
 	});
 
@@ -182,12 +182,49 @@ describe('report consultee add submit', () => {
 		assert.ok(location.indexOf(existingParam) < location.indexOf(addParam('Test Consultee', 'Adjacent landowner')));
 	});
 
-	it('should trim the entered values and allow an empty reason', async () => {
+	it('should trim the entered values', async () => {
 		const mockRes = { redirect: mock.fn(), render: mock.fn(), status: mock.fn(() => mockRes) };
-		await submitFor(dbFor())(request({ body: { name: '  Test Consultee  ', reason: '' } }), mockRes);
+		await submitFor(dbFor())(
+			request({ body: { name: '  Test Consultee  ', reason: '  Adjacent landowner  ' } }),
+			mockRes
+		);
 
 		const location = mockRes.redirect.mock.calls[0].arguments[0];
-		assert.ok(location.includes(`add=${addParam('Test Consultee', '')}`));
+		assert.ok(location.includes(`add=${addParam('Test Consultee', 'Adjacent landowner')}`));
+	});
+
+	it('should re-render the form with an error and the entered values when the reason is blank', async () => {
+		const nunjucks = configureNunjucks();
+		const mockRes = {
+			status: mock.fn(() => mockRes),
+			render: mock.fn((view, data) => nunjucks.render(view, data)),
+			redirect: mock.fn()
+		};
+		await submitFor(dbFor())(request({ body: { name: 'Test Consultee', reason: '   ' } }), mockRes);
+
+		assert.strictEqual(mockRes.redirect.mock.callCount(), 0);
+		const viewModel = mockRes.render.mock.calls[0].arguments[1];
+		assert.strictEqual(viewModel.nameError, undefined);
+		assert.strictEqual(viewModel.reasonError.text, 'Enter a reason for adding');
+		assert.strictEqual(viewModel.nameValue, 'Test Consultee');
+		assert.strictEqual(viewModel.reasonValue, '   ');
+		assert.strictEqual(viewModel.errorSummary[0].href, '#consultee-reason');
+
+		const html = mockRes.render.mock.calls[0].result;
+		assert.match(html, /There is a problem/);
+		assert.match(html, /Enter a reason for adding/);
+		assert.match(html, /govuk-textarea--error/);
+	});
+
+	it('should report each missing field when the submit is blank', async () => {
+		const mockRes = { render: mock.fn(), redirect: mock.fn(), status: mock.fn(() => mockRes) };
+		await submitFor(dbFor())(request({ body: {} }), mockRes);
+
+		const viewModel = mockRes.render.mock.calls[0].arguments[1];
+		assert.deepStrictEqual(viewModel.errorSummary, [
+			{ text: 'Enter the consultee name', href: '#consultee-name' },
+			{ text: 'Enter a reason for adding', href: '#consultee-reason' }
+		]);
 	});
 
 	it('should re-render the form with an error and the entered values when the name is blank', async () => {

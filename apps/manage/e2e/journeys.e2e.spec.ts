@@ -132,16 +132,21 @@ test.describe('manage journeys', () => {
 			removed = 1;
 		}
 
-		// "Add consultee" opens its form - a blank name fails validation with the entered reason kept
+		// "Add consultee" opens its form - name and reason are both required (mirroring
+		// the removal reason), so a blank submit fails on both fields; a blank name then
+		// fails validation with the entered reason kept
 		await page.getByRole('button', { name: 'Add consultee' }).click();
 		await expect(page).toHaveURL(/\/report\/consultees\/add\?.*category=Parish/);
-		await expect(page.getByRole('heading', { level: 1 })).toContainText('Select a consultee');
-		await page.getByLabel('Reason for identification').fill('Entered first');
+		await expect(page.getByRole('heading', { level: 1 })).toContainText('Add consultee');
 		await page.getByRole('button', { name: 'Add consultee' }).click();
 		await expect(page.getByText('There is a problem')).toBeVisible();
 		await expect(page.getByRole('link', { name: 'Enter the consultee name' })).toBeVisible();
+		await expect(page.getByRole('link', { name: 'Enter a reason for adding' })).toBeVisible();
+		await page.getByLabel('Reason for adding').fill('Entered first');
+		await page.getByRole('button', { name: 'Add consultee' }).click();
+		await expect(page.getByRole('link', { name: 'Enter the consultee name' })).toBeVisible();
 		await expect(page.getByText('Error: Enter the consultee name')).toBeVisible();
-		await expect(page.getByLabel('Reason for identification')).toHaveValue('Entered first');
+		await expect(page.getByLabel('Reason for adding')).toHaveValue('Entered first');
 
 		// saving a consultee returns to the category page with it listed below the map - and any
 		// number can be added one at a time
@@ -153,9 +158,10 @@ test.describe('manage journeys', () => {
 
 		await page.getByRole('button', { name: 'Add consultee' }).click();
 		await page.getByLabel('Name of consultee').fill('Second Test Consultee');
+		await page.getByLabel('Reason for adding').fill('Borders the site');
 		await page.getByRole('button', { name: 'Add consultee' }).click();
 		await expect(page.getByRole('rowheader', { name: 'Second Test Consultee' })).toBeVisible();
-		await expect(page.getByText('Manually added')).toBeVisible();
+		await expect(page.getByText('Borders the site')).toBeVisible();
 		await expect(page.getByRole('link', { name: /Remove/ })).toHaveCount(parishCount - removed + 2);
 
 		// a hand-added consultee's Remove link goes through the same reason page -

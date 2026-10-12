@@ -335,10 +335,10 @@ describe('manage page accessibility smoke', () => {
 		await assertNoSeriousA11yViolations(html);
 	});
 
-	test('select a consultee page has no serious a11y violations', async () => {
+	test('add consultee page has no serious a11y violations', async () => {
 		const html = nunjucks.render('views/consultees/report/consultees/add/view.njk', {
 			...pageLocals,
-			pageHeading: 'Select a consultee',
+			pageHeading: 'Add consultee',
 			pageCaption: 'Parish Council',
 			backLinkUrl:
 				'/consultees/11111111-1111-1111-1111-111111111111/report/consultees?ruleset=england-wales-post-20240430&category=Parish%20Council',
@@ -350,19 +350,23 @@ describe('manage page accessibility smoke', () => {
 		await assertNoSeriousA11yViolations(html);
 	});
 
-	test('select a consultee page in its error state has no serious a11y violations', async () => {
+	test('add consultee page in its error state has no serious a11y violations', async () => {
 		const html = nunjucks.render('views/consultees/report/consultees/add/view.njk', {
 			...pageLocals,
-			pageHeading: 'Select a consultee',
+			pageHeading: 'Add consultee',
 			pageCaption: 'Parish Council',
 			backLinkUrl:
 				'/consultees/11111111-1111-1111-1111-111111111111/report/consultees?ruleset=england-wales-post-20240430&category=Parish%20Council',
 			formAction:
 				'/consultees/11111111-1111-1111-1111-111111111111/report/consultees/add?ruleset=england-wales-post-20240430&category=Parish%20Council',
 			nameValue: '',
-			reasonValue: 'Adjacent landowner',
+			reasonValue: '',
 			nameError: { text: 'Enter the consultee name' },
-			errorSummary: [{ text: 'Enter the consultee name', href: '#consultee-name' }]
+			reasonError: { text: 'Enter a reason for adding' },
+			errorSummary: [
+				{ text: 'Enter the consultee name', href: '#consultee-name' },
+				{ text: 'Enter a reason for adding', href: '#consultee-reason' }
+			]
 		});
 		assert.match(html, /There is a problem/);
 		await assertNoSeriousA11yViolations(html);

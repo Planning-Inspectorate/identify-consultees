@@ -20,7 +20,7 @@ interface AddConsulteeContext {
 }
 
 /**
- * The case/ruleset/category a "Select a consultee" request targets, since this form lives under a
+ * The case/ruleset/category an "Add consultee" request targets, since this form lives under a
  * category page: a case that isn't found, a ruleset that isn't known, or a category that's neither
  * one the ruleset covers nor one in the reference data (the nearby search finds those) 404s. `undefined` means a response has
  * already been sent.
@@ -58,26 +58,28 @@ function viewModel(
 	{ project, ruleset, category, selection }: AddConsulteeContext,
 	nameValue = '',
 	reasonValue = '',
-	nameError?: string
+	errors: { name?: string; reason?: string } = {}
 ): AddConsulteeViewModel {
+	// the summary lists errors in the order the fields appear on the page
+	const errorSummary = [
+		...(errors.name ? [{ text: errors.name, href: '#consultee-name' }] : []),
+		...(errors.reason ? [{ text: errors.reason, href: '#consultee-reason' }] : [])
+	];
 	return {
-		pageHeading: 'Select a consultee',
+		pageHeading: 'Add consultee',
 		pageCaption: category,
 		backLinkUrl: consulteesUrl(project.id, ruleset.id, category, selection),
 		formAction: addConsulteeUrl(project.id, ruleset.id, category, selection),
 		nameValue,
 		reasonValue,
-		...(nameError
-			? {
-					nameError: { text: nameError },
-					errorSummary: [{ text: nameError, href: '#consultee-name' }]
-				}
-			: {})
+		...(errors.name ? { nameError: { text: errors.name } } : {}),
+		...(errors.reason ? { reasonError: { text: errors.reason } } : {}),
+		...(errorSummary.length ? { errorSummary } : {})
 	};
 }
 
 /**
- * The "Select a consultee" form a category page's "Add consultee" button opens: a name input
+ * The "Add consultee" form a category page's "Add consultee" button opens: a name input
  * and a reason textarea. Saving adds the consultee to the URL's `add` params and returns to the
  * category page where it's listed below the map.
  */
@@ -92,10 +94,11 @@ export function buildReportConsulteeAddPage(service: ManageService): AsyncReques
 }
 
 /**
- * Saves a hand-added consultee. The name is required (it's the row's only required value) - a
- * blank submit re-renders the form with the entered values and a validation error; the reason
- * is optional free text shown in the category page's Identified column. On success the new
- * consultee joins the `add` params and the user lands back on the category page.
+ * Saves a hand-added consultee. The name and the reason are both required - like the removal
+ * reason, the reason is recorded for auditing and shows in the category page's Identified
+ * column - so a blank submit re-renders the form with the entered values and a validation
+ * error per missing field. On success the new consultee joins the `add` params and the user
+ * lands back on the category page.
  */
 export function buildReportConsulteeAddSubmit(
 	service: ManageService
@@ -109,10 +112,18 @@ export function buildReportConsulteeAddSubmit(
 
 		const name = typeof req.body?.name === 'string' ? req.body.name.trim() : '';
 		const reason = typeof req.body?.reason === 'string' ? req.body.reason.trim() : '';
-		if (!name) {
+		if (!name || !reason) {
 			return res.render(
 				'views/consultees/report/consultees/add/view.njk',
-				viewModel(context, typeof req.body?.name === 'string' ? req.body.name : '', reason, 'Enter the consultee name')
+				viewModel(
+					context,
+					typeof req.body?.name === 'string' ? req.body.name : '',
+					typeof req.body?.reason === 'string' ? req.body.reason : '',
+					{
+						...(!name ? { name: 'Enter the consultee name' } : {}),
+						...(!reason ? { reason: 'Enter a reason for adding' } : {})
+					}
+				)
 			);
 		}
 

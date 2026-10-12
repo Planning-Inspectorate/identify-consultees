@@ -23,7 +23,7 @@ export interface ReportConsulteesViewModel {
 	pageCaption: string;
 	backLinkUrl: string;
 	rows: ConsulteeRow[];
-	/** The "Select a consultee" form for adding a consultee to this category by hand. */
+	/** The "Add consultee" form for adding a consultee to this category by hand. */
 	addConsulteeUrl: string;
 	/** Back to the check page, carrying the current exclusions. */
 	saveAndReturnUrl: string;

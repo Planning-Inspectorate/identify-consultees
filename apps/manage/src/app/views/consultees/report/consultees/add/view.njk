@@ -23,11 +23,12 @@
 
 		{{ govukTextarea({
 			label: {
-				text: "Reason for identification"
+				text: "Reason for adding"
 			},
 			id: "consultee-reason",
 			name: "reason",
 			value: reasonValue,
+			errorMessage: reasonError,
 			rows: 5
 		}) }}
 
