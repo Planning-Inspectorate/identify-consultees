@@ -1,0 +1,56 @@
+{% extends "views/layouts/main.njk" %}
+
+{% from "govuk/components/button/macro.njk" import govukButton %}
+{% from "govuk/components/table/macro.njk" import govukTable %}
+{% from "govuk/components/textarea/macro.njk" import govukTextarea %}
+
+{% block pageTitle %}
+	{% if errorSummary %}Error: {% endif %}{{ pageHeading }} - {{ config.headerTitle }}
+{% endblock %}
+
+{% block pageContent %}
+	{% if rulesetFailed %}
+		{% from "govuk/components/notification-banner/macro.njk" import govukNotificationBanner %}
+		{% set failureHtml %}
+			<h3 class="govuk-notification-banner__heading">The ruleset could not be run</h3>
+			<p class="govuk-body">The consultee cannot be shown because the search did not finish. <a class="govuk-notification-banner__link" href="{{ retryUrl }}">Try again</a>.</p>
+		{% endset %}
+		{{ govukNotificationBanner({ html: failureHtml }) }}
+	{% else %}
+		{# one reason per line - each item is autoescaped #}
+		{% set identifiedHtml %}{% for reason in identified %}{{ reason }}{% if not loop.last %}<br>{% endif %}{% endfor %}{% endset %}
+		{{ govukTable({
+			caption: "Consultee being removed",
+			captionClasses: "govuk-visually-hidden",
+			firstCellIsHeader: true,
+			head: [
+				{ text: "Name" },
+				{ text: "Identified" }
+			],
+			rows: [
+				[
+					{ text: name, classes: "govuk-table__cell--no-wrap" },
+					{ html: identifiedHtml }
+				]
+			]
+		}) }}
+
+		<form method="post" action="{{ formAction }}" novalidate>
+			<input type="hidden" name="_csrf" value="{{ _csrf }}">
+			{{ govukTextarea({
+				label: {
+					text: "Reason for removal"
+				},
+				id: "removal-reason",
+				name: "reason",
+				value: reasonValue,
+				errorMessage: reasonError,
+				rows: 5
+			}) }}
+
+			{{ govukButton({
+				text: "Remove consultee"
+			}) }}
+		</form>
+	{% endif %}
+{% endblock %}

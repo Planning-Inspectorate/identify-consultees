@@ -1,7 +1,8 @@
 /**
  * The consultee selections the report pages carry in their URLs. There's no server-side state:
  * which consultee areas the user removed (via a category's Change page) lives in the `exclude`
- * query params, and consultees added by hand live in repeated `add` params, so the check page's
+ * query params - each a small JSON object recording the match id it excludes and the reason it
+ * was removed - and consultees added by hand live in repeated `add` params, so the check page's
  * counts, the category page's rows and the maps drawn from the same URL always agree.
  */
 
@@ -13,9 +14,61 @@ export function queryValues(value: unknown): string[] {
 	return typeof value === 'string' && value !== '' ? [value] : [];
 }
 
-/** The excluded consultee_area ids on the request, as a Set for `has()` lookups. */
+/** A consultee removed on a category's Change page, with the reason given for removing it. */
+export interface RemovedConsultee {
+	/**
+	 * The excluded ruleset match's feature id - absent when a hand-added consultee was removed
+	 * (that removal drops the `add` param instead, so there is no match to exclude).
+	 */
+	id?: string;
+	/** The category it was removed from - the page whose Removed consultees section lists it. */
+	category: string;
+	name: string;
+	/** Why it was removed - required by the remove form. */
+	reason: string;
+}
+
+/**
+ * The consultee removals on the request: each `exclude` param is a small JSON object
+ * (`{"i":matchId,"c":category,"n":name,"r":reason}`) - one param per entry so a removal and its
+ * reason can't drift out of step, and encoded JSON so any name/reason text survives a query
+ * string unambiguously. A bare `exclude=<id>` value (a link predating reasons, or the static
+ * map's) still excludes that match but has nothing to list in a Removed consultees section.
+ * Malformed or incomplete entries are ignored rather than failing the page.
+ */
+export function removedConsultees(value: unknown): RemovedConsultee[] {
+	return queryValues(value).flatMap((raw) => {
+		try {
+			const parsed: unknown = JSON.parse(raw);
+			if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+				return [{ id: raw, category: '', name: '', reason: '' }];
+			}
+			const { i, c, n, r } = parsed as { i?: unknown; c?: unknown; n?: unknown; r?: unknown };
+			if (typeof c !== 'string' || c === '' || typeof n !== 'string' || n === '') {
+				return [];
+			}
+			return [
+				{
+					...(typeof i === 'string' && i !== '' ? { id: i } : {}),
+					category: c,
+					name: n,
+					reason: typeof r === 'string' ? r : ''
+				}
+			];
+		} catch {
+			return [{ id: raw, category: '', name: '', reason: '' }];
+		}
+	});
+}
+
+/** The consultee_area ids a removal list excludes, as a Set for `has()` lookups. */
+export function excludedMatchIds(removed: readonly RemovedConsultee[]): Set<string> {
+	return new Set(removed.flatMap((removal) => (removal.id ? [removal.id] : [])));
+}
+
+/** The excluded consultee_area ids on the request - see removedConsultees for the param shapes. */
 export function excludedIds(value: unknown): Set<string> {
-	return new Set(queryValues(value));
+	return excludedMatchIds(removedConsultees(value));
 }
 
 /** A consultee added by hand on a category's Change page - a table row, not a map feature. */
@@ -51,22 +104,42 @@ function encodeAdd(consultee: AddedConsultee): string {
 	return JSON.stringify({ c: consultee.category, n: consultee.name, r: consultee.reason });
 }
 
+function encodeRemoval(removal: RemovedConsultee): string {
+	// an id-only entry round-trips as the bare param it arrived as - a recorded removal encodes
+	// the same small JSON shape the `add` params use
+	if (!removal.name) {
+		return removal.id ?? '';
+	}
+	return JSON.stringify({
+		...(removal.id ? { i: removal.id } : {}),
+		c: removal.category,
+		n: removal.name,
+		r: removal.reason
+	});
+}
+
 /**
- * The consultee-selection state a report URL carries: excluded match ids and manually-added
- * consultees, in page order. Every report-page URL builder takes the same shape so state can't
- * be dropped by passing a link through the wrong helper.
+ * The consultee-selection state a report URL carries: removed consultees (each excluding its
+ * match, if it was one, and listed in the category page's Removed consultees section) and
+ * manually-added consultees, in page order. Every report-page URL builder takes the same shape
+ * so state can't be dropped by passing a link through the wrong helper.
  */
 export interface ConsulteeSelection {
-	excluded: ReadonlySet<string>;
+	removed: readonly RemovedConsultee[];
 	adds: readonly AddedConsultee[];
 }
 
+/** The selection a report-page request's query params carry (`?exclude=` and `?add=`). */
+export function consulteeSelection(query?: Record<string, unknown>): ConsulteeSelection {
+	return { removed: removedConsultees(query?.exclude), adds: addedConsultees(query?.add) };
+}
+
 /** No removals and no additions - the selection the map page's links carry. */
-const NO_SELECTION: ConsulteeSelection = { excluded: new Set(), adds: [] };
+const NO_SELECTION: ConsulteeSelection = { removed: [], adds: [] };
 
 function appendSelection(url: string, selection: ConsulteeSelection): string {
-	for (const id of selection.excluded) {
-		url += `&exclude=${encodeURIComponent(id)}`;
+	for (const removal of selection.removed) {
+		url += `&exclude=${encodeURIComponent(encodeRemoval(removal))}`;
 	}
 	for (const add of selection.adds) {
 		url += `&add=${encodeURIComponent(encodeAdd(add))}`;
@@ -128,6 +201,30 @@ export function addConsulteeUrl(
 	);
 }
 
+/**
+ * The consultee a Change page row's Remove link targets: a ruleset match by feature id, or a
+ * hand-added consultee by its index in the `add` params.
+ */
+export type RemovalTarget = { matchId: string } | { addedIndex: number };
+
+/** The "Remove consultee" form on a category page - posts back to the same URL with the reason. */
+export function removeConsulteeUrl(
+	caseId: string,
+	rulesetId: string,
+	category: string,
+	target: RemovalTarget,
+	selection: ConsulteeSelection = NO_SELECTION
+): string {
+	const targetParam =
+		'matchId' in target
+			? `&match=${encodeURIComponent(target.matchId)}`
+			: `&added=${encodeURIComponent(String(target.addedIndex))}`;
+	return appendSelection(
+		`/consultees/${encodeURIComponent(caseId)}/report/consultees/remove?ruleset=${encodeURIComponent(rulesetId)}&category=${encodeURIComponent(category)}${targetParam}`,
+		selection
+	);
+}
+
 /** The static map for one category's visible (non-excluded) matches - manual adds aren't mapped. */
 export function categoryStaticMapUrl(
 	caseId: string,
@@ -136,7 +233,7 @@ export function categoryStaticMapUrl(
 	selection: ConsulteeSelection = NO_SELECTION
 ): string {
 	let url = `/consultees/${encodeURIComponent(caseId)}/results/static-map?ruleset=${encodeURIComponent(rulesetId)}&category=${encodeURIComponent(category)}`;
-	for (const id of selection.excluded) {
+	for (const id of excludedMatchIds(selection.removed)) {
 		url += `&exclude=${encodeURIComponent(id)}`;
 	}
 	return url;

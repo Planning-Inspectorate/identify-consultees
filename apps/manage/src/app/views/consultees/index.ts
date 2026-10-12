@@ -5,6 +5,10 @@ import { Router as createRouter } from 'express';
 import { buildBoundaryStaticMap, buildBoundarySubmit, buildConsulteeProjectPage } from './project/controller.ts';
 import { buildReportConsulteeAddPage, buildReportConsulteeAddSubmit } from './report/consultees/add/controller.ts';
 import { buildReportConsulteesPage } from './report/consultees/controller.ts';
+import {
+	buildReportConsulteeRemovePage,
+	buildReportConsulteeRemoveSubmit
+} from './report/consultees/remove/controller.ts';
 import { buildReportCheckPage, buildReportCreatedPage } from './report/controller.ts';
 import { buildConsulteesResultsPage, buildResultsStaticMap } from './results/controller.ts';
 import { buildRulesetPickerPage, buildRulesetPickerSubmit } from './ruleset/controller.ts';
@@ -21,6 +25,8 @@ export function createRoutes(service: ManageService): IRouter {
 	const reportConsulteesPage = buildReportConsulteesPage(service);
 	const reportConsulteeAddPage = buildReportConsulteeAddPage(service);
 	const reportConsulteeAddSubmit = buildReportConsulteeAddSubmit(service);
+	const reportConsulteeRemovePage = buildReportConsulteeRemovePage(service);
+	const reportConsulteeRemoveSubmit = buildReportConsulteeRemoveSubmit(service);
 	const reportCreatedPage = buildReportCreatedPage(service);
 	const resultsPage = buildConsulteesResultsPage(service);
 	const resultsStaticMap = buildResultsStaticMap(service);
@@ -42,6 +48,9 @@ export function createRoutes(service: ManageService): IRouter {
 	// its "Add consultee" form - adds a consultee to the category and returns to the Change page
 	router.get('/:caseId/report/consultees/add', asyncHandler(reportConsulteeAddPage));
 	router.post('/:caseId/report/consultees/add', asyncHandler(reportConsulteeAddSubmit));
+	// its "Remove consultee" form - records the removal reason and returns to the Change page
+	router.get('/:caseId/report/consultees/remove', asyncHandler(reportConsulteeRemovePage));
+	router.post('/:caseId/report/consultees/remove', asyncHandler(reportConsulteeRemoveSubmit));
 	// "Create report": confirmation page with the report download link (a placeholder for now)
 	router.get('/:caseId/report/created', asyncHandler(reportCreatedPage));
 	// the consultee report (tables) for the current shapefile/ruleset selection

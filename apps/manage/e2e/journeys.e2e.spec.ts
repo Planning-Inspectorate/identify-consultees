@@ -113,12 +113,22 @@ test.describe('manage journeys', () => {
 		const removeLinks = page.getByRole('link', { name: /Remove/ });
 		await expect(removeLinks).toHaveCount(parishCount);
 
-		// removing a consultee reloads the page with it excluded, so the table drops a row
+		// removing a consultee opens a reason page first - a blank reason fails
+		// validation; submitting one returns to the category page with the row
+		// excluded and the removal listed in the open Removed consultees section
 		let removed = 0;
 		if (parishCount > 0) {
 			await removeLinks.first().click();
-			await expect(page).toHaveURL(/exclude=/);
+			await expect(page).toHaveURL(/\/report\/consultees\/remove\?.*match=/);
+			await expect(page.getByRole('heading', { level: 1 })).toContainText('Remove consultee');
+			await page.getByRole('button', { name: 'Remove consultee' }).click();
+			await expect(page.getByText('There is a problem')).toBeVisible();
+			await expect(page.getByRole('link', { name: 'Enter a reason for removal' })).toBeVisible();
+			await page.getByLabel('Reason for removal').fill('Duplicate of another consultee');
+			await page.getByRole('button', { name: 'Remove consultee' }).click();
+			await expect(page).toHaveURL(/\/report\/consultees\?.*exclude=/);
 			await expect(page.getByRole('link', { name: /Remove/ })).toHaveCount(parishCount - 1);
+			await expect(page.getByText('Duplicate of another consultee')).toBeVisible();
 			removed = 1;
 		}
 
@@ -148,10 +158,19 @@ test.describe('manage journeys', () => {
 		await expect(page.getByText('Manually added')).toBeVisible();
 		await expect(page.getByRole('link', { name: /Remove/ })).toHaveCount(parishCount - removed + 2);
 
-		// a hand-added consultee's Remove link drops just that row
+		// a hand-added consultee's Remove link goes through the same reason page -
+		// its row leaves the Consultees table and joins Removed consultees instead
 		await page.getByRole('link', { name: 'Remove Second Test Consultee' }).click();
-		await expect(page.getByRole('rowheader', { name: 'Second Test Consultee' })).toHaveCount(0);
-		await expect(page.getByRole('rowheader', { name: 'First Test Consultee' })).toBeVisible();
+		await expect(page).toHaveURL(/\/report\/consultees\/remove\?.*added=/);
+		await expect(page.getByRole('rowheader', { name: 'Second Test Consultee' })).toBeVisible();
+		await page.getByLabel('Reason for removal').fill('Added in error');
+		await page.getByRole('button', { name: 'Remove consultee' }).click();
+		const consulteesTable = page.getByRole('table', { name: 'Consultees', exact: true });
+		await expect(consulteesTable.getByRole('rowheader', { name: 'Second Test Consultee' })).toHaveCount(0);
+		await expect(consulteesTable.getByRole('rowheader', { name: 'First Test Consultee' })).toBeVisible();
+		const removedTable = page.getByRole('table', { name: 'Removed consultees' });
+		await expect(removedTable.getByRole('rowheader', { name: 'Second Test Consultee' })).toBeVisible();
+		await expect(removedTable.getByRole('row', { name: /Added in error/ })).toBeVisible();
 		await expect(page.getByRole('link', { name: /Remove/ })).toHaveCount(parishCount - removed + 1);
 
 		// "Save and return" lands back on the check page - the row's list/total matching the rows

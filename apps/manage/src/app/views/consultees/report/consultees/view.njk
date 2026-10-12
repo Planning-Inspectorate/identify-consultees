@@ -1,6 +1,7 @@
 {% extends "views/layouts/main.njk" %}
 
 {% from "govuk/components/button/macro.njk" import govukButton %}
+{% from "govuk/components/details/macro.njk" import govukDetails %}
 {% from "govuk/components/table/macro.njk" import govukTable %}
 
 {% block pageTitle %}
@@ -78,6 +79,34 @@
 			classes: "govuk-button--secondary"
 		}) }}
 	</div>
+
+	{% if removedRows.length > 0 %}
+		{% set removedTableRows = [] %}
+		{% for row in removedRows %}
+			{% set removedTableRows = (removedTableRows.push([
+				{ text: row.name, classes: "govuk-table__cell--no-wrap" },
+				{ text: row.reason }
+			]), removedTableRows) %}
+		{% endfor %}
+		{% set removedHtml %}
+			<h3 class="govuk-heading-s">Removed consultees</h3>
+			{{ govukTable({
+				caption: "Removed consultees",
+				captionClasses: "govuk-visually-hidden",
+				firstCellIsHeader: true,
+				head: [
+					{ text: "Name" },
+					{ text: "Reason" }
+				],
+				rows: removedTableRows
+			}) }}
+		{% endset %}
+		{{ govukDetails({
+			summaryText: "Removed consultees",
+			html: removedHtml,
+			open: removedOpen
+		}) }}
+	{% endif %}
 
 	<div>
 		{{ govukButton({

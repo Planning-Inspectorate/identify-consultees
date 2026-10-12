@@ -290,6 +290,8 @@ describe('manage page accessibility smoke', () => {
 			mapWidth: 900,
 			mapHeight: 506,
 			mapConfigJson: '{"type":"FeatureCollection","features":[]}',
+			removedRows: [{ name: 'Little Bedwyn Parish Council', reason: 'Outside the search area' }],
+			removedOpen: true,
 			rulesetFailed: false,
 			retryUrl:
 				'/consultees/11111111-1111-1111-1111-111111111111/report/consultees?ruleset=england-wales-post-20240430&category=Parish%20Council',
@@ -297,6 +299,8 @@ describe('manage page accessibility smoke', () => {
 			mapIsSampled: false,
 			mapSampleSize: 30
 		});
+		assert.match(html, /Removed consultees/);
+		assert.match(html, /Outside the search area/);
 		await assertNoSeriousA11yViolations(html);
 	});
 
@@ -318,6 +322,8 @@ describe('manage page accessibility smoke', () => {
 			mapWidth: 900,
 			mapHeight: 506,
 			mapConfigJson: '{"type":"FeatureCollection","features":[]}',
+			removedRows: [],
+			removedOpen: false,
 			rulesetFailed: false,
 			retryUrl:
 				'/consultees/11111111-1111-1111-1111-111111111111/report/consultees?ruleset=england-wales-post-20240430&category=Parish%20Council',
@@ -357,6 +363,48 @@ describe('manage page accessibility smoke', () => {
 			reasonValue: 'Adjacent landowner',
 			nameError: { text: 'Enter the consultee name' },
 			errorSummary: [{ text: 'Enter the consultee name', href: '#consultee-name' }]
+		});
+		assert.match(html, /There is a problem/);
+		await assertNoSeriousA11yViolations(html);
+	});
+
+	test('remove consultee page has no serious a11y violations', async () => {
+		const html = nunjucks.render('views/consultees/report/consultees/remove/view.njk', {
+			...pageLocals,
+			pageHeading: 'Remove consultee',
+			pageCaption: 'Longfield Solar Farm',
+			backLinkUrl:
+				'/consultees/11111111-1111-1111-1111-111111111111/report/consultees?ruleset=england-wales-post-20240430&category=Parish%20Council',
+			formAction:
+				'/consultees/11111111-1111-1111-1111-111111111111/report/consultees/remove?ruleset=england-wales-post-20240430&category=Parish%20Council&match=55555555-5555-5555-5555-555555555555',
+			name: 'Little Snoring Parish Council',
+			identified: ['"B" host Parishes or Community Councils: intersects the site'],
+			reasonValue: '',
+			rulesetFailed: false,
+			retryUrl:
+				'/consultees/11111111-1111-1111-1111-111111111111/report/consultees/remove?ruleset=england-wales-post-20240430&category=Parish%20Council&match=55555555-5555-5555-5555-555555555555'
+		});
+		assert.match(html, /Reason for removal/);
+		await assertNoSeriousA11yViolations(html);
+	});
+
+	test('remove consultee page in its error state has no serious a11y violations', async () => {
+		const html = nunjucks.render('views/consultees/report/consultees/remove/view.njk', {
+			...pageLocals,
+			pageHeading: 'Remove consultee',
+			pageCaption: 'Longfield Solar Farm',
+			backLinkUrl:
+				'/consultees/11111111-1111-1111-1111-111111111111/report/consultees?ruleset=england-wales-post-20240430&category=Parish%20Council',
+			formAction:
+				'/consultees/11111111-1111-1111-1111-111111111111/report/consultees/remove?ruleset=england-wales-post-20240430&category=Parish%20Council&match=55555555-5555-5555-5555-555555555555',
+			name: 'Little Snoring Parish Council',
+			identified: ['"B" host Parishes or Community Councils: intersects the site'],
+			reasonValue: '   ',
+			reasonError: { text: 'Enter a reason for removal' },
+			errorSummary: [{ text: 'Enter a reason for removal', href: '#removal-reason' }],
+			rulesetFailed: false,
+			retryUrl:
+				'/consultees/11111111-1111-1111-1111-111111111111/report/consultees/remove?ruleset=england-wales-post-20240430&category=Parish%20Council&match=55555555-5555-5555-5555-555555555555'
 		});
 		assert.match(html, /There is a problem/);
 		await assertNoSeriousA11yViolations(html);

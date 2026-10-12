@@ -2,6 +2,7 @@ import type { ConsulteeMatch, Ruleset } from '@pins/identify-consultees-database
 import { describeReasons } from '../reasons.ts';
 import { reportCategories } from './categories.ts';
 import type { AddedConsultee, ConsulteeSelection } from './urls.ts';
+import { excludedMatchIds } from './urls.ts';
 
 /** One consultee as the report lists it. */
 export interface ReportConsultee {
@@ -43,16 +44,14 @@ export function reportByCategory(
 			categories.push(add.category);
 		}
 	}
+	const excluded = excludedMatchIds(selection.removed);
 
 	return categories
 		.map((category) => ({
 			category,
 			consultees: [
 				...consultees
-					.filter(
-						(match) =>
-							match.feature.properties.consulteeCategory === category && !selection.excluded.has(match.feature.id)
-					)
+					.filter((match) => match.feature.properties.consulteeCategory === category && !excluded.has(match.feature.id))
 					.map((match) => ({ name: consulteeName(match), identified: describeReasons(match, ruleset) })),
 				...selection.adds
 					.filter((add) => add.category === category)

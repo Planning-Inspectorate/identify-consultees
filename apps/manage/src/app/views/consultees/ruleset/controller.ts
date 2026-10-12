@@ -2,7 +2,7 @@ import type { ManageService } from '#service';
 import { getRuleset, RULESETS } from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
 import type { AsyncRequestHandler, AsyncRequestHandlerWithBody } from '@planning-inspectorate/core/util';
 import type { ConsulteeSelection } from '../report/urls.ts';
-import { addedConsultees, excludedIds, reportUrl, rulesetUrl } from '../report/urls.ts';
+import { consulteeSelection, reportUrl, rulesetUrl } from '../report/urls.ts';
 import { isCaseId, resolveCaseSummary } from '../resolve-case.ts';
 import { firstQueryValue, selectedRuleset } from '../run-ruleset.ts';
 import type { RulesetPickerViewModel } from './view-model.ts';
@@ -30,10 +30,7 @@ export function buildRulesetPickerPage(service: ManageService): AsyncRequestHand
 		const ruleset = selectedRuleset(req.query?.ruleset);
 		// the check page's "Change" link arrives here carrying the user's consultee selection -
 		// the form posts back to the same URL so the submit can carry it on to the report
-		const selection: ConsulteeSelection = {
-			excluded: excludedIds(req.query?.exclude),
-			adds: addedConsultees(req.query?.add)
-		};
+		const selection: ConsulteeSelection = consulteeSelection(req.query);
 
 		const viewModel: RulesetPickerViewModel = {
 			pageHeading: 'Ruleset',
@@ -61,10 +58,7 @@ export function buildRulesetPickerSubmit(): AsyncRequestHandlerWithBody<{ rulese
 			return;
 		}
 
-		const selection: ConsulteeSelection = {
-			excluded: excludedIds(req.query?.exclude),
-			adds: addedConsultees(req.query?.add)
-		};
+		const selection: ConsulteeSelection = consulteeSelection(req.query);
 		const ruleset = getRuleset(firstQueryValue(req.body?.ruleset));
 		if (!ruleset) {
 			res.redirect(rulesetUrl(caseId, RULESETS[0].id, selection));

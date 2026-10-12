@@ -12,17 +12,19 @@ import { addedConsulteeReason, consulteeName } from '../report-consultees.ts';
 import type { ConsulteeSelection } from '../urls.ts';
 import {
 	addConsulteeUrl,
-	addedConsultees,
 	categoryStaticMapUrl,
+	consulteeSelection,
 	consulteesUrl,
-	excludedIds,
+	excludedMatchIds,
+	removeConsulteeUrl,
 	reportUrl
 } from '../urls.ts';
 import type { ConsulteeRow, ReportConsulteesViewModel } from './view-model.ts';
 
 /**
  * A check-page category's Change page: the consultees the ruleset identified in that category,
- * mapped and listed, each with a Remove link that excludes it. Consultees added by hand on the
+ * mapped and listed, each with a Remove link to the "Remove consultee" page (which records the
+ * reason for the removal). Consultees added by hand on the
  * linked "Add consultee" page appear after the ruleset's matches. The whole selection lives in
  * the URL (see urls.ts), so the check page's counts stay in step. "Save and return" goes back to
  * the check page.
@@ -47,9 +49,8 @@ export function buildReportConsulteesPage(service: ManageService): AsyncRequestH
 		}
 
 		const category = firstQueryValue(req.query.category);
-		const excluded = excludedIds(req.query.exclude);
-		const adds = addedConsultees(req.query.add);
-		const selection: ConsulteeSelection = { excluded, adds };
+		const selection: ConsulteeSelection = consulteeSelection(req.query);
+		const excluded = excludedMatchIds(selection.removed);
 		const { consultees, failed } = await runRulesetSafely(
 			rulesetRunner,
 			project,
@@ -75,18 +76,15 @@ export function buildReportConsulteesPage(service: ManageService): AsyncRequestH
 		const staticMapAlt = `Static map showing ${category} consultees for ${project.properties.caseName}`;
 		const map = buildCaseMapConfig(project, visible, category, searchArea, { src: staticMapSrc, alt: staticMapAlt });
 
-		// ruleset matches first, then hand-added consultees (each removable by dropping its add
-		// param - removal by index so duplicate entries each get their own link)
+		// ruleset matches first, then hand-added consultees - every Remove link opens the "Remove
+		// consultee" page, which records the reason before excluding the match or dropping the add
 		const rows: ConsulteeRow[] = [
 			...visible.map((match) => ({
 				name: consulteeName(match),
 				identified: describeReasons(match, ruleset),
-				removeUrl: consulteesUrl(project.id, ruleset.id, category, {
-					excluded: new Set([...excluded, match.feature.id]),
-					adds
-				})
+				removeUrl: removeConsulteeUrl(project.id, ruleset.id, category, { matchId: match.feature.id }, selection)
 			})),
-			...adds.flatMap((add, index) => {
+			...selection.adds.flatMap((add, index) => {
 				if (add.category !== category) {
 					return [];
 				}
@@ -94,10 +92,7 @@ export function buildReportConsulteesPage(service: ManageService): AsyncRequestH
 					{
 						name: add.name,
 						identified: [addedConsulteeReason(add)],
-						removeUrl: consulteesUrl(project.id, ruleset.id, category, {
-							excluded,
-							adds: adds.filter((_, i) => i !== index)
-						})
+						removeUrl: removeConsulteeUrl(project.id, ruleset.id, category, { addedIndex: index }, selection)
 					}
 				];
 			})
@@ -117,6 +112,12 @@ export function buildReportConsulteesPage(service: ManageService): AsyncRequestH
 			mapWidth: MAP_VIEWPORT.width,
 			mapHeight: MAP_VIEWPORT.height,
 			mapConfigJson: stringifyForInlineScript(map),
+			// this category's recorded removals, for the expandable Removed consultees section -
+			// ?removed=open (where a successful removal redirects) opens it
+			removedRows: selection.removed
+				.filter((removal) => removal.category === category && removal.name !== '')
+				.map((removal) => ({ name: removal.name, reason: removal.reason })),
+			removedOpen: firstQueryValue(req.query.removed) === 'open',
 			rulesetFailed: failed,
 			retryUrl: consulteesUrl(project.id, ruleset.id, category, selection),
 			matchCount: map.matchCount,

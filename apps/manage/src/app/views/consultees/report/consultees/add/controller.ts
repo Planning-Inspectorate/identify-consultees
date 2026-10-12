@@ -9,7 +9,7 @@ import { resolveCaseSummary } from '../../../resolve-case.ts';
 import { firstQueryValue } from '../../../run-ruleset.ts';
 import { rulesetCategories } from '../../categories.ts';
 import type { ConsulteeSelection } from '../../urls.ts';
-import { addConsulteeUrl, addedConsultees, consulteesUrl, excludedIds } from '../../urls.ts';
+import { addConsulteeUrl, consulteeSelection, consulteesUrl } from '../../urls.ts';
 import type { AddConsulteeViewModel } from './view-model.ts';
 
 interface AddConsulteeContext {
@@ -50,10 +50,7 @@ async function addConsulteeContext(
 		project,
 		ruleset,
 		category,
-		selection: {
-			excluded: excludedIds(query.exclude),
-			adds: addedConsultees(query.add)
-		}
+		selection: consulteeSelection(query)
 	};
 }
 
@@ -120,6 +117,6 @@ export function buildReportConsulteeAddSubmit(
 		}
 
 		const adds = [...selection.adds, { category, name, reason }];
-		return res.redirect(consulteesUrl(project.id, ruleset.id, category, { excluded: selection.excluded, adds }));
+		return res.redirect(consulteesUrl(project.id, ruleset.id, category, { removed: selection.removed, adds }));
 	};
 }

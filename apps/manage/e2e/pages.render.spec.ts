@@ -65,6 +65,12 @@ const pages = [
 		mustSee: [/Name of consultee/i, /Reason for identification/i, /Add consultee/i]
 	},
 	{
+		path: `/consultees/${SAMPLE_CASE_ID}/report/consultees/remove?ruleset=${SAMPLE_RULESET_ID}&category=Parish%20Council&add=${encodeURIComponent('{"c":"Parish Council","n":"A Consultee","r":"borders"}')}&added=0`,
+		name: 'report consultee remove',
+		heading: /Remove consultee/i,
+		mustSee: [/A Consultee/i, /Reason for removal/i]
+	},
+	{
 		path: `/consultees/${SAMPLE_CASE_ID}/report/created?ruleset=${SAMPLE_RULESET_ID}`,
 		name: 'report created',
 		heading: /Report created/i,

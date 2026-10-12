@@ -260,6 +260,73 @@ describe('manage router wiring', () => {
 		assert.match(response.text, /Enter the consultee name/);
 	});
 
+	test('POST /consultees/:id/report/consultees/remove records the reason and lists the removal', async () => {
+		const agent = request.agent(authDisabledApp);
+		// add a consultee first so there's a hand-added row to remove
+		const addPage = await agent.get(
+			`/consultees/${homePageTestCaseId}/report/consultees/add?ruleset=england-wales-post-20240430&category=Parish%20Council`
+		);
+		const addCsrf = /name="_csrf" value="([^"]+)"/.exec(addPage.text)?.[1];
+		const added = await agent
+			.post(
+				`/consultees/${homePageTestCaseId}/report/consultees/add?ruleset=england-wales-post-20240430&category=Parish%20Council`
+			)
+			.type('form')
+			.send({ _csrf: addCsrf, name: 'Router Test Consultee', reason: 'Adjacent landowner' });
+		const categoryPageUrl = added.headers.location;
+
+		// the row's Remove link opens the remove page - here, targeting the add by index
+		const removeUrl = categoryPageUrl.replace('/report/consultees?', '/report/consultees/remove?') + '&added=0';
+		const removePage = await agent.get(removeUrl);
+		assert.equal(removePage.status, 200);
+		assert.match(removePage.text, /Remove consultee/);
+		assert.match(removePage.text, /Router Test Consultee/);
+		const removeCsrf = /name="_csrf" value="([^"]+)"/.exec(removePage.text)?.[1];
+		assert.ok(removeCsrf, 'expected the remove form to carry a CSRF token');
+
+		const response = await agent.post(removeUrl).type('form').send({ _csrf: removeCsrf, reason: 'Added in error' });
+		assert.equal(response.status, 302);
+		const location = response.headers.location;
+		assert.match(
+			location,
+			/\/report\/consultees\?ruleset=england-wales-post-20240430&category=Parish%20Council&exclude=/
+		);
+		assert.match(location, /removed=open/);
+
+		const categoryPage = await agent.get(location);
+		assert.equal(categoryPage.status, 200);
+		// off the included table, into the expandable Removed consultees section
+		assert.match(categoryPage.text, /Removed consultees/);
+		assert.match(categoryPage.text, /Added in error/);
+	});
+
+	test('POST /consultees/:id/report/consultees/remove re-renders with an error when the reason is blank', async () => {
+		const agent = request.agent(authDisabledApp);
+		const page = await agent.get(
+			`/consultees/${homePageTestCaseId}/report/consultees/add?ruleset=england-wales-post-20240430&category=Parish%20Council`
+		);
+		const csrf = /name="_csrf" value="([^"]+)"/.exec(page.text)?.[1];
+		const added = await agent
+			.post(
+				`/consultees/${homePageTestCaseId}/report/consultees/add?ruleset=england-wales-post-20240430&category=Parish%20Council`
+			)
+			.type('form')
+			.send({ _csrf: csrf, name: 'Router Test Consultee', reason: '' });
+		const removeUrl = added.headers.location.replace('/report/consultees?', '/report/consultees/remove?') + '&added=0';
+
+		const response = await agent.post(removeUrl).type('form').send({ _csrf: csrf, reason: '' });
+		assert.equal(response.status, 200);
+		assert.match(response.text, /There is a problem/);
+		assert.match(response.text, /Enter a reason for removal/);
+	});
+
+	test('GET /consultees/:id/report/consultees/remove 404s without a target', async () => {
+		const response = await request(authDisabledApp).get(
+			`/consultees/${homePageTestCaseId}/report/consultees/remove?ruleset=england-wales-post-20240430&category=Parish%20Council`
+		);
+		assert.equal(response.status, 404);
+	});
+
 	test('GET /consultees/:id/report/created renders the report created page', async () => {
 		const response = await request(authDisabledApp).get(
 			`/consultees/${homePageTestCaseId}/report/created?ruleset=england-wales-post-20240430`
