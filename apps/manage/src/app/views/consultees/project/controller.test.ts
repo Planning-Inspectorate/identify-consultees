@@ -56,8 +56,6 @@ describe('consultee project boundary page', () => {
 			status: mock.fn(() => mockRes),
 			render: mock.fn((view, data) => nunjucks.render(view, data))
 		};
-		// a polygon boundary so the stand-in file's scaled copy is visibly distinct (scaling a
-		// lone point around its own centre would be a no-op)
 		const polygonRow = realProjectRow({
 			geometryType: 'Polygon',
 			geometryWkt: 'POLYGON((-1.5 52.5, -1.4 52.5, -1.4 52.6, -1.5 52.6, -1.5 52.5))'
@@ -75,25 +73,17 @@ describe('consultee project boundary page', () => {
 		assert.strictEqual(viewModel.formAction, `/consultees/${realProjectId}`);
 		assert.ok(viewModel.mapConfigJson.includes('FeatureCollection'));
 
-		// a single-file case gains the stand-in second file, unchecked (see boundary-files.ts)
-		assert.strictEqual(viewModel.files.length, 2);
+		// a single-file case lists just that file, checked
+		assert.strictEqual(viewModel.files.length, 1);
 		assert.strictEqual(viewModel.files[0].value, realProjectId);
 		assert.strictEqual(viewModel.files[0].text, 'EN010099.geojson');
 		assert.strictEqual(viewModel.files[0].checked, true);
 		assert.match(viewModel.files[0].hint.text, /Uploaded: /);
-		assert.strictEqual(viewModel.files[1].value, `${realProjectId}:placeholder`);
-		assert.strictEqual(viewModel.files[1].checked, false);
 
 		const mapConfig = JSON.parse(viewModel.mapConfigJson);
 		assert.strictEqual(mapConfig.shapefileGroupLabel, 'GIS shapefiles');
-		assert.strictEqual(mapConfig.shapefileDatasets.length, 2);
+		assert.strictEqual(mapConfig.shapefileDatasets.length, 1);
 		assert.strictEqual(mapConfig.shapefileDatasets[0].checked, true);
-		assert.strictEqual(mapConfig.shapefileDatasets[1].checked, false);
-		// the stand-in file's layer is a shrunken copy of the real boundary, not identical data
-		assert.notDeepStrictEqual(
-			mapConfig.shapefileDatasets[0].geojson.features[0].geometry,
-			mapConfig.shapefileDatasets[1].geojson.features[0].geometry
-		);
 		assert.strictEqual(mapConfig.fallback.src, `/consultees/${realProjectId}/boundary-map`);
 
 		const html = mockRes.render.mock.calls[0].result;
@@ -103,7 +93,7 @@ describe('consultee project boundary page', () => {
 		assert.match(html, /app-consultee-map/);
 	});
 
-	it('should list every stored file when a case has more than one, without a stand-in', async () => {
+	it('should list every stored file when a case has more than one', async () => {
 		const mockRes = { status: mock.fn(() => mockRes), render: mock.fn() };
 		const db = dbReturning([
 			[realProjectRow()],
@@ -119,7 +109,6 @@ describe('consultee project boundary page', () => {
 		assert.strictEqual(viewModel.files[0].checked, false);
 		assert.strictEqual(viewModel.files[1].value, realProjectId);
 		assert.strictEqual(viewModel.files[1].checked, true);
-		assert.ok(viewModel.files.every((file: { value: string }) => !file.value.endsWith(':placeholder')));
 
 		const mapConfig = JSON.parse(viewModel.mapConfigJson);
 		// the sibling's geometry came from its own case_boundary row
@@ -154,7 +143,7 @@ describe('consultee project boundary page', () => {
 		await pageHandlerFor(db)({ params: { caseId: realProjectId }, query: {} }, mockRes);
 
 		const viewModel = mockRes.render.mock.calls[0].arguments[1];
-		assert.strictEqual(viewModel.files.length, 2);
+		assert.strictEqual(viewModel.files.length, 1);
 		assert.ok(viewModel.files.every((file: { hint?: unknown }) => file.hint === undefined));
 	});
 
@@ -187,16 +176,6 @@ describe('project boundary submit', () => {
 		const db = dbReturning([[realProjectRow()], [boundaryFile(siblingProjectRow()), boundaryFile(realProjectRow())]]);
 		await submitHandlerFor(db)({ params: { caseId: realProjectId }, body: { shapefile: siblingProjectId } }, mockRes);
 		assert.strictEqual(mockRes.redirect.mock.calls[0].arguments[0], `/consultees/${siblingProjectId}/ruleset`);
-	});
-
-	it('should continue with the real boundary when the stand-in file is chosen', async () => {
-		const mockRes = { status: mock.fn(() => mockRes), render: mock.fn(), redirect: mock.fn() };
-		const db = dbReturning([[realProjectRow()], [boundaryFile(realProjectRow())]]);
-		await submitHandlerFor(db)(
-			{ params: { caseId: realProjectId }, body: { shapefile: `${realProjectId}:placeholder` } },
-			mockRes
-		);
-		assert.strictEqual(mockRes.redirect.mock.calls[0].arguments[0], `/consultees/${realProjectId}/ruleset`);
 	});
 
 	it('should return to the page when the submitted file is missing or not one of this project', async () => {
