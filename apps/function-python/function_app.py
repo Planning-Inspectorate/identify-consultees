@@ -2,9 +2,15 @@ import hmac
 import json
 import logging
 import os
+import uuid
 
 import azure.functions as func
 
+from cbos.boundaries import (
+    BoundaryFileNotFound,
+    fetch_boundary_geojson,
+    list_boundary_files,
+)
 from cbos.config import CbosNotConfigured, cbos_config_from_env
 from cbos.connection_check import check_cbos, default_credential
 from intersector.api import BadRequest, consultees_json, parse_run_ruleset_request
@@ -79,6 +85,50 @@ def cbos_health(req: func.HttpRequest) -> func.HttpResponse:
     if result["status"] != "OK":
         logger.error("CBOS connection check failed: %s", result)
     return _json_response(result, 200 if result["status"] == "OK" else 503)
+
+
+@app.route(route="cbos/boundary-files")
+def cbos_boundary_files(req: func.HttpRequest) -> func.HttpResponse:
+    """Every case boundary file CBOS has converted to GeoJSON - see cbos/boundaries.py."""
+    auth_error = _check_api_key(req)
+    if auth_error is not None:
+        return auth_error
+
+    try:
+        files = list_boundary_files(cbos_config_from_env(), default_credential())
+    except CbosNotConfigured as error:
+        return _json_response({"error": str(error)}, 500)
+    except Exception:
+        logger.exception("Failed to list CBOS boundary files")
+        return _json_response({"error": "Failed to list CBOS boundary files"}, 500)
+
+    return _json_response({"files": [file.as_json() for file in files]})
+
+
+@app.route(route="cbos/boundary-files/{guid}/{version:int}")
+def cbos_boundary_file(req: func.HttpRequest) -> func.HttpResponse:
+    """One boundary file's GeoJSON FeatureCollection, as CBOS converted it."""
+    auth_error = _check_api_key(req)
+    if auth_error is not None:
+        return auth_error
+
+    try:
+        document_guid = str(uuid.UUID(req.route_params.get("guid", "")))
+        version = int(req.route_params.get("version", ""))
+    except ValueError:
+        return _json_response({"error": "guid must be a UUID and version a number"}, 400)
+
+    try:
+        collection = fetch_boundary_geojson(cbos_config_from_env(), default_credential(), document_guid, version)
+    except CbosNotConfigured as error:
+        return _json_response({"error": str(error)}, 500)
+    except BoundaryFileNotFound:
+        return _json_response({"error": "Boundary file not found"}, 404)
+    except Exception:
+        logger.exception("Failed to fetch CBOS boundary file %s version %s", document_guid, version)
+        return _json_response({"error": "Failed to fetch the boundary file"}, 500)
+
+    return _json_response(collection)
 
 
 @app.route(route="consultee-areas")

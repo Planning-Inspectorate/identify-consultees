@@ -4,7 +4,16 @@ from unittest.mock import MagicMock, patch
 import azure.functions as func
 import pytest
 
-from function_app import cbos_health, consultee_areas, health, run_ruleset_route
+from cbos.boundaries import BoundaryFileNotFound
+from cbos.config import CbosNotConfigured
+from function_app import (
+    cbos_boundary_file,
+    cbos_boundary_files,
+    cbos_health,
+    consultee_areas,
+    health,
+    run_ruleset_route,
+)
 from intersector.models import (
     ConditionReason,
     Consultee,
@@ -244,3 +253,84 @@ def test_cbos_health_returns_the_check_result(status, status_code):
 
     assert response.status_code == status_code
     assert json.loads(response.get_body()) == result
+
+
+def _route_request(guid: str = "0f8fad5b-d9cb-469f-a165-70867728950e", version: str = "2") -> MagicMock:
+    req = _request({"x-api-key": API_KEY})
+    req.route_params = {"guid": guid, "version": version}
+    return req
+
+
+def _cbos_patches(**patches):
+    return (
+        patch.dict("os.environ", {"CONSULTEE_AREAS_API_KEY": API_KEY}),
+        patch("function_app.cbos_config_from_env", return_value=object()),
+        patch("function_app.default_credential", return_value=object()),
+        *(patch(f"function_app.{name}", **kwargs) for name, kwargs in patches.items()),
+    )
+
+
+def test_cbos_boundary_routes_require_the_api_key():
+    with patch.dict("os.environ", {"CONSULTEE_AREAS_API_KEY": API_KEY}):
+        assert cbos_boundary_files(_request()).status_code == 401
+        assert cbos_boundary_file(_request()).status_code == 401
+
+
+def test_cbos_boundary_files_lists_each_file():
+    file = MagicMock()
+    file.as_json.return_value = {"documentGuid": "abc"}
+    env, config, credential, listing = _cbos_patches(list_boundary_files={"return_value": [file]})
+    with env, config, credential, listing:
+        response = cbos_boundary_files(_request({"x-api-key": API_KEY}))
+
+    assert response.status_code == 200
+    assert json.loads(response.get_body()) == {"files": [{"documentGuid": "abc"}]}
+
+
+@pytest.mark.parametrize(
+    ("error", "status_code"),
+    [(CbosNotConfigured(["IDAS_BACK_OFFICE_DATABASE_SERVER"]), 500), (RuntimeError("boom"), 500)],
+)
+def test_cbos_boundary_files_reports_failures(error, status_code):
+    env, config, credential, listing = _cbos_patches(list_boundary_files={"side_effect": error})
+    with env, config, credential, listing:
+        response = cbos_boundary_files(_request({"x-api-key": API_KEY}))
+
+    assert response.status_code == status_code
+    assert "boom" not in response.get_body().decode()
+
+
+def test_cbos_boundary_file_returns_the_geojson():
+    collection = {"type": "FeatureCollection", "features": []}
+    env, config, credential, fetch = _cbos_patches(fetch_boundary_geojson={"return_value": collection})
+    with env, config, credential, fetch as fetch_mock:
+        response = cbos_boundary_file(_route_request(guid="0F8FAD5B-D9CB-469F-A165-70867728950E"))
+
+    assert response.status_code == 200
+    assert json.loads(response.get_body()) == collection
+    assert fetch_mock.call_args.args[2:] == ("0f8fad5b-d9cb-469f-a165-70867728950e", 2)
+
+
+@pytest.mark.parametrize(("guid", "version"), [("not-a-guid", "2"), ("0f8fad5b-d9cb-469f-a165-70867728950e", "x")])
+def test_cbos_boundary_file_rejects_bad_route_params(guid, version):
+    with patch.dict("os.environ", {"CONSULTEE_AREAS_API_KEY": API_KEY}):
+        response = cbos_boundary_file(_route_request(guid, version))
+
+    assert response.status_code == 400
+
+
+@pytest.mark.parametrize(
+    ("error", "status_code"),
+    [
+        (BoundaryFileNotFound("missing"), 404),
+        (CbosNotConfigured(["IDAS_BACK_OFFICE_DATABASE_SERVER"]), 500),
+        (RuntimeError("boom"), 500),
+    ],
+)
+def test_cbos_boundary_file_reports_failures(error, status_code):
+    env, config, credential, fetch = _cbos_patches(fetch_boundary_geojson={"side_effect": error})
+    with env, config, credential, fetch:
+        response = cbos_boundary_file(_route_request())
+
+    assert response.status_code == status_code
+    assert "boom" not in response.get_body().decode()
