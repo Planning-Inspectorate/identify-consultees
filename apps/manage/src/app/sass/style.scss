@@ -49,6 +49,11 @@ $font-family: arial, helvetica, sans-serif;
 	display: inline-flex;
 	gap: 8px;
 	align-items: center;
+
+	// Let the label shrink to the panel's width. Without this, a long file name keeps it at full
+	// width and the row's flex layout squeezes the (hidden) checkbox input instead, sliding the
+	// label - and its key symbol - left over the checkbox's box.
+	min-width: 0;
 }
 
 /* stylelint-disable-next-line selector-class-pattern */
@@ -56,10 +61,13 @@ $font-family: arial, helvetica, sans-serif;
 	flex: 0 0 auto;
 }
 
-// Keep wrapped label text aligned after the symbol rather than flowing under it
+// Keep wrapped label text aligned after the symbol rather than flowing under it, and break long
+// unspaced names (e.g. `arrowvalleysolar_scoping_cablecorridor.geojson`) anywhere they need to
 /* stylelint-disable-next-line selector-class-pattern */
 .app-layers-key__text {
 	flex: 1 1 auto;
+	min-width: 0;
+	overflow-wrap: anywhere;
 }
 
 // set font-family for any autocomplete menu items
