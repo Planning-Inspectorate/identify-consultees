@@ -68,6 +68,14 @@ describe('report url helpers', () => {
 		);
 	});
 
+	it('should serialize a name-less removal with no id as an empty exclude param', () => {
+		// an id-only entry carries no name - and if it carried no id either there's nothing to encode
+		assert.strictEqual(
+			rulesetUrl('case-1', 'rs-1', { removed: [{ category: '', name: '', reason: '' }], adds: [] }),
+			'/consultees/case-1/ruleset?ruleset=rs-1&exclude='
+		);
+	});
+
 	it('should read repeated and single query values the same', () => {
 		assert.deepStrictEqual(queryValues('a'), ['a']);
 		assert.deepStrictEqual(queryValues(['a', 'b']), ['a', 'b']);
