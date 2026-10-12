@@ -8,6 +8,7 @@ import rateLimit from 'express-rate-limit';
 import { buildSanitisingErrorHandler } from './error-handler.ts';
 import { createDefraVendorRouter } from './maps/vendor.ts';
 import { createRoutes as createAdminCbosConnectionRoutes } from './views/admin-cbos-connection/index.ts';
+import { createRoutes as createAdminImportFromCbosRoutes } from './views/admin-import-from-cbos/index.ts';
 import { createRoutes as createAdminImportReferenceDataRoutes } from './views/admin-import-reference-data/index.ts';
 import { createRoutes as createAdminUploadToBlobRoutes } from './views/admin-upload-to-blob/index.ts';
 import { createRoutes as createComponentRoutes } from './views/components/index.ts';
@@ -61,6 +62,7 @@ export function buildRouter(service: ManageService, options: BuildRouterOptions 
 	const adminUploadToBlobRoutes = createAdminUploadToBlobRoutes(service);
 	const adminImportReferenceDataRoutes = createAdminImportReferenceDataRoutes(service);
 	const adminCbosConnectionRoutes = createAdminCbosConnectionRoutes(service);
+	const adminImportFromCbosRoutes = createAdminImportFromCbosRoutes(service);
 	const authRateLimiter = options.authRateLimiter ?? buildAuthRateLimiter();
 
 	router.use('/', monitoringRoutes);
@@ -126,6 +128,7 @@ export function buildRouter(service: ManageService, options: BuildRouterOptions 
 	router.use('/admin/upload-to-blob', adminUploadToBlobRoutes);
 	router.use('/admin/import-reference-data', adminImportReferenceDataRoutes);
 	router.use('/admin/cbos-connection', adminCbosConnectionRoutes);
+	router.use('/admin/import-from-cbos', adminImportFromCbosRoutes);
 	router.use('/error', createErrorRoutes(service));
 
 	// last: route errors render generic copy (full detail goes to the logs only) rather

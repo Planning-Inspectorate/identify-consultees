@@ -40,6 +40,7 @@ A request goes: `server.ts` → `createApp` → `buildRouter` (monitoring, `/ven
 | `GET /consultees/:caseId/results`                                           | Every consultee identified, with why                                                                                              |
 | `GET /consultees/:caseId/results/static-map(.svg)`                          | Static map image (AVIF, WebP or PNG from `Accept`; or SVG). `category` and `exclude` filter it                                    |
 | `/admin/upload-to-blob`, `/admin/import-reference-data`                     | Upload a file to blob storage; replace the reference-data tables from it. See [Data model and loading](./data/data-model.md)      |
+| `/admin/cbos-connection`, `/admin/import-from-cbos`                         | Check the function can reach CBOS; import case boundaries from CBOS                                                               |
 | `/terms-and-conditions`, `/accessibility-statement`, `/cookies`, `/contact` | Footer pages, reachable signed out                                                                                                |
 | `/auth/*`, `/signed-out`, `/unauthenticated`, `/error/*`                    | Entra sign-in and error pages                                                                                                     |
 | `/vendor/*`                                                                 | Defra map bundles, rate limited, lazy Brotli                                                                                      |

@@ -140,7 +140,7 @@ The main journey is **database-backed**: there are no fixtures. Locally the data
 - Uploading a project's shapefile: the journey uses case boundaries already in the database
 - The remaining rulesets (about 8 CSV exports; one exists)
 - Redeveloped data processing (new ingest, ids and schema), being built separately
-- IDAS back office integration: networking and access are in place, no code yet
+- Keeping case boundaries in step with CBOS automatically: today an admin imports them by hand (`/admin/import-from-cbos`); a Service Bus subscription is the next step
 
 ## Decisions
 
