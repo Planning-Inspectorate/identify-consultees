@@ -7,7 +7,14 @@ import { firstQueryValue, runRulesetSafely } from '../run-ruleset.ts';
 import { reportCategories } from './categories.ts';
 import { consulteeName, reportByCategory } from './report-consultees.ts';
 import type { ConsulteeSelection } from './urls.ts';
-import { addedConsultees, consulteesUrl, excludedIds, reportCreatedUrl, reportUrl, rulesetUrl } from './urls.ts';
+import {
+	consulteeSelection,
+	consulteesUrl,
+	excludedMatchIds,
+	reportCreatedUrl,
+	reportUrl,
+	rulesetUrl
+} from './urls.ts';
 import type { IdentifiedConsultee, ReportCheckViewModel, ReportCreatedViewModel } from './view-model.ts';
 
 // the check page lists consultee names per category, capped - seeing or removing the rest is
@@ -29,9 +36,10 @@ function identifiedConsultees(
 	selection: ConsulteeSelection
 ): IdentifiedConsultee[] {
 	const names = new Map<string, string[]>();
+	const excluded = excludedMatchIds(selection.removed);
 	for (const match of matches) {
 		const category = match.feature.properties.consulteeCategory;
-		if (category && !selection.excluded.has(match.feature.id)) {
+		if (category && !excluded.has(match.feature.id)) {
 			names.set(category, [...(names.get(category) ?? []), consulteeName(match)]);
 		}
 	}
@@ -86,10 +94,7 @@ export function buildReportCheckPage(service: ManageService): AsyncRequestHandle
 			nearbyConsulteeRadiusMetres,
 			logger
 		);
-		const selection: ConsulteeSelection = {
-			excluded: excludedIds(req.query?.exclude),
-			adds: addedConsultees(req.query?.add)
-		};
+		const selection: ConsulteeSelection = consulteeSelection(req.query);
 
 		const viewModel: ReportCheckViewModel = {
 			pageHeading: 'Check consultees before creating the report',
@@ -138,10 +143,7 @@ export function buildReportCreatedPage(service: ManageService): AsyncRequestHand
 			return;
 		}
 
-		const selection: ConsulteeSelection = {
-			excluded: excludedIds(req.query?.exclude),
-			adds: addedConsultees(req.query?.add)
-		};
+		const selection: ConsulteeSelection = consulteeSelection(req.query);
 		const { consultees, failed } = await runRulesetSafely(
 			rulesetRunner,
 			project,

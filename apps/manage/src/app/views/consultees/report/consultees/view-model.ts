@@ -7,11 +7,14 @@ export interface ConsulteeRow {
 	 * ("Manually added" when none was).
 	 */
 	identified: string[];
-	/**
-	 * Reloads this page with the consultee removed: a match joins the exclusion set, a
-	 * hand-added consultee loses its `add` param.
-	 */
+	/** The "Remove consultee" page for this row - it records the removal reason, then returns here. */
 	removeUrl: string;
+}
+
+/** One row of the expandable Removed consultees section - a removal and the reason given. */
+export interface RemovedConsulteeRow {
+	name: string;
+	reason: string;
 }
 
 export interface ReportConsulteesViewModel {
@@ -31,6 +34,10 @@ export interface ReportConsulteesViewModel {
 	mapWidth: number;
 	mapHeight: number;
 	mapConfigJson: string;
+	/** This category's recorded removals - the Removed consultees section renders when non-empty. */
+	removedRows: RemovedConsulteeRow[];
+	/** Opens the Removed consultees section - set by the remove page's redirect back here. */
+	removedOpen: boolean;
 	/** True when the ruleset couldn't be run at all - the page shows an error, not an empty list. */
 	rulesetFailed: boolean;
 	retryUrl: string;

@@ -114,8 +114,10 @@ describe('report consultees change page', () => {
 		]);
 		assert.strictEqual(
 			viewModel.rows[0].removeUrl,
-			`/consultees/${realProjectId}/report/consultees?ruleset=england-wales-post-20240430&category=Parish%20Council&exclude=${matchId}`
+			`/consultees/${realProjectId}/report/consultees/remove?ruleset=england-wales-post-20240430&category=Parish%20Council&match=${matchId}`
 		);
+		assert.strictEqual(viewModel.removedRows.length, 0);
+		assert.strictEqual(viewModel.removedOpen, false);
 		assert.strictEqual(
 			viewModel.addConsulteeUrl,
 			`/consultees/${realProjectId}/report/consultees/add?ruleset=england-wales-post-20240430&category=Parish%20Council`
@@ -126,6 +128,8 @@ describe('report consultees change page', () => {
 		assert.match(html, /Remove/);
 		assert.match(html, /Add consultee/);
 		assert.match(html, /Save and return/);
+		// nothing has been removed - the expandable Removed consultees section doesn't render
+		assert.doesNotMatch(html, /Removed consultees/);
 	});
 
 	it('should list every reason a consultee was identified - its conditions, then the nearby search', async () => {
@@ -210,10 +214,10 @@ describe('report consultees change page', () => {
 		const viewModel = mockRes.render.mock.calls[0].arguments[1];
 		assert.strictEqual(viewModel.rows.length, 1);
 		assert.strictEqual(viewModel.rows[0].name, 'Great Snoring Parish Council');
-		// the remaining row's remove link carries the existing exclusion forward
+		// the remaining row's remove link opens the remove page, carrying the existing exclusion forward
 		assert.strictEqual(
 			viewModel.rows[0].removeUrl,
-			`/consultees/${realProjectId}/report/consultees?ruleset=england-wales-post-20240430&category=Parish%20Council&exclude=${matchId}&exclude=${otherMatchId}`
+			`/consultees/${realProjectId}/report/consultees/remove?ruleset=england-wales-post-20240430&category=Parish%20Council&match=${otherMatchId}&exclude=${matchId}`
 		);
 		assert.strictEqual(
 			viewModel.saveAndReturnUrl,
@@ -267,21 +271,73 @@ describe('report consultees change page', () => {
 		assert.strictEqual(viewModel.rows[2].name, 'Second Test Consultee');
 		assert.deepStrictEqual(viewModel.rows[2].identified, ['Manually added']);
 
-		// removing the first added row drops only its add param - the second stays
+		// a hand-added row's remove link opens the remove page targeting that add's index - the
+		// adds all ride along so the page can drop the right one on submit
+		const addsParam = `&add=${encodeURIComponent(firstAdd)}&add=${encodeURIComponent(secondAdd)}&add=${encodeURIComponent(otherCategoryAdd)}`;
 		assert.strictEqual(
 			viewModel.rows[1].removeUrl,
-			`/consultees/${realProjectId}/report/consultees?ruleset=england-wales-post-20240430&category=Parish%20Council&add=${encodeURIComponent(secondAdd)}&add=${encodeURIComponent(otherCategoryAdd)}`
+			`/consultees/${realProjectId}/report/consultees/remove?ruleset=england-wales-post-20240430&category=Parish%20Council&added=0${addsParam}`
 		);
 		assert.strictEqual(
 			viewModel.rows[2].removeUrl,
-			`/consultees/${realProjectId}/report/consultees?ruleset=england-wales-post-20240430&category=Parish%20Council&add=${encodeURIComponent(firstAdd)}&add=${encodeURIComponent(otherCategoryAdd)}`
+			`/consultees/${realProjectId}/report/consultees/remove?ruleset=england-wales-post-20240430&category=Parish%20Council&added=1${addsParam}`
 		);
 		// the adds ride along to the check page and the next add
 		assert.ok(viewModel.saveAndReturnUrl.includes(`add=${encodeURIComponent(firstAdd)}`));
 		assert.ok(viewModel.addConsulteeUrl.includes(`add=${encodeURIComponent(firstAdd)}`));
-		// a ruleset match's remove link keeps the adds while excluding the match
-		assert.match(viewModel.rows[0].removeUrl, /exclude=55555555/);
+		// a ruleset match's remove link keeps the adds while targeting the match
+		assert.match(viewModel.rows[0].removeUrl, /match=55555555/);
 		assert.ok(viewModel.rows[0].removeUrl.includes(`add=${encodeURIComponent(firstAdd)}`));
+	});
+
+	it('should list this category’s recorded removals in the Removed consultees section, open when asked', async () => {
+		const nunjucks = configureNunjucks();
+		const mockRes = {
+			status: mock.fn(() => mockRes),
+			render: mock.fn((view, data) => nunjucks.render(view, data))
+		};
+		// the first match was removed with a reason; a removal recorded under another category
+		// and a bare-id exclusion (a link predating reasons) don't belong in this page's section
+		const removal = JSON.stringify({
+			i: matchId,
+			c: 'Parish Council',
+			n: 'Little Snoring Parish Council',
+			r: 'Out of area'
+		});
+		const otherCategoryRemoval = JSON.stringify({ c: 'Hospital', n: 'A Hospital', r: 'duplicate' });
+		const db = dbReturning([
+			[realProjectRow()],
+			[parishMatchRow(), parishMatchRow(otherMatchId, 'Great Snoring Parish Council')]
+		]);
+		await handlerFor(db)(
+			{
+				params: { caseId: realProjectId },
+				query: {
+					category: 'Parish Council',
+					exclude: [removal, otherCategoryRemoval, 'id-without-reason'],
+					removed: 'open'
+				}
+			},
+			mockRes
+		);
+
+		const viewModel = mockRes.render.mock.calls[0].arguments[1];
+		// the excluded match is gone from the rows; only this category's recorded removal is listed
+		assert.strictEqual(viewModel.rows.length, 1);
+		assert.deepStrictEqual(viewModel.removedRows, [{ name: 'Little Snoring Parish Council', reason: 'Out of area' }]);
+		assert.strictEqual(viewModel.removedOpen, true);
+
+		const html = mockRes.render.mock.calls[0].result;
+		assert.match(html, /Removed consultees/);
+		assert.match(html, /Out of area/);
+		assert.match(html, /<details[^>]*open/);
+		// the other category's removal isn't listed here (the reasonless exclusion still rides
+		// along in the page's links - it just has nothing the section can list)
+		assert.doesNotMatch(html, /A Hospital/);
+		// but every removal rides along in the page's links
+		assert.ok(viewModel.saveAndReturnUrl.includes(`exclude=${encodeURIComponent(removal)}`));
+		assert.ok(viewModel.saveAndReturnUrl.includes(`exclude=${encodeURIComponent(otherCategoryRemoval)}`));
+		assert.ok(viewModel.saveAndReturnUrl.includes('exclude=id-without-reason'));
 	});
 
 	it('should ignore malformed add params rather than fail the page', async () => {
