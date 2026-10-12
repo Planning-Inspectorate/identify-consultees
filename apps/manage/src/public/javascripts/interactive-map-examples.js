@@ -12,6 +12,8 @@
  * on that failure path; a working map never downloads it.
  */
 
+import { createLayersKeyPlugin } from './layers-key-plugin.mjs';
+
 /**
  * @param {string} mapId
  * @returns {object | null}
@@ -86,7 +88,16 @@ export function buildPlugins(defra, config) {
 	let draw;
 
 	if (config.datasets?.length && defra.datasetsPlugin) {
-		plugins.push(defra.datasetsPlugin({ datasets: config.datasets }));
+		plugins.push(
+			defra.datasetsPlugin({
+				datasets: config.datasets,
+				// the local combined Layers+Key panel replaces the built-in menus
+				...(config.layersKey ? { hasMenu: false } : {})
+			})
+		);
+	}
+	if (config.layersKey && config.datasets?.length) {
+		plugins.push(createLayersKeyPlugin({ datasets: config.datasets }));
 	}
 	if (config.interact && defra.interactPlugin) {
 		interact = defra.interactPlugin(config.interact);

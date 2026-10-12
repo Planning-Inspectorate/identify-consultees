@@ -2,12 +2,15 @@
  * Initialise Defra Interactive Maps for each consultee section on the results page.
  *
  * Pattern ported from PINS-data-spike `uploads-map.js` / `case-map.js`:
- * - datasetsPlugin + mapKeyPlugin for layers and legend
+ * - datasetsPlugin (its own Layers menu hidden) + layers-key-plugin for a combined
+ *   layers/legend panel
  * - OpenFreeMap Liberty basemap
  * - Static map fallback (PNG or SVG) via `config.fallback` when interactive init fails.
  *   Fallback details travel in the page's JSON config, not data-* attributes - the
  *   InteractiveMap constructor JSON.parses every data-* attribute on its container.
  */
+
+import { createLayersKeyPlugin } from './layers-key-plugin.mjs';
 
 // consultee features carry their category colour (`colour`), assigned server-side so the static map
 // matches - see app/maps/category-colours.ts. This is only for features without one
@@ -332,8 +335,10 @@ export function initConsulteeMap(mapId) {
 
 	try {
 		const datasets = buildDatasets(config);
-		const datasetsPlugin = defra.datasetsPlugin({ datasets });
-		const mapKeyPlugin = defra.mapKeyPlugin();
+		// hasMenu:false hides the plugin's own Layers button/panel - the layers-key plugin
+		// below shows the same toggles with each layer's key symbol inline
+		const datasetsPlugin = defra.datasetsPlugin({ datasets, hasMenu: false });
+		const layersKeyPlugin = createLayersKeyPlugin({ datasets });
 		const interactPlugin = defra.interactPlugin?.({
 			interactionModes: ['selectFeature'],
 			deselectOnClickOutside: true,
@@ -352,7 +357,7 @@ export function initConsulteeMap(mapId) {
 			zoom: config.zoom,
 			containerHeight: `${config.height ?? 516}px`,
 			mapLabel: config.mapLabel,
-			plugins: [datasetsPlugin, mapKeyPlugin, ...(interactPlugin ? [interactPlugin] : [])]
+			plugins: [datasetsPlugin, layersKeyPlugin, ...(interactPlugin ? [interactPlugin] : [])]
 		});
 		if (interactPlugin) {
 			wireFeatureDetails(map, interactPlugin);

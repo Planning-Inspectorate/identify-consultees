@@ -114,6 +114,26 @@ describe('interactive-map-examples client helpers', () => {
 		assert.ok(interact);
 	});
 
+	test('buildPlugins wires the local layers-key plugin and hides the datasets menu', () => {
+		const { defra } = mockDefra();
+		const { plugins } = buildPlugins(defra, {
+			datasets: [{ id: 'a' }],
+			layersKey: true
+		});
+
+		assert.equal(plugins.length, 2);
+		assert.deepEqual(defra.datasetsPlugin.mock.calls[0].arguments[0], {
+			datasets: [{ id: 'a' }],
+			hasMenu: false
+		});
+		assert.equal(plugins[1].id, 'layersKey');
+		assert.equal(defra.mapKeyPlugin.mock.callCount(), 0);
+
+		// layersKey without datasets adds nothing
+		const { plugins: none } = buildPlugins(defra, { layersKey: true });
+		assert.equal(none.length, 0);
+	});
+
 	test('draw-tools instantiates the draw plugin and adds the polygon button at map:ready', () => {
 		installDom(pageHtml({ kind: 'draw-tools', interact: {}, draw: { snapLayers: ['field-parcels'] } }));
 		const drawInstance = { newPolygon: mock.fn() };

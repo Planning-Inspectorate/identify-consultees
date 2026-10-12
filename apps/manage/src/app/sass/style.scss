@@ -42,6 +42,26 @@ $font-family: arial, helvetica, sans-serif;
 	margin-top: 15px;
 }
 
+// Combined Layers/Key panel (javascripts/layers-key-plugin.mjs): each row's key symbol sits
+// between the checkbox and its label, inside the label so it is part of the click target
+/* stylelint-disable-next-line selector-class-pattern */
+.app-layers-key__label {
+	display: inline-flex;
+	gap: 8px;
+	align-items: center;
+}
+
+/* stylelint-disable-next-line selector-class-pattern */
+.app-layers-key__swatch {
+	flex: 0 0 auto;
+}
+
+// Keep wrapped label text aligned after the symbol rather than flowing under it
+/* stylelint-disable-next-line selector-class-pattern */
+.app-layers-key__text {
+	flex: 1 1 auto;
+}
+
 // set font-family for any autocomplete menu items
 /* stylelint-disable-next-line selector-class-pattern */
 .autocomplete__menu {
