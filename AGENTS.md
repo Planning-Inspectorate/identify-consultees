@@ -81,11 +81,24 @@ When the feature branch has diverged or accumulated noise:
 - Never push or merge directly to `main` — always open a new pull request from a feature branch.
 - Choose a branch name that reflects the changes: `<type>/<short-kebab-case-description>` using the Conventional Commit type (e.g. `feat/interactive-map-examples`, `fix/azure-playwright-e2e-ci`, `chore/pin-npm-dependencies-policy`).
 - Before creating or updating a PR for review: rebase onto latest `main`, squash to a clean history, ensure commit messages are semantic, then push with `--force-with-lease` if history was rewritten.
+- Before opening a PR, verify the branch the way the pipeline will (see "Verifying changes before opening a PR" below): 100% of the tests pass — old and new code — and every linting and coverage check CI runs passes too. This minimises builds failing in the pipeline.
 - Prefer rebasing the feature branch onto `main` over merging `main` into the feature branch.
 - `--force-with-lease` is allowed on feature / PR branches only, and only after an intentional history rewrite (rebase/squash).
 - Still never force-push `main` (or `master`).
 - Still only commit / push / open PRs when the user asks (or existing user rules already authorize that step); when they do, apply the practices above.
 - Follow the AI identification rules above: do not identify as an AI or add AI co-authorship in any GitHub-visible content.
+
+### Verifying changes before opening a PR
+
+Before a PR is opened or handed over for review, run the same checks the pipeline runs (`.azure/pipelines/pr.yml`) and make sure they all pass — the tests, on old and new code alike, and every linting and coverage gate. A PR that fails CI on its first build wastes a pipeline run and delays review.
+
+- `npm run check-types && npm run lint && npm run format-prettier-check` — the static checks.
+- `npm run build` (in `apps/manage`) — the app must still build.
+- `npm run test-coverage` — every test passes, and the run ends with the manage app's hard 100% line/function/branch coverage gate (`apps/manage/scripts/run-frontend-coverage.mjs`): a green `node --test` run alone does not prove the gate passes, and new code needs tests that cover it.
+- `npm run commitlint` — confirms the commit subjects are Conventional Commits.
+- `apps/function-python` changes: `python3 -m ruff check .` and `python3 -m pytest` there.
+
+`test-coverage` needs the local database and Playwright browsers set up (see CONTRIBUTING.md). If the pipeline still fails, "Reading Azure DevOps CI logs" below explains how to pull the failing step's log.
 
 ### PR description checklist
 
@@ -104,6 +117,7 @@ And mechanically:
 - [ ] Commit subjects are semantic (`feat:` / `fix:` / `docs:` / …).
 - [ ] No secrets, `.env`, or production data dumps in the diff.
 - [ ] No AI self-identification in the PR description, commits, or diff.
+- [ ] All tests and the CI checks (lint, typecheck, format, coverage) pass locally — see "Verifying changes before opening a PR".
 
 ## Node and npm toolchain (match Azure Pipelines)
 
