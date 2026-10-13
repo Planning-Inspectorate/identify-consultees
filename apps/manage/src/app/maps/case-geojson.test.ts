@@ -1,5 +1,5 @@
 import type { CaseBoundaryFeature } from '@pins/identify-consultees-database/src/geospatial/case-boundaries.ts';
-import type { ConsulteeAreaMatch } from '@pins/identify-consultees-database/src/geospatial/consultee-areas.ts';
+import type { ConsulteeMatch } from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
 import type { Geometry } from '@pins/identify-consultees-database/src/geospatial/wkt.ts';
 import assert from 'node:assert';
 import { describe, it } from 'node:test';
@@ -9,6 +9,8 @@ import {
 	LOCAL_FILL_OPACITY,
 	MAP_SAMPLING_THRESHOLD,
 	MAX_SAMPLED_MAP_MATCHES,
+	NEARBY_LOCAL_FILL_OPACITY,
+	NEARBY_REGIONAL_FILL_OPACITY,
 	REGIONAL_FILL_OPACITY
 } from './case-geojson.ts';
 import { MAP_VIEWPORT } from './sample-geojson.ts';
@@ -22,7 +24,7 @@ function project(): CaseBoundaryFeature {
 	};
 }
 
-function match(id: string): ConsulteeAreaMatch {
+function match(id: string): ConsulteeMatch {
 	return {
 		feature: {
 			id,
@@ -30,8 +32,9 @@ function match(id: string): ConsulteeAreaMatch {
 			geometry: { type: 'Point', coordinates: [-1.5, 52.5] },
 			properties: { consultee: 'Network Rail', consulteeCategory: 'Railway', region: 'Midlands' }
 		},
-		distanceMetres: 0
-	};
+		distanceMetres: 0,
+		reasons: [{ type: 'condition', conditionId: 'railways_10km' }]
+	} as ConsulteeMatch;
 }
 
 describe('buildConsulteeMatchesGeojson', () => {
@@ -132,15 +135,16 @@ describe('buildCaseMapConfig with a search area', () => {
 	});
 
 	it('tints categories with an area covering most of the search area, and draws them first', () => {
-		const regionalMatch: ConsulteeAreaMatch = {
+		const regionalMatch = {
 			feature: {
 				id: 'county',
 				type: 'Feature',
 				geometry: area,
 				properties: { consultee: 'Suffolk', consulteeCategory: 'Upper Tier Authority' }
 			},
-			distanceMetres: 0
-		};
+			distanceMetres: 0,
+			reasons: [{ type: 'condition', conditionId: 'c_host_county_councils_upper_tier_authorities' }]
+		} as ConsulteeMatch;
 		const empty = { type: 'GeometryCollection' as const, geometries: [] };
 		const config = buildCaseMapConfig(
 			project(),
@@ -162,6 +166,46 @@ describe('buildCaseMapConfig with a search area', () => {
 				['county', String(REGIONAL_FILL_OPACITY)],
 				['parish', String(LOCAL_FILL_OPACITY)],
 				['empty', String(LOCAL_FILL_OPACITY)]
+			]
+		);
+	});
+
+	it('marks consultees only the nearby search found, fainter, and draws them under the identified ones', () => {
+		const nearby = (base: ConsulteeMatch, id: string): ConsulteeMatch => ({
+			...base,
+			feature: { ...base.feature, id },
+			reasons: [{ type: 'nearby', radiusMetres: 20000 }]
+		});
+		const regionalMatch = {
+			...match('county'),
+			feature: { ...match('county').feature, geometry: area, properties: { consulteeCategory: 'Upper Tier Authority' } }
+		} as ConsulteeMatch;
+		const config = buildCaseMapConfig(
+			project(),
+			[match('parish'), nearby(match('x'), 'nearby-parish'), regionalMatch, nearby(regionalMatch, 'nearby-county')],
+			'England Wales post 30 April 2024',
+			{
+				area,
+				geometries: new Map<string, Geometry>([
+					['parish', display],
+					['nearby-parish', display],
+					['county', area],
+					['nearby-county', area]
+				])
+			}
+		);
+
+		assert.deepStrictEqual(
+			config.consulteeGeojson.features.map((feature) => [
+				feature.id,
+				feature.properties.identified,
+				feature.properties.fillOpacity
+			]),
+			[
+				['nearby-county', 'false', String(NEARBY_REGIONAL_FILL_OPACITY)],
+				['county', 'true', String(REGIONAL_FILL_OPACITY)],
+				['nearby-parish', 'false', String(NEARBY_LOCAL_FILL_OPACITY)],
+				['parish', 'true', String(LOCAL_FILL_OPACITY)]
 			]
 		);
 	});

@@ -30,7 +30,12 @@ export function describeReason(reason: ConsulteeReason, ruleset: Ruleset): strin
 	return `${rule.name}: ${bufferMetres > 0 ? `within ${kilometres(bufferMetres)} of the site` : 'intersects the site'}`;
 }
 
-/** Every reason a consultee was identified, in the order the run gave them, each once. */
-export function describeReasons(match: ConsulteeMatch, ruleset: Ruleset): string[] {
-	return [...new Set(match.reasons.map((reason) => describeReason(reason, ruleset)))];
+/**
+ * Every reason a consultee was identified, in the order the run gave them, each once. The report
+ * pages leave out the nearby search (`nearby: false`): the report is about what the ruleset
+ * identified, and being within 20km is only context, shown on the maps.
+ */
+export function describeReasons(match: ConsulteeMatch, ruleset: Ruleset, options: { nearby?: boolean } = {}): string[] {
+	const reasons = options.nearby === false ? match.reasons.filter((reason) => reason.type !== 'nearby') : match.reasons;
+	return [...new Set(reasons.map((reason) => describeReason(reason, ruleset)))];
 }

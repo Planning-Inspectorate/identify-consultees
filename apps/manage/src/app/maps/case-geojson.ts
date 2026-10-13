@@ -6,6 +6,7 @@
 
 import type { CaseBoundaryFeature } from '@pins/identify-consultees-database/src/geospatial/case-boundaries.ts';
 import type { ConsulteeMatch } from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
+import { isIdentifiedByCondition } from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
 import type { Geometry } from '@pins/identify-consultees-database/src/geospatial/wkt.ts';
 import { assignCategoryColours, colourFor, UNCATEGORISED } from './category-colours.ts';
 import { computeBounds, computeMapView } from './geometry-bounds.ts';
@@ -89,7 +90,9 @@ export function buildConsulteeMatchesGeojson(
 				name: match.feature.properties.consultee ?? '',
 				consulteeCategory: categoryOf(match),
 				region: match.feature.properties.region ?? '',
-				colour: colourFor(colours, categoryOf(match))
+				colour: colourFor(colours, categoryOf(match)),
+				// 'false' when only the nearby search found it: drawn fainter, as context (see withFillOpacity)
+				identified: String(isIdentifiedByCondition(match))
 			},
 			geometry: match.feature.geometry
 		}))
@@ -142,6 +145,10 @@ export interface CaseMapConfig {
 // the local ones
 export const LOCAL_FILL_OPACITY = 0.35;
 export const REGIONAL_FILL_OPACITY = 0.06;
+// consultees only the nearby search found aren't in the report - the map shows them as context,
+// fainter than the ones a ruleset condition identified
+export const NEARBY_LOCAL_FILL_OPACITY = 0.1;
+export const NEARBY_REGIONAL_FILL_OPACITY = 0.03;
 const REGIONAL_COVERAGE = 0.5;
 
 function boundingBoxArea(features: GeoJsonFeature[]): number {
@@ -151,8 +158,9 @@ function boundingBoxArea(features: GeoJsonFeature[]): number {
 
 /**
  * Each match's fill opacity (`fillOpacity`), by category: regional if any area in the category
- * covers most of the search area's bounding box, and regional ones first. Without a search area,
- * every category is local.
+ * covers most of the search area's bounding box, and fainter for a consultee only the nearby search
+ * found. Drawn faintest first, so regional tints and nearby context sit under the identified local
+ * areas. Without a search area, every category is local.
  */
 function withFillOpacity(
 	collection: GeoJsonFeatureCollection,
@@ -164,19 +172,23 @@ function withFillOpacity(
 			.filter((feature) => boundingBoxArea([feature]) >= regionalArea)
 			.map((feature) => feature.properties.consulteeCategory)
 	);
-	const isRegional = (feature: GeoJsonFeature) => regional.has(feature.properties.consulteeCategory);
+	const fillOpacity = (feature: GeoJsonFeature): number => {
+		const isRegional = regional.has(feature.properties.consulteeCategory);
+		if (feature.properties.identified === 'false') {
+			return isRegional ? NEARBY_REGIONAL_FILL_OPACITY : NEARBY_LOCAL_FILL_OPACITY;
+		}
+		return isRegional ? REGIONAL_FILL_OPACITY : LOCAL_FILL_OPACITY;
+	};
 	return {
 		...collection,
-		// the static map draws in feature order
-		features: [...collection.features.filter(isRegional), ...collection.features.filter((f) => !isRegional(f))].map(
-			(feature) => ({
+		// the static map draws in feature order (a stable sort keeps the original order within each opacity)
+		features: collection.features
+			.map((feature) => ({ feature, opacity: fillOpacity(feature) }))
+			.sort((a, b) => a.opacity - b.opacity)
+			.map(({ feature, opacity }) => ({
 				...feature,
-				properties: {
-					...feature.properties,
-					fillOpacity: String(isRegional(feature) ? REGIONAL_FILL_OPACITY : LOCAL_FILL_OPACITY)
-				}
-			})
-		)
+				properties: { ...feature.properties, fillOpacity: String(opacity) }
+			}))
 	};
 }
 

@@ -49,42 +49,59 @@ const SMALL_CIRCLE_SYMBOL = {
 	symbolAnchor: [0.5, 0.5]
 };
 
+// a dot for a consultee only the nearby search found is drawn in this much of its category's colour
+const NEARBY_POINT_ALPHA = 0.45;
+
 /**
  * One sublayer per consultee category, in the category's colour, so each can be shown or hidden
- * from the map's layers menu. Points (hospitals, harbours) are drawn as small dots; areas are
- * filled at the category's `fillOpacity`, lightest first so the regional tints sit under the local
- * areas.
+ * from the map's layers menu - and a second, fainter one for the category's consultees only the
+ * nearby search found (`identified: 'false'`), which aren't in the report but show what's nearby:
+ * a thin dashed outline and the lighter `fillOpacity` the page gives them. Points (hospitals,
+ * harbours) are drawn as small dots; areas are filled at their `fillOpacity`, lightest first so
+ * regional tints and nearby context sit under the identified local areas.
  *
  * @param {object[]} features
  * @param {string} idPrefix
  * @returns {object[]}
  */
 export function buildCategorySublayers(features, idPrefix) {
-	const byCategory = new Map();
+	const groups = new Map();
 	for (const feature of features) {
 		const category = feature.properties?.consulteeCategory || 'Other';
-		const members = byCategory.get(category) ?? [];
-		members.push(feature);
-		byCategory.set(category, members);
+		const nearbyOnly = feature.properties?.identified === 'false';
+		const key = `${nearbyOnly ? 1 : 0}${category}`;
+		const group = groups.get(key) ?? { category, nearbyOnly, members: [] };
+		group.members.push(feature);
+		groups.set(key, group);
 	}
 
-	const categories = [...byCategory.keys()].sort().map((category) => {
-		const members = byCategory.get(category);
-		return { category, members, opacity: Number(members[0].properties?.fillOpacity) || DEFAULT_FILL_OPACITY };
-	});
+	const sorted = [...groups.values()]
+		.sort((a, b) => a.category.localeCompare(b.category) || Number(a.nearbyOnly) - Number(b.nearbyOnly))
+		.map((group) => ({ ...group, opacity: Number(group.members[0].properties?.fillOpacity) || DEFAULT_FILL_OPACITY }));
 	// sublayers draw in order
-	categories.sort((a, b) => a.opacity - b.opacity);
+	sorted.sort((a, b) => a.opacity - b.opacity);
 
-	return categories.map(({ category, members, opacity }, index) => {
+	return sorted.map(({ category, nearbyOnly, members, opacity }, index) => {
 		const colour = members[0].properties?.colour || DEFAULT_CONSULTEE_COLOUR;
 		const isPoints = members.every((feature) => POINT_TYPES.has(feature.geometry?.type));
-		const style = isPoints
-			? { ...SMALL_CIRCLE_SYMBOL, symbolBackgroundColor: colour }
-			: { stroke: colour, strokeWidth: 2, fill: translucent(colour, opacity) };
+		let style;
+		if (isPoints) {
+			style = {
+				...SMALL_CIRCLE_SYMBOL,
+				symbolBackgroundColor: nearbyOnly ? translucent(colour, NEARBY_POINT_ALPHA) : colour
+			};
+		} else if (nearbyOnly) {
+			style = { stroke: colour, strokeWidth: 1, strokeDashArray: [2, 2], fill: translucent(colour, opacity) };
+		} else {
+			style = { stroke: colour, strokeWidth: 2, fill: translucent(colour, opacity) };
+		}
+		const identifiedFilter = nearbyOnly
+			? ['==', ['get', 'identified'], 'false']
+			: ['!=', ['get', 'identified'], 'false'];
 		return {
 			id: `${idPrefix}-${index}`,
-			label: `${category} (${members.length})`,
-			filter: ['==', ['get', 'consulteeCategory'], category],
+			label: nearbyOnly ? `${category}: nearby, not identified (${members.length})` : `${category} (${members.length})`,
+			filter: ['all', ['==', ['get', 'consulteeCategory'], category], identifiedFilter],
 			style
 		};
 	});

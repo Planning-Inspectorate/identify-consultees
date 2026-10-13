@@ -1,6 +1,10 @@
 import type { ManageService } from '#service';
 import type { ConsulteeMatch, Ruleset } from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
-import { getRuleset, RULESETS } from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
+import {
+	getRuleset,
+	isIdentifiedByCondition,
+	RULESETS
+} from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
 import type { AsyncRequestHandler } from '@planning-inspectorate/core/util';
 import { resolveCase } from '../resolve-case.ts';
 import { firstQueryValue, runRulesetSafely } from '../run-ruleset.ts';
@@ -22,8 +26,9 @@ import type { IdentifiedConsultee, ReportCheckViewModel, ReportCreatedViewModel 
 const MAX_LISTED_CONSULTEES = 10;
 
 /**
- * Every category the ruleset covers, in the order its rules name them, then any other category the
- * run found (see reportCategories), with each one's visible consultee names - including covered
+ * Every category the ruleset covers, in the order its rules name them, then any other category its
+ * conditions identified consultees in (see reportCategories), with each one's visible consultee names.
+ * Consultees only the nearby search found aren't counted: they're map context, not report content - including covered
  * categories that matched nothing, so the list reads as the ruleset's full coverage. Excluded
  * consultees (removed on a category's Change page) don't appear and hand-added ones do - the
  * total here is the number of rows that page lists. Categories bigger than MAX_LISTED_CONSULTEES
@@ -37,7 +42,8 @@ function identifiedConsultees(
 ): IdentifiedConsultee[] {
 	const names = new Map<string, string[]>();
 	const excluded = excludedMatchIds(selection.removed);
-	for (const match of matches) {
+	const identified = matches.filter(isIdentifiedByCondition);
+	for (const match of identified) {
 		const category = match.feature.properties.consulteeCategory;
 		if (category && !excluded.has(match.feature.id)) {
 			names.set(category, [...(names.get(category) ?? []), consulteeName(match)]);
@@ -46,7 +52,7 @@ function identifiedConsultees(
 	for (const add of selection.adds) {
 		names.set(add.category, [...(names.get(add.category) ?? []), add.name]);
 	}
-	return reportCategories(ruleset, matches).map((name) => {
+	return reportCategories(ruleset, identified).map((name) => {
 		const categoryNames = names.get(name) ?? [];
 		return {
 			name,

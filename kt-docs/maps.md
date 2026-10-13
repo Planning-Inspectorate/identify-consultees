@@ -22,12 +22,13 @@ If step 3 fails the page still renders, with the project and condition matches o
 
 ## Layers
 
-| Layer              | Shows                                                              | Style                                                                                                          |
-| ------------------ | ------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------- |
-| The ruleset's name | Every consultee identified, one sublayer per category with a count | Areas filled in the category colour; point categories (hospitals, harbours, generators, nuclear sites) as dots |
-| Project site       | The case boundary                                                  | Red, translucent                                                                                               |
+| Layer              | Shows                                                                                              | Style                                                                                                            |
+| ------------------ | -------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| The ruleset's name | Every consultee identified, one sublayer per category with a count                                 | Areas filled in the category colour; point categories (hospitals, harbours, generators, nuclear sites) as dots   |
+| (same dataset)     | Each category's consultees only the nearby search found, as "Category: nearby, not identified (n)" | Fainter: 10% fill (3% regional), thin dashed outline; dots at 45% of the colour. Drawn under the identified ones |
+| Project site       | The case boundary                                                                                  | Red, translucent                                                                                                 |
 
-Regional categories (police, ambulance trusts, ICBs, counties) would hide everything else at a normal fill. A category with any area covering half or more of the search area's bounding box is filled at 6% (`REGIONAL_FILL_OPACITY`) and drawn first; local areas get 35% (`LOCAL_FILL_OPACITY`).
+Regional categories (police, ambulance trusts, ICBs, counties) would hide everything else at a normal fill. A category with any area covering half or more of the search area's bounding box is filled at 6% (`REGIONAL_FILL_OPACITY`) and drawn first; local areas get 35% (`LOCAL_FILL_OPACITY`). Consultees only the nearby search found (`identified: 'false'`) get `NEARBY_REGIONAL_FILL_OPACITY` and `NEARBY_LOCAL_FILL_OPACITY` instead: they aren't in the report, but show what's around the site.
 
 **Category colours are interim**: a 14-colour placeholder palette (`maps/category-colours.ts`), assigned in alphabetical order per map, so a category's colour can change between projects. Consultee categories aren't in the GIS Tool Styling tables and need product and design sign-off.
 

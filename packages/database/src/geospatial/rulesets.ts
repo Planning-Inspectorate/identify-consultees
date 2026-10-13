@@ -455,6 +455,14 @@ export interface ConsulteeMatch {
 	reasons: ConsulteeReason[];
 }
 
+/**
+ * True when a ruleset condition identified the consultee - false when only the general nearby
+ * search found it. The report lists only the first kind; maps show both, the second fainter.
+ */
+export function isIdentifiedByCondition(match: Pick<ConsulteeMatch, 'reasons'>): boolean {
+	return match.reasons.some((reason) => reason.type === 'condition');
+}
+
 export interface RunRulesetResult {
 	/** Every consultee, nearest first, each once: what any condition met, and everything nearby. */
 	consultees: ConsulteeMatch[];
