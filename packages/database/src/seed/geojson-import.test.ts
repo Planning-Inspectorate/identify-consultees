@@ -72,6 +72,17 @@ describe('toConsulteeArea', () => {
 		});
 		assert.equal(feature.properties.currentVersion, 1);
 	});
+
+	test('maps a feature with no metadata to just the source fields', () => {
+		const feature = toConsulteeArea({
+			geometry: { type: 'Point', coordinates: [0, 0] },
+			properties: { id: 'src-2' }
+		});
+
+		assert.equal(feature.properties.consultee, null);
+		assert.equal(feature.properties.consulteeCategory, null);
+		assert.deepEqual(feature.properties.metadata, { sourceId: 'src-2', sourceLastUpdated: undefined });
+	});
 });
 
 describe('toCaseBoundary', () => {
@@ -100,6 +111,16 @@ describe('toCaseBoundary', () => {
 		assert.equal(first.properties.caseName, 'Example');
 		assert.equal(first.properties.fileName, 'v1.zip');
 		assert.ok(first.properties.receivedDate instanceof Date);
+	});
+
+	test('maps absent optional fields to null', () => {
+		const feature = toCaseBoundary({
+			geometry: { type: 'Point', coordinates: [0, 0] },
+			properties: { caseReference: 'EN010099', projectName: 'Example' }
+		});
+
+		assert.equal(feature.properties.fileName, null);
+		assert.equal(feature.properties.receivedDate, null);
 	});
 });
 
