@@ -77,20 +77,20 @@ export function defraMaplibreFrameworkPath(packageRoot = process.cwd()): string 
 export function patchDefraMaplibreFrameworkFile(filePath: string, options: { log?: boolean } = {}): boolean {
 	const log = options.log === true;
 	const original = fs.readFileSync(filePath, 'utf8');
-	const { source, changed, alreadyPatched } = applyMaplibreSanitizePatch(original);
+	// applyMaplibreSanitizePatch only returns changed: false alongside alreadyPatched: true (it
+	// throws otherwise), so reaching the write means the bundle was rewritten
+	const { source, alreadyPatched } = applyMaplibreSanitizePatch(original);
 	if (alreadyPatched) {
 		if (log) {
 			console.log(`MapLibre sanitize already patched: ${filePath}`);
 		}
 		return false;
 	}
-	if (changed) {
-		fs.writeFileSync(filePath, source);
-		if (log) {
-			console.log(`Patched MapLibre sanitize (CVE-2026-85061): ${filePath}`);
-		}
+	fs.writeFileSync(filePath, source);
+	if (log) {
+		console.log(`Patched MapLibre sanitize (CVE-2026-85061): ${filePath}`);
 	}
-	return changed;
+	return true;
 }
 
 const isMain = process.argv[1] !== undefined && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);

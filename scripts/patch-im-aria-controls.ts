@@ -71,20 +71,20 @@ export function defraImCorePaths(packageRoot = process.cwd()): string[] {
 export function patchDefraImCoreFile(filePath: string, options: { log?: boolean } = {}): boolean {
 	const log = options.log === true;
 	const original = fs.readFileSync(filePath, 'utf8');
-	const { source, changed, alreadyPatched } = applyImAriaControlsPatch(original);
+	// applyImAriaControlsPatch only returns changed: false alongside alreadyPatched: true (it throws
+	// otherwise), so reaching the write means the bundle was rewritten
+	const { source, alreadyPatched } = applyImAriaControlsPatch(original);
 	if (alreadyPatched) {
 		if (log) {
 			console.log(`Interactive map aria-controls already patched: ${filePath}`);
 		}
 		return false;
 	}
-	if (changed) {
-		fs.writeFileSync(filePath, source);
-		if (log) {
-			console.log(`Patched viewport aria-controls to "#<id>-spatial-list": ${filePath}`);
-		}
+	fs.writeFileSync(filePath, source);
+	if (log) {
+		console.log(`Patched viewport aria-controls to "#<id>-spatial-list": ${filePath}`);
 	}
-	return changed;
+	return true;
 }
 
 const isMain = process.argv[1] !== undefined && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);

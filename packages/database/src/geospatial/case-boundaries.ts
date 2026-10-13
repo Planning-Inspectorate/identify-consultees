@@ -351,7 +351,8 @@ export async function searchCaseBoundaries(dbClient: PrismaClient, options: Sear
 				WHERE caseName LIKE ${likePattern} OR caseReference LIKE ${likePattern}
 			`
 		);
-		total = countRows[0] ? Number(countRows[0].total) : 0;
+		// an aggregate SELECT always returns exactly one row, even when it counts zero matches
+		total = Number(countRows[0].total);
 	}
 
 	return {
