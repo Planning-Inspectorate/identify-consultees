@@ -137,62 +137,62 @@ test.describe('manage journeys', () => {
 			removed = 1;
 		}
 
-		// "Add consultee" opens its form: the category's consultees only the nearby search found (the
-		// faint ones on its map) to pick from, or one not listed by name - with nothing nearby, the
-		// name alone. Which one and the reason are both required (mirroring the removal reason), so a
-		// blank submit fails on both; a blank name then fails validation with the entered reason kept
-		const notListed = page.getByRole('radio', { name: 'A consultee not listed' });
-		// the seeded data decides whether anything nearby is left to offer
-		const chooseNotListed = async () => {
-			if ((await notListed.count()) > 0) {
-				await notListed.check();
-			}
-		};
-		await page.getByRole('button', { name: 'Add consultee' }).click();
-		await expect(page).toHaveURL(/\/report\/consultees\/add\?.*category=Parish/);
-		await expect(page.getByRole('heading', { level: 1 })).toContainText('Add consultee');
-		const offersNearby = (await notListed.count()) > 0;
-		await page.getByRole('button', { name: 'Add consultee' }).click();
+		// the page's own add form: a name - matched to the category's consultees only the nearby
+		// search found (the faint ones on its map) as it's typed - and a reason, both required. A blank
+		// submit fails on both and stays on the page; a blank name then fails with the reason kept
+		const nameInput = page.getByLabel('Name of consultee');
+		const addButton = page.getByRole('button', { name: 'Add consultee' });
+		await expect(page.getByRole('heading', { level: 2, name: 'Add a consultee' })).toBeVisible();
+		await addButton.click();
+		await expect(page).toHaveURL(/\/report\/consultees\?.*category=Parish/);
+		await expect(page.getByRole('heading', { level: 1 })).toContainText('Parish Council');
 		await expect(page.getByText('There is a problem')).toBeVisible();
-		await expect(
-			page.getByRole('link', { name: offersNearby ? 'Select the consultee to add' : 'Enter the consultee name' })
-		).toBeVisible();
+		await expect(page.getByRole('link', { name: 'Enter the consultee name' })).toBeVisible();
 		await expect(page.getByRole('link', { name: 'Enter a reason for adding this consultee.' })).toBeVisible();
 		await page.getByLabel('Reason for adding').fill('Entered first');
-		await chooseNotListed();
-		await page.getByRole('button', { name: 'Add consultee' }).click();
+		await addButton.click();
 		await expect(page.getByRole('link', { name: 'Enter the consultee name' })).toBeVisible();
 		await expect(page.getByText('Error: Enter the consultee name')).toBeVisible();
 		await expect(page.getByLabel('Reason for adding')).toHaveValue('Entered first');
 
-		// saving a consultee returns to the category page with it listed below the map - and any
-		// number can be added one at a time
-		await page.getByLabel('Name of consultee').fill('First Test Consultee');
-		await page.getByRole('button', { name: 'Add consultee' }).click();
+		// adding a consultee returns to the page with it listed below the map - and any number can be
+		// added one at a time
+		await nameInput.fill('First Test Consultee');
+		await addButton.click();
 		await expect(page).toHaveURL(/\/report\/consultees\?.*category=Parish.*add=/);
 		await expect(page.getByRole('rowheader', { name: 'First Test Consultee' })).toBeVisible();
 		await expect(page.getByText('Entered first')).toBeVisible();
 
-		// a nearby consultee picked from the list joins the report by name - and the map draws it as
-		// identified rather than faint
+		// with nearby consultees to suggest, the GOV.UK accessible autocomplete offers them as a name
+		// is typed - picking one adds it by name, and the map draws it as identified. The seeded data
+		// decides whether there are any
 		let picked = 0;
-		if (offersNearby) {
-			await page.getByRole('button', { name: 'Add consultee' }).click();
-			const nearest = page.getByRole('radio').first();
-			const pickedName = (await page.locator(`label[for="${await nearest.getAttribute('id')}"]`).innerText()).trim();
-			await nearest.check();
+		if ((await page.locator('.autocomplete__wrapper').count()) > 0) {
+			const suggestions = page.locator('.autocomplete__option');
+			for (const letter of 'aeiourn') {
+				await nameInput.fill(letter);
+				if (
+					await suggestions
+						.first()
+						.isVisible({ timeout: 1_000 })
+						.catch(() => false)
+				) {
+					break;
+				}
+			}
+			await suggestions.first().click();
+			const pickedName = await nameInput.inputValue();
 			await page.getByLabel('Reason for adding').fill('Picked from nearby');
-			await page.getByRole('button', { name: 'Add consultee' }).click();
-			await expect(page.getByRole('rowheader', { name: pickedName })).toBeVisible();
+			await addButton.click();
+			await expect(page.getByRole('rowheader', { name: pickedName, exact: true })).toBeVisible();
 			await expect(page.getByText('Picked from nearby')).toBeVisible();
+			expect(decodeURIComponent(page.url())).toContain('"i":');
 			picked = 1;
 		}
 
-		await page.getByRole('button', { name: 'Add consultee' }).click();
-		await chooseNotListed();
-		await page.getByLabel('Name of consultee').fill('Second Test Consultee');
+		await nameInput.fill('Second Test Consultee');
 		await page.getByLabel('Reason for adding').fill('Borders the site');
-		await page.getByRole('button', { name: 'Add consultee' }).click();
+		await addButton.click();
 		await expect(page.getByRole('rowheader', { name: 'Second Test Consultee' })).toBeVisible();
 		await expect(page.getByText('Borders the site')).toBeVisible();
 		await expect(page.getByRole('link', { name: /Remove/ })).toHaveCount(parishCount - removed + picked + 2);

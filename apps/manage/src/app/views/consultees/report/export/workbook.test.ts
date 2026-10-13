@@ -204,7 +204,7 @@ describe('report workbook', () => {
 		assert.ok(!summary.some((cells) => cells[0] === 'Removed consultees'));
 	});
 
-	it('gives a nearby consultee picked on an Add consultee page its stored row and distance', () => {
+	it('gives a nearby consultee added by hand its stored row and distance', () => {
 		const admin = buildReportSheets(
 			report({
 				records: new Map([['p', record('p', { region: 'Stored region', documentId: 'doc-p' })]]),

@@ -121,3 +121,19 @@ $font-family: arial, helvetica, sans-serif;
 		margin-bottom: 2px;
 	}
 }
+
+// The add consultee autocomplete (consultee-autocomplete.js): a suggestion's distance from the site
+// after its name - in the focused option's white on blue along with the name
+.pins-autocomplete__hint {
+	color: index.govuk-functional-colour(secondary-text);
+
+	[aria-selected='true'] &,
+	[role='option']:hover & {
+		color: inherit;
+	}
+}
+
+// the autocomplete's own stylesheet sets its input's border - keep a GOV.UK error border on it
+.pins-autocomplete--error input {
+	border-color: index.govuk-functional-colour(error);
+}

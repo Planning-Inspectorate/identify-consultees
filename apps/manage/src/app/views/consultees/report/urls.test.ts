@@ -1,7 +1,6 @@
 import assert from 'node:assert';
 import { describe, it } from 'node:test';
 import {
-	addConsulteeUrl,
 	addedConsultees,
 	addedMatchIds,
 	categoryStaticMapUrl,
@@ -24,10 +23,6 @@ describe('report url helpers', () => {
 		assert.strictEqual(
 			consulteesUrl('case-1', 'rs-1', 'Parish Council'),
 			'/consultees/case-1/report/consultees?ruleset=rs-1&category=Parish%20Council'
-		);
-		assert.strictEqual(
-			addConsulteeUrl('case-1', 'rs-1', 'Parish Council'),
-			'/consultees/case-1/report/consultees/add?ruleset=rs-1&category=Parish%20Council'
 		);
 		assert.strictEqual(
 			removeConsulteeUrl('case-1', 'rs-1', 'Parish Council', { matchId: 'm-1' }),
@@ -159,7 +154,7 @@ describe('report url helpers', () => {
 			[
 				{ category: 'Parish Council', name: 'A Consultee', reason: 'borders' },
 				{ category: 'Parish Council', name: 'No Reason Given', reason: '' },
-				// picked from the nearby consultees on the Add consultee page
+				// a typed name matched to one of the nearby consultees
 				{ id: 'm-1', category: 'Parish Council', name: 'Picked Nearby', reason: 'borders' },
 				{ category: 'Parish Council', name: 'Empty Id', reason: 'r' }
 			]

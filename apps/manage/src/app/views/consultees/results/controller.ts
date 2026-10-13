@@ -122,7 +122,7 @@ export function buildResultsStaticMap(service: ManageService, forceSvg = false):
 			return;
 		}
 		// a category page's static map draws only that category's non-excluded consultees, with the
-		// nearby ones picked on its Add consultee page (`include`) drawn as identified; with no
+		// nearby ones added by hand (`include`) drawn as identified; with no
 		// category it's every consultee the run found, same as the interactive map
 		const category = firstQueryValue(req.query.category);
 		const excluded = excludedIds(req.query.exclude);

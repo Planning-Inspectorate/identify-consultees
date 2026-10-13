@@ -61,7 +61,7 @@ export function removedConsultees(value: unknown): RemovedConsultee[] {
 	});
 }
 
-/** The consultee_area ids of the nearby consultees picked on the Add consultee page. */
+/** The consultee_area ids of the nearby consultees added by hand (a typed name matched to one). */
 export function addedMatchIds(adds: readonly AddedConsultee[]): Set<string> {
 	return new Set(adds.flatMap((add) => (add.id ? [add.id] : [])));
 }
@@ -77,11 +77,11 @@ export function excludedIds(value: unknown): Set<string> {
 }
 
 /**
- * A consultee added by hand on a category's Change page: one the nearby search found (picked on the
- * Add consultee page, so it has an area to map), or one typed in by name (a table row only).
+ * A consultee added by hand on a category's Change page: one the nearby search found (the typed
+ * name matched it, so it has an area to map), or one by any other name (a table row only).
  */
 export interface AddedConsultee {
-	/** The picked nearby consultee's consultee_area id - absent for one typed in by name. */
+	/** The matched nearby consultee's consultee_area id - absent for any other name. */
 	id?: string;
 	/** The ruleset category it was added under - the page and check-page count it belongs to. */
 	category: string;
@@ -223,19 +223,6 @@ export function consulteesUrl(
 	);
 }
 
-/** The "Add consultee" form on a category page - posts back to the same URL. */
-export function addConsulteeUrl(
-	caseId: string,
-	rulesetId: string,
-	category: string,
-	selection: ConsulteeSelection = NO_SELECTION
-): string {
-	return appendSelection(
-		`/consultees/${encodeURIComponent(caseId)}/report/consultees/add?ruleset=${encodeURIComponent(rulesetId)}&category=${encodeURIComponent(category)}`,
-		selection
-	);
-}
-
 /**
  * The consultee a Change page row's Remove link targets: a ruleset match by feature id, or a
  * hand-added consultee by its index in the `add` params.
@@ -262,7 +249,7 @@ export function removeConsulteeUrl(
 
 /**
  * The static map for one category's visible (non-excluded) matches, with the nearby consultees
- * picked on the Add consultee page (`include`) drawn as identified - consultees typed in by name
+ * added by hand (`include`) drawn as identified - consultees typed in by name
  * have no area to map.
  */
 export function categoryStaticMapUrl(

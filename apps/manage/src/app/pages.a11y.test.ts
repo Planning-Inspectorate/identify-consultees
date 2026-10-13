@@ -279,8 +279,13 @@ describe('manage page accessibility smoke', () => {
 						'/consultees/11111111-1111-1111-1111-111111111111/report/consultees?ruleset=england-wales-post-20240430&category=Parish%20Council&exclude=55555555-5555-5555-5555-555555555555'
 				}
 			],
-			addConsulteeUrl:
-				'/consultees/11111111-1111-1111-1111-111111111111/report/consultees/add?ruleset=england-wales-post-20240430&category=Parish%20Council',
+			addFormAction:
+				'/consultees/11111111-1111-1111-1111-111111111111/report/consultees?ruleset=england-wales-post-20240430&category=Parish%20Council',
+			nearbySuggestions: [
+				{ name: 'Great Snoring Parish Council', hint: '1.3 km from the site' },
+				{ name: 'Barton', hint: '4.0 km from the site' }
+			],
+			addForm: { nameValue: '', reasonValue: '' },
 			saveAndReturnUrl: '/consultees/11111111-1111-1111-1111-111111111111/report?ruleset=england-wales-post-20240430',
 			mapId: 'case-map',
 			mapRegionLabel: 'Map showing Parish Council consultees for Longfield Solar Farm',
@@ -301,18 +306,30 @@ describe('manage page accessibility smoke', () => {
 		});
 		assert.match(html, /Removed consultees/);
 		assert.match(html, /Outside the search area/);
+		assert.match(html, /<datalist id="nearby-consultees">/);
 		await assertNoSeriousA11yViolations(html);
 	});
 
-	test('report consultees change page with no remaining consultees has no serious a11y violations', async () => {
+	test('report consultees change page with no remaining consultees, its add form in error, has no serious a11y violations', async () => {
 		const html = nunjucks.render('views/consultees/report/consultees/view.njk', {
 			...pageLocals,
 			pageHeading: 'Parish Council',
 			pageCaption: 'Longfield Solar Farm',
 			backLinkUrl: '/consultees/11111111-1111-1111-1111-111111111111/report?ruleset=england-wales-post-20240430',
 			rows: [],
-			addConsulteeUrl:
-				'/consultees/11111111-1111-1111-1111-111111111111/report/consultees/add?ruleset=england-wales-post-20240430&category=Parish%20Council',
+			addFormAction:
+				'/consultees/11111111-1111-1111-1111-111111111111/report/consultees?ruleset=england-wales-post-20240430&category=Parish%20Council',
+			nearbySuggestions: [],
+			addForm: {
+				nameValue: '',
+				reasonValue: '',
+				nameError: { text: 'Enter the consultee name' },
+				reasonError: { text: 'Enter a reason for adding this consultee.' }
+			},
+			errorSummary: [
+				{ text: 'Enter the consultee name', href: '#consultee-name' },
+				{ text: 'Enter a reason for adding this consultee.', href: '#consultee-reason' }
+			],
 			saveAndReturnUrl: '/consultees/11111111-1111-1111-1111-111111111111/report?ruleset=england-wales-post-20240430',
 			mapId: 'case-map',
 			mapRegionLabel: 'Map showing Parish Council consultees for Longfield Solar Farm',
@@ -332,87 +349,7 @@ describe('manage page accessibility smoke', () => {
 			mapSampleSize: 30
 		});
 		assert.match(html, /No consultees identified in this category/);
-		await assertNoSeriousA11yViolations(html);
-	});
-
-	test('add consultee page has no serious a11y violations', async () => {
-		const html = nunjucks.render('views/consultees/report/consultees/add/view.njk', {
-			...pageLocals,
-			pageHeading: 'Add consultee',
-			pageCaption: 'Parish Council',
-			backLinkUrl:
-				'/consultees/11111111-1111-1111-1111-111111111111/report/consultees?ruleset=england-wales-post-20240430&category=Parish%20Council',
-			formAction:
-				'/consultees/11111111-1111-1111-1111-111111111111/report/consultees/add?ruleset=england-wales-post-20240430&category=Parish%20Council',
-			nearbyOptions: [],
-			notListedValue: 'not-listed',
-			notListedChecked: false,
-			nameValue: '',
-			reasonValue: ''
-		});
-		await assertNoSeriousA11yViolations(html);
-	});
-
-	test('add consultee page in its error state has no serious a11y violations', async () => {
-		const html = nunjucks.render('views/consultees/report/consultees/add/view.njk', {
-			...pageLocals,
-			pageHeading: 'Add consultee',
-			pageCaption: 'Parish Council',
-			backLinkUrl:
-				'/consultees/11111111-1111-1111-1111-111111111111/report/consultees?ruleset=england-wales-post-20240430&category=Parish%20Council',
-			formAction:
-				'/consultees/11111111-1111-1111-1111-111111111111/report/consultees/add?ruleset=england-wales-post-20240430&category=Parish%20Council',
-			nearbyOptions: [],
-			notListedValue: 'not-listed',
-			notListedChecked: false,
-			nameValue: '',
-			reasonValue: '',
-			nameError: { text: 'Enter the consultee name' },
-			reasonError: { text: 'Enter a reason for adding this consultee.' },
-			errorSummary: [
-				{ text: 'Enter the consultee name', href: '#consultee-name' },
-				{ text: 'Enter a reason for adding this consultee.', href: '#consultee-reason' }
-			]
-		});
 		assert.match(html, /There is a problem/);
-		await assertNoSeriousA11yViolations(html);
-	});
-
-	test('add consultee page offering nearby consultees, in its error state, has no serious a11y violations', async () => {
-		const html = nunjucks.render('views/consultees/report/consultees/add/view.njk', {
-			...pageLocals,
-			pageHeading: 'Add consultee',
-			pageCaption: 'Parish Council',
-			backLinkUrl:
-				'/consultees/11111111-1111-1111-1111-111111111111/report/consultees?ruleset=england-wales-post-20240430&category=Parish%20Council',
-			formAction:
-				'/consultees/11111111-1111-1111-1111-111111111111/report/consultees/add?ruleset=england-wales-post-20240430&category=Parish%20Council',
-			nearbyOptions: [
-				{
-					value: '22222222-2222-2222-2222-222222222222',
-					text: 'Little Snoring Parish Council',
-					hint: { text: '1.3 km from the site' },
-					checked: false
-				},
-				{
-					value: '33333333-3333-3333-3333-333333333333',
-					text: 'Great Snoring Parish Council',
-					hint: { text: '4.0 km from the site' },
-					checked: false
-				}
-			],
-			notListedValue: 'not-listed',
-			notListedChecked: true,
-			nameValue: '',
-			reasonValue: '',
-			nameError: { text: 'Enter the consultee name' },
-			reasonError: { text: 'Enter a reason for adding this consultee.' },
-			errorSummary: [
-				{ text: 'Enter the consultee name', href: '#consultee-name' },
-				{ text: 'Enter a reason for adding this consultee.', href: '#consultee-reason' }
-			]
-		});
-		assert.match(html, /Which consultee do you want to add\?/);
 		await assertNoSeriousA11yViolations(html);
 	});
 
