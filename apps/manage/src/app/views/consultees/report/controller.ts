@@ -16,6 +16,7 @@ import {
 	consulteesUrl,
 	excludedMatchIds,
 	reportCreatedUrl,
+	reportDownloadUrl,
 	reportUrl,
 	rulesetUrl
 } from './urls.ts';
@@ -66,8 +67,7 @@ function identifiedConsultees(
 /**
  * The map page's "Preview report" destination: check the consultees the selected ruleset
  * identified before generating the report. Shows the report's details (case, stage, ruleset)
- * and the per-category match counts. "Generate report" is a placeholder - report generation
- * doesn't exist yet.
+ * and the per-category match counts. "Generate report" leads to the Report created page.
  */
 export function buildReportCheckPage(service: ManageService): AsyncRequestHandler {
 	const { db, logger, nearbyConsulteeRadiusMetres, rulesetRunner } = service;
@@ -125,10 +125,10 @@ export function buildReportCheckPage(service: ManageService): AsyncRequestHandle
 }
 
 /**
- * "Generate report" lands here: a confirmation naming the case, a download link, and the report's
- * consultees by category with why each is in it - the run's results less anything removed, plus
- * anything added by hand (the selection rides along in the URL, as on the check page). Report
- * generation itself doesn't exist yet, so the download link is a placeholder.
+ * "Generate report" lands here: a confirmation naming the case, a link to download the report as an
+ * Excel workbook (see export/controller.ts), and the report's consultees by category with why each
+ * is in it - the run's results less anything removed, plus anything added by hand (the selection
+ * rides along in the URL, as on the check page).
  */
 export function buildReportCreatedPage(service: ManageService): AsyncRequestHandler {
 	const { db, logger, nearbyConsulteeRadiusMetres, rulesetRunner } = service;
@@ -165,9 +165,8 @@ export function buildReportCreatedPage(service: ManageService): AsyncRequestHand
 			caseName: project.properties.caseName,
 			reference: project.properties.caseReference,
 			rulesetName: ruleset.name,
-			// placeholder until report generation exists - there is no file to link to yet
-			downloadUrl: '#',
-			downloadText: `Download ${project.properties.caseName} scoping report (ZIP)`,
+			downloadUrl: reportDownloadUrl(project.id, ruleset.id, selection),
+			downloadText: `Download ${project.properties.caseName} consultee report (Excel)`,
 			report,
 			consulteeCount: report.reduce((total, section) => total + section.consultees.length, 0),
 			rulesetFailed: failed,

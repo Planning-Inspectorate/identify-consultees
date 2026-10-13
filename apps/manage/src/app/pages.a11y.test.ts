@@ -421,8 +421,9 @@ describe('manage page accessibility smoke', () => {
 			backLinkUrl: '/consultees/11111111-1111-1111-1111-111111111111?ruleset=england-wales-post-20240430',
 			caseName: 'Longfield Solar Farm',
 			reference: 'EN0110007',
-			downloadUrl: '#',
-			downloadText: 'Download Longfield Solar Farm scoping report (ZIP)',
+			downloadUrl:
+				'/consultees/11111111-1111-1111-1111-111111111111/report/download?ruleset=england-wales-post-20240430',
+			downloadText: 'Download Longfield Solar Farm consultee report (Excel)',
 			rulesetName: 'England Wales post 30 April 2024',
 			report: [
 				{
@@ -454,8 +455,9 @@ describe('manage page accessibility smoke', () => {
 			backLinkUrl: '/consultees/11111111-1111-1111-1111-111111111111?ruleset=england-wales-post-20240430',
 			caseName: 'Longfield Solar Farm',
 			reference: 'EN0110007',
-			downloadUrl: '#',
-			downloadText: 'Download Longfield Solar Farm scoping report (ZIP)',
+			downloadUrl:
+				'/consultees/11111111-1111-1111-1111-111111111111/report/download?ruleset=england-wales-post-20240430',
+			downloadText: 'Download Longfield Solar Farm consultee report (Excel)',
 			rulesetName: 'England Wales post 30 April 2024',
 			report: [],
 			consulteeCount: 0,

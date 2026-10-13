@@ -38,7 +38,8 @@
     "pino": "*",
     "pino-pretty": "*",
     "redis": "*",
-    "sharp": "*"
+    "sharp": "*",
+    "write-excel-file": "^4.1.1"
   },
   "devDependencies": {
     "@types/js-yaml": "^4.0.9",

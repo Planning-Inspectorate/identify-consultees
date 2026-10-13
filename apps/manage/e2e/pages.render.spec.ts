@@ -74,7 +74,7 @@ const pages = [
 		path: `/consultees/${SAMPLE_CASE_ID}/report/created?ruleset=${SAMPLE_RULESET_ID}`,
 		name: 'report created',
 		heading: /Report created/i,
-		mustSee: [/scoping report/i]
+		mustSee: [/consultee report/i]
 	},
 	{
 		path: `/consultees/${SAMPLE_CASE_ID}/results?ruleset=${SAMPLE_RULESET_ID}`,

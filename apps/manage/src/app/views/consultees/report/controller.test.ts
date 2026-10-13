@@ -358,7 +358,8 @@ describe('report created page', () => {
 
 		const html = mockRes.render.mock.calls[0].result;
 		assert.match(html, /Report created/);
-		assert.match(html, /Download Real Test Project scoping report/);
+		assert.match(html, /Download Real Test Project consultee report \(Excel\)/);
+		assert.match(html, new RegExp(`href="/consultees/${realProjectId}/report/download\\?ruleset=`));
 		assert.match(html, /Consultees in the report \(2\)/);
 		assert.match(html, /Why identified/);
 		assert.match(

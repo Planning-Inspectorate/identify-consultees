@@ -175,6 +175,18 @@ export function reportCreatedUrl(
 	);
 }
 
+/** The Report created page's download: the report as an Excel workbook (see export/controller.ts). */
+export function reportDownloadUrl(
+	caseId: string,
+	rulesetId: string,
+	selection: ConsulteeSelection = NO_SELECTION
+): string {
+	return appendSelection(
+		`/consultees/${encodeURIComponent(caseId)}/report/download?ruleset=${encodeURIComponent(rulesetId)}`,
+		selection
+	);
+}
+
 /** A category's Change page - the identified consultees table under the map. */
 export function consulteesUrl(
 	caseId: string,

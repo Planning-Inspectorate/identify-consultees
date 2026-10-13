@@ -10,6 +10,7 @@ import {
 	buildReportConsulteeRemoveSubmit
 } from './report/consultees/remove/controller.ts';
 import { buildReportCheckPage, buildReportCreatedPage } from './report/controller.ts';
+import { buildReportDownload } from './report/export/controller.ts';
 import { buildConsulteesResultsPage, buildResultsStaticMap } from './results/controller.ts';
 import { buildRulesetPickerPage, buildRulesetPickerSubmit } from './ruleset/controller.ts';
 
@@ -28,6 +29,7 @@ export function createRoutes(service: ManageService): IRouter {
 	const reportConsulteeRemovePage = buildReportConsulteeRemovePage(service);
 	const reportConsulteeRemoveSubmit = buildReportConsulteeRemoveSubmit(service);
 	const reportCreatedPage = buildReportCreatedPage(service);
+	const reportDownload = buildReportDownload(service);
 	const resultsPage = buildConsulteesResultsPage(service);
 	const resultsStaticMap = buildResultsStaticMap(service);
 	const resultsStaticMapSvg = buildResultsStaticMap(service, true);
@@ -53,6 +55,7 @@ export function createRoutes(service: ManageService): IRouter {
 	router.post('/:caseId/report/consultees/remove', asyncHandler(reportConsulteeRemoveSubmit));
 	// "Create report": confirmation page with the report download link (a placeholder for now)
 	router.get('/:caseId/report/created', asyncHandler(reportCreatedPage));
+	router.get('/:caseId/report/download', asyncHandler(reportDownload));
 	// the consultee report (tables) for the current shapefile/ruleset selection
 	router.get('/:caseId/results/static-map.svg', asyncHandler(resultsStaticMapSvg));
 	router.get('/:caseId/results/static-map', asyncHandler(resultsStaticMap));
