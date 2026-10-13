@@ -138,7 +138,7 @@ The main journey is **database-backed**: there are no fixtures. Locally the data
 
 - The report document itself: the download link is a placeholder
 - Uploading a project's shapefile: the journey uses case boundaries already in the database
-- The remaining rulesets (about 8 CSV exports; one exists)
+- The remaining rulesets: three of the expected eight exist (see [Screening engine](./data/screening-engine.md#rulesets))
 - Redeveloped data processing (new ingest, ids and schema), being built separately
 - Keeping case boundaries in step with CBOS automatically: today an admin imports them by hand (`/admin/import-from-cbos`); a Service Bus subscription is the next step
 
@@ -158,7 +158,7 @@ The main journey is **database-backed**: there are no fixtures. Locally the data
 
 | Question                                                                      | Today                                                              |
 | ----------------------------------------------------------------------------- | ------------------------------------------------------------------ |
-| Where do the other ~8 rulesets come from, and who owns the CSV format?        | One ruleset, `england_wales_post_20240430_ruleset.csv`             |
+| Where do the other rulesets come from?                                        | Three, from the rulesets workbook                                  |
 | Should the report include every consultee within the nearby radius?           | It does: they're listed with the reason "Within 20km of the site"  |
 | Which formats should project upload accept, and who owns the stored boundary? | No upload; existing case boundaries only                           |
 | When does the full reference dataset replace the sample in Test and Training? | Dev has the full dataset; Test and Training have the seeded sample |
