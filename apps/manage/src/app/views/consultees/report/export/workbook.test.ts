@@ -108,7 +108,7 @@ describe('report workbook', () => {
 		assert.deepStrictEqual(rowValues(sheets[6].data[1]), ['Not filled yet.']);
 	});
 
-	it('lists each consultee with every stored column but geometry, sorted by category then name', () => {
+	it('lists each consultee with its stored columns, sorted by category then name', () => {
 		const sheets = buildReportSheets(
 			report({
 				identified: [
@@ -118,56 +118,105 @@ describe('report workbook', () => {
 				],
 				records: new Map([
 					['a', record('a', { consultee: 'Abbey Parish Council', region: 'Stored region' })],
-					['h', record('h', { consulteeCategory: 'Hospital', consultee: 'General Hospital', documentId: 'doc-1' })]
+					['h', record('h', { consulteeCategory: 'Hospital', consultee: 'General Hospital' })]
 				]),
 				added: [{ category: 'Parish Council', name: 'Added Parish', reason: '' }]
 			})
 		);
 		const admin = sheets.find((sheet) => sheet.sheet === 'Administrative boundaries')!;
-		assert.equal(valueOf(admin.data[0][14]), 'Metadata (JSON)');
-		assert.deepStrictEqual(
-			admin.data.slice(1).map((row) => rowValues(row).slice(0, 7)),
-			[
-				// the stored row's values win over the run's
-				[
-					'Abbey Parish Council',
-					'Parish Council',
-					'Stored region',
-					'"B" host Parish Councils: intersects the site',
-					0.01,
-					'Ruleset',
-					'a'
-				],
-				// added by hand, with the default reason
-				['Added Parish', 'Parish Council', null, 'Manually added', null, 'Added by hand', null],
-				// no stored row (deleted mid-request) - the run's values
-				[
-					'Zeal Parish Council',
-					'Parish Council',
-					'Feature region',
-					'"B" host Parish Councils: intersects the site',
-					1.23,
-					'Ruleset',
-					'b'
-				]
-			]
-		);
-		const abbey = rowValues(admin.data[1]);
-		assert.deepStrictEqual(abbey.slice(7), [
-			'Polygon',
-			null,
-			null,
-			null,
-			null,
-			1,
-			new Date('2026-10-01T09:00:00Z'),
-			'{"FID":1}'
+		// no geometry, no ids or version the reference data leaves empty, no Source - then the
+		// metadata's own attributes
+		assert.deepStrictEqual(rowValues(admin.data[0]), [
+			'Consultee',
+			'Category',
+			'Region',
+			'Why identified',
+			'Distance from site (km)',
+			'Consultee area id',
+			'Geometry type',
+			'Case reference',
+			'Last updated',
+			'FID'
 		]);
-		assert.deepStrictEqual(rowValues(admin.data[3]).slice(7), [null, null, null, null, null, null, null, null]);
+		assert.deepStrictEqual(admin.data.slice(1).map(rowValues), [
+			// the stored row's values win over the run's
+			[
+				'Abbey Parish Council',
+				'Parish Council',
+				'Stored region',
+				'"B" host Parish Councils: intersects the site',
+				0.01,
+				'a',
+				'Polygon',
+				null,
+				new Date('2026-10-01T09:00:00Z'),
+				1
+			],
+			// added by hand, saying so in place of a reason
+			['Added Parish', 'Parish Council', null, 'Added by hand', null, null, null, null, null, null],
+			// no stored row (deleted mid-request) - the run's values, and no metadata
+			[
+				'Zeal Parish Council',
+				'Parish Council',
+				'Feature region',
+				'"B" host Parish Councils: intersects the site',
+				1.23,
+				'b',
+				null,
+				null,
+				null,
+				null
+			]
+		]);
 
 		const publicBodies = sheets.find((sheet) => sheet.sheet === 'Public bodies')!;
 		assert.equal(publicBodies.data.length, 2);
-		assert.equal(valueOf(publicBodies.data[1][9]), 'doc-1');
+	});
+
+	it("spreads each tab's metadata into a column per attribute, blank where a consultee lacks one", () => {
+		const sheets = buildReportSheets(
+			report({
+				identified: [
+					match('a', 'Parish Council', 'Abbey', 'b_host_parish'),
+					match('b', 'Parish Council', 'Barton', 'b_host_parish'),
+					match('c', 'Parish Council', 'Christleton', 'b_host_parish'),
+					match('d', 'Parish Council', 'Dodleston', 'b_host_parish'),
+					match('h', 'Hospital', 'General Hospital', 'hospitals_10km')
+				],
+				records: new Map([
+					['a', record('a', { metadata: '{"PARNCP":"Abbey","FID":7,"open":true,"area":{"ha":12}}' })],
+					['b', record('b', { metadata: '{"FID":8,"PARNCP":null,"note":""}' })],
+					// not a JSON object, or not JSON at all - kept whole
+					['c', record('c', { metadata: '[1,2]' })],
+					['d', record('d', { metadata: 'not json' })],
+					['h', record('h', { consulteeCategory: 'Hospital', metadata: '{"ODS":"RX1"}' })]
+				])
+			})
+		);
+		const admin = sheets.find((sheet) => sheet.sheet === 'Administrative boundaries')!;
+		assert.deepStrictEqual(rowValues(admin.data[0]).slice(9), ['PARNCP', 'FID', 'open', 'area', 'note', 'Metadata']);
+		assert.deepStrictEqual(
+			admin.data.slice(1).map((row) => rowValues(row).slice(9)),
+			[
+				['Abbey', 7, true, '{"ha":12}', null, null],
+				[null, 8, null, null, null, null],
+				[null, null, null, null, null, '[1,2]'],
+				[null, null, null, null, null, 'not json']
+			]
+		);
+		// numbers and true/false keep their types
+		assert.deepStrictEqual(admin.data[1][10], { type: Number, value: 7 });
+		assert.deepStrictEqual(admin.data[1][11], { type: Boolean, value: true });
+		// a column per attribute, sized to its name
+		assert.deepStrictEqual(
+			admin.columns.slice(9).map((column) => column.width),
+			[12, 12, 12, 12, 12, 12]
+		);
+
+		// another tab has its own data's attributes
+		const publicBodies = sheets.find((sheet) => sheet.sheet === 'Public bodies')!;
+		assert.deepStrictEqual(rowValues(publicBodies.data[0]).slice(9), ['ODS']);
+		assert.deepStrictEqual(rowValues(publicBodies.data[1]).slice(9), ['RX1']);
 	});
 
 	it('summarises the report, counting each tab, and lists removals with their reasons', () => {
@@ -204,10 +253,10 @@ describe('report workbook', () => {
 		assert.ok(!summary.some((cells) => cells[0] === 'Removed consultees'));
 	});
 
-	it('gives a nearby consultee added by hand its stored row and distance', () => {
+	it('gives a nearby consultee added by hand its stored row, distance and metadata', () => {
 		const admin = buildReportSheets(
 			report({
-				records: new Map([['p', record('p', { region: 'Stored region', documentId: 'doc-p' })]]),
+				records: new Map([['p', record('p', { region: 'Stored region', caseReference: 'EN010001' })]]),
 				added: [
 					{
 						id: 'p',
@@ -219,17 +268,18 @@ describe('report workbook', () => {
 				]
 			})
 		).find((sheet) => sheet.sheet === 'Administrative boundaries')!;
-		const row = rowValues(admin.data[1]);
-		assert.deepStrictEqual(row.slice(0, 7), [
+		assert.deepStrictEqual(rowValues(admin.data[1]), [
 			'Picked Parish',
 			'Parish Council',
 			'Stored region',
-			'Borders the site',
+			'Added by hand: Borders the site',
 			2.5,
-			'Added by hand',
-			'p'
+			'p',
+			'Polygon',
+			'EN010001',
+			new Date('2026-10-01T09:00:00Z'),
+			1
 		]);
-		assert.equal(row[9], 'doc-p');
 	});
 
 	it('leaves cells blank for a consultee with no distance, name or category anywhere', () => {
@@ -241,14 +291,16 @@ describe('report workbook', () => {
 		const admin = buildReportSheets(report({ identified: [unnamed] })).find(
 			(sheet) => sheet.sheet === 'Administrative boundaries'
 		)!;
-		assert.deepStrictEqual(rowValues(admin.data[1]).slice(0, 7), [
+		assert.deepStrictEqual(rowValues(admin.data[1]), [
 			null,
 			null,
 			null,
 			'"B" host Parish Councils: intersects the site',
 			null,
-			'Ruleset',
-			'u'
+			'u',
+			null,
+			null,
+			null
 		]);
 	});
 

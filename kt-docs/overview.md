@@ -136,7 +136,7 @@ The main journey is **database-backed**: there are no fixtures. Locally the data
 
 ## Not built yet
 
-- The report workbook's **Other Cases** tab, and combining each category's metadata into its own columns (it's one JSON column for now)
+- The report workbook's **Other Cases** tab
 - Uploading a project's shapefile: the journey uses case boundaries already in the database
 - The remaining rulesets: three of the expected eight exist (see [Screening engine](./data/screening-engine.md#rulesets))
 - Redeveloped data processing (new ingest, ids and schema), being built separately

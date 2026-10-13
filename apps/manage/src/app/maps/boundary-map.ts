@@ -7,7 +7,8 @@
  */
 
 import type { Geometry } from '@pins/identify-consultees-database/src/geospatial/wkt.ts';
-import { computeMapView } from './geometry-bounds.ts';
+import type { FitOptions } from './geometry-bounds.ts';
+import { computeFittedMapView } from './geometry-bounds.ts';
 import type { GeoJsonFeature, GeoJsonFeatureCollection } from './sample-geojson.ts';
 import { MAP_VIEWPORT } from './sample-geojson.ts';
 
@@ -17,6 +18,9 @@ import type { StaticMapFallbackConfig } from './case-geojson.ts';
 
 // ~1m - plenty for drawing, and coordinates are most of the layer's size (same as case-geojson.ts)
 const DISPLAY_COORDINATE_DECIMALS = 5;
+
+/** The boundary map opens on the case's shapefiles, filling most of the map - they're what it's for. */
+export const BOUNDARY_FRAMING: FitOptions = { fill: 0.8, minExtentMetres: 1_000 };
 
 type Coordinates = number | Coordinates[];
 
@@ -93,7 +97,11 @@ export function buildBoundaryMapConfig(
 		style: toDatasetStyle(styleForRank(ranks[index])),
 		geojson: toGeojson(file, caseReference)
 	}));
-	const view = computeMapView({ features: datasets.flatMap((dataset) => dataset.geojson.features) });
+	const view = computeFittedMapView(
+		{ features: datasets.flatMap((dataset) => dataset.geojson.features) },
+		MAP_VIEWPORT,
+		BOUNDARY_FRAMING
+	);
 
 	return {
 		center: view.center,
