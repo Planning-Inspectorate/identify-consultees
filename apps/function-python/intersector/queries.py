@@ -125,7 +125,11 @@ def find_areas_near(
 
 
 def find_areas_bordering(
-    db: Database, site_within_margin: str, host_category: str, categories: Iterable[str]
+    db: Database,
+    site_within_margin: str,
+    host_category: str,
+    categories: Iterable[str],
+    with_geometry: bool = True,
 ) -> list[ConsulteeArea]:
     """Areas of `categories` within BORDERING_TOLERANCE_METRES of any `host_category` area that
     intersects the site (already grown by the distance margin). Unmeasured - see AreaMatch.
@@ -155,7 +159,7 @@ def find_areas_bordering(
     for host in hosts:
         rows = db.query(
             f"""
-            SELECT {AREA_COLUMNS_WITH_GEOMETRY}
+            SELECT {AREA_COLUMNS_WITH_GEOMETRY if with_geometry else AREA_COLUMNS}
             FROM consultee_area {USE_SPATIAL_INDEX}
             WHERE consulteeCategory IN ({_placeholders(categories)})
                 AND id <> CAST(%s AS UNIQUEIDENTIFIER)

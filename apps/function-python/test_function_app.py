@@ -155,7 +155,20 @@ def test_run_ruleset_runs_the_posted_conditions_and_returns_each_consultee_with_
         ],
         20_000,
         {},
+        with_geometry=True,
     )
+
+
+def test_run_ruleset_leaves_geometry_out_when_asked():
+    with (
+        patch.dict("os.environ", {"CONSULTEE_AREAS_API_KEY": API_KEY}),
+        patch("function_app.connection_params_from_env", return_value=object()),
+        patch("function_app.run_ruleset", return_value=[]) as run,
+    ):
+        response = run_ruleset_route(_ruleset_request({**VALID_BODY, "includeGeometry": False}))
+
+    assert response.status_code == 200
+    assert run.call_args.kwargs == {"with_geometry": False}
 
 
 def test_run_ruleset_passes_each_categorys_nearby_radius_on():
@@ -191,6 +204,8 @@ def test_run_ruleset_passes_each_categorys_nearby_radius_on():
         {**VALID_BODY, "nearbyRadiusMetresByCategory": {"Parish Council": -1}},
         {**VALID_BODY, "nearbyRadiusMetresByCategory": {"": 5_000}},
         {**VALID_BODY, "nearbyRadiusMetresByCategory": {f"Category {i}": 1 for i in range(201)}},
+        {**VALID_BODY, "includeGeometry": "no"},
+        {**VALID_BODY, "includeGeometry": 0},
     ],
 )
 def test_run_ruleset_rejects_a_malformed_request_before_touching_the_database(body):

@@ -64,6 +64,7 @@ describe('buildPythonRulesetRunner', () => {
 			siteWkt: 'POINT(-1.5 52.5)',
 			nearbyRadiusMetres: 20_000,
 			nearbyRadiusMetresByCategory: { 'Parish Council': 5_000 },
+			includeGeometry: false,
 			// the display name stays here - the function only needs what to run
 			rules: [
 				{ id: 'hospital', logicType: 'intersection', categories: ['Hospital'], bufferMetres: 10_000 },

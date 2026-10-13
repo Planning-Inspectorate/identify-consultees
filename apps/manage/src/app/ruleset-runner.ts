@@ -84,6 +84,10 @@ export function buildPythonRulesetRunner(options: {
 					siteWkt: geometryToWkt(site),
 					nearbyRadiusMetres,
 					nearbyRadiusMetresByCategory,
+					// the maps draw from their own display geometry (see buildSearchAreaSafely), so the
+					// matches' original geometry - tens of MB for a run touching whole counties or
+					// National Parks - is left out, and the function never reads it
+					includeGeometry: false,
 					rules: ruleset.rules.map(({ id, logicType, categories, bufferMetres, hostCategory }) => ({
 						id,
 						logicType,

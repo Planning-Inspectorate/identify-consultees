@@ -31,6 +31,7 @@ def run_ruleset(
     rules: list[RuleCondition],
     nearby_radius_metres: float,
     nearby_radius_metres_by_category: dict[str, float] | None = None,
+    with_geometry: bool = True,
 ) -> list[Consultee]:
     """Every consultee the ruleset identifies for the site, plus every area within its category's
     nearby radius (`nearby_radius_metres_by_category`, else `nearby_radius_metres`; any category
@@ -38,6 +39,10 @@ def run_ruleset(
 
     Each consultee appears once, with every reason it qualified: a ConditionReason for each
     condition it met, in the ruleset's order, then a NearbyReason if the nearby search found it.
+
+    `with_geometry` gives condition matches their original geometry. Without it no geometry is
+    read at all - the bulk of a run's time and response when the matches include whole counties
+    or National Parks, and unneeded by a caller that draws from its own display geometry.
     """
     radius_by_category = nearby_radius_metres_by_category or {}
     search_radius = max([nearby_radius_metres, *radius_by_category.values()])
@@ -48,7 +53,7 @@ def run_ruleset(
         fetched = queries.find_areas_near(
             db, site, search_radius, excluded_categories=CATEGORIES_EXCLUDED_FROM_NEARBY, with_geometry=False
         )
-        matches_by_condition = _match_conditions(db, site, rules, fetched, search_radius)
+        matches_by_condition = _match_conditions(db, site, rules, fetched, search_radius, with_geometry)
 
         nearby = [
             (match, radius)
@@ -57,7 +62,8 @@ def run_ruleset(
         ]
         consultees = _combine(rules, matches_by_condition, nearby)
         _measure_unmeasured(db, site, consultees)
-        _add_geometry_to_condition_matches(db, consultees)
+        if with_geometry:
+            _add_geometry_to_condition_matches(db, consultees)
         return sorted(consultees.values(), key=_nearest_first)
 
 
@@ -94,7 +100,12 @@ def meets_intersection_condition(match: AreaMatch, rule: RuleCondition) -> bool:
 
 
 def _match_conditions(
-    db: Database, site: str, rules: list[RuleCondition], nearby: list[AreaMatch], nearby_radius_metres: float
+    db: Database,
+    site: str,
+    rules: list[RuleCondition],
+    nearby: list[AreaMatch],
+    nearby_radius_metres: float,
+    with_geometry: bool,
 ) -> dict[str, list[AreaMatch]]:
     """Each condition's matches, by condition id - filtered from the nearby search where it can be,
     otherwise from the condition's own query."""
@@ -114,20 +125,24 @@ def _match_conditions(
         else None
     )
 
-    query = partial(_query_condition, db, site, site_within_margin)
+    query = partial(_query_condition, db, site, site_within_margin, with_geometry)
     with ThreadPoolExecutor(max_workers=CONDITION_CONCURRENCY) as pool:
         for rule, matches in zip(needs_query, pool.map(query, needs_query), strict=True):
             matches_by_condition[rule.id] = matches
     return matches_by_condition
 
 
-def _query_condition(db: Database, site: str, site_within_margin: str | None, rule: RuleCondition) -> list[AreaMatch]:
+def _query_condition(
+    db: Database, site: str, site_within_margin: str | None, with_geometry: bool, rule: RuleCondition
+) -> list[AreaMatch]:
     """`rule`'s matches from its own query."""
     if rule.logic_type == "intersection":
-        return queries.find_areas_near(db, site, rule.buffer_metres, rule.categories)
+        return queries.find_areas_near(db, site, rule.buffer_metres, rule.categories, with_geometry=with_geometry)
     if not rule.host_category:
         return []
-    neighbours = queries.find_areas_bordering(db, site_within_margin, rule.host_category, rule.categories)
+    neighbours = queries.find_areas_bordering(
+        db, site_within_margin, rule.host_category, rule.categories, with_geometry=with_geometry
+    )
     return [AreaMatch(area, distance_metres=None) for area in neighbours]
 
 

@@ -20,6 +20,7 @@ Request:
 	"siteWkt": "POLYGON((...))",
 	"nearbyRadiusMetres": 20000,
 	"nearbyRadiusMetresByCategory": { "Parish Council": 5000, "Hospital": 0 },
+	"includeGeometry": false,
 	"rules": [
 		{ "id": "hospital", "logicType": "intersection", "categories": ["Hospital"], "bufferMetres": 10000 },
 		{
@@ -58,7 +59,8 @@ Response (200):
 - `nearbyRadiusMetresByCategory` (optional): a category's own nearby distance, overriding `nearbyRadiusMetres`; 0 means never nearby. The web app sends [`config/nearby-consultees.yaml`](../config/nearby-consultees.yaml).
 - `consultees`: each consultee once, nearest first (ties by id). The union of every condition's matches and every area within its category's nearby distance (else `nearbyRadiusMetres`) (any category except Railway).
 - `reasons`: at least one. A `condition` for each condition met, in the ruleset's order, then `nearby` if within the radius. The web app turns them into **Why identified** text (`views/consultees/reasons.ts`).
-- `geometryWkt`: only for condition matches. The map draws every consultee from the web app's own display geometry.
+- `includeGeometry` (optional, default `true`): whether condition matches carry `geometryWkt`. The web app sends `false`: its maps draw every consultee from its own display geometry. Leaving geometry out means it's never read, which about halves a run (EN0110007: 3.9s and 75MB to 2.0s and 0.13MB, with the full reference data loaded locally).
+- `geometryWkt`: only for condition matches, and only when `includeGeometry` is `true`.
 - Ids are lowercase, matching the web app's Prisma queries, which use them for display geometry and `exclude=` URLs.
 - Errors: 401 for a bad or missing key; 500 `{ "error": "Failed to run the ruleset" }` with no internal detail.
 
