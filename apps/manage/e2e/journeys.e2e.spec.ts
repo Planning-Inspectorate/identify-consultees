@@ -123,7 +123,7 @@ test.describe('manage journeys', () => {
 			await expect(page.getByRole('heading', { level: 1 })).toContainText('Remove consultee');
 			await page.getByRole('button', { name: 'Remove consultee' }).click();
 			await expect(page.getByText('There is a problem')).toBeVisible();
-			await expect(page.getByRole('link', { name: 'Enter a reason for removal' })).toBeVisible();
+			await expect(page.getByRole('link', { name: 'Enter a reason for removing this consultee.' })).toBeVisible();
 			await page.getByLabel('Reason for removal').fill('Duplicate of another consultee');
 			await page.getByRole('button', { name: 'Remove consultee' }).click();
 			await expect(page).toHaveURL(/\/report\/consultees\?.*exclude=/);
@@ -141,7 +141,7 @@ test.describe('manage journeys', () => {
 		await page.getByRole('button', { name: 'Add consultee' }).click();
 		await expect(page.getByText('There is a problem')).toBeVisible();
 		await expect(page.getByRole('link', { name: 'Enter the consultee name' })).toBeVisible();
-		await expect(page.getByRole('link', { name: 'Enter a reason for adding' })).toBeVisible();
+		await expect(page.getByRole('link', { name: 'Enter a reason for adding this consultee.' })).toBeVisible();
 		await page.getByLabel('Reason for adding').fill('Entered first');
 		await page.getByRole('button', { name: 'Add consultee' }).click();
 		await expect(page.getByRole('link', { name: 'Enter the consultee name' })).toBeVisible();

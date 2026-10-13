@@ -362,10 +362,10 @@ describe('manage page accessibility smoke', () => {
 			nameValue: '',
 			reasonValue: '',
 			nameError: { text: 'Enter the consultee name' },
-			reasonError: { text: 'Enter a reason for adding' },
+			reasonError: { text: 'Enter a reason for adding this consultee.' },
 			errorSummary: [
 				{ text: 'Enter the consultee name', href: '#consultee-name' },
-				{ text: 'Enter a reason for adding', href: '#consultee-reason' }
+				{ text: 'Enter a reason for adding this consultee.', href: '#consultee-reason' }
 			]
 		});
 		assert.match(html, /There is a problem/);
@@ -404,8 +404,8 @@ describe('manage page accessibility smoke', () => {
 			name: 'Little Snoring Parish Council',
 			identified: ['"B" host Parishes or Community Councils: intersects the site'],
 			reasonValue: '   ',
-			reasonError: { text: 'Enter a reason for removal' },
-			errorSummary: [{ text: 'Enter a reason for removal', href: '#removal-reason' }],
+			reasonError: { text: 'Enter a reason for removing this consultee.' },
+			errorSummary: [{ text: 'Enter a reason for removing this consultee.', href: '#removal-reason' }],
 			rulesetFailed: false,
 			retryUrl:
 				'/consultees/11111111-1111-1111-1111-111111111111/report/consultees/remove?ruleset=england-wales-post-20240430&category=Parish%20Council&match=55555555-5555-5555-5555-555555555555'

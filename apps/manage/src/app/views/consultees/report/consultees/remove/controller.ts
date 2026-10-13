@@ -198,7 +198,11 @@ export function buildReportConsulteeRemoveSubmit(
 		if (!reason) {
 			return res.render(
 				'views/consultees/report/consultees/remove/view.njk',
-				viewModel(context, typeof req.body?.reason === 'string' ? req.body.reason : '', 'Enter a reason for removal')
+				viewModel(
+					context,
+					typeof req.body?.reason === 'string' ? req.body.reason : '',
+					'Enter a reason for removing this consultee.'
+				)
 			);
 		}
 
