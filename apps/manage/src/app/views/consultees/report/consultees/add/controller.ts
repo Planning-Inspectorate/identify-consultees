@@ -121,7 +121,7 @@ export function buildReportConsulteeAddSubmit(
 					typeof req.body?.reason === 'string' ? req.body.reason : '',
 					{
 						...(!name ? { name: 'Enter the consultee name' } : {}),
-						...(!reason ? { reason: 'Enter a reason for adding' } : {})
+						...(!reason ? { reason: 'Enter a reason for adding this consultee.' } : {})
 					}
 				)
 			);

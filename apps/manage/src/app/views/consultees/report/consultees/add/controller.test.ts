@@ -205,14 +205,14 @@ describe('report consultee add submit', () => {
 		assert.strictEqual(mockRes.redirect.mock.callCount(), 0);
 		const viewModel = mockRes.render.mock.calls[0].arguments[1];
 		assert.strictEqual(viewModel.nameError, undefined);
-		assert.strictEqual(viewModel.reasonError.text, 'Enter a reason for adding');
+		assert.strictEqual(viewModel.reasonError.text, 'Enter a reason for adding this consultee.');
 		assert.strictEqual(viewModel.nameValue, 'Test Consultee');
 		assert.strictEqual(viewModel.reasonValue, '   ');
 		assert.strictEqual(viewModel.errorSummary[0].href, '#consultee-reason');
 
 		const html = mockRes.render.mock.calls[0].result;
 		assert.match(html, /There is a problem/);
-		assert.match(html, /Enter a reason for adding/);
+		assert.match(html, /Enter a reason for adding this consultee\./);
 		assert.match(html, /govuk-textarea--error/);
 	});
 
@@ -223,7 +223,7 @@ describe('report consultee add submit', () => {
 		const viewModel = mockRes.render.mock.calls[0].arguments[1];
 		assert.deepStrictEqual(viewModel.errorSummary, [
 			{ text: 'Enter the consultee name', href: '#consultee-name' },
-			{ text: 'Enter a reason for adding', href: '#consultee-reason' }
+			{ text: 'Enter a reason for adding this consultee.', href: '#consultee-reason' }
 		]);
 	});
 
