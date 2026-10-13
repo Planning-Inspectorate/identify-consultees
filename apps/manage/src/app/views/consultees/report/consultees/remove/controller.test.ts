@@ -35,7 +35,7 @@ function summaryRow() {
 
 function parishMatchRow(id = matchId, consultee = 'Little Snoring Parish Council') {
 	return {
-		reasons: [{ type: 'condition' as const, conditionId: 'b_host_parish_comm_council' }],
+		reasons: [{ type: 'condition' as const, conditionId: 'b_host_parish_town_community_councils' }],
 		id,
 		geometryType: 'MultiLineString',
 		consulteeCategory: 'Parish Council',
@@ -98,7 +98,7 @@ describe('report consultee remove page', () => {
 		assert.strictEqual(viewModel.pageHeading, 'Remove consultee');
 		assert.strictEqual(viewModel.pageCaption, 'Real Test Project');
 		assert.strictEqual(viewModel.name, 'Little Snoring Parish Council');
-		assert.deepStrictEqual(viewModel.identified, ['"B" host Parishes or Community Councils: intersects the site']);
+		assert.deepStrictEqual(viewModel.identified, ['"B" host Parish / Town / Community Councils: intersects the site']);
 		assert.strictEqual(
 			viewModel.backLinkUrl,
 			`/consultees/${realProjectId}/report/consultees?ruleset=england-wales-post-20240430&category=Parish%20Council`

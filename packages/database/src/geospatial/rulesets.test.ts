@@ -5,8 +5,11 @@ import path from 'node:path';
 import { describe, test } from 'node:test';
 import {
 	buildRulesetFromCsv,
+	CATEGORIES_AWAITING_DATA,
+	DEFAULT_RULESET_ID,
 	getRuleset,
 	loadRulesets,
+	parseCsv,
 	parseRulesetCsv,
 	rulesetIdFromFileName,
 	rulesetNameFromFileName,
@@ -15,69 +18,129 @@ import {
 
 // running a ruleset is the Python function's job now - see apps/function-python/intersector/test_screening.py
 
-describe('parseRulesetCsv', () => {
-	const header =
-		'consulteeName\treferenceData\tconsulteeDescription\tmatchingConsulteeType\thostType\tlogicDescription\tlogicType\tintersectionBufferKm';
+const HEADER = 'Group hierarchy,Group,Category,Consultee Type(s),Logic,Buffer (km)';
 
-	test('resolves the matching category from referenceData when set', () => {
-		const [rule] = parseRulesetCsv(`${header}\nrailway\trail_epsg27700\tRailways\t\t\tIntersects\tintersection\t10`);
+describe('parseCsv', () => {
+	test('splits rows and fields as Excel saves them, including quoted commas and quotes', () => {
+		assert.deepEqual(parseCsv('\uFEFFa,b,c\r\n1,"two, three","say ""hi"""\r\n\r\n4,,6'), [
+			['a', 'b', 'c'],
+			['1', 'two, three', 'say "hi"'],
+			['4', '', '6']
+		]);
+	});
+
+	test('keeps a line break inside a quoted field, and a last row with no line ending', () => {
+		assert.deepEqual(parseCsv('a,b\n"line one\nline two",x'), [
+			['a', 'b'],
+			['line one\nline two', 'x']
+		]);
+	});
+});
+
+describe('parseRulesetCsv', () => {
+	test('maps a host authority row to its category, named with its authority letter', () => {
+		const [rule] = parseRulesetCsv(
+			`${HEADER}\n1,Administative boundaries,B Host Authority,Unitary Authorities,Intersects application site,0`
+		);
 		assert.deepEqual(rule, {
-			id: 'railway',
-			name: 'Railways',
+			id: 'b_host_unitary_authorities',
+			name: '"B" host Unitary Authorities',
 			logicType: 'intersection',
-			categories: ['Railway'],
-			bufferMetres: 10000
+			categories: ['Unitary Authority'],
+			bufferMetres: 0
 		});
 	});
 
-	test('falls back to matchingConsulteeType (splitting on ";"), then consulteeName', () => {
-		const [withType] = parseRulesetCsv(
-			`${header}\nb_host\t\tHost\tparish; unitary_auth\t\tIntersects\tintersection\t0`
-		);
-		assert.deepEqual(withType.categories, ['Parish Council', 'Unitary Authority']);
-
-		const [bareName] = parseRulesetCsv(`${header}\nhospital\t\tHospitals\t\t\tIntersects\tintersection\t10`);
-		assert.deepEqual(bareName.categories, ['Hospital']);
-	});
-
-	test('parses a bordering rule with a host category', () => {
+	test('maps a bordering row to its categories and host, quoting the host letter in its name', () => {
 		const [rule] = parseRulesetCsv(
-			`${header}\na_bordering_b\t\tBordering\tparish\tparish\tBordering host authority\tbordering\t0`
+			`${HEADER}\n1,Administative boundaries,D Bordering Authority,"County Councils, Unitary Authorities, National Parks & Broads bordering C Host County Councils",Borders host authority,0`
 		);
-		assert.equal(rule.logicType, 'bordering');
-		assert.deepEqual(rule.categories, ['Parish Council']);
-		assert.equal(rule.hostCategory, 'Parish Council');
-		assert.equal(rule.bufferMetres, undefined);
+		assert.deepEqual(rule, {
+			id: 'd_bordering_county_councils_unitary_authorities_national_parks_broads_bordering_c_host_county_councils',
+			name: '"D" County Councils, Unitary Authorities, National Parks & Broads bordering "C" host County Councils',
+			logicType: 'bordering',
+			categories: ['Upper Tier Authority', 'Unitary Authority', 'National Park'],
+			hostCategory: 'Upper Tier Authority'
+		});
 	});
 
-	test('passes through an unmapped identifier unchanged rather than dropping it', () => {
-		const [rule] = parseRulesetCsv(`${header}\ncanal\tcanals_epsg27700\tCanals\t\t\tIntersects\tintersection\t10`);
-		// no reference data has this category loaded yet - the condition still exists, it just
-		// won't match anything until it does
-		assert.deepEqual(rule.categories, ['canals_epsg27700']);
+	test('takes a buffer in km, keeps a row the same buffer and type apart, and reads a blank buffer as 0', () => {
+		const rules = parseRulesetCsv(
+			[
+				HEADER,
+				'2,Public bodies,,Ambulance Trusts,Intersects application site buffer,1',
+				'2,Public bodies,,Ambulance Trusts,Intersects application site buffer,10',
+				'5,Other,,cheshire  BRINE area,intersects application site,'
+			].join('\n')
+		);
+		assert.deepEqual(
+			rules.map((rule) => [rule.id, rule.name, rule.bufferMetres, rule.categories]),
+			[
+				['ambulance_trusts_1km', 'Ambulance Trusts', 1000, ['Ambulance Trust']],
+				['ambulance_trusts_10km', 'Ambulance Trusts', 10000, ['Ambulance Trust']],
+				// matched case- and space-insensitively, named as written
+				['cheshire_brine_area', 'cheshire  BRINE area', 0, ['Cheshire Brine Area']]
+			]
+		);
 	});
 
-	test('throws on a CSV missing an expected column', () => {
-		assert.throws(() => parseRulesetCsv('a\tb\tc\n1\t2\t3'), /missing expected column/);
+	const invalid: [string, string, RegExp][] = [
+		[
+			'an unknown consultee type',
+			'2,Public bodies,,Space Agencies,Intersects application site,0',
+			/Unknown consultee type in ruleset row 2/
+		],
+		['an unknown logic', '2,Public bodies,,Ambulance Trusts,Near the site,0', /Unknown logic "Near the site"/],
+		[
+			'a buffer that is not a number',
+			'2,Public bodies,,Ambulance Trusts,Intersects application site buffer,ten',
+			/must be a number/
+		],
+		[
+			'a negative buffer',
+			'2,Public bodies,,Ambulance Trusts,Intersects application site buffer,-1',
+			/must be a number/
+		],
+		[
+			'a buffer without the buffer logic',
+			'2,Public bodies,,Ambulance Trusts,Intersects application site,5',
+			/can have a buffer/
+		],
+		[
+			'a bordering row with no host',
+			'2,Public bodies,,Ambulance Trusts,Borders host authority,0',
+			/needs a host authority/
+		],
+		[
+			'two rows that would share an id',
+			'2,Public bodies,,Ambulance Trusts,Intersects application site buffer,1\n2,Public bodies,,Ambulance Trusts,Intersects application site buffer,1',
+			/both be condition "ambulance_trusts_1km"/
+		]
+	];
+	for (const [name, rows, error] of invalid) {
+		test(`throws, naming the row, on ${name}`, () => {
+			assert.throws(() => parseRulesetCsv(`${HEADER}\n${rows}`), error);
+		});
+	}
+
+	test('throws on a CSV missing an expected column, or with no header at all', () => {
+		assert.throws(() => parseRulesetCsv('Group,Category\n1,2'), /missing expected column "Group hierarchy"/);
+		assert.throws(() => parseRulesetCsv(''), /missing expected column/);
 	});
 });
 
 describe('buildRulesetFromCsv', () => {
-	const header =
-		'consulteeName\treferenceData\tconsulteeDescription\tmatchingConsulteeType\thostType\tlogicDescription\tlogicType\tintersectionBufferKm';
-
-	test('wraps every row of a CSV export as one ruleset', () => {
+	test('wraps every row of a ruleset CSV as one ruleset', () => {
 		const ruleset = buildRulesetFromCsv(
 			'test-ruleset',
 			'Test ruleset',
-			`${header}\nrailway\trail_epsg27700\tRailways\t\t\tIntersects\tintersection\t10\nhospital\t\tHospitals\t\t\tIntersects\tintersection\t10`
+			`${HEADER}\n4,Transport,,Railways,Intersects application site buffer,10\n2,Public bodies,,Hospitals operated by NHS Trusts and NHS Foundation Trusts (England),Intersects application site buffer,10`
 		);
 		assert.equal(ruleset.id, 'test-ruleset');
 		assert.equal(ruleset.name, 'Test ruleset');
-		assert.equal(ruleset.rules.length, 2);
 		assert.deepEqual(
-			ruleset.rules.map((rule) => rule.id),
-			['railway', 'hospital']
+			ruleset.rules.map((rule) => rule.categories),
+			[['Railway'], ['Hospital']]
 		);
 	});
 });
@@ -103,9 +166,8 @@ describe('ruleset names from file names', () => {
 });
 
 describe('loadRulesets', () => {
-	const header =
-		'consulteeName\treferenceData\tconsulteeDescription\tmatchingConsulteeType\thostType\tlogicDescription\tlogicType\tintersectionBufferKm';
-	const row = 'hospital\t\tHospitals\t\t\t\tintersection\t10';
+	const header = HEADER;
+	const row = '4,Transport,,Railways,Intersects application site buffer,10';
 
 	test('loads every *_ruleset.csv in file-name order, named from the file, and ignores other files', () => {
 		const dir = mkdtempSync(path.join(tmpdir(), 'rulesets-'));
@@ -129,6 +191,26 @@ describe('loadRulesets', () => {
 		}
 	});
 
+	test('puts the default ruleset first, wherever its file sorts', () => {
+		const dir = mkdtempSync(path.join(tmpdir(), 'rulesets-'));
+		try {
+			for (const file of ['a_ruleset.csv', 'b_ruleset.csv', 'c_ruleset.csv']) {
+				writeFileSync(path.join(dir, file), `${header}\n${row}\n`);
+			}
+			assert.deepEqual(
+				loadRulesets(dir, 'b').map((ruleset) => ruleset.id),
+				['b', 'a', 'c']
+			);
+			// an unknown default leaves file-name order
+			assert.deepEqual(
+				loadRulesets(dir, 'missing').map((ruleset) => ruleset.id),
+				['a', 'b', 'c']
+			);
+		} finally {
+			rmSync(dir, { recursive: true, force: true });
+		}
+	});
+
 	test('fails loudly rather than starting with no rulesets', () => {
 		const dir = mkdtempSync(path.join(tmpdir(), 'rulesets-'));
 		try {
@@ -140,17 +222,69 @@ describe('loadRulesets', () => {
 });
 
 describe('rulesets registry', () => {
-	test('loads exactly the one real ruleset, named from its export, with its conditions', () => {
-		assert.equal(RULESETS.length, 1);
-		const [ruleset] = RULESETS;
-		assert.equal(ruleset.id, 'england-wales-post-20240430');
-		assert.equal(ruleset.name, 'England Wales post 30 April 2024');
-		assert.ok(ruleset.rules.length > 1, 'expected the real export to contain more than one condition');
+	test('loads the three rulesets from the workbook, England and Wales post 30 April 2024 first', () => {
+		assert.deepEqual(
+			RULESETS.map((ruleset) => [ruleset.id, ruleset.name, ruleset.rules.length]),
+			[
+				['england-wales-post-20240430', 'England Wales post 30 April 2024', 34],
+				['england-pre-20240430', 'England pre 30 April 2024', 31],
+				['wales-pre-20240430', 'Wales pre 30 April 2024', 23]
+			]
+		);
+		assert.equal(RULESETS[0].id, DEFAULT_RULESET_ID);
+	});
+
+	test('every condition matches a category the reference data has, or one deliberately awaiting data', () => {
+		// the consultee_area categories in the reference data today (see kt-docs/data/reference-data.md)
+		const referenceCategories = new Set([
+			'Ambulance Trust',
+			'DNO',
+			'Dock or Harbour',
+			'Electricity Generator',
+			'Fire and Rescue Authority',
+			'Greater London Authority',
+			'Hospital',
+			'ICB',
+			'Integrated Transport Authority',
+			'Interconnector',
+			'Internal Drainage Board',
+			'Internal Drainage District',
+			'Local Health Board',
+			'Local Resilience Forum',
+			'Lower Tier Authority',
+			'National Landscape',
+			'National Park',
+			'ONR Site',
+			'Offshore Wind Export Cable',
+			'Offshore Wind Site',
+			'Parish Council',
+			'Passenger Transport Executive',
+			'Police',
+			'Railway',
+			'Unitary Authority',
+			'Upper Tier Authority'
+		]);
+		const categories = RULESETS.flatMap((ruleset) =>
+			ruleset.rules.flatMap((rule) => [...rule.categories, ...(rule.hostCategory ? [rule.hostCategory] : [])])
+		);
+		const unknown = categories.filter(
+			(category) => !referenceCategories.has(category) && !CATEGORIES_AWAITING_DATA.has(category)
+		);
+		assert.deepEqual([...new Set(unknown)], []);
+		// and everything awaiting data is still used, so the list doesn't go stale
+		assert.deepEqual(
+			[...CATEGORIES_AWAITING_DATA].filter((category) => !categories.includes(category)),
+			[]
+		);
+	});
+
+	test("every condition id fits the screening function's 200-character limit", () => {
+		const longest = Math.max(...RULESETS.flatMap((ruleset) => ruleset.rules.map((rule) => rule.id.length)));
+		assert.ok(longest <= 200, `longest condition id is ${longest} characters`);
 	});
 
 	test('getRuleset finds a known ruleset by id and returns undefined for an unknown one', () => {
-		const ruleset = getRuleset('england-wales-post-20240430');
-		assert.ok(ruleset);
+		assert.ok(getRuleset('wales-pre-20240430'));
 		assert.equal(getRuleset('not-a-real-ruleset'), undefined);
 	});
 });

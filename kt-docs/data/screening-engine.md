@@ -6,27 +6,34 @@ The guiding policy is **when in doubt, include**. Consulting one body too many i
 
 ## Rulesets
 
-A ruleset is a list of **conditions**, such as "the district council the site is in", "hospitals within 10km" or "parishes bordering the site's parish". Each is a tab-separated CSV export, one row per condition, named `<name>_ruleset.csv` in `packages/database/src/geospatial/`. The web app loads every such file at start-up (`rulesets.ts`) and sends the selected ruleset's conditions with each run, so the definitions have one home, which the report pages also read to explain matches.
+A ruleset is a list of **conditions**, such as "the district council the site is in", "hospitals within 10km" or "parishes bordering the site's parish". The rulesets come from the **rulesets workbook** (`Rulesets.xlsx`): each sheet is one ruleset, saved as CSV, one row per condition, named `<name>_ruleset.csv` in `packages/database/src/geospatial/`. The web app loads every such file at start-up (`rulesets.ts`) and sends the selected ruleset's conditions with each run, so the definitions have one home, which the report pages also read to explain matches.
 
-The file name gives the id and display name: `england_wales_post_20240430_ruleset.csv` is `england-wales-post-20240430`, shown as "England Wales post 30 April 2024" (joining words stay lower case, `YYYYMMDD` dates are written out). Rename the file to change what users see. The first file alphabetically is the default. One ruleset exists: 27 conditions, 7 that must touch the site, 16 within a distance (1km to 35km) and 4 bordering.
+| Workbook sheet      | File                                      | Shown as                         | Conditions |
+| ------------------- | ----------------------------------------- | -------------------------------- | ---------: |
+| `ew_aft_30_04_2024` | `england_wales_post_20240430_ruleset.csv` | England Wales post 30 April 2024 |         34 |
+| `en_pre_30_04_2024` | `england_pre_20240430_ruleset.csv`        | England pre 30 April 2024        |         31 |
+| `wa_pre_30_04_2024` | `wales_pre_20240430_ruleset.csv`          | Wales pre 30 April 2024          |         23 |
 
-| CSV column                               | Meaning                                                                                                                                |
-| ---------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
-| `consulteeName`                          | Condition id, e.g. `hospital`                                                                                                          |
-| `consulteeDescription`                   | Display name                                                                                                                           |
-| `referenceData`, `matchingConsulteeType` | Category or categories to match: the first non-empty of `referenceData`, `matchingConsulteeType` (`;`-separated), then `consulteeName` |
-| `logicType`                              | `intersection` or `bordering`                                                                                                          |
-| `intersectionBufferKm`                   | For `intersection`: distance from the site; `0` means it must touch                                                                    |
-| `hostType`                               | For `bordering`: the category of the site's "host" area (e.g. parish)                                                                  |
+The file name gives the id and display name: `england_wales_post_20240430_ruleset.csv` is `england-wales-post-20240430`, shown as "England Wales post 30 April 2024" (joining words stay lower case, `YYYYMMDD` dates are written out). Rename the file to change what users see. England Wales post 30 April 2024 is the default (`DEFAULT_RULESET_ID`).
 
-The CSV uses short codes (`distr_council`); the database uses readable categories (`Lower Tier Authority`). `CATEGORY_ALIASES` in `rulesets.ts` maps them. **A code with no alias and no matching category silently matches nothing**: check new conditions against the [reference data](./reference-data.md).
+| CSV column                 | Meaning                                                                                                                                   |
+| -------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| `Group hierarchy`, `Group` | The workbook's grouping (administrative boundaries, public bodies, energy...). Not used by screening                                      |
+| `Category`                 | For administrative boundaries, the authority role from the workbook's A-D_authorities sheet (`B Host Authority`, `A Bordering Authority`) |
+| `Consultee Type(s)`        | Which consultees, in words. `CONSULTEE_TYPES` in `rulesets.ts` maps each wording to categories, and a bordering one to its host category  |
+| `Logic`                    | `Intersects application site`, `Intersects application site buffer`, or `Borders host authority`                                          |
+| `Buffer (km)`              | For the buffer logic: distance from the site                                                                                              |
+
+**An unrecognised Consultee Type(s), Logic or buffer stops the app at start-up**, naming the row, rather than silently matching nothing. A condition's id comes from its authority letter, consultee type and buffer (`b_host_unitary_authorities`, `ambulance_trusts_10km`); its name, shown in **Why identified**, keeps the letter (`"B" host Unitary Authorities`).
+
+Some consultee types have no reference data yet: canals, Joint Transport Authorities (Wales), MoD safeguarding and low flying areas, coal mining reporting areas and the Cheshire brine area (`CATEGORIES_AWAITING_DATA`). Their conditions stay in the rulesets and match nothing until data with those category names is loaded. The check page still lists them, with nothing found.
 
 ## How a run works
 
 Python decides which queries to run and combines the results; the geometry maths runs in SQL Server, as `geography` methods against the spatial index. The SQL is all in `intersector/queries.py`.
 
 1. **Simplify the site** to 10m, once. Detailed boundaries are the main cost: Silvertown Tunnel goes from 2,536 points to 66.
-2. **Fetch everything nearby, once**: every consultee area within 20km (`NEARBY_CONSULTEE_RADIUS_KM`) in any category except Railway. This answers the 20 conditions of 20km or less, filtered in memory, and every area it finds gets a `nearby` reason whether or not a condition matched it.
+2. **Fetch everything nearby, once**: every consultee area within 20km (`NEARBY_CONSULTEE_RADIUS_KM`) in any category except Railway. This answers every condition of 20km or less, filtered in memory, except Railway's, which runs as its own query, and every area it finds gets a `nearby` reason whether or not a condition matched it.
 3. **Run the other conditions**, six at a time, each on its own connection:
    - **Wider than 20km** (three 35km conditions): one query each, limited to their category.
    - **Bordering** (four): find **hosts** (host-category areas intersecting the site), grow each by 50m, and find **neighbours** (matching-category areas intersecting a grown host, excluding the host).
@@ -98,9 +105,9 @@ Long linear schemes are by far the slowest. Azure SQL is slower than a laptop an
 
 ## Changing a ruleset
 
-1. Edit the CSV, or add another `<name>_ruleset.csv` beside it. No code change: conditions travel with each request.
-2. Add new short codes to `CATEGORY_ALIASES`.
-3. Check each condition's category exists in the [reference data](./reference-data.md).
+1. Update the workbook, then save each changed sheet as CSV (UTF-8) over its `<name>_ruleset.csv`, or as a new one beside them. No code change: conditions travel with each request.
+2. A new Consultee Type(s) wording needs an entry in `CONSULTEE_TYPES`; the app won't start until it has one, and `npm test` says which row.
+3. Check each condition's category exists in the [reference data](./reference-data.md); the rulesets test fails on one that doesn't, unless it's listed in `CATEGORIES_AWAITING_DATA`.
 4. Regenerate the golden expectations from an independent calculation, not the app's own output.
 
 ## What screening needs from the data

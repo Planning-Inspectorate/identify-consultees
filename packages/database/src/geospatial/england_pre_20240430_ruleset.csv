@@ -1,0 +1,32 @@
+Group hierarchy,Group,Category,Consultee Type(s),Logic,Buffer (km)
+1,Administative boundaries,B Host Authority,Parish / Town / Community Councils,Intersects application site,0
+1,Administative boundaries,B Host Authority,District Councils (Lower Tier Authorities),Intersects application site,0
+1,Administative boundaries,B Host Authority,Unitary Authorities,Intersects application site,0
+1,Administative boundaries,B Host Authority,National Parks & Broads,Intersects application site,0
+1,Administative boundaries,C Host Authority,County Councils (Upper Tier Authorities),Intersects application site,0
+1,Administative boundaries,A Bordering Authority,"District Councils, Unitary Authorities, National Parks & Broads bordering B Host District Councils",Borders host authority,0
+1,Administative boundaries,A Bordering Authority,"County Councils, District Councils, Unitary Authorities, National Parks & Broads bordering B Host Unitary Authorities",Borders host authority,0
+1,Administative boundaries,D Bordering Authority,"County Councils, Unitary Authorities, National Parks & Broads bordering C Host County Councils",Borders host authority,0
+1,Administative boundaries,Greater London Authority,Greater London Authority,Intersects application site buffer,35
+2,Public bodies,,Ambulance Trusts,Intersects application site,0
+2,Public bodies,,Fire & Rescue Authorities,Intersects application site,0
+2,Public bodies,,Police & Crime Commissioners,Intersects application site,0
+2,Public bodies,,Hospitals operated by NHS Trusts and NHS Foundation Trusts (England),Intersects application site buffer,10
+2,Public bodies,,Integrated Care Boards (England),Intersects application site,0
+2,Public bodies,,Internal Drainage Boards (England & Wales),Intersects application site buffer,10
+2,Public bodies,,Local Resilience Forums,Intersects application site buffer,10
+2,Public bodies,,Local Health Boards (Wales),Intersects application site buffer,10
+2,Public bodies,,National Landscapes (formerly AONBs),Intersects application site buffer,35
+3,Energy,,"Electricity Generators (Biomass, Coal, Energy from Waste, Hydroelectric, Hydrogen, Natural Gas, Nuclear, Offshore Wind, Onshore Wind, Solar, Tidal, Other, Unknown)",Intersects application site buffer,10
+3,Energy,,Offshore Wind Sites,Intersects application site buffer,10
+3,Energy,,Wind Export Cables,Intersects application site buffer,10
+3,Energy,,Office for Nuclear Regulation Sites,Intersects application site buffer,30
+4,Transport,,Canals England & Wales,Intersects application site buffer,10
+4,Transport,,Railways,Intersects application site buffer,10
+4,Transport,,Passenger Transport Executives,Intersects application site buffer,10
+4,Transport,,Integrated Transport Authorities,Intersects application site buffer,10
+4,Transport,,Docks / Harbours operated by Statutory Harbour Authorities,Intersects application site buffer,10
+5,Other,,MoD Safeguarding Areas,Intersects application site buffer,10
+5,Other,,"MoD Low Flying Areas (Green, Amber, Red, Blue)",Intersects application site buffer,10
+5,Other,,Coal Mining Reporting Areas,Intersects application site,0
+5,Other,,Cheshire Brine Area,Intersects application site buffer,10

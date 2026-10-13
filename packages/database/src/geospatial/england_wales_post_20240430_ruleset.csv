@@ -1,28 +1,35 @@
-consulteeName	referenceData	consulteeDescription	matchingConsulteeType	hostType	logicDescription	logicType	intersectionBufferKm
-b_host_parish_comm_council		"B" host Parishes or Community Councils 	parish		Intersects application site 	intersection	0
-a_bordering_b_host_parish_comm_council		"A" Community Councils bordering "B" host Community Councils 	parish	parish	Bordering host authority 	bordering	0
-b_host_distr_council		"B" host District Councils 	distr_council		Intersects application site 	intersection	0
-b_host_unit_auth		"B" host Unitary Councils 	unitary_auth		Intersects application site 	intersection	0
-b_host_nat_park		"B" host National Parks and Broads 	nat_park		Intersects application site 	intersection	0
-c_host_county_council		"C" host County Councils 	county_council		Intersects application site 	intersection	0
-a_unit_auth_nat_park_distr_council_bordering_b_host_distr_auth		"A" Unitary Councils, National Parks and Broads and District Councils bordering "B" host District Councils 	unitary_auth; nat_park; distr_council	distr_council	Bordering host authority 	bordering	0
-a_county_council_unit_auth_nat_park_distr_council_bordering_b_host_unitary_auth		"A" County Councils, Unitary Councils, National Parks and Broads and District Councils bordering "B" host Unitary Councils 	county_council; unit_auth; nat_park; distr_council	unit_auth	Bordering host authority 	bordering	0
-d_county_unitary_nat_park_bordering_c_host_county_council		"D" County Councils, Unitary Councils, National Parks and Broads bordering "C" host County Councils 	county_council; unit_auth; nat_park	county_council	Bordering host authority 	bordering	0
-greater_london_authority		Greater London Authority 	greater_london_authority		Intersects 35km buffer of application site 	intersection	35
-ambulance_trust_1km	ambulance_services_epsg27700	Ambulance Trusts 			Intersects 1km buffer of application site 	intersection	1
-ambulance_trust	ambulance_services_epsg27700	Ambulance Trusts 			Intersects10km buffer of application site 	intersection	10
-fire_and_rescue_service		Fire and Rescue Services boundaries 			Intersects 1km of application site 	intersection	1
-passenger_transport_exec_integrated_transport_auth		Passenger Transport Executives and Integrated Transport Authorities 			Intersects 10km buffer of application site 	intersection	10
-police_crime_commissioner		Police Crime Commissioner 			Intersects 1km of application site 	intersection	1
-hospital		Hospitals 			Intersects 10km buffer of application site 	intersection	10
-integrated_care_board		Clinical Commissioning Groups (Integrated Care Boards) 			Intersects 10km buffer of application site 	intersection	10
-internal_drainage_board_wales	idd_w_epsg27700	Internal Drainage Boards (Wales) 			Intersects 10km buffer of application site 	intersection	10
-internal_drainage_board_england		Internal Drainage Boards (England) 			Intersects	intersection	10
-local_resilience_forum		Local Resilience Forum 			N/A 	intersection	0
-local_health_board		Local Health Board 			Intersects 10km buffer of application site 	intersection	10
-national_landscape_aonb_england		National Landscapes - previously Areas of Outstanding Natural Beauty (England) 			Intersects 35km buffer of application site 	intersection	35
-national_landscape_aonb_wales		National Landscapes - previously Areas of Outstanding Natural Beauty (Wales) 			Intersects 35km buffer of application site 	intersection	35
-docks_harbours_statutory_auth	ports_harbours_epsg27700	Docks or harbours operated by statutory dock or harbour authorities 			Intersects 10km buffer of application site 	intersection	10
-offshore_areas_wind_site		Offshore areas (wind) 			Intersects 10km buffer of application site 	intersection	10
-offshore_areas_export_cable		Offshore areas (export cables) 			Intersects 10km buffer of application site 	intersection	10
-office_for_nuclear_regulation_site		Office for Nuclear Regulation sites 			N/A 	intersection	0
+Group hierarchy,Group,Category,Consultee Type(s),Logic,Buffer (km)
+1,Administative boundaries,B Host Authority,Parish / Town / Community Councils,Intersects application site,0
+1,Administative boundaries,A Bordering Authority,Community Councils bordering B Host Community Councils,Borders host authority,0
+1,Administative boundaries,B Host Authority,District Councils (Lower Tier Authorities),Intersects application site,0
+1,Administative boundaries,B Host Authority,Unitary Authorities,Intersects application site,0
+1,Administative boundaries,B Host Authority,National Parks & Broads,Intersects application site,0
+1,Administative boundaries,C Host Authority,County Councils (Upper Tier Authorities),Intersects application site,0
+1,Administative boundaries,A Bordering Authority,"District Councils, Unitary Authorities, National Parks & Broads bordering B Host District Councils",Borders host authority,0
+1,Administative boundaries,A Bordering Authority,"County Councils, District Councils, Unitary Authorities, National Parks & Broads bordering B Host Unitary Authorities",Borders host authority,0
+1,Administative boundaries,D Bordering Authority,"County Councils, Unitary Authorities, National Parks & Broads bordering C Host County Councils",Borders host authority,0
+1,Administative boundaries,Greater London Authority,Greater London Authority,Intersects application site buffer,35
+2,Public bodies,,National Landscapes (formerly AONBs),Intersects application site buffer,35
+2,Public bodies,,Internal Drainage Boards (England & Wales),Intersects application site buffer,10
+2,Public bodies,,Ambulance Trusts,Intersects application site buffer,1
+2,Public bodies,,Ambulance Trusts,Intersects application site buffer,10
+2,Public bodies,,Fire & Rescue Authorities,Intersects application site buffer,1
+2,Public bodies,,Police & Crime Commissioners,Intersects application site buffer,1
+2,Public bodies,,Hospitals operated by NHS Trusts and NHS Foundation Trusts (England),Intersects application site buffer,10
+2,Public bodies,,Integrated Care Boards (England),Intersects application site buffer,10
+2,Public bodies,,Local Health Boards (Wales),Intersects application site buffer,10
+3,Energy,,"Electricity Generators (Biomass, Coal, Energy from Waste, Hydroelectric, Hydrogen, Natural Gas, Nuclear, Offshore Wind, Onshore Wind, Solar, Tidal, Other, Unknown)",Intersects application site buffer,10
+3,Energy,,Offshore Wind Sites,Intersects application site buffer,10
+3,Energy,,Wind Export Cables,Intersects application site buffer,10
+3,Energy,,Electricity Distribution Networks,Intersects application site buffer,10
+3,Energy,,"Electricity Interconnectors (Built, Proposed, Scoping)",Intersects application site buffer,10
+4,Transport,,Canals England & Wales,Intersects application site buffer,10
+4,Transport,,Railways,Intersects application site buffer,10
+4,Transport,,Passenger Transport Executives,Intersects application site buffer,10
+4,Transport,,Integrated Transport Authorities,Intersects application site buffer,10
+4,Transport,,Docks / Harbours operated by Statutory Harbour Authorities,Intersects application site buffer,10
+4,Transport,,Joint Transport Authorities (Wales),Intersects application site buffer,10
+5,Other,,MoD Safeguarding Areas,Intersects application site buffer,10
+5,Other,,"MoD Low Flying Areas (Green, Amber, Red, Blue)",Intersects application site buffer,10
+5,Other,,Coal Mining Reporting Areas,Intersects application site,0
+5,Other,,Cheshire Brine Area,Intersects application site,0

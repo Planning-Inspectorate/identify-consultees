@@ -27,7 +27,7 @@ function realProjectRow(overrides: Record<string, unknown> = {}) {
 
 function parishMatchRow(id = matchId, consultee = 'Little Snoring Parish Council', distanceMetres = 0) {
 	return {
-		reasons: [{ type: 'condition' as const, conditionId: 'b_host_parish_comm_council' }],
+		reasons: [{ type: 'condition' as const, conditionId: 'b_host_parish_town_community_councils' }],
 		id,
 		geometryType: 'MultiLineString',
 		consulteeCategory: 'Parish Council',
@@ -110,7 +110,7 @@ describe('report consultees change page', () => {
 		assert.strictEqual(viewModel.rows[0].name, 'Little Snoring Parish Council');
 		// the reason the function gave, as the ruleset condition's own description
 		assert.deepStrictEqual(viewModel.rows[0].identified, [
-			'"B" host Parishes or Community Councils: intersects the site'
+			'"B" host Parish / Town / Community Councils: intersects the site'
 		]);
 		assert.strictEqual(
 			viewModel.rows[0].removeUrl,
@@ -140,7 +140,10 @@ describe('report consultees change page', () => {
 			consultee: 'Norfolk Hospital',
 			distanceMetres: 123.456,
 			reasons: [
-				{ type: 'condition' as const, conditionId: 'hospital' },
+				{
+					type: 'condition' as const,
+					conditionId: 'hospitals_operated_by_nhs_trusts_and_nhs_foundation_trusts_england_10km'
+				},
 				{ type: 'nearby' as const, radiusMetres: 20_000 }
 			]
 		};
@@ -149,7 +152,7 @@ describe('report consultees change page', () => {
 
 		const viewModel = mockRes.render.mock.calls[0].arguments[1];
 		assert.deepStrictEqual(viewModel.rows[0].identified, [
-			'Hospitals: within 10km of the site',
+			'Hospitals operated by NHS Trusts and NHS Foundation Trusts (England): within 10km of the site',
 			'Within 20km of the site'
 		]);
 	});
@@ -158,7 +161,12 @@ describe('report consultees change page', () => {
 		const mockRes = { status: mock.fn(() => mockRes), render: mock.fn() };
 		const borderingRow = {
 			...parishMatchRow(matchId, 'Little Snoring Parish Council', 500),
-			reasons: [{ type: 'condition' as const, conditionId: 'a_bordering_b_host_parish_comm_council' }]
+			reasons: [
+				{
+					type: 'condition' as const,
+					conditionId: 'a_bordering_community_councils_bordering_b_host_community_councils'
+				}
+			]
 		};
 		const db = dbReturning([[realProjectRow()], [borderingRow]]);
 		await handlerFor(db)({ params: { caseId: realProjectId }, query: { category: 'Parish Council' } }, mockRes);

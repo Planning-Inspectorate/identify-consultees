@@ -268,13 +268,16 @@ describe('report created page', () => {
 		consulteeCategory: 'Hospital',
 		consultee: 'Norfolk Hospital',
 		reasons: [
-			{ type: 'condition' as const, conditionId: 'hospital' },
+			{
+				type: 'condition' as const,
+				conditionId: 'hospitals_operated_by_nhs_trusts_and_nhs_foundation_trusts_england_10km'
+			},
 			{ type: 'nearby' as const, radiusMetres: 20_000 }
 		]
 	});
 	const parishRow = () => ({
 		...parishMatchRow(),
-		reasons: [{ type: 'condition' as const, conditionId: 'b_host_parish_comm_council' }]
+		reasons: [{ type: 'condition' as const, conditionId: 'b_host_parish_town_community_councils' }]
 	});
 
 	function createdPage(rows: ConsulteeAreaMatchRow[], rulesetRunner = rulesetRunnerReturning(rows)) {
@@ -313,7 +316,7 @@ describe('report created page', () => {
 				consultees: [
 					{
 						name: 'Little Snoring Parish Council',
-						identified: ['"B" host Parishes or Community Councils: intersects the site']
+						identified: ['"B" host Parish / Town / Community Councils: intersects the site']
 					}
 				]
 			},
@@ -322,7 +325,10 @@ describe('report created page', () => {
 				consultees: [
 					{
 						name: 'Norfolk Hospital',
-						identified: ['Hospitals: within 10km of the site', 'Within 20km of the site']
+						identified: [
+							'Hospitals operated by NHS Trusts and NHS Foundation Trusts (England): within 10km of the site',
+							'Within 20km of the site'
+						]
 					}
 				]
 			}
@@ -334,7 +340,10 @@ describe('report created page', () => {
 		assert.match(html, /Download Real Test Project scoping report/);
 		assert.match(html, /Consultees in the report \(2\)/);
 		assert.match(html, /Why identified/);
-		assert.match(html, /Hospitals: within 10km of the site<br>Within 20km of the site/);
+		assert.match(
+			html,
+			/Hospitals operated by NHS Trusts and NHS Foundation Trusts \(England\): within 10km of the site<br>Within 20km of the site/
+		);
 	});
 
 	it('should leave out removed consultees and include hand-added ones, with the reason given', async () => {
@@ -358,7 +367,13 @@ describe('report created page', () => {
 			{
 				category: 'Hospital',
 				consultees: [
-					{ name: 'Norfolk Hospital', identified: ['Hospitals: within 10km of the site', 'Within 20km of the site'] },
+					{
+						name: 'Norfolk Hospital',
+						identified: [
+							'Hospitals operated by NHS Trusts and NHS Foundation Trusts (England): within 10km of the site',
+							'Within 20km of the site'
+						]
+					},
 					{ name: 'Added Hospital', identified: ['Asked to be consulted'] }
 				]
 			},
