@@ -229,6 +229,27 @@ def test_combines_every_conditions_matches_deduplicated_with_geometry(connection
     assert matches[0].area.properties["metadata"] == {}
 
 
+def test_leaves_out_every_geometry_when_asked(connection_params, areas):
+    # one condition answered from the nearby search, one by its own query, and one bordering - every
+    # way a condition match can come by geometry
+    areas(
+        (TEST_AREA_ID, "POINT(0 0)", "Railway", "Test Railway"),
+        (SECOND_AREA_ID, "POINT(0 0)", "Hospital", "Test Hospital"),
+        (HOST_AREA_ID, _square(0, 1), "Parish Council", "Host Parish"),
+        (NEIGHBOUR_AREA_ID, _square(1, 2), "Parish Council", "Neighbour Parish"),
+    )
+    rules = [
+        _rule(id="railway", categories=("Railway",), buffer_metres=10_000),
+        _rule(id="hospital", categories=("Hospital",), buffer_metres=10_000),
+        _rule(id="bordering", logic_type="bordering", categories=("Parish Council",), host_category="Parish Council"),
+    ]
+
+    matches = _matched(run_ruleset(connection_params, "POINT(0.001 0.001)", rules, 20_000, with_geometry=False))
+
+    assert {TEST_AREA_ID, SECOND_AREA_ID, NEIGHBOUR_AREA_ID} <= set(_ids(matches))
+    assert all(match.area.geometry_wkt is None for match in matches)
+
+
 def test_orders_matches_tied_at_the_same_distance_by_id(connection_params, areas):
     areas(
         (SECOND_AREA_ID, "POINT(0 0)", "Railway", "Test Railway 2"),

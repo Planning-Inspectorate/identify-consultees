@@ -35,12 +35,14 @@ class RunRulesetRequest:
     nearby_radius_metres: float
     nearby_radius_metres_by_category: dict[str, float]
     """A nearby radius for particular categories, overriding nearby_radius_metres for them."""
+    include_geometry: bool = True
+    """Whether condition matches carry their original geometry (`geometryWkt`) - see run_ruleset."""
 
 
 def parse_run_ruleset_request(body: object) -> RunRulesetRequest:
     """Validate a decoded request body: `{siteWkt, rules: [{id, logicType, categories,
-    bufferMetres?, hostCategory?}], nearbyRadiusMetres, nearbyRadiusMetresByCategory?}`. Raises
-    BadRequest."""
+    bufferMetres?, hostCategory?}], nearbyRadiusMetres, nearbyRadiusMetresByCategory?,
+    includeGeometry?}` (includeGeometry defaults to true). Raises BadRequest."""
     if not isinstance(body, dict):
         raise BadRequest("request body must be a JSON object")
 
@@ -56,7 +58,14 @@ def parse_run_ruleset_request(body: object) -> RunRulesetRequest:
         rules=[_parse_rule(rule) for rule in rules],
         nearby_radius_metres=_distance(body.get("nearbyRadiusMetres"), "nearbyRadiusMetres"),
         nearby_radius_metres_by_category=_radius_by_category(body.get("nearbyRadiusMetresByCategory", {})),
+        include_geometry=_boolean(body.get("includeGeometry", True), "includeGeometry"),
     )
+
+
+def _boolean(value: object, name: str) -> bool:
+    if not isinstance(value, bool):
+        raise BadRequest(f"{name} must be true or false")
+    return value
 
 
 def _radius_by_category(raw: object) -> dict[str, float]:
@@ -102,7 +111,7 @@ def _string(value: object, name: str) -> str:
 
 def consultees_json(consultees: list[Consultee]) -> dict:
     """The response body: `{consultees: [{feature: {id, properties, geometryWkt?}, distanceMetres,
-    reasons}]}`."""
+    reasons}]}` - geometryWkt only for condition matches, and only when the request asked for it."""
     return {"consultees": [_consultee_json(consultee) for consultee in consultees]}
 
 
