@@ -6,8 +6,9 @@ import type { AddedConsultee, RemovedConsultee } from '../urls.ts';
 /**
  * The exported consultee report: a Summary tab, then one tab per high-level group of the rulesets
  * workbook. Each consultee goes on the tab of the condition that identified it (a hand-added one,
- * its category's), with its consultee_area columns - less the geometries and the ids and version the
- * reference data leaves empty - and its metadata spread into a column per attribute.
+ * its category's), with where it came from (the ruleset, or added by hand), its consultee_area
+ * columns - less the geometries and the ids and version the reference data leaves empty - and its
+ * metadata spread into a column per attribute.
  */
 
 /** The tabs after Summary, in order. "Other Cases" is a placeholder - nothing fills it yet. */
@@ -82,13 +83,14 @@ const HEADER = [
 	'Region',
 	'Why identified',
 	'Distance from site (km)',
+	'Source',
 	'Consultee area id',
 	'Geometry type',
 	'Case reference',
 	'Last updated'
 ] as const;
 
-export const GROUP_TAB_COLUMN_WIDTHS = [36, 28, 22, 60, 12, 38, 16, 14, 18];
+export const GROUP_TAB_COLUMN_WIDTHS = [36, 28, 22, 60, 12, 16, 38, 16, 14, 18];
 
 type Cell = SheetData[number][number];
 
@@ -151,6 +153,7 @@ function matchRow(match: ConsulteeMatch, ruleset: Ruleset, record: ConsulteeArea
 		text(record?.region ?? properties.region),
 		{ value: describeReasons(match, ruleset, { nearby: false }).join('\n'), wrap: true },
 		kilometres(match.distanceMetres),
+		{ value: 'Ruleset' },
 		{ value: match.feature.id },
 		...storedCells(record)
 	];
@@ -162,8 +165,9 @@ function addedRow(add: ReportExport['added'][number], record: ConsulteeAreaRecor
 		{ value: add.name },
 		{ value: add.category },
 		text(record?.region),
-		{ value: add.reason ? `Added by hand: ${add.reason}` : 'Added by hand', wrap: true },
+		{ value: add.reason || 'Manually added', wrap: true },
 		kilometres(add.distanceMetres ?? null),
+		{ value: 'Added by hand' },
 		text(add.id),
 		...storedCells(record)
 	];

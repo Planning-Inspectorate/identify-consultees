@@ -124,14 +124,15 @@ describe('report workbook', () => {
 			})
 		);
 		const admin = sheets.find((sheet) => sheet.sheet === 'Administrative boundaries')!;
-		// no geometry, no ids or version the reference data leaves empty, no Source - then the
-		// metadata's own attributes
+		// no geometry, no ids or version the reference data leaves empty - then the metadata's own
+		// attributes
 		assert.deepStrictEqual(rowValues(admin.data[0]), [
 			'Consultee',
 			'Category',
 			'Region',
 			'Why identified',
 			'Distance from site (km)',
+			'Source',
 			'Consultee area id',
 			'Geometry type',
 			'Case reference',
@@ -146,14 +147,15 @@ describe('report workbook', () => {
 				'Stored region',
 				'"B" host Parish Councils: intersects the site',
 				0.01,
+				'Ruleset',
 				'a',
 				'Polygon',
 				null,
 				new Date('2026-10-01T09:00:00Z'),
 				1
 			],
-			// added by hand, saying so in place of a reason
-			['Added Parish', 'Parish Council', null, 'Added by hand', null, null, null, null, null, null],
+			// added by hand, with the default reason
+			['Added Parish', 'Parish Council', null, 'Manually added', null, 'Added by hand', null, null, null, null, null],
 			// no stored row (deleted mid-request) - the run's values, and no metadata
 			[
 				'Zeal Parish Council',
@@ -161,6 +163,7 @@ describe('report workbook', () => {
 				'Feature region',
 				'"B" host Parish Councils: intersects the site',
 				1.23,
+				'Ruleset',
 				'b',
 				null,
 				null,
@@ -194,9 +197,9 @@ describe('report workbook', () => {
 			})
 		);
 		const admin = sheets.find((sheet) => sheet.sheet === 'Administrative boundaries')!;
-		assert.deepStrictEqual(rowValues(admin.data[0]).slice(9), ['PARNCP', 'FID', 'open', 'area', 'note', 'Metadata']);
+		assert.deepStrictEqual(rowValues(admin.data[0]).slice(10), ['PARNCP', 'FID', 'open', 'area', 'note', 'Metadata']);
 		assert.deepStrictEqual(
-			admin.data.slice(1).map((row) => rowValues(row).slice(9)),
+			admin.data.slice(1).map((row) => rowValues(row).slice(10)),
 			[
 				['Abbey', 7, true, '{"ha":12}', null, null],
 				[null, 8, null, null, null, null],
@@ -205,18 +208,18 @@ describe('report workbook', () => {
 			]
 		);
 		// numbers and true/false keep their types
-		assert.deepStrictEqual(admin.data[1][10], { type: Number, value: 7 });
-		assert.deepStrictEqual(admin.data[1][11], { type: Boolean, value: true });
+		assert.deepStrictEqual(admin.data[1][11], { type: Number, value: 7 });
+		assert.deepStrictEqual(admin.data[1][12], { type: Boolean, value: true });
 		// a column per attribute, sized to its name
 		assert.deepStrictEqual(
-			admin.columns.slice(9).map((column) => column.width),
+			admin.columns.slice(10).map((column) => column.width),
 			[12, 12, 12, 12, 12, 12]
 		);
 
 		// another tab has its own data's attributes
 		const publicBodies = sheets.find((sheet) => sheet.sheet === 'Public bodies')!;
-		assert.deepStrictEqual(rowValues(publicBodies.data[0]).slice(9), ['ODS']);
-		assert.deepStrictEqual(rowValues(publicBodies.data[1]).slice(9), ['RX1']);
+		assert.deepStrictEqual(rowValues(publicBodies.data[0]).slice(10), ['ODS']);
+		assert.deepStrictEqual(rowValues(publicBodies.data[1]).slice(10), ['RX1']);
 	});
 
 	it('summarises the report, counting each tab, and lists removals with their reasons', () => {
@@ -272,8 +275,9 @@ describe('report workbook', () => {
 			'Picked Parish',
 			'Parish Council',
 			'Stored region',
-			'Added by hand: Borders the site',
+			'Borders the site',
 			2.5,
+			'Added by hand',
 			'p',
 			'Polygon',
 			'EN010001',
@@ -297,6 +301,7 @@ describe('report workbook', () => {
 			null,
 			'"B" host Parish Councils: intersects the site',
 			null,
+			'Ruleset',
 			'u',
 			null,
 			null,
