@@ -54,9 +54,11 @@ export function parseArgs(argv: string[]): ParsedArgs {
 function logProgress(startedAt: number) {
 	return (loaded: number, total: number) => {
 		const elapsedSeconds = (Date.now() - startedAt) / 1000;
+		// onProgress only fires after a batch wrote at least one row, so rate is never 0 (a
+		// sub-millisecond batch just makes it Infinity, which still rounds to a 0s ETA)
 		const rate = loaded / elapsedSeconds;
 		const remaining = total - loaded;
-		const etaSeconds = rate > 0 ? Math.round(remaining / rate) : 0;
+		const etaSeconds = Math.round(remaining / rate);
 		console.log(`  ${loaded}/${total} (${rate.toFixed(0)} rows/s, ~${etaSeconds}s remaining)`);
 	};
 }
