@@ -131,6 +131,8 @@ test.describe('manage journeys', () => {
 		await expect(page.getByText(SAMPLE_CASE_NAME).first()).toBeVisible();
 		const shapefileRadios = page.getByRole('radio');
 		expect(await shapefileRadios.count()).toBeGreaterThanOrEqual(1);
+		// no radio is pre-selected - pick the page's own file to stay on the same case id
+		await page.locator(`input[name="shapefile"][value="${SAMPLE_CASE_ID}"]`).check();
 		await page.getByRole('button', { name: 'Continue' }).click();
 
 		// the ruleset page picks the ruleset the report is generated with

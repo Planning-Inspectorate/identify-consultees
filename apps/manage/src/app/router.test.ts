@@ -134,12 +134,13 @@ describe('manage router wiring', () => {
 		assert.match(response.text, /Confirm shapefile for report/);
 		assert.match(response.text, /Continue/);
 		assert.match(response.text, /app-consultee-map/);
-		// the single stored file, and nothing else
+		// the single stored file, and nothing else - and no radio pre-selected
 		assert.match(response.text, /type="radio"[^>]*value="33333333-3333-3333-3333-333333333333"/);
+		assert.doesNotMatch(response.text, /type="radio"[^>]*checked/);
 		assert.doesNotMatch(response.text, /:placeholder/);
 	});
 
-	test('GET /consultees/:id/ruleset renders the ruleset radios', async () => {
+	test('GET /consultees/:id/ruleset renders the ruleset radios, none pre-selected', async () => {
 		const response = await request(authDisabledApp).get(`/consultees/${homePageTestCaseId}/ruleset`);
 		assert.equal(response.status, 200);
 		// the fieldset legend is the page heading, with the case name as its caption
@@ -149,7 +150,16 @@ describe('manage router wiring', () => {
 		);
 		assert.match(response.text, /Router Test Fixture Wind Farm/);
 		assert.match(response.text, /type="radio"[^>]*value="england-wales-post-20240430"/);
+		assert.doesNotMatch(response.text, /type="radio"[^>]*checked/);
 		assert.match(response.text, /Identify consultees/);
+	});
+
+	test('GET /consultees/:id/ruleset?ruleset= marks only the already-chosen ruleset checked', async () => {
+		const response = await request(authDisabledApp).get(
+			`/consultees/${homePageTestCaseId}/ruleset?ruleset=england-wales-post-20240430`
+		);
+		assert.equal(response.status, 200);
+		assert.match(response.text, /type="radio"[^>]*value="england-wales-post-20240430"[^>]*checked/);
 	});
 
 	test('POST /consultees/:id/ruleset leads on to the check page with the chosen ruleset', async () => {
@@ -183,7 +193,7 @@ describe('manage router wiring', () => {
 		assert.equal(response.headers.location, `/consultees/${homePageTestCaseId}/ruleset`);
 	});
 
-	test('POST /consultees/:id returns to the page when the shapefile is not one of its files', async () => {
+	test('POST /consultees/:id re-renders with an error when the shapefile is not one of its files', async () => {
 		const agent = request.agent(authDisabledApp);
 		const page = await agent.get(`/consultees/${homePageTestCaseId}`);
 		const csrf = /name="_csrf" value="([^"]+)"/.exec(page.text)?.[1];
@@ -193,8 +203,21 @@ describe('manage router wiring', () => {
 			.post(`/consultees/${homePageTestCaseId}`)
 			.type('form')
 			.send({ _csrf: csrf, shapefile: '99999999-9999-9999-9999-999999999999' });
-		assert.equal(response.status, 302);
-		assert.equal(response.headers.location, `/consultees/${homePageTestCaseId}`);
+		assert.equal(response.status, 200);
+		assert.match(response.text, /There is a problem/);
+		assert.match(response.text, /Select a shapefile/);
+	});
+
+	test('POST /consultees/:id/ruleset re-renders with an error when no ruleset is chosen', async () => {
+		const agent = request.agent(authDisabledApp);
+		const page = await agent.get(`/consultees/${homePageTestCaseId}/ruleset`);
+		const csrf = /name="_csrf" value="([^"]+)"/.exec(page.text)?.[1];
+		assert.ok(csrf, 'expected the ruleset form to carry a CSRF token');
+
+		const response = await agent.post(`/consultees/${homePageTestCaseId}/ruleset`).type('form').send({ _csrf: csrf });
+		assert.equal(response.status, 200);
+		assert.match(response.text, /There is a problem/);
+		assert.match(response.text, /Select a ruleset/);
 	});
 
 	test('GET /consultees/:id/report renders the report check page', async () => {

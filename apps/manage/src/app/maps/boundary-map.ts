@@ -2,8 +2,8 @@
  * Build the map config for the project boundary page: one dataset per shapefile the case holds,
  * grouped under "GIS shapefiles" in the map's Layers menu so each file can be toggled on or off,
  * each in its own style - the most recent red (see config/map-styles/boundary-map.yaml).
- * Only the file carried forward (the current selection) starts visible - the rest are unchecked,
- * matching the radios below the map.
+ * Only the page's own file starts visible - the rest are unchecked in the Layers menu (the radios
+ * below the map are never pre-selected; this is which layer the map draws, not a form answer).
  */
 
 import type { Geometry } from '@pins/identify-consultees-database/src/geospatial/wkt.ts';
@@ -41,7 +41,7 @@ export interface BoundaryMapFile {
 	id: string;
 	/** The file's name - the dataset's label in the Layers menu and the radio's text. */
 	label: string;
-	/** True for the file carried into the report - it starts checked in the Layers menu. */
+	/** True for the file the page was opened on - it starts checked (visible) in the Layers menu. */
 	checked: boolean;
 	/** When the file was received - the most recent is drawn red (see config/map-styles/boundary-map.yaml). */
 	receivedDate: Date | null;

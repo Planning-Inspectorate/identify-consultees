@@ -141,14 +141,12 @@ describe('manage page accessibility smoke', () => {
 				{
 					value: '11111111-1111-1111-1111-111111111111',
 					text: 'EN0110007.geojson',
-					hint: { text: 'Uploaded: 11:20, 19 Sept 2026' },
-					checked: true
+					hint: { text: 'Uploaded: 11:20, 19 Sept 2026' }
 				},
 				{
 					value: '22222222-2222-2222-2222-222222222222',
 					text: 'EN0110007-acceptance.geojson',
-					hint: { text: 'Uploaded: 12:16, 29 Jul 2026' },
-					checked: false
+					hint: { text: 'Uploaded: 12:16, 29 Jul 2026' }
 				}
 			],
 			mapId: 'case-map',

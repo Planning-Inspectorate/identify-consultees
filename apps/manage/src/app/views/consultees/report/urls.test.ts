@@ -74,6 +74,19 @@ describe('report url helpers', () => {
 		);
 	});
 
+	it('should build a ruleset picker URL with no ruleset chosen, opening the query string itself', () => {
+		assert.strictEqual(rulesetUrl('case-1'), '/consultees/case-1/ruleset');
+		assert.strictEqual(
+			rulesetUrl('case-1', undefined, {
+				removed: [{ id: 'm-1', category: '', name: '', reason: '' }],
+				adds: [{ category: 'Parish Council', name: 'A Consultee', reason: 'borders' }]
+			}),
+			`/consultees/case-1/ruleset?exclude=m-1&add=${encodeURIComponent(
+				JSON.stringify({ c: 'Parish Council', n: 'A Consultee', r: 'borders' })
+			)}`
+		);
+	});
+
 	it('should serialize a name-less removal with no id as an empty exclude param', () => {
 		// an id-only entry carries no name - and if it carried no id either there's nothing to encode
 		assert.strictEqual(

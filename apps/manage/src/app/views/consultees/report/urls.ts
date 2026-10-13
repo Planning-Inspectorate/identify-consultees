@@ -178,21 +178,30 @@ export function consulteeSelection(query?: Record<string, unknown>): ConsulteeSe
 const NO_SELECTION: ConsulteeSelection = { removed: [], adds: [] };
 
 function appendSelection(url: string, selection: ConsulteeSelection): string {
+	// the picker URL only carries a query string once a ruleset is chosen, so the first param
+	// may need to open it
+	const separator = () => (url.includes('?') ? '&' : '?');
 	for (const removal of selection.removed) {
-		url += `&exclude=${encodeURIComponent(encodeRemoval(removal))}`;
+		url += `${separator()}exclude=${encodeURIComponent(encodeRemoval(removal))}`;
 	}
 	for (const add of selection.adds) {
-		url += `&add=${encodeURIComponent(encodeAdd(add))}`;
+		url += `${separator()}add=${encodeURIComponent(encodeAdd(add))}`;
 	}
 	return url;
 }
 
-/** The ruleset picker page - where the boundary page's "Continue" and the check page's "Change"/back links lead. */
-export function rulesetUrl(caseId: string, rulesetId: string, selection: ConsulteeSelection = NO_SELECTION): string {
-	return appendSelection(
-		`/consultees/${encodeURIComponent(caseId)}/ruleset?ruleset=${encodeURIComponent(rulesetId)}`,
-		selection
-	);
+/**
+ * The ruleset picker page - where the boundary page's "Continue" and the check page's
+ * "Change"/back links lead. `rulesetId` is present only when the user has already picked a
+ * ruleset (the links the check page builds) - the picker's radios are never pre-selected, so
+ * the boundary page's "Continue" leads here without one.
+ */
+export function rulesetUrl(caseId: string, rulesetId?: string, selection: ConsulteeSelection = NO_SELECTION): string {
+	let url = `/consultees/${encodeURIComponent(caseId)}/ruleset`;
+	if (rulesetId) {
+		url += `?ruleset=${encodeURIComponent(rulesetId)}`;
+	}
+	return appendSelection(url, selection);
 }
 
 /** The report check page ("Identify consultees" destination) for a boundary/ruleset/selection. */

@@ -9,7 +9,6 @@ import type {
 	Ruleset,
 	RunRulesetResult
 } from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
-import { getRuleset, RULESETS } from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
 import type { SearchAreaDisplay } from '../../maps/case-geojson.ts';
 import type { RulesetRunner } from '../../ruleset-runner.ts';
 
@@ -139,13 +138,4 @@ export async function buildSearchAreaSafely(
 		logger.error({ error, caseId: project.id }, 'Failed to build the map search area');
 		return undefined;
 	}
-}
-
-/**
- * The ruleset a picker page should treat as current: the requested one if it's real, else the
- * first (top-of-list) ruleset - pickers pre-select rather than error, since they only carry the
- * map page's state.
- */
-export function selectedRuleset(requestedId: unknown): Ruleset {
-	return getRuleset(firstQueryValue(requestedId)) ?? RULESETS[0];
 }

@@ -73,16 +73,17 @@ describe('consultee project boundary page', () => {
 		assert.strictEqual(viewModel.formAction, `/consultees/${realProjectId}`);
 		assert.ok(viewModel.mapConfigJson.includes('FeatureCollection'));
 
-		// a single-file case lists just that file, checked
+		// a single-file case lists just that file, and no radio is pre-selected
 		assert.strictEqual(viewModel.files.length, 1);
 		assert.strictEqual(viewModel.files[0].value, realProjectId);
 		assert.strictEqual(viewModel.files[0].text, 'EN010099.geojson');
-		assert.strictEqual(viewModel.files[0].checked, true);
+		assert.strictEqual('checked' in viewModel.files[0], false);
 		assert.match(viewModel.files[0].hint.text, /Uploaded: /);
 
 		const mapConfig = JSON.parse(viewModel.mapConfigJson);
 		assert.strictEqual(mapConfig.shapefileGroupLabel, 'GIS shapefiles');
 		assert.strictEqual(mapConfig.shapefileDatasets.length, 1);
+		// the map still draws the page's own file first - layer state, not a form answer
 		assert.strictEqual(mapConfig.shapefileDatasets[0].checked, true);
 		assert.strictEqual(mapConfig.fallback.src, `/consultees/${realProjectId}/boundary-map`);
 
@@ -104,13 +105,15 @@ describe('consultee project boundary page', () => {
 
 		const viewModel = mockRes.render.mock.calls[0].arguments[1];
 		assert.strictEqual(viewModel.files.length, 2);
-		// receivedDate DESC puts the newer sibling first; the file the page was opened on is checked
+		// receivedDate DESC puts the newer sibling first; no radio is pre-selected
 		assert.strictEqual(viewModel.files[0].value, siblingProjectId);
-		assert.strictEqual(viewModel.files[0].checked, false);
 		assert.strictEqual(viewModel.files[1].value, realProjectId);
-		assert.strictEqual(viewModel.files[1].checked, true);
+		assert.ok(viewModel.files.every((file) => !('checked' in file)));
 
 		const mapConfig = JSON.parse(viewModel.mapConfigJson);
+		// the file the page was opened on is the layer the map draws first
+		assert.strictEqual(mapConfig.shapefileDatasets[0].checked, false);
+		assert.strictEqual(mapConfig.shapefileDatasets[1].checked, true);
 		// the sibling's geometry came from its own case_boundary row
 		assert.deepStrictEqual(mapConfig.shapefileDatasets[0].geojson.features[0].geometry, {
 			type: 'Point',
@@ -178,9 +181,10 @@ describe('project boundary submit', () => {
 		assert.strictEqual(mockRes.redirect.mock.calls[0].arguments[0], `/consultees/${siblingProjectId}/ruleset`);
 	});
 
-	it('should return to the page when the submitted file is missing or not one of this project', async () => {
+	it('should re-render with a validation error when the submitted file is missing or not one of this project', async () => {
 		const mockRes = { status: mock.fn(() => mockRes), render: mock.fn(), redirect: mock.fn() };
-		// each submit needs the summary row then the file list - supply them for all three calls
+		// each unanswered submit resolves the case then lists its files (the single-file map needs
+		// no further lookups), so supply those rows for all three calls
 		const db = dbReturning([
 			[realProjectRow()],
 			[boundaryFile(realProjectRow())],
@@ -195,9 +199,13 @@ describe('project boundary submit', () => {
 			{ params: { caseId: realProjectId }, body: { shapefile: '99999999-9999-9999-9999-999999999999' } },
 			mockRes
 		);
-		assert.strictEqual(mockRes.redirect.mock.calls[0].arguments[0], `/consultees/${realProjectId}`);
-		assert.strictEqual(mockRes.redirect.mock.calls[1].arguments[0], `/consultees/${realProjectId}`);
-		assert.strictEqual(mockRes.redirect.mock.calls[2].arguments[0], `/consultees/${realProjectId}`);
+		assert.strictEqual(mockRes.redirect.mock.callCount(), 0);
+		assert.strictEqual(mockRes.render.mock.callCount(), 3);
+		for (const call of mockRes.render.mock.calls) {
+			assert.strictEqual(call.arguments[0], 'views/consultees/project/view.njk');
+			assert.deepStrictEqual(call.arguments[1].errorSummary, [{ text: 'Select a shapefile', href: '#shapefile' }]);
+			assert.deepStrictEqual(call.arguments[1].shapefileError, { text: 'Select a shapefile' });
+		}
 	});
 
 	it('should 404 for a malformed or unknown case', async () => {

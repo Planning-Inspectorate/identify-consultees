@@ -4,7 +4,7 @@
 {% from "govuk/components/radios/macro.njk" import govukRadios %}
 
 {% block pageTitle %}
-	{{ pageHeading }} - {{ config.headerTitle }}
+	{% if errorSummary %}Error: {% endif %}{{ pageHeading }} - {{ config.headerTitle }}
 {% endblock %}
 
 {% block head %}
@@ -33,6 +33,7 @@
 					classes: "govuk-fieldset__legend--m"
 				}
 			},
+			errorMessage: shapefileError,
 			items: files
 		}) }}
 
