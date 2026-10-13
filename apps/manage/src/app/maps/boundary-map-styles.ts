@@ -1,8 +1,10 @@
+import { CONFIG_DIR } from '@pins/identify-consultees-database/src/config-dir.ts';
 import yaml from 'js-yaml';
 import { readFileSync } from 'node:fs';
+import path from 'node:path';
 
 /**
- * Styles for the project boundary page's map, from boundary-map-styles.yaml: the most recent
+ * Styles for the project boundary page's map, from config/map-styles/boundary-map.yaml: the most recent
  * boundary file in one style (red), each earlier file in the next of a list. Read and checked once
  * when the app starts, so an invalid file stops the app rather than drawing a broken map.
  */
@@ -74,10 +76,10 @@ function parseStyle(value: unknown, path: string): BoundaryFileStyle {
 export function parseBoundaryMapStyles(text: string): BoundaryMapStyles {
 	const document = yaml.load(text);
 	if (!isRecord(document) || document.version !== 1) {
-		throw new Error('boundary-map-styles.yaml must be a version 1 document');
+		throw new Error('config/map-styles/boundary-map.yaml must be a version 1 document');
 	}
 	if (!Array.isArray(document.earlier) || document.earlier.length === 0) {
-		throw new Error('boundary-map-styles.yaml: earlier must list at least one style');
+		throw new Error('config/map-styles/boundary-map.yaml: earlier must list at least one style');
 	}
 	return {
 		mostRecent: parseStyle(document.mostRecent, 'mostRecent'),
@@ -86,7 +88,7 @@ export function parseBoundaryMapStyles(text: string): BoundaryMapStyles {
 }
 
 export const BOUNDARY_MAP_STYLES = parseBoundaryMapStyles(
-	readFileSync(new URL('./boundary-map-styles.yaml', import.meta.url), 'utf8')
+	readFileSync(path.join(CONFIG_DIR, 'map-styles', 'boundary-map.yaml'), 'utf8')
 );
 
 /**

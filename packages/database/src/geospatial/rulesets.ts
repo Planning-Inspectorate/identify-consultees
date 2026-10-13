@@ -1,6 +1,6 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { CONFIG_DIR } from '../config-dir.ts';
 import type { ConsulteeAreaSummary } from './consultee-areas.ts';
 import type { Geometry } from './wkt.ts';
 
@@ -37,8 +37,8 @@ export interface RuleCondition {
 
 /**
  * A named ruleset: the full set of conditions to run against a project to find every consultee it
- * needs to notify. Each is one sheet of the rulesets workbook, saved as `<name>_ruleset.csv` next
- * to this module (see loadRulesets).
+ * needs to notify. Each is one sheet of the rulesets workbook, saved as `<name>_ruleset.csv` in
+ * config/rulesets/ (see loadRulesets).
  */
 export interface Ruleset {
 	id: string;
@@ -332,12 +332,9 @@ export function buildRulesetFromCsv(id: string, name: string, contents: string):
 	return { id, name, rules: parseRulesetCsv(contents) };
 }
 
-// Every ruleset is its own CSV export, named `<name>_ruleset.csv`, co-located with this module (not
-// under apps/function-python/setup_database/sample_data, where the first one originally lived) so
-// it's guaranteed to exist wherever packages/database is deployed - a cross-app relative path here
-// previously crashed the manage app's Docker image at startup, since that image only ever copies
-// packages/ and apps/manage/, never apps/function-python
-const RULESETS_DIR = path.dirname(fileURLToPath(import.meta.url));
+// Every ruleset is one sheet of the rulesets workbook saved as `<name>_ruleset.csv` in
+// config/rulesets/ - with the other files a maintainer edits (see config/README.md)
+const RULESETS_DIR = path.join(CONFIG_DIR, 'rulesets');
 const RULESET_FILE_SUFFIX = '_ruleset.csv';
 
 const MONTHS = [
@@ -433,8 +430,8 @@ export function loadRulesets(dir: string = RULESETS_DIR, defaultId: string = DEF
 	];
 }
 
-// Saving another sheet of the rulesets workbook as `<name>_ruleset.csv` alongside this module is
-// all it takes for the app to offer it.
+// Saving another sheet of the rulesets workbook as `<name>_ruleset.csv` in config/rulesets/ is all
+// it takes for the app to offer it.
 export const RULESETS: Ruleset[] = loadRulesets();
 
 export function getRuleset(id: string): Ruleset | undefined {

@@ -198,6 +198,8 @@ describe('consultees-map client helpers', () => {
 				['Parish Council (1)', ['!=', ['get', 'identified'], 'false']]
 			]
 		);
+		// every sublayer, nearby context included, starts shown
+		assert.ok(sublayers.every((sublayer) => sublayer.visible === true));
 		const [hospitalDots, nearbyParishes, parishes] = sublayers.map((sublayer) => sublayer.style);
 		assert.equal(hospitalDots.symbolBackgroundColor, 'rgba(213, 56, 128, 0.45)');
 		assert.deepEqual(nearbyParishes, {

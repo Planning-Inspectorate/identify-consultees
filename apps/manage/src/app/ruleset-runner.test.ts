@@ -49,7 +49,8 @@ describe('buildPythonRulesetRunner', () => {
 		const fetchMock = respondWith({ consultees: [] });
 		const run = buildPythonRulesetRunner({
 			pythonFunctionUrl: 'http://localhost:7071/api/consultee-areas',
-			apiKey: 'shared-key'
+			apiKey: 'shared-key',
+			nearbyRadiusMetresByCategory: { 'Parish Council': 5_000 }
 		});
 
 		await run(site, ruleset, 20_000);
@@ -62,6 +63,7 @@ describe('buildPythonRulesetRunner', () => {
 		assert.deepEqual(JSON.parse(String(init?.body)), {
 			siteWkt: 'POINT(-1.5 52.5)',
 			nearbyRadiusMetres: 20_000,
+			nearbyRadiusMetresByCategory: { 'Parish Council': 5_000 },
 			// the display name stays here - the function only needs what to run
 			rules: [
 				{ id: 'hospital', logicType: 'intersection', categories: ['Hospital'], bufferMetres: 10_000 },

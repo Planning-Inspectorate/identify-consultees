@@ -1,0 +1,55 @@
+# Nearby consultees: how far around a project's site the maps show consultees the ruleset didn't
+# identify. They're context, not report content - the report pages list only consultees a ruleset
+# condition identified - and the maps draw them faintly, under the identified ones.
+#
+# Read when the app starts (apps/manage/src/app/nearby-consultees.ts), which refuses to start if a
+# value here is invalid - so a change is checked by `npm test` and takes effect on the next deploy.
+#
+#   defaultRadiusKm  - the distance for any category not listed below. More than 0.
+#   categories       - a distance in km for each consultee category. 0 means never show that
+#                      category as nearby. Names must match consultee_area.consulteeCategory exactly
+#                      (see kt-docs/data/reference-data.md).
+#
+# Railway is never searched as nearby, whatever is set here: its data is one national shape per
+# line type, which is near almost every site and slows the search (see kt-docs/data/screening-issues.md).
+#
+# Larger distances mean more consultees on the maps and a slower search: the search reaches out to
+# the largest distance here, for every category.
+
+version: 1
+
+defaultRadiusKm: 20
+
+categories:
+  # local government
+  Parish Council: 20
+  Lower Tier Authority: 20
+  Unitary Authority: 20
+  Upper Tier Authority: 20
+  Greater London Authority: 20
+  Corporate Joint Committee: 20
+  # health
+  Hospital: 20
+  ICB: 20
+  Local Health Board: 20
+  Ambulance Trust: 20
+  # emergency services and resilience
+  Police: 20
+  Fire and Rescue Authority: 20
+  Local Resilience Forum: 20
+  # landscape and water
+  National Park: 20
+  National Landscape: 20
+  Internal Drainage Board: 20
+  Internal Drainage District: 20
+  # transport
+  Dock or Harbour: 20
+  Integrated Transport Authority: 20
+  Passenger Transport Executive: 20
+  # energy
+  Electricity Generator: 20
+  ONR Site: 20
+  DNO: 20
+  Interconnector: 20
+  Offshore Wind Site: 20
+  Offshore Wind Export Cable: 20

@@ -1,0 +1,40 @@
+# Configuration
+
+Everything that changes **what the service does**, rather than how it does it, lives in this folder. These are the files to edit to change which consultees a ruleset identifies, how far around a site the maps look, and how the maps are coloured. None needs a code change.
+
+| File | Controls | Read by |
+| ---- | -------- | ------- |
+| [`rulesets/*_ruleset.csv`](./rulesets/) | The rulesets: which consultees each one identifies, and why. One file per sheet of the rulesets workbook (`Rulesets.xlsx`) | `packages/database/src/geospatial/rulesets.ts` |
+| [`nearby-consultees.yaml`](./nearby-consultees.yaml) | How far around a site the maps show consultees the ruleset didn't identify (faint context, not in the report), per category | `apps/manage/src/app/nearby-consultees.ts` |
+| [`map-styles/boundary-map.yaml`](./map-styles/boundary-map.yaml) | The project boundary page's map: the most recent boundary file red, earlier ones in other colours | `apps/manage/src/app/maps/boundary-map-styles.ts` |
+| [`map-styles/consultee-map.example.yaml`](./map-styles/consultee-map.example.yaml) | **Not read yet.** The proposed colours and opacities for the consultee maps, per category and sub-category | Nothing yet: waits for the consultee sub-category column |
+
+## Changing something
+
+1. Edit the file. Each one explains its settings at the top.
+2. Run `npm test`. The app reads every file here when it starts and **refuses to start if a value is invalid**, naming the file and the setting. The tests load the real files, so a mistake fails there first.
+3. Open a PR as usual. The change takes effect when it's deployed.
+
+## Rulesets
+
+Each ruleset is one sheet of the rulesets workbook, saved as CSV (UTF-8) in the workbook's own columns: `Group hierarchy, Group, Category, Consultee Type(s), Logic, Buffer (km)`.
+
+| Sheet | File | Shown as |
+| ----- | ---- | -------- |
+| `ew_aft_30_04_2024` | `england_wales_post_20240430_ruleset.csv` | England Wales post 30 April 2024 (the default) |
+| `en_pre_30_04_2024` | `england_pre_20240430_ruleset.csv` | England pre 30 April 2024 |
+| `wa_pre_30_04_2024` | `wales_pre_20240430_ruleset.csv` | Wales pre 30 April 2024 |
+
+- **To update a ruleset**, save its sheet over the file. **To add one**, save the sheet as `<name>_ruleset.csv`. The file name sets the name users see: `england_wales_post_20240430` is shown as "England Wales post 30 April 2024".
+- **A new "Consultee Type(s)" wording** needs adding to `CONSULTEE_TYPES` in `rulesets.ts`, which maps each wording to the reference data's categories. The app won't start until it's there, and `npm test` names the row.
+- **The default ruleset** is set by `DEFAULT_RULESET_ID` in `rulesets.ts`.
+
+More: [kt-docs/data/screening-engine.md](../kt-docs/data/screening-engine.md#rulesets).
+
+## Category names
+
+The YAML files key settings by consultee category, such as `Parish Council` or `Hospital`. Names must match the reference data's `consultee_area.consulteeCategory` exactly: see [kt-docs/data/reference-data.md](../kt-docs/data/reference-data.md).
+
+## Deployment
+
+The Docker image copies this folder alongside `packages/` (`apps/manage/Dockerfile`), and the code finds it through `CONFIG_DIR` (`packages/database/src/config-dir.ts`). If you move it, update both.

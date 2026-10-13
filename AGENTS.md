@@ -6,14 +6,15 @@ This file is the single source of truth for agent instructions in this repositor
 
 Keep instructions in one place and link to them — do not repeat the same rules across files.
 
-| Location                                                                                                                  | Role                                                                                                             |
-| ------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
-| `AGENTS.md` (this file)                                                                                                   | Single source of truth for agent rules and repo conventions                                                      |
-| [`CLAUDE.md`](./CLAUDE.md), [`.github/copilot-instructions.md`](./.github/copilot-instructions.md), `.cursor/rules/*.mdc` | Thin pointers back to this file — add scoped detail here, not in the pointers                                    |
-| `.devin/skills/*/SKILL.md`                                                                                                | Task-specific skills (for example `dependency-update-check` for green-pipeline checks before dependency updates) |
-| [`ACCESSIBILITY.md`](./ACCESSIBILITY.md)                                                                                  | Accessibility policy: WCAG 2.2 AA, testing, audit and statement duties                                           |
-| [`CONTRIBUTING.md`](./CONTRIBUTING.md)                                                                                    | Human-facing contribution workflow                                                                               |
-| [`docs/`](./docs/), [`kt-docs/`](./kt-docs/README.md)                                                                     | Procedural and onboarding detail linked from the relevant sections below                                         |
+| Location                                                                                                                  | Role                                                                                                              |
+| ------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| `AGENTS.md` (this file)                                                                                                   | Single source of truth for agent rules and repo conventions                                                       |
+| [`CLAUDE.md`](./CLAUDE.md), [`.github/copilot-instructions.md`](./.github/copilot-instructions.md), `.cursor/rules/*.mdc` | Thin pointers back to this file — add scoped detail here, not in the pointers                                     |
+| `.devin/skills/*/SKILL.md`                                                                                                | Task-specific skills (for example `dependency-update-check` for green-pipeline checks before dependency updates)  |
+| [`ACCESSIBILITY.md`](./ACCESSIBILITY.md)                                                                                  | Accessibility policy: WCAG 2.2 AA, testing, audit and statement duties                                            |
+| [`CONTRIBUTING.md`](./CONTRIBUTING.md)                                                                                    | Human-facing contribution workflow                                                                                |
+| [`docs/`](./docs/), [`kt-docs/`](./kt-docs/README.md)                                                                     | Procedural and onboarding detail linked from the relevant sections below                                          |
+| [`config/`](./config/README.md)                                                                                           | What the service does, not how: rulesets, map styles, nearby distances. Edit these, not code, to change behaviour |
 
 When adding new guidance: put the rule here (or in a linked doc it points to), reference it from the
 pointers/skills, and do not copy the content between files.

@@ -100,6 +100,8 @@ export function buildCategorySublayers(features, idPrefix) {
 			: ['!=', ['get', 'identified'], 'false'];
 		return {
 			id: `${idPrefix}-${index}`,
+			// nearby context always starts shown, like the identified consultees - the Layers panel can hide it
+			visible: true,
 			label: nearbyOnly ? `${category}: nearby, not identified (${members.length})` : `${category} (${members.length})`,
 			filter: ['all', ['==', ['get', 'consulteeCategory'], category], identifiedFilter],
 			style
@@ -133,7 +135,7 @@ export function buildDatasets(config) {
 
 	// the boundary page's shapefiles: one dataset each, grouped under the same Layers-menu
 	// heading - only the confirmed file starts visible (checked), the rest are toggled on. Each
-	// carries its own style, by how recent it is (boundary-map-styles.yaml); red if it doesn't
+	// carries its own style, by how recent it is (config/map-styles/boundary-map.yaml); red if it doesn't
 	for (const file of config.shapefileDatasets ?? []) {
 		if (file.geojson?.features?.length > 0) {
 			datasets.push({

@@ -1,6 +1,7 @@
 # Consultee map styles: every map showing identified consultees (the ruleset results and the
-# report's category pages). The project boundary page has its own file:
-# boundary-map-styles.yaml.
+# report's category pages). The project boundary page has its own file next to this one:
+# boundary-map.yaml. How far around the site nearby consultees are shown is set per category in
+# ../nearby-consultees.yaml.
 #
 # EXAMPLE - not read by the app yet. Colours are placeholders: consultee categories aren't in the
 # GIS Tool Styling tables (AGENTS.md), so they need product and design sign-off.

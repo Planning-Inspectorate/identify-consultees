@@ -154,7 +154,21 @@ def test_run_ruleset_runs_the_posted_conditions_and_returns_each_consultee_with_
             ),
         ],
         20_000,
+        {},
     )
+
+
+def test_run_ruleset_passes_each_categorys_nearby_radius_on():
+    with (
+        patch.dict("os.environ", {"CONSULTEE_AREAS_API_KEY": API_KEY}),
+        patch("function_app.connection_params_from_env", return_value=object()),
+        patch("function_app.run_ruleset", return_value=[]) as run,
+    ):
+        body = {**VALID_BODY, "nearbyRadiusMetresByCategory": {"Parish Council": 5_000, "Hospital": 0}}
+        response = run_ruleset_route(_ruleset_request(body))
+
+    assert response.status_code == 200
+    assert run.call_args.args[4] == {"Parish Council": 5_000.0, "Hospital": 0.0}
 
 
 @pytest.mark.parametrize(
@@ -173,6 +187,10 @@ def test_run_ruleset_runs_the_posted_conditions_and_returns_each_consultee_with_
         {**VALID_BODY, "rules": [{"id": "x", "logicType": "intersection", "categories": [7]}]},
         {**VALID_BODY, "rules": [{"logicType": "intersection", "categories": []}]},
         {**VALID_BODY, "rules": [{"id": "x", "logicType": "intersection", "categories": [], "bufferMetres": "5"}]},
+        {**VALID_BODY, "nearbyRadiusMetresByCategory": ["Parish Council"]},
+        {**VALID_BODY, "nearbyRadiusMetresByCategory": {"Parish Council": -1}},
+        {**VALID_BODY, "nearbyRadiusMetresByCategory": {"": 5_000}},
+        {**VALID_BODY, "nearbyRadiusMetresByCategory": {f"Category {i}": 1 for i in range(201)}},
     ],
 )
 def test_run_ruleset_rejects_a_malformed_request_before_touching_the_database(body):

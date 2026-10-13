@@ -137,7 +137,7 @@ export function buildBoundarySubmit(service: ManageService): AsyncRequestHandler
  */
 /**
  * The opened file's colour on the static map, by how recent it is among the case's files - the
- * same style the interactive map draws it in (see boundary-map-styles.yaml).
+ * same style the interactive map draws it in (see config/map-styles/boundary-map.yaml).
  */
 async function withBoundaryFileStyle(
 	db: ManageService['db'],

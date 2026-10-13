@@ -17,7 +17,7 @@ earlier:
 `;
 
 describe('boundary map styles', () => {
-	it('loads the shipped boundary-map-styles.yaml, with the most recent file red', () => {
+	it('loads the shipped config/map-styles/boundary-map.yaml, with the most recent file red', () => {
 		assert.strictEqual(BOUNDARY_MAP_STYLES.mostRecent.colour, '#C44E52');
 		assert.ok(BOUNDARY_MAP_STYLES.earlier.length > 0);
 		const colours = [BOUNDARY_MAP_STYLES.mostRecent, ...BOUNDARY_MAP_STYLES.earlier].map((style) => style.colour);
