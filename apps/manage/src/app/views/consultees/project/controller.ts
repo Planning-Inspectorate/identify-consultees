@@ -1,5 +1,6 @@
 import type { ManageService } from '#service';
 import { stringifyForInlineScript } from '#util/inline-json.ts';
+import type { CaseBoundaryFeature } from '@pins/identify-consultees-database/src/geospatial/case-boundaries.ts';
 import {
 	getCaseBoundaryById,
 	listCaseBoundaryFiles
@@ -12,8 +13,9 @@ import { buildProjectGeojson } from '../../../maps/case-geojson.ts';
 import { computeMapView } from '../../../maps/geometry-bounds.ts';
 import { MAP_VIEWPORT } from '../../../maps/sample-geojson.ts';
 import { buildConsulteeStaticMapResponse, sendStaticMapResponse } from '../../../maps/serve-static-map.ts';
-import { resolveCase, resolveCaseSummary } from '../resolve-case.ts';
+import { resolveCase } from '../resolve-case.ts';
 import { firstQueryValue } from '../run-ruleset.ts';
+import type { BoundaryFileOption } from './boundary-files.ts';
 import { boundaryFileOptions } from './boundary-files.ts';
 import { formatUploadedAt } from './format-uploaded.ts';
 import type { BoundaryFileRadio, ConsulteeProjectViewModel } from './view-model.ts';
@@ -25,8 +27,8 @@ import type { BoundaryFileRadio, ConsulteeProjectViewModel } from './view-model.
  */
 async function mapFiles(
 	db: ManageService['db'],
-	project: NonNullable<Awaited<ReturnType<typeof resolveCase>>>,
-	options: ReturnType<typeof boundaryFileOptions>
+	project: CaseBoundaryFeature,
+	options: BoundaryFileOption[]
 ): Promise<BoundaryMapFile[]> {
 	const files: BoundaryMapFile[] = [];
 	for (const option of options) {
@@ -35,13 +37,62 @@ async function mapFiles(
 			files.push({
 				id: option.id,
 				label: option.label,
-				checked: option.checked,
+				checked: option.current,
 				receivedDate: option.receivedDate,
 				geometry
 			});
 		}
 	}
 	return files;
+}
+
+/**
+ * The boundary page's view model: the map draws every shapefile the case holds (the page's own
+ * file visible first), and the radios below ask the user to confirm which single file is carried
+ * into the report - never pre-selected, so `shapefileError` marks them invalid after an
+ * unanswered submit.
+ */
+async function boundaryPageViewModel(
+	db: ManageService['db'],
+	project: CaseBoundaryFeature,
+	options: BoundaryFileOption[],
+	shapefileError?: string
+): Promise<ConsulteeProjectViewModel> {
+	const map = buildBoundaryMapConfig(
+		project.properties.caseName,
+		project.properties.caseReference,
+		await mapFiles(db, project, options),
+		{
+			src: `/consultees/${encodeURIComponent(project.id)}/boundary-map`,
+			alt: `Static map showing the project boundary for ${project.properties.caseName}`
+		}
+	);
+
+	return {
+		pageHeading: 'Project boundary',
+		pageCaption: project.properties.caseName,
+		reference: project.properties.caseReference,
+		caseName: project.properties.caseName,
+		caseId: project.id,
+		backLinkUrl: '/',
+		backLinkText: 'Back to projects',
+		formAction: `/consultees/${encodeURIComponent(project.id)}`,
+		files: options.map((option): BoundaryFileRadio => ({
+			value: option.id,
+			text: option.label,
+			...(option.receivedDate ? { hint: { text: `Uploaded: ${formatUploadedAt(option.receivedDate)}` } } : {})
+		})),
+		...(shapefileError
+			? { shapefileError: { text: shapefileError }, errorSummary: [{ text: shapefileError, href: '#shapefile' }] }
+			: {}),
+		mapId: 'case-map',
+		mapRegionLabel: `Map showing the project boundary for ${project.properties.caseName}`,
+		staticMapSrc: `/consultees/${encodeURIComponent(project.id)}/boundary-map`,
+		staticMapAlt: `Static map showing the project boundary for ${project.properties.caseName}`,
+		mapWidth: MAP_VIEWPORT.width,
+		mapHeight: MAP_VIEWPORT.height,
+		mapConfigJson: stringifyForInlineScript(map)
+	};
 }
 
 /**
@@ -66,64 +117,36 @@ export function buildConsulteeProjectPage(service: ManageService): AsyncRequestH
 
 		const files = await listCaseBoundaryFiles(db, project.properties.caseReference);
 		const options = boundaryFileOptions(files, project.id);
-		const map = buildBoundaryMapConfig(
-			project.properties.caseName,
-			project.properties.caseReference,
-			await mapFiles(db, project, options),
-			{
-				src: `/consultees/${encodeURIComponent(project.id)}/boundary-map`,
-				alt: `Static map showing the project boundary for ${project.properties.caseName}`
-			}
-		);
-
-		const viewModel: ConsulteeProjectViewModel = {
-			pageHeading: 'Project boundary',
-			pageCaption: project.properties.caseName,
-			reference: project.properties.caseReference,
-			caseName: project.properties.caseName,
-			caseId: project.id,
-			backLinkUrl: '/',
-			backLinkText: 'Back to projects',
-			formAction: `/consultees/${encodeURIComponent(project.id)}`,
-			files: options.map((option): BoundaryFileRadio => ({
-				value: option.id,
-				text: option.label,
-				...(option.receivedDate ? { hint: { text: `Uploaded: ${formatUploadedAt(option.receivedDate)}` } } : {}),
-				checked: option.checked
-			})),
-			mapId: 'case-map',
-			mapRegionLabel: `Map showing the project boundary for ${project.properties.caseName}`,
-			staticMapSrc: `/consultees/${encodeURIComponent(project.id)}/boundary-map`,
-			staticMapAlt: `Static map showing the project boundary for ${project.properties.caseName}`,
-			mapWidth: MAP_VIEWPORT.width,
-			mapHeight: MAP_VIEWPORT.height,
-			mapConfigJson: stringifyForInlineScript(map)
-		};
+		const viewModel = await boundaryPageViewModel(db, project, options);
 
 		return res.render('views/consultees/project/view.njk', viewModel);
 	};
 }
 
 /**
- * "Continue" on the boundary page: the chosen file must be one of this project's options -
- * anything else (or a missing selection) just returns to the page unchanged.
+ * "Continue" on the boundary page: the chosen file must be one of this project's options. The
+ * radios are never pre-selected, so an unanswered (or unrecognised) submit re-renders the page
+ * with a validation error rather than guessing a file.
  */
 export function buildBoundarySubmit(service: ManageService): AsyncRequestHandlerWithBody<{ shapefile?: unknown }> {
 	const { db } = service;
 
 	return async (req, res) => {
 		const caseId = String(req.params.caseId ?? '');
-		const project = await resolveCaseSummary(db, caseId);
+		const project = await resolveCase(db, caseId);
 		if (!project) {
 			res.status(404).render('views/errors/404.njk', { pageHeading: 'Page not found' });
 			return;
 		}
 
-		const files = await listCaseBoundaryFiles(db, project.reference);
+		const files = await listCaseBoundaryFiles(db, project.properties.caseReference);
 		const options = boundaryFileOptions(files, project.id);
 		const chosen = options.find((option) => option.id === firstQueryValue(req.body?.shapefile));
 		if (!chosen) {
-			res.redirect(`/consultees/${encodeURIComponent(project.id)}`);
+			res.render(
+				'views/consultees/project/view.njk',
+				await boundaryPageViewModel(db, project, options, 'Select a shapefile')
+			);
 			return;
 		}
 

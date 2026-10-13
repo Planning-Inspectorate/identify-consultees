@@ -5,8 +5,6 @@ export interface BoundaryFileRadio {
 	text: string;
 	/** "Uploaded: ..." when the file has a received date. */
 	hint?: { text: string };
-	/** True for the file this boundary page was opened on. */
-	checked: boolean;
 }
 
 export interface ConsulteeProjectViewModel {
@@ -21,8 +19,16 @@ export interface ConsulteeProjectViewModel {
 	backLinkText: string;
 	/** Where the "Confirm shapefile" form posts. */
 	formAction: string;
-	/** Every shapefile the case holds, as radios - only one is carried into the report. */
+	/**
+	 * Every shapefile the case holds, as radios - only one is carried into the report. The
+	 * Design System's radios guidance says never to pre-select an option, so the items carry
+	 * no `checked` state: the user must pick one before continuing.
+	 */
 	files: BoundaryFileRadio[];
+	/** govukRadios' errorMessage param - present only after an unanswered submit. */
+	shapefileError?: { text: string };
+	/** The layout renders the summary itself - links to the radios fieldset. */
+	errorSummary?: { text: string; href: string }[];
 	mapId: string;
 	mapRegionLabel: string;
 	staticMapSrc: string;

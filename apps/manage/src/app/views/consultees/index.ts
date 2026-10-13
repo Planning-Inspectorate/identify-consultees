@@ -20,7 +20,7 @@ export function createRoutes(service: ManageService): IRouter {
 	const boundaryStaticMap = buildBoundaryStaticMap(service);
 	const boundaryStaticMapSvg = buildBoundaryStaticMap(service, true);
 	const rulesetPickerPage = buildRulesetPickerPage(service);
-	const rulesetPickerSubmit = buildRulesetPickerSubmit();
+	const rulesetPickerSubmit = buildRulesetPickerSubmit(service);
 	const reportCheckPage = buildReportCheckPage(service);
 	const reportConsulteesPage = buildReportConsulteesPage(service);
 	const reportConsulteeAddPage = buildReportConsulteeAddPage(service);

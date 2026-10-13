@@ -7,18 +7,18 @@ function file(id: string, fileName: string | null = null, receivedDate: Date | n
 }
 
 describe('boundaryFileOptions', () => {
-	it('should map the stored files to options with the current one checked', () => {
+	it('should map the stored files to options with the current one marked', () => {
 		const received = new Date('2026-09-19T00:00:00Z');
 		const files = [file('a', 'first.geojson', received), file('b', 'second.geojson')];
 		assert.deepStrictEqual(boundaryFileOptions(files, 'b'), [
-			{ id: 'a', label: 'first.geojson', receivedDate: received, checked: false },
-			{ id: 'b', label: 'second.geojson', receivedDate: null, checked: true }
+			{ id: 'a', label: 'first.geojson', receivedDate: received, current: false },
+			{ id: 'b', label: 'second.geojson', receivedDate: null, current: true }
 		]);
 	});
 
-	it('should check the first file when the current id is not among them', () => {
+	it('should mark the first file current when the current id is not among them', () => {
 		const options = boundaryFileOptions([file('a'), file('b')], 'zzz');
-		assert.strictEqual(options[0].checked, true);
+		assert.strictEqual(options[0].current, true);
 	});
 
 	it('should list only the stored file when a case has one', () => {

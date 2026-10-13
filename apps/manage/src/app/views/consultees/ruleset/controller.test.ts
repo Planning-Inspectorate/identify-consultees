@@ -24,7 +24,7 @@ function summaryDb() {
 }
 
 describe('ruleset picker page', () => {
-	it('should render the ruleset radios with the current ruleset checked', async () => {
+	it('should render the ruleset radios with the already-chosen ruleset checked', async () => {
 		const nunjucks = configureNunjucks();
 		const mockRes = {
 			status: mock.fn(() => mockRes),
@@ -54,7 +54,7 @@ describe('ruleset picker page', () => {
 		assert.match(html, /Identify consultees/);
 	});
 
-	it('should pre-check the top option when no ruleset is selected yet', async () => {
+	it('should not pre-select a radio when no ruleset is selected yet', async () => {
 		const mockRes = {
 			status: mock.fn(() => mockRes),
 			render: mock.fn()
@@ -63,10 +63,13 @@ describe('ruleset picker page', () => {
 		await handler({ params: { caseId: realProjectId }, query: {} }, mockRes);
 
 		const viewModel = mockRes.render.mock.calls[0].arguments[1];
-		assert.strictEqual(viewModel.rulesets[0].checked, true);
+		assert.ok(viewModel.rulesets.every((ruleset) => ruleset.checked === false));
+		// nothing chosen yet - the form posts back without a ruleset param
+		assert.strictEqual(viewModel.formAction, `/consultees/${realProjectId}/ruleset`);
+		assert.strictEqual(viewModel.errorSummary, undefined);
 	});
 
-	it('should fall back to the top option when the selected ruleset is unknown', async () => {
+	it('should not pre-select a radio when the requested ruleset is unknown', async () => {
 		const mockRes = {
 			status: mock.fn(() => mockRes),
 			render: mock.fn()
@@ -75,7 +78,7 @@ describe('ruleset picker page', () => {
 		await handler({ params: { caseId: realProjectId }, query: { ruleset: 'not-a-real-ruleset' } }, mockRes);
 
 		const viewModel = mockRes.render.mock.calls[0].arguments[1];
-		assert.strictEqual(viewModel.rulesets[0].checked, true);
+		assert.ok(viewModel.rulesets.every((ruleset) => ruleset.checked === false));
 	});
 
 	it('should carry the consultee selection through the form action', async () => {
@@ -137,7 +140,7 @@ describe('ruleset picker submit', () => {
 			render: mock.fn(),
 			redirect: mock.fn()
 		};
-		const handler = buildRulesetPickerSubmit();
+		const handler = buildRulesetPickerSubmit({ db: summaryDb() });
 		await handler({ params: { caseId: realProjectId }, body: { ruleset: 'england-wales-post-20240430' } }, mockRes);
 		assert.strictEqual(
 			mockRes.redirect.mock.calls[0].arguments[0],
@@ -151,7 +154,7 @@ describe('ruleset picker submit', () => {
 			render: mock.fn(),
 			redirect: mock.fn()
 		};
-		const handler = buildRulesetPickerSubmit();
+		const handler = buildRulesetPickerSubmit({ db: summaryDb() });
 		const add = JSON.stringify({ c: 'Parish Council', n: 'Test Consultee', r: 'Adjacent' });
 		await handler(
 			{
@@ -167,37 +170,54 @@ describe('ruleset picker submit', () => {
 		assert.ok(location.includes(`&add=${encodeURIComponent(add)}`));
 	});
 
-	it('should return to the picker when the submitted ruleset is unknown or missing', async () => {
+	it('should re-render the picker with a validation error when the submitted ruleset is unknown or missing', async () => {
 		const mockRes = {
 			status: mock.fn(() => mockRes),
 			render: mock.fn(),
 			redirect: mock.fn()
 		};
-		const handler = buildRulesetPickerSubmit();
+		const handler = buildRulesetPickerSubmit({ db: summaryDb() });
 		await handler({ params: { caseId: realProjectId }, body: { ruleset: 'not-a-real-ruleset' } }, mockRes);
-		assert.strictEqual(
-			mockRes.redirect.mock.calls[0].arguments[0],
-			`/consultees/${realProjectId}/ruleset?ruleset=england-wales-post-20240430`
-		);
+
+		assert.strictEqual(mockRes.render.mock.calls[0].arguments[0], 'views/consultees/ruleset/view.njk');
+		const viewModel = mockRes.render.mock.calls[0].arguments[1];
+		assert.deepStrictEqual(viewModel.errorSummary, [{ text: 'Select a ruleset', href: '#ruleset' }]);
+		assert.deepStrictEqual(viewModel.rulesetError, { text: 'Select a ruleset' });
+		assert.ok(viewModel.rulesets.every((ruleset) => ruleset.checked === false));
 
 		// and a missing body entirely (no parser on a bare handler call)
 		await handler({ params: { caseId: realProjectId } }, mockRes);
-		assert.strictEqual(
-			mockRes.redirect.mock.calls[1].arguments[0],
-			`/consultees/${realProjectId}/ruleset?ruleset=england-wales-post-20240430`
-		);
+		const secondViewModel = mockRes.render.mock.calls[1].arguments[1];
+		assert.deepStrictEqual(secondViewModel.errorSummary, [{ text: 'Select a ruleset', href: '#ruleset' }]);
+		assert.strictEqual(mockRes.redirect.mock.callCount(), 0);
 	});
 
-	it('should 404 when caseId is missing or malformed', async () => {
+	it('should carry the consultee selection through an error re-render', async () => {
 		const mockRes = {
 			status: mock.fn(() => mockRes),
 			render: mock.fn(),
 			redirect: mock.fn()
 		};
-		const handler = buildRulesetPickerSubmit();
+		const handler = buildRulesetPickerSubmit({ db: summaryDb() });
+		await handler({ params: { caseId: realProjectId }, query: { exclude: 'abc' }, body: {} }, mockRes);
+		const viewModel = mockRes.render.mock.calls[0].arguments[1];
+		assert.ok(viewModel.formAction.includes('exclude=abc'));
+	});
+
+	it('should 404 when caseId is missing, malformed, or matches no project', async () => {
+		const mockRes = {
+			status: mock.fn(() => mockRes),
+			render: mock.fn(),
+			redirect: mock.fn()
+		};
+		const handler = buildRulesetPickerSubmit({ db: summaryDb() });
 		await handler({ params: {}, body: {} }, mockRes);
 		await handler({ params: { caseId: 'not-a-uuid' }, body: {} }, mockRes);
 		assert.strictEqual(mockRes.status.mock.calls[0].arguments[0], 404);
 		assert.strictEqual(mockRes.status.mock.calls[1].arguments[0], 404);
+
+		const missingHandler = buildRulesetPickerSubmit({ db: { $queryRaw: mock.fn(async () => []) } });
+		await missingHandler({ params: { caseId: realProjectId }, body: {} }, mockRes);
+		assert.strictEqual(mockRes.status.mock.calls[2].arguments[0], 404);
 	});
 });

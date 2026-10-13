@@ -9,24 +9,28 @@ export interface BoundaryFileOption {
 	id: string;
 	label: string;
 	receivedDate: Date | null;
-	/** True for the file this boundary page was opened on. */
-	checked: boolean;
+	/**
+	 * True for the file this boundary page was opened on - the map draws it first. This is map
+	 * layer state, not a form answer: the page's radios are never pre-selected (see the Design
+	 * System radios guidance).
+	 */
+	current: boolean;
 }
 
 /**
  * The boundary page's file options: the case's stored files (its own boundary row is always one),
- * with the file the page was opened on checked - or the top file when the current id isn't in the
- * list.
+ * with the file the page was opened on current - or the top file when the current id isn't in the
+ * list, so the map still has a boundary to draw.
  */
 export function boundaryFileOptions(files: CaseBoundaryFile[], currentId: string): BoundaryFileOption[] {
 	const options = files.map((file) => ({
 		id: file.id,
 		label: file.fileName ?? 'Unnamed file',
 		receivedDate: file.receivedDate,
-		checked: file.id === currentId
+		current: file.id === currentId
 	}));
-	if (options.length > 0 && !options.some((option) => option.checked)) {
-		options[0].checked = true;
+	if (options.length > 0 && !options.some((option) => option.current)) {
+		options[0].current = true;
 	}
 	return options;
 }
