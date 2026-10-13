@@ -140,14 +140,17 @@ resource "azurerm_mssql_server_extended_auditing_policy" "sql_server_secondary" 
   ]
 }
 
+# Threat detection alerts go by email; they don't need a storage account. Pointing the policy at
+# the audit account (with its access key) made every update fail where alerts are enabled (Test,
+# Training, Prod): Azure checks it can write there on each update, and the account has public
+# network access disabled, so the check fails with SecurityAlertPoliciesInsufficientStorageAccountPermissions.
+# Dev never hit it because alerts are off there. Auditing and the vulnerability assessment still
+# write to the account, using the server's managed identity (azurerm_role_assignment.sql_server_storage).
 resource "azurerm_mssql_server_security_alert_policy" "sql_server" {
   #checkov:skip=CKV_AZURE_27: "Ensure that 'Email service and co-administrators' is 'Enabled' for MSSQL servers"
   state                        = var.alerts_enabled ? "Enabled" : "Disabled"
   resource_group_name          = azurerm_resource_group.primary.name
   server_name                  = azurerm_mssql_server.primary.name
-  storage_endpoint             = azurerm_storage_account.sql_server.primary_blob_endpoint
-  storage_account_access_key   = azurerm_storage_account.sql_server.primary_access_key
-  retention_days               = var.sql_config.retention.audit_days
   email_account_admins_enabled = true
   email_addresses              = local.tech_emails
 }
