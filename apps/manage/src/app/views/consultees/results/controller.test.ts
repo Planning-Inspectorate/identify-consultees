@@ -511,7 +511,7 @@ describe('consultees results static map', () => {
 		assert.strictEqual(unfiltered, excludingNothing);
 	});
 
-	it('should draw the nearby consultees picked on an Add consultee page (`include`) as identified', async () => {
+	it('should draw the nearby consultees added by hand (`include`) as identified', async () => {
 		// a filled area, so its fill opacity shows - wider than the point site's search area, so regional
 		const nearbyRow = {
 			...railwayMatchRow(),

@@ -47,7 +47,7 @@ interface CategoryMapContext {
 
 /**
  * One category's map as its Change page draws it - the category's consultees less removals, nearby
- * ones faint and the ones picked on its Add consultee page as identified - as a PNG for the PDF,
+ * ones faint and the ones added by hand as identified - as a PNG for the PDF,
  * with the colours it draws in for the PDF's key.
  */
 async function categoryMap(
@@ -96,7 +96,7 @@ async function categoryMap(
 /**
  * The Report created page's download: a ZIP of the report as an Excel workbook (see workbook.ts)
  * and a PDF of each of its categories' maps (see map-pdf.ts), drawn as the category pages left them
- * - removals gone, and nearby consultees picked on an Add consultee page drawn as identified. Uses
+ * - removals gone, and nearby consultees added by hand drawn as identified. Uses
  * the run the report pages kept in the session (see runRulesetSafely), so the ruleset only runs
  * again if that has gone; nothing is stored. If the ruleset can't be run, it goes back to the Report
  * created page, which says so.

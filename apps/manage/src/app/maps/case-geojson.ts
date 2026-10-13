@@ -65,7 +65,7 @@ function categoryOf(match: Pick<ConsulteeMatch, 'feature'>): string {
 export type MapMatch = ConsulteeMatch & { addedByHand?: boolean };
 
 /**
- * `matches` with the ones in `ids` - nearby consultees picked on the Add consultee page - marked
+ * `matches` with the ones in `ids` - nearby consultees added by hand (a typed name matched to one) - marked
  * as added by hand, so the map draws them as identified rather than as faint context.
  */
 export function markAddedByHand(matches: ConsulteeMatch[], ids: ReadonlySet<string>): MapMatch[] {
