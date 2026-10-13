@@ -28,6 +28,7 @@ Each ruleset is one sheet of the rulesets workbook, saved as CSV (UTF-8) in the 
 - **To update a ruleset**, save its sheet over the file. **To add one**, save the sheet as `<name>_ruleset.csv`. The file name sets the name users see: `england_wales_post_20240430` is shown as "England Wales post 30 April 2024".
 - **A new "Consultee Type(s)" wording** needs adding to `CONSULTEE_TYPES` in `rulesets.ts`, which maps each wording to the reference data's categories. The app won't start until it's there, and `npm test` names the row.
 - **The default ruleset** is set by `DEFAULT_RULESET_ID` in `rulesets.ts`.
+- **The `Group` column decides the tab** a consultee goes on in the downloaded report: Administrative boundaries, Public bodies, Energy, Transport or Other. Any other group lands on Other.
 
 More: [kt-docs/data/screening-engine.md](../kt-docs/data/screening-engine.md#rulesets).
 

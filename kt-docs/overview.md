@@ -129,14 +129,14 @@ The main journey is **database-backed**: there are no fixtures. Locally the data
 - Search projects, open a project's map of consultees, change the ruleset or boundary file
 - Screening in the Python function: `intersection` and `bordering` conditions, plus a general nearby search
 - Every consultee carries its reasons, shown as **Why identified**
-- Report journey: check counts per category, remove or add consultees, generate, and see the report's consultees
+- Report journey: check counts per category, remove or add consultees, generate, see the report's consultees and download them as an Excel workbook
 - Interactive Defra map with a server-rendered static fallback
 - Admin upload and import that replaces each reference-data table
 - Entra sign-in, Front Door, Key Vault, Redis sessions, Application Insights
 
 ## Not built yet
 
-- The report document itself: the download link is a placeholder
+- The report workbook's **Other Cases** tab, and combining each category's metadata into its own columns (it's one JSON column for now)
 - Uploading a project's shapefile: the journey uses case boundaries already in the database
 - The remaining rulesets: three of the expected eight exist (see [Screening engine](./data/screening-engine.md#rulesets))
 - Redeveloped data processing (new ingest, ids and schema), being built separately

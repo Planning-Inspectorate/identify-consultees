@@ -54,6 +54,8 @@ describe('parseRulesetCsv', () => {
 		assert.deepEqual(rule, {
 			id: 'b_host_unitary_authorities',
 			name: '"B" host Unitary Authorities',
+			// the workbook's Group, as written - the report's export tabs follow it
+			group: 'Administative boundaries',
 			logicType: 'intersection',
 			categories: ['Unitary Authority'],
 			bufferMetres: 0
@@ -67,6 +69,7 @@ describe('parseRulesetCsv', () => {
 		assert.deepEqual(rule, {
 			id: 'd_bordering_county_councils_unitary_authorities_national_parks_broads_bordering_c_host_county_councils',
 			name: '"D" County Councils, Unitary Authorities, National Parks & Broads bordering "C" host County Councils',
+			group: 'Administative boundaries',
 			logicType: 'bordering',
 			categories: ['Upper Tier Authority', 'Unitary Authority', 'National Park'],
 			hostCategory: 'Upper Tier Authority'

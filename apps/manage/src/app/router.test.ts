@@ -352,7 +352,7 @@ describe('manage router wiring', () => {
 		);
 		assert.equal(response.status, 200);
 		assert.match(response.text, /Report created/);
-		assert.match(response.text, /Download Router Test Fixture Wind Farm scoping report/);
+		assert.match(response.text, /Download Router Test Fixture Wind Farm consultee report/);
 	});
 
 	test('GET /consultees/:id/results runs the ruleset and renders the results page', async () => {

@@ -26,6 +26,12 @@ export type RuleLogicType = 'intersection' | 'bordering';
 export interface RuleCondition {
 	id: string;
 	name: string;
+	/**
+	 * The rulesets workbook's Group (Administative boundaries, Public bodies, Energy, Transport,
+	 * Other) - the tab the exported report lists the condition's consultees on. Not sent to the
+	 * screening function.
+	 */
+	group: string;
 	logicType: RuleLogicType;
 	/** consultee_area.consulteeCategory values this condition matches (OR'd together). */
 	categories: string[];
@@ -321,9 +327,10 @@ export function parseRulesetCsv(contents: string): RuleCondition[] {
 		ids.add(id);
 
 		const name = conditionName(cell('Category'), cell('Consultee Type(s)'));
+		const group = cell('Group');
 		return logicType === 'bordering'
-			? { id, name, logicType, categories: mapping.categories, hostCategory: mapping.hostCategory }
-			: { id, name, logicType, categories: mapping.categories, bufferMetres: bufferKm * 1000 };
+			? { id, name, group, logicType, categories: mapping.categories, hostCategory: mapping.hostCategory }
+			: { id, name, group, logicType, categories: mapping.categories, bufferMetres: bufferKm * 1000 };
 	});
 }
 

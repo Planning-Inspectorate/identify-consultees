@@ -74,6 +74,9 @@ test.describe('manage journeys', () => {
 	});
 
 	test('choosing a project starts the boundary-ruleset-check journey', async ({ page }) => {
+		// every report page, and the download, re-runs the ruleset - a dozen of them outgrow 30s on
+		// a full reference data load
+		test.slow();
 		await page.goto(`/?q=${SAMPLE_CASE_REFERENCE}`);
 		// a caseReference isn't guaranteed unique (a project can have several boundary submissions),
 		// so follow the link by its href (a specific case id) rather than by its visible text
@@ -202,9 +205,11 @@ test.describe('manage journeys', () => {
 			new RegExp(`/consultees/${SAMPLE_CASE_ID}/report/created\\?ruleset=${SAMPLE_RULESET_ID}`)
 		);
 		await expect(page.getByRole('heading', { level: 1 })).toContainText('Report created');
-		await expect(
-			page.getByRole('link', { name: new RegExp(`Download ${SAMPLE_CASE_NAME} scoping report`) })
-		).toBeVisible();
+		// the download is the report as an Excel workbook, with the selection carried into it
+		const downloadLink = page.getByRole('link', { name: new RegExp(`Download ${SAMPLE_CASE_NAME} consultee report`) });
+		await expect(downloadLink).toBeVisible();
+		const [download] = await Promise.all([page.waitForEvent('download'), downloadLink.click()]);
+		expect(download.suggestedFilename()).toMatch(/consultees \d{4}-\d{2}-\d{2}\.xlsx$/);
 		// and lists the report's consultees by category with why each is in it - the hand-added one
 		// with the reason entered for it, the removed one and the removed hand-added one left out
 		await expect(page.getByRole('heading', { level: 2, name: /Consultees in the report/ })).toBeVisible();
