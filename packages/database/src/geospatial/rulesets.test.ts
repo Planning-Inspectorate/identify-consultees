@@ -35,6 +35,14 @@ describe('parseCsv', () => {
 			['line one\nline two', 'x']
 		]);
 	});
+
+	test('treats a lone carriage return as a row break and a trailing comma as an empty last field', () => {
+		assert.deepEqual(parseCsv('a,\rb,c'), [
+			['a', ''],
+			['b', 'c']
+		]);
+		assert.deepEqual(parseCsv('a,b,'), [['a', 'b', '']]);
+	});
 });
 
 describe('parseRulesetCsv', () => {
@@ -70,7 +78,9 @@ describe('parseRulesetCsv', () => {
 				HEADER,
 				'2,Public bodies,,Ambulance Trusts,Intersects application site buffer,1',
 				'2,Public bodies,,Ambulance Trusts,Intersects application site buffer,10',
-				'5,Other,,cheshire  BRINE area,intersects application site,'
+				'5,Other,,cheshire  BRINE area,intersects application site,',
+				// and a row simply short of the column, which reads the missing cell as blank too
+				'4,Transport,,Railways,Intersects application site'
 			].join('\n')
 		);
 		assert.deepEqual(
@@ -79,7 +89,8 @@ describe('parseRulesetCsv', () => {
 				['ambulance_trusts_1km', 'Ambulance Trusts', 1000, ['Ambulance Trust']],
 				['ambulance_trusts_10km', 'Ambulance Trusts', 10000, ['Ambulance Trust']],
 				// matched case- and space-insensitively, named as written
-				['cheshire_brine_area', 'cheshire  BRINE area', 0, ['Cheshire Brine Area']]
+				['cheshire_brine_area', 'cheshire  BRINE area', 0, ['Cheshire Brine Area']],
+				['railways', 'Railways', 0, ['Railway']]
 			]
 		);
 	});
@@ -162,6 +173,8 @@ describe('ruleset names from file names', () => {
 		);
 		// a leading joining word is still capitalised, and an impossible date is left as it is
 		assert.equal(rulesetNameFromFileName('post_20241301_ruleset.csv'), 'Post 20241301');
+		// so is a date-shaped word whose day is out of range (April has no 32nd)
+		assert.equal(rulesetNameFromFileName('wales_20240432_ruleset.csv'), 'Wales 20240432');
 	});
 });
 

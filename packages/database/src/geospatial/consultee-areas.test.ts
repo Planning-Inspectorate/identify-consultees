@@ -13,9 +13,10 @@ import {
 	loadConsulteeAreas
 } from './consultee-areas.ts';
 
-// a fixed id, rather than a wholesale table truncate, so this suite can't wipe out other data in
+// fixed ids, rather than a wholesale table truncate, so this suite can't wipe out other data in
 // a shared local dev database
 const testAreaId = '11111111-1111-1111-1111-111111111111';
+const secondAreaId = '11111111-1111-1111-1111-111111111112';
 
 let dbClient: PrismaClient;
 let dbAvailable = false;
@@ -36,7 +37,7 @@ after(async () => {
 });
 
 async function cleanup() {
-	await dbClient.$executeRaw`DELETE FROM consultee_area WHERE id = ${testAreaId}`;
+	await dbClient.$executeRaw`DELETE FROM consultee_area WHERE id IN (${testAreaId}, ${secondAreaId})`;
 }
 
 describe('consultee areas (requires a local SQL Server - see docker-compose.yml)', () => {
@@ -150,6 +151,72 @@ describe('consultee areas (requires a local SQL Server - see docker-compose.yml)
 				] as [number, number][][]
 			};
 			assert.equal((await getConsulteeAreaDisplayGeometries(dbClient, [testAreaId], farWindow)).size, 0);
+
+			// a well-formed id with no row behind it is a genuine not-found, not an error
+			assert.equal(await getConsulteeAreaById(dbClient, '99999999-9999-9999-9999-999999999999'), null);
+		} finally {
+			await cleanup();
+		}
+	});
+
+	test('load reports progress per batch and stores every populated column', async (t) => {
+		if (!dbAvailable) return t.skip('SQL Server database not available');
+
+		const progress: [number, number][] = [];
+		await cleanup();
+		try {
+			const featureCollection: ConsulteeAreaFeatureCollection = {
+				type: 'FeatureCollection',
+				features: [
+					{
+						id: testAreaId,
+						type: 'Feature',
+						geometry: { type: 'Point', coordinates: [0, 0] },
+						properties: {
+							consulteeCategory: 'Railway',
+							consultee: 'Network Rail',
+							region: 'South',
+							caseReference: 'EN010001',
+							documentId: '33333333-3333-3333-3333-333333333333',
+							consulteeId: '44444444-4444-4444-4444-444444444444',
+							organisationId: '55555555-5555-5555-5555-555555555555',
+							currentVersion: 3,
+							metadata: { source: 'test' }
+						}
+					},
+					// and one with everything optional absent, so the loaders exercise both sides of
+					// each null/default fallback
+					{
+						id: secondAreaId,
+						type: 'Feature',
+						geometry: { type: 'Point', coordinates: [1, 1] },
+						properties: {}
+					}
+				]
+			};
+
+			// batchSize 1 forces a second batch, so progress fires once per row
+			const loaded = await loadConsulteeAreas(dbClient, featureCollection, {
+				batchSize: 1,
+				onProgress: (done, total) => progress.push([done, total])
+			});
+			assert.equal(loaded, 2);
+			assert.deepEqual(progress, [
+				[1, 2],
+				[2, 2]
+			]);
+
+			const stored = await getConsulteeAreaById(dbClient, testAreaId);
+			assert.ok(stored);
+			assert.equal(stored.properties.caseReference, 'EN010001');
+			assert.equal(stored.properties.currentVersion, 3);
+			assert.equal(stored.properties.documentId?.toLowerCase(), '33333333-3333-3333-3333-333333333333');
+			assert.equal(stored.properties.consulteeId?.toLowerCase(), '44444444-4444-4444-4444-444444444444');
+			assert.equal(stored.properties.organisationId?.toLowerCase(), '55555555-5555-5555-5555-555555555555');
+
+			const minimal = await getConsulteeAreaById(dbClient, secondAreaId);
+			assert.equal(minimal?.properties.consulteeCategory, null);
+			assert.equal(minimal?.properties.currentVersion, 1);
 		} finally {
 			await cleanup();
 		}

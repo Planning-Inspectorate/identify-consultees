@@ -310,6 +310,84 @@ describe('case boundaries (requires a local SQL Server - see docker-compose.yml)
 		}
 	});
 
+	test('load reports progress per batch and stores optional columns when present', async (t) => {
+		if (!dbAvailable) return t.skip('SQL Server database not available');
+
+		const secondBoundaryId = '22222222-2222-2222-2222-222222222226';
+		const progress: [number, number][] = [];
+		const cleanupBoth = async () => {
+			await dbClient.$executeRaw`DELETE FROM case_boundary WHERE id IN (${testBoundaryId}, ${secondBoundaryId})`;
+		};
+
+		await cleanupBoth();
+		try {
+			// batchSize 1 forces a second batch, so progress fires once per row - and one feature
+			// carries every optional column while the other omits them, covering both sides of each
+			// fallback in the loader
+			const loaded = await loadCaseBoundaries(
+				dbClient,
+				{
+					type: 'FeatureCollection',
+					features: [
+						{
+							id: testBoundaryId,
+							type: 'Feature',
+							geometry: { type: 'Point', coordinates: [0, 0] },
+							properties: {
+								caseReference: 'EN010001',
+								caseName: 'Fully populated',
+								fileName: 'v1.geojson',
+								receivedDate: new Date(Date.UTC(2026, 0, 5)),
+								acceptance: 'Accepted'
+							}
+						},
+						{
+							id: secondBoundaryId,
+							type: 'Feature',
+							geometry: { type: 'Point', coordinates: [1, 1] },
+							properties: { caseReference: 'EN010002', caseName: 'Bare minimum' }
+						}
+					]
+				},
+				{ batchSize: 1, onProgress: (done, total) => progress.push([done, total]) }
+			);
+			assert.equal(loaded, 2);
+			assert.deepEqual(progress, [
+				[1, 2],
+				[2, 2]
+			]);
+
+			const stored = await getCaseBoundaryById(dbClient, testBoundaryId);
+			assert.equal(stored?.properties.acceptance, 'Accepted');
+			assert.equal(stored?.properties.fileName, 'v1.geojson');
+
+			const minimal = await getCaseBoundaryById(dbClient, secondBoundaryId);
+			assert.equal(minimal?.properties.acceptance, null);
+			assert.equal(minimal?.properties.fileName, null);
+		} finally {
+			await cleanupBoth();
+		}
+	});
+
+	test('listCaseBoundaries paginates with limit and offset together', async (t) => {
+		if (!dbAvailable) return t.skip('SQL Server database not available');
+
+		const page = await listCaseBoundaries(dbClient, { limit: 5, offset: 1 });
+		assert.equal(page.type, 'FeatureCollection');
+		assert.ok(page.features.length <= 5);
+	});
+
+	test('searchCaseBoundaries treats a missing or blank query as match-everything', async (t) => {
+		if (!dbAvailable) return t.skip('SQL Server database not available');
+
+		const all = await searchCaseBoundaries(dbClient);
+		assert.ok(Array.isArray(all.features));
+		assert.ok(all.total >= 0);
+
+		const blank = await searchCaseBoundaries(dbClient, { query: '   ' });
+		assert.equal(blank.total, all.total);
+	});
+
 	test('searchCaseBoundaries still reports the match total when the page is out of range', async (t) => {
 		if (!dbAvailable) return t.skip('SQL Server database not available');
 
