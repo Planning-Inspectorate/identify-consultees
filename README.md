@@ -7,6 +7,7 @@ The monorepo for the Identify consultees service: finds who must be consulted ab
 | `apps/manage` | Web app (Express + Nunjucks + GOV.UK Frontend) |
 | `apps/function-python` | Python Azure Function: runs the screening (`run-ruleset`) |
 | `packages/database` | Prisma schema, migrations, geospatial SQL, rulesets, seed and import |
+| `config` | **Configuration to edit**: rulesets, map styles, nearby-consultee distances. Start at [`config/README.md`](./config/README.md) |
 | `infrastructure` | Azure / Terraform |
 
 ## Prerequisites

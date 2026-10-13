@@ -18,6 +18,7 @@ from intersector.screening import (
     _nearest_first,
     answerable_from_nearby,
     meets_intersection_condition,
+    nearby_radius_for,
     run_ruleset,
 )
 from intersector.tolerances import DISTANCE_MARGIN_METRES
@@ -345,6 +346,39 @@ def test_all_nearby_lists_every_category_within_the_radius_except_railway(connec
     # listed, never drawn - no geometry
     assert all(match.area.geometry_wkt is None for match in nearby)
     assert _nearby(run_ruleset(connection_params, "POINT(10 10)", [], 1_000)) == []
+
+
+def test_a_categorys_own_nearby_radius_overrides_the_default_and_0_leaves_it_out(connection_params, areas):
+    # the site is ~157m from both areas
+    areas(
+        (TEST_AREA_ID, "POINT(0 0)", "Electricity Generator", "Test Generator"),
+        (SECOND_AREA_ID, "POINT(0 0)", "Hospital", "Test Hospital"),
+    )
+    site = "POINT(0.001 0.001)"
+
+    by_default = _nearby(run_ruleset(connection_params, site, [], 1_000))
+    assert {TEST_AREA_ID, SECOND_AREA_ID} <= set(_ids(by_default))
+
+    # a smaller radius for one category leaves it out; 0 never shows it; others keep the default
+    shorter = run_ruleset(connection_params, site, [], 1_000, {"Electricity Generator": 100, "Hospital": 0})
+    assert set(_ids(_nearby(shorter))).isdisjoint({TEST_AREA_ID, SECOND_AREA_ID})
+
+    # a larger one reaches past the default, with its own radius as the reason
+    wider = run_ruleset(connection_params, site, [], 50, {"Hospital": 1_000})
+    hospital = next(consultee for consultee in wider if consultee.area.id == SECOND_AREA_ID)
+    assert hospital.reasons == [NearbyReason(1_000)]
+    assert TEST_AREA_ID not in _ids(_nearby(wider))
+
+
+def test_nearby_radius_for_uses_the_category_radius_with_the_distance_margin():
+    assert nearby_radius_for(_match("a", 1_000 + DISTANCE_MARGIN_METRES), 1_000, {}) == 1_000
+    assert nearby_radius_for(_match("a", 1_001 + DISTANCE_MARGIN_METRES), 1_000, {}) is None
+    assert nearby_radius_for(_match("a", 4_000), 1_000, {"Hospital": 5_000}) == 5_000
+    assert nearby_radius_for(_match("a", 0), 1_000, {"Hospital": 0}) is None
+    # an unmeasured match (a bordering one) isn't nearby
+    assert nearby_radius_for(_match("a", None), 1_000, {}) is None
+    # an uncategorised area takes the default
+    assert nearby_radius_for(_match("a", 10, category=None), 1_000, {"Hospital": 0}) == 1_000
 
 
 def _polygon_wkt(geometry: dict) -> str:

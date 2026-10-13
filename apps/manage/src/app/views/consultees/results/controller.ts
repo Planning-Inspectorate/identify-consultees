@@ -58,7 +58,7 @@ export function buildConsulteesResultsPage(service: ManageService): AsyncRequest
 			nearbyConsulteeRadiusMetres,
 			logger
 		);
-		const searchArea = await buildSearchAreaSafely(db, project, consultees, nearbyConsulteeRadiusMetres, logger);
+		const searchArea = await buildSearchAreaSafely(db, project, consultees, service.nearbySearchRadiusMetres, logger);
 		const staticMapSrc = `/consultees/${encodeURIComponent(project.id)}/results/static-map?ruleset=${encodeURIComponent(ruleset.id)}`;
 		const staticMapAlt = `Static map showing ${ruleset.name} for ${project.properties.caseName}`;
 		const map = buildCaseMapConfig(project, consultees, ruleset.name, searchArea, {
@@ -131,7 +131,13 @@ export function buildResultsStaticMap(service: ManageService, forceSvg = false):
 					)
 				: consultees;
 		// same search area as the interactive map, so both open on the same view
-		const searchArea = await buildSearchAreaSafely(db, project, displayMatches, nearbyConsulteeRadiusMetres, logger);
+		const searchArea = await buildSearchAreaSafely(
+			db,
+			project,
+			displayMatches,
+			service.nearbySearchRadiusMetres,
+			logger
+		);
 		const map = buildCaseMapConfig(project, displayMatches, category || ruleset.name, searchArea);
 		const ifNoneMatch = typeof req.headers['if-none-match'] === 'string' ? req.headers['if-none-match'] : undefined;
 		const accept = typeof req.headers.accept === 'string' ? req.headers.accept : undefined;

@@ -6,7 +6,7 @@ The guiding policy is **when in doubt, include**. Consulting one body too many i
 
 ## Rulesets
 
-A ruleset is a list of **conditions**, such as "the district council the site is in", "hospitals within 10km" or "parishes bordering the site's parish". The rulesets come from the **rulesets workbook** (`Rulesets.xlsx`): each sheet is one ruleset, saved as CSV, one row per condition, named `<name>_ruleset.csv` in `packages/database/src/geospatial/`. The web app loads every such file at start-up (`rulesets.ts`) and sends the selected ruleset's conditions with each run, so the definitions have one home, which the report pages also read to explain matches.
+A ruleset is a list of **conditions**, such as "the district council the site is in", "hospitals within 10km" or "parishes bordering the site's parish". The rulesets come from the **rulesets workbook** (`Rulesets.xlsx`): each sheet is one ruleset, saved as CSV, one row per condition, named `<name>_ruleset.csv` in [`config/rulesets/`](../../config/rulesets/) with the rest of the service's configuration ([`config/README.md`](../../config/README.md)). The web app loads every such file at start-up (`rulesets.ts`) and sends the selected ruleset's conditions with each run, so the definitions have one home, which the report pages also read to explain matches.
 
 | Workbook sheet      | File                                      | Shown as                         | Conditions |
 | ------------------- | ----------------------------------------- | -------------------------------- | ---------: |
@@ -33,7 +33,7 @@ Some consultee types have no reference data yet: canals, Joint Transport Authori
 Python decides which queries to run and combines the results; the geometry maths runs in SQL Server, as `geography` methods against the spatial index. The SQL is all in `intersector/queries.py`.
 
 1. **Simplify the site** to 10m, once. Detailed boundaries are the main cost: Silvertown Tunnel goes from 2,536 points to 66.
-2. **Fetch everything nearby, once**: every consultee area within 20km (`NEARBY_CONSULTEE_RADIUS_KM`) in any category except Railway. This answers every condition of 20km or less, filtered in memory, except Railway's, which runs as its own query, and every area it finds gets a `nearby` reason whether or not a condition matched it.
+2. **Fetch everything nearby, once**: every consultee area within the largest nearby distance in [`config/nearby-consultees.yaml`](../../config/nearby-consultees.yaml) (20km by default), in any category except Railway. Each area counts as nearby only within its own category's distance, sent with the request; a category set to 0 is never nearby. This answers every condition of 20km or less, filtered in memory, except Railway's, which runs as its own query, and every area it finds gets a `nearby` reason whether or not a condition matched it.
 3. **Run the other conditions**, six at a time, each on its own connection:
    - **Wider than 20km** (three 35km conditions): one query each, limited to their category.
    - **Bordering** (four): find **hosts** (host-category areas intersecting the site), grow each by 50m, and find **neighbours** (matching-category areas intersecting a grown host, excluding the host).

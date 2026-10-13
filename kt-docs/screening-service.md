@@ -19,6 +19,7 @@ Request:
 {
 	"siteWkt": "POLYGON((...))",
 	"nearbyRadiusMetres": 20000,
+	"nearbyRadiusMetresByCategory": { "Parish Council": 5000, "Hospital": 0 },
 	"rules": [
 		{ "id": "hospital", "logicType": "intersection", "categories": ["Hospital"], "bufferMetres": 10000 },
 		{
@@ -54,7 +55,8 @@ Response (200):
 }
 ```
 
-- `consultees`: each consultee once, nearest first (ties by id). The union of every condition's matches and every area within `nearbyRadiusMetres` (any category except Railway).
+- `nearbyRadiusMetresByCategory` (optional): a category's own nearby distance, overriding `nearbyRadiusMetres`; 0 means never nearby. The web app sends [`config/nearby-consultees.yaml`](../config/nearby-consultees.yaml).
+- `consultees`: each consultee once, nearest first (ties by id). The union of every condition's matches and every area within its category's nearby distance (else `nearbyRadiusMetres`) (any category except Railway).
 - `reasons`: at least one. A `condition` for each condition met, in the ruleset's order, then `nearby` if within the radius. The web app turns them into **Why identified** text (`views/consultees/reasons.ts`).
 - `geometryWkt`: only for condition matches. The map draws every consultee from the web app's own display geometry.
 - Ids are lowercase, matching the web app's Prisma queries, which use them for display geometry and `exclude=` URLs.

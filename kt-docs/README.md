@@ -12,6 +12,7 @@ How the service works and how to work on it. Plain Markdown, so it can move to C
 | Add or fix tests | [Testing](./testing.md) |
 | Ship to an environment, or load data there | [Deployment](./deployment.md) → [Data model and loading](./data/data-model.md) |
 | Work on the data | [Data model and loading](./data/data-model.md) → [Reference data](./data/reference-data.md) → [Screening issues](./data/screening-issues.md) |
+| Change a ruleset, map colours or the nearby distances | [`config/README.md`](../config/README.md) |
 
 Elsewhere in the repo:
 

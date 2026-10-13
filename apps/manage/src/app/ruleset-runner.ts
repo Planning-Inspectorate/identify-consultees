@@ -64,8 +64,10 @@ export function toRunRulesetResult(body: RunRulesetResponse): RunRulesetResult {
 export function buildPythonRulesetRunner(options: {
 	pythonFunctionUrl: string | undefined;
 	apiKey: string | undefined;
+	/** Each category's own nearby distance (config/nearby-consultees.yaml); others use nearbyRadiusMetres. */
+	nearbyRadiusMetresByCategory?: Record<string, number>;
 }): RulesetRunner {
-	const { pythonFunctionUrl, apiKey } = options;
+	const { pythonFunctionUrl, apiKey, nearbyRadiusMetresByCategory = {} } = options;
 	return async (site, ruleset, nearbyRadiusMetres) => {
 		if (!pythonFunctionUrl) {
 			throw new Error('PYTHON_FUNCTION_URL is not configured');
@@ -81,6 +83,7 @@ export function buildPythonRulesetRunner(options: {
 				body: JSON.stringify({
 					siteWkt: geometryToWkt(site),
 					nearbyRadiusMetres,
+					nearbyRadiusMetresByCategory,
 					rules: ruleset.rules.map(({ id, logicType, categories, bufferMetres, hostCategory }) => ({
 						id,
 						logicType,

@@ -21,6 +21,7 @@ MAX_RULES = 500
 MAX_CATEGORIES_PER_RULE = 50
 MAX_DISTANCE_METRES = 500_000
 MAX_STRING_LENGTH = 200
+MAX_NEARBY_CATEGORIES = 200
 
 
 class BadRequest(ValueError):
@@ -32,11 +33,14 @@ class RunRulesetRequest:
     site_wkt: str
     rules: list[RuleCondition]
     nearby_radius_metres: float
+    nearby_radius_metres_by_category: dict[str, float]
+    """A nearby radius for particular categories, overriding nearby_radius_metres for them."""
 
 
 def parse_run_ruleset_request(body: object) -> RunRulesetRequest:
     """Validate a decoded request body: `{siteWkt, rules: [{id, logicType, categories,
-    bufferMetres?, hostCategory?}], nearbyRadiusMetres}`. Raises BadRequest."""
+    bufferMetres?, hostCategory?}], nearbyRadiusMetres, nearbyRadiusMetresByCategory?}`. Raises
+    BadRequest."""
     if not isinstance(body, dict):
         raise BadRequest("request body must be a JSON object")
 
@@ -51,7 +55,17 @@ def parse_run_ruleset_request(body: object) -> RunRulesetRequest:
         site_wkt=site_wkt,
         rules=[_parse_rule(rule) for rule in rules],
         nearby_radius_metres=_distance(body.get("nearbyRadiusMetres"), "nearbyRadiusMetres"),
+        nearby_radius_metres_by_category=_radius_by_category(body.get("nearbyRadiusMetresByCategory", {})),
     )
+
+
+def _radius_by_category(raw: object) -> dict[str, float]:
+    if not isinstance(raw, dict) or len(raw) > MAX_NEARBY_CATEGORIES:
+        raise BadRequest(f"nearbyRadiusMetresByCategory must be an object of at most {MAX_NEARBY_CATEGORIES} categories")
+    return {
+        _string(category, "nearby category"): _distance(radius, "nearbyRadiusMetresByCategory radius")
+        for category, radius in raw.items()
+    }
 
 
 def _parse_rule(raw: object) -> RuleCondition:

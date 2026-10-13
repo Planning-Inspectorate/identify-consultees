@@ -38,7 +38,6 @@ Don't regenerate `package-lock.json` under another Node or npm major. `react`, `
 | `PYTHON_FUNCTION_URL`                     | `http://localhost:7071/api/consultee-areas`. `run-ruleset` is resolved next to it                                                                                                                  |
 | `PYTHON_FUNCTION_API_KEY`                 | Set by `npm start` to match the function's `CONSULTEE_AREAS_API_KEY`                                                                                                                               |
 | `BLOB_STORE_HOST`, `BLOB_STORE_CONTAINER` | Unset. Needed only for the admin upload and import pages                                                                                                                                           |
-| `NEARBY_CONSULTEE_RADIUS_KM`              | Unset (20)                                                                                                                                                                                         |
 | `MANAGED_REDIS_URL`                       | Unset: sessions in memory                                                                                                                                                                          |
 | `LOG_LEVEL`                               | `debug` shows Prisma queries                                                                                                                                                                       |
 

@@ -172,7 +172,11 @@ def run_ruleset_route(req: func.HttpRequest) -> func.HttpResponse:
     logger.info("run-ruleset: %d conditions, nearby radius %sm", len(request.rules), request.nearby_radius_metres)
     try:
         consultees = run_ruleset(
-            connection_params_from_env(), request.site_wkt, request.rules, request.nearby_radius_metres
+            connection_params_from_env(),
+            request.site_wkt,
+            request.rules,
+            request.nearby_radius_metres,
+            request.nearby_radius_metres_by_category,
         )
     except Exception:
         logger.exception("Failed to run the ruleset")

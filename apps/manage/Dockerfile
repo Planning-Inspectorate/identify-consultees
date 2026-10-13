@@ -32,6 +32,9 @@ COPY --chown=node:node .npmrc .
 COPY --chown=node:node scripts ./scripts
 COPY --chown=node:node packages ./packages
 COPY --chown=node:node apps/manage ./apps/manage
+# the rulesets, map styles and nearby-consultee distances (config/README.md) - read at startup,
+# and by the build, through CONFIG_DIR (packages/database/src/config-dir.ts)
+COPY --chown=node:node config ./config
 
 # --ignore-scripts skips the root postinstall, which is required: it also runs
 # check-toolchain.mjs, which intentionally fails under the image's npm-major-only

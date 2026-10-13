@@ -14,8 +14,23 @@ describe('ManageService', () => {
 			assert.equal(service.pythonFunctionApiKey, config.pythonFunctionApiKey);
 			assert.equal(service.blobStoreConfig, config.blobStore);
 			assert.equal(service.nearbyConsulteeRadiusMetres, config.nearbyConsulteeRadiusMetres);
+			// with no per-category distances, the search reaches the default
+			assert.equal(service.nearbySearchRadiusMetres, config.nearbyConsulteeRadiusMetres);
 			assert.equal(service.assetsStaticDir, config.staticDir);
 			assert.match(service.staticDir, /\.core-static-noop$/);
+		} finally {
+			await service.db.$disconnect().catch(() => undefined);
+		}
+	});
+
+	test('searches out to the largest nearby distance, default or per category', async () => {
+		const service = new ManageService({
+			...buildManageTestConfig(true),
+			nearbyConsulteeRadiusMetres: 20_000,
+			nearbyRadiusMetresByCategory: { Hospital: 35_000, 'Parish Council': 5_000 }
+		});
+		try {
+			assert.equal(service.nearbySearchRadiusMetres, 35_000);
 		} finally {
 			await service.db.$disconnect().catch(() => undefined);
 		}

@@ -3,6 +3,7 @@ import type { PrismaClient } from '@pins/identify-consultees-database/src/client
 import { BaseService } from '@planning-inspectorate/core/app';
 import path from 'node:path';
 import type { Config } from './config.ts';
+import { searchRadiusMetres } from './nearby-consultees.ts';
 import type { RulesetRunner } from './ruleset-runner.ts';
 import { buildPythonRulesetRunner } from './ruleset-runner.ts';
 
@@ -24,7 +25,11 @@ export class ManageService extends BaseService<PrismaClient> {
 		this.#config = config;
 		this.#rulesetRunner =
 			rulesetRunner ??
-			buildPythonRulesetRunner({ pythonFunctionUrl: config.pythonFunctionUrl, apiKey: config.pythonFunctionApiKey });
+			buildPythonRulesetRunner({
+				pythonFunctionUrl: config.pythonFunctionUrl,
+				apiKey: config.pythonFunctionApiKey,
+				nearbyRadiusMetresByCategory: config.nearbyRadiusMetresByCategory
+			});
 	}
 
 	get authConfig(): Config['auth'] {
@@ -52,8 +57,17 @@ export class ManageService extends BaseService<PrismaClient> {
 		return this.#config.blobStore;
 	}
 
+	/** The default nearby distance - see config/nearby-consultees.yaml. */
 	get nearbyConsulteeRadiusMetres(): number {
 		return this.#config.nearbyConsulteeRadiusMetres;
+	}
+
+	/** How far the maps' search area reaches: the largest nearby distance, default or per category. */
+	get nearbySearchRadiusMetres(): number {
+		return searchRadiusMetres({
+			defaultRadiusMetres: this.#config.nearbyConsulteeRadiusMetres,
+			radiusMetresByCategory: this.#config.nearbyRadiusMetresByCategory ?? {}
+		});
 	}
 
 	/** Whether the prototype/debug pages are mounted - see Config.devPagesEnabled. */

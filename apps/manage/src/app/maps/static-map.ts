@@ -95,7 +95,7 @@ export function consulteeColours(feature: GeoJsonFeature): FeatureColours {
 
 /**
  * The project's own colour and fill opacity, or red - the boundary page sets the opened file's
- * colour (see boundary-map-styles.yaml) so the image matches the interactive map.
+ * colour (see config/map-styles/boundary-map.yaml) so the image matches the interactive map.
  */
 export function projectColours(feature: GeoJsonFeature): FeatureColours {
 	return featureColours(feature, PROJECT_COLOUR);

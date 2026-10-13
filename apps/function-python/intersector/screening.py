@@ -26,27 +26,50 @@ deadlocks and timeouts once other work hit the same table."""
 
 
 def run_ruleset(
-    params: ConnectionParams, site_wkt: str, rules: list[RuleCondition], nearby_radius_metres: float
+    params: ConnectionParams,
+    site_wkt: str,
+    rules: list[RuleCondition],
+    nearby_radius_metres: float,
+    nearby_radius_metres_by_category: dict[str, float] | None = None,
 ) -> list[Consultee]:
-    """Every consultee the ruleset identifies for the site, plus every area within
-    `nearby_radius_metres` (any category but Railway), nearest first.
+    """Every consultee the ruleset identifies for the site, plus every area within its category's
+    nearby radius (`nearby_radius_metres_by_category`, else `nearby_radius_metres`; any category
+    but Railway), nearest first.
 
     Each consultee appears once, with every reason it qualified: a ConditionReason for each
     condition it met, in the ruleset's order, then a NearbyReason if the nearby search found it.
     """
+    radius_by_category = nearby_radius_metres_by_category or {}
+    search_radius = max([nearby_radius_metres, *radius_by_category.values()])
     with open_database(params) as db:
         site = queries.simplify(db, site_wkt)
-        # one query for everything nearby: the nearby reasons, and the answer to most conditions.
-        # No geometry - some rows are whole counties or National Parks, and most aren't drawn
-        nearby = queries.find_areas_near(
-            db, site, nearby_radius_metres, excluded_categories=CATEGORIES_EXCLUDED_FROM_NEARBY, with_geometry=False
+        # one query out to the largest radius: the nearby reasons, and the answer to most
+        # conditions. No geometry - some rows are whole counties or National Parks, and most aren't drawn
+        fetched = queries.find_areas_near(
+            db, site, search_radius, excluded_categories=CATEGORIES_EXCLUDED_FROM_NEARBY, with_geometry=False
         )
-        matches_by_condition = _match_conditions(db, site, rules, nearby, nearby_radius_metres)
+        matches_by_condition = _match_conditions(db, site, rules, fetched, search_radius)
 
-        consultees = _combine(rules, matches_by_condition, nearby, nearby_radius_metres)
+        nearby = [
+            (match, radius)
+            for match in fetched
+            if (radius := nearby_radius_for(match, nearby_radius_metres, radius_by_category)) is not None
+        ]
+        consultees = _combine(rules, matches_by_condition, nearby)
         _measure_unmeasured(db, site, consultees)
         _add_geometry_to_condition_matches(db, consultees)
         return sorted(consultees.values(), key=_nearest_first)
+
+
+def nearby_radius_for(match: AreaMatch, default_metres: float, radius_by_category: dict[str, float]) -> float | None:
+    """The radius `match` counts as nearby within, if it does: its category's radius (or the
+    default), widened by the distance margin as every distance is. A radius of 0 means the category
+    is never shown as nearby."""
+    category = match.area.properties["consulteeCategory"] or ""
+    radius = radius_by_category.get(category, default_metres)
+    if radius <= 0 or match.distance_metres is None or match.distance_metres > radius + DISTANCE_MARGIN_METRES:
+        return None
+    return radius
 
 
 def answerable_from_nearby(rule: RuleCondition, nearby_radius_metres: float) -> bool:
@@ -111,8 +134,7 @@ def _query_condition(db: Database, site: str, site_within_margin: str | None, ru
 def _combine(
     rules: list[RuleCondition],
     matches_by_condition: dict[str, list[AreaMatch]],
-    nearby: list[AreaMatch],
-    nearby_radius_metres: float,
+    nearby: list[tuple[AreaMatch, float]],
 ) -> dict[str, Consultee]:
     """One Consultee per area, by id, with its nearest measured distance, any geometry a query
     brought back, and its reasons: conditions in the ruleset's order, then the nearby search."""
@@ -124,8 +146,8 @@ def _combine(
     for rule in rules:
         for match in matches_by_condition.get(rule.id, []):
             add(match, ConditionReason(rule.id))
-    for match in nearby:
-        add(match, NearbyReason(nearby_radius_metres))
+    for match, radius in nearby:
+        add(match, NearbyReason(radius))
     return consultees
 
 

@@ -1,7 +1,7 @@
 /**
  * Build the map config for the project boundary page: one dataset per shapefile the case holds,
  * grouped under "GIS shapefiles" in the map's Layers menu so each file can be toggled on or off,
- * each in its own style - the most recent red (see boundary-map-styles.yaml).
+ * each in its own style - the most recent red (see config/map-styles/boundary-map.yaml).
  * Only the file carried forward (the current selection) starts visible - the rest are unchecked,
  * matching the radios below the map.
  */
@@ -39,7 +39,7 @@ export interface BoundaryMapFile {
 	label: string;
 	/** True for the file carried into the report - it starts checked in the Layers menu. */
 	checked: boolean;
-	/** When the file was received - the most recent is drawn red (see boundary-map-styles.yaml). */
+	/** When the file was received - the most recent is drawn red (see config/map-styles/boundary-map.yaml). */
 	receivedDate: Date | null;
 	geometry: Geometry;
 }
@@ -57,7 +57,7 @@ export interface BoundaryMapConfig {
 		id: string;
 		label: string;
 		checked: boolean;
-		/** The file's style, by how recent it is - see boundary-map-styles.yaml. */
+		/** The file's style, by how recent it is - see config/map-styles/boundary-map.yaml. */
 		style: BoundaryDatasetStyle;
 		geojson: GeoJsonFeatureCollection;
 	}[];

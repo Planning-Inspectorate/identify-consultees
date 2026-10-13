@@ -1,5 +1,5 @@
 # Boundary map styles: the project boundary page, the first map in the journey. Read when the app
-# starts (maps/boundary-map-styles.ts), which refuses to start if a value here is invalid - so a
+# starts (apps/manage/src/app/maps/boundary-map-styles.ts), which refuses to start if a value here is invalid - so a
 # change is checked by `npm test` and takes effect on the next deploy.
 #
 # The map draws one layer per boundary file the case holds, under "GIS shapefiles" in the Layers
@@ -16,7 +16,7 @@
 #                   colour (GDS: don't rely on colour alone).
 #   description   - how the style looks, in words, read out by screen readers in the map key.
 #
-# The consultee maps will have their own file: consultee-map-styles.example.yaml.
+# The consultee maps will have their own file: consultee-map.example.yaml, next to this one.
 
 version: 1
 
