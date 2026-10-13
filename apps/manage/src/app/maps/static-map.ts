@@ -372,15 +372,77 @@ export function escapeXml(value: string): string {
 		.replaceAll("'", '&apos;');
 }
 
-function svgPathCommandsForLine(line: Position[], project: (lng: number, lat: number) => [number, number]): string {
-	const commands: string[] = [];
-	for (let i = 0; i < line.length; i += 1) {
-		const point = line[i];
-		if (point?.[0] === undefined || point?.[1] === undefined) {
+// how far past the map's edge a point counts as off it - more than a 2px stroke reaches
+const OFF_MAP_MARGIN_PIXELS = 16;
+const LEFT = 1;
+const RIGHT = 2;
+const ABOVE = 4;
+const BELOW = 8;
+
+/** The map edges a pixel lies beyond (bits LEFT, RIGHT, ABOVE, BELOW), or 0 on or near the map. */
+function edgesBeyond([x, y]: [number, number], width: number, height: number): number {
+	return (
+		(x < -OFF_MAP_MARGIN_PIXELS ? LEFT : 0) |
+		(x > width + OFF_MAP_MARGIN_PIXELS ? RIGHT : 0) |
+		(y < -OFF_MAP_MARGIN_PIXELS ? ABOVE : 0) |
+		(y > height + OFF_MAP_MARGIN_PIXELS ? BELOW : 0)
+	);
+}
+
+/**
+ * A line's points in map pixels, leaving out what can't be seen: of each run of points beyond one
+ * and the same edge, only its first and last - the straight line between them stays beyond that
+ * edge, so what's drawn on the map is unchanged - and any point that rounds to the one before it.
+ * A county's coastline is thousands of points, nearly all off a map zoomed in on a site; drawn in
+ * full it runs to megabytes of SVG.
+ */
+export function visiblePathPoints(pixels: [number, number][], width: number, height: number): [number, number][] {
+	const kept: [number, number][] = [];
+	let run: { first: [number, number]; last: [number, number]; edges: number } | undefined;
+	const endRun = () => {
+		if (run) {
+			kept.push(run.first);
+			if (run.last !== run.first) {
+				kept.push(run.last);
+			}
+			run = undefined;
+		}
+	};
+	for (const pixel of pixels) {
+		const edges = edgesBeyond(pixel, width, height);
+		if (run && (run.edges & edges) !== 0) {
+			run.edges &= edges;
+			run.last = pixel;
 			continue;
 		}
-		const [x, y] = project(point[0], point[1]);
-		commands.push(`${i === 0 ? 'M' : 'L'}${x.toFixed(1)} ${y.toFixed(1)}`);
+		endRun();
+		if (edges === 0) {
+			kept.push(pixel);
+		} else {
+			run = { first: pixel, last: pixel, edges };
+		}
+	}
+	endRun();
+	return kept;
+}
+
+function svgPathCommandsForLine(
+	line: Position[],
+	project: (lng: number, lat: number) => [number, number],
+	width: number,
+	height: number
+): string {
+	const pixels = line
+		.filter((point) => point?.[0] !== undefined && point?.[1] !== undefined)
+		.map((point) => project(point[0], point[1]));
+	const commands: string[] = [];
+	let previous = '';
+	for (const [x, y] of visiblePathPoints(pixels, width, height)) {
+		const coordinates = `${x.toFixed(1)} ${y.toFixed(1)}`;
+		if (coordinates !== previous) {
+			commands.push(`${commands.length === 0 ? 'M' : 'L'}${coordinates}`);
+			previous = coordinates;
+		}
 	}
 	return commands.join(' ');
 }
@@ -388,12 +450,14 @@ function svgPathCommandsForLine(line: Position[], project: (lng: number, lat: nu
 function pathForFeature(
 	feature: GeoJsonFeature,
 	project: (lng: number, lat: number) => [number, number],
-	colours: FeatureColours
+	colours: FeatureColours,
+	width: number,
+	height: number
 ): string {
 	const filled = isArealGeometryType(feature.geometry.type);
 	const subpaths = collectLines(feature.geometry)
 		.filter((line) => line.length >= 2)
-		.map((line) => `${svgPathCommandsForLine(line, project)}${filled ? ' Z' : ''}`);
+		.map((line) => `${svgPathCommandsForLine(line, project, width, height)}${filled ? ' Z' : ''}`);
 	if (subpaths.length === 0) {
 		return '';
 	}
@@ -443,11 +507,11 @@ export function renderStaticMapOverlaySvg(options: StaticMapBuildOptions): strin
 	};
 
 	const consulteePaths = options.consulteeGeojson.features
-		.map((feature) => pathForFeature(feature, project, consulteeColours(feature)))
+		.map((feature) => pathForFeature(feature, project, consulteeColours(feature), width, height))
 		.filter(Boolean)
 		.join('\n');
 	const projectPaths = options.projectGeojson.features
-		.map((feature) => pathForFeature(feature, project, projectColours(feature)))
+		.map((feature) => pathForFeature(feature, project, projectColours(feature), width, height))
 		.filter(Boolean)
 		.join('\n');
 

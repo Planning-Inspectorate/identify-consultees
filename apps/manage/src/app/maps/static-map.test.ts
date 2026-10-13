@@ -16,7 +16,8 @@ import {
 	osmTileCacheSizeForTests,
 	renderStaticMapOverlaySvg,
 	renderStaticMapSvg,
-	staticMapViewportOrigin
+	staticMapViewportOrigin,
+	visiblePathPoints
 } from './static-map.ts';
 
 const tinyPng = Buffer.from(
@@ -620,5 +621,115 @@ describe('static-map helpers', () => {
 		ageOsmTileCacheForTests();
 		await fetchOsmBasemapTiles({ center: [0, 0], zoom: 2, width: 256, height: 256 });
 		assert.ok(calls > afterWarm);
+	});
+});
+
+describe('visiblePathPoints', () => {
+	test('keeps every point on or near the map', () => {
+		const points: [number, number][] = [
+			[0, 0],
+			[-10, 50],
+			[100, 516],
+			[970, 20]
+		];
+		assert.deepEqual(visiblePathPoints(points, 960, 516), points);
+	});
+
+	test('keeps only the ends of a run beyond one edge - the line between them stays beyond it', () => {
+		assert.deepEqual(
+			visiblePathPoints(
+				[
+					[100, 100],
+					[-50, 100],
+					[-300, -900],
+					[-800, 2000],
+					[-60, 300],
+					[200, 300]
+				],
+				960,
+				516
+			),
+			[
+				[100, 100],
+				[-50, 100],
+				[-60, 300],
+				[200, 300]
+			]
+		);
+	});
+
+	test('ends a run when the points go beyond a different edge', () => {
+		// beyond the left, then above - the corner between is kept, so the line doesn't cut across the map
+		assert.deepEqual(
+			visiblePathPoints(
+				[
+					[-100, 300],
+					[-100, 200],
+					[-100, -100],
+					[500, -100],
+					[700, -100]
+				],
+				960,
+				516
+			),
+			[
+				[-100, 300],
+				[-100, -100],
+				[500, -100],
+				[700, -100]
+			]
+		);
+	});
+
+	test('keeps a lone point beyond an edge, and a whole path off the map as its two ends', () => {
+		assert.deepEqual(visiblePathPoints([[2000, 100]], 960, 516), [[2000, 100]]);
+		assert.deepEqual(
+			visiblePathPoints(
+				[
+					[100, 2000],
+					[200, 2100],
+					[300, 2000]
+				],
+				960,
+				516
+			),
+			[
+				[100, 2000],
+				[300, 2000]
+			]
+		);
+	});
+
+	test('writes a far smaller path for an area mostly off the map, and none of a point that rounds to the last', () => {
+		const coastline = Array.from({ length: 2_000 }, (_, i) => [-3 + i * 0.001, 55 + (i % 2) * 0.001]);
+		const svg = renderStaticMapOverlaySvg({
+			center: [-1.5, 52.5],
+			zoom: 12,
+			width: 960,
+			height: 516,
+			projectGeojson: { type: 'FeatureCollection', features: [] },
+			consulteeGeojson: {
+				type: 'FeatureCollection',
+				features: [
+					{ type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: coastline } },
+					{
+						type: 'Feature',
+						properties: {},
+						geometry: {
+							type: 'LineString',
+							coordinates: [
+								[-1.5, 52.5],
+								[-1.5, 52.5],
+								[-1.49, 52.5]
+							]
+						}
+					}
+				]
+			}
+		});
+		const paths = [...svg.matchAll(/<path d="([^"]*)"/g)].map((match) => match[1]);
+		// 2,000 points far above the map - just the two ends
+		assert.equal(paths[0].split(/[ML]/).filter(Boolean).length, 2);
+		assert.equal(paths[1].split(/[ML]/).filter(Boolean).length, 2);
 	});
 });

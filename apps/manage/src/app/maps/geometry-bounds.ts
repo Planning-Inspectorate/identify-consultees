@@ -132,3 +132,51 @@ export function computeMapView(featureCollection: { features: { geometry: Geomet
 
 	return { center, zoom };
 }
+
+// Web Mercator: the world is one 256px tile at zoom 0
+const WORLD_TILE_PIXELS = 256;
+const EARTH_CIRCUMFERENCE_METRES = 40_075_016.686;
+
+/** A longitude/latitude as a fraction of the Web Mercator world, x east and y south from the top left. */
+function worldFraction(longitude: number, latitude: number): [number, number] {
+	const clamped = Math.max(-85.051_128_78, Math.min(85.051_128_78, latitude));
+	const sinLatitude = Math.sin((clamped * Math.PI) / 180);
+	return [(longitude + 180) / 360, 0.5 - Math.log((1 + sinLatitude) / (1 - sinLatitude)) / (4 * Math.PI)];
+}
+
+export interface FitOptions {
+	/** The largest share of the map's width and height the features fill, leaving the rest as surroundings. */
+	fill: number;
+	/** The least distance the view spans across, so a small site isn't shown at street level. */
+	minExtentMetres: number;
+}
+
+/**
+ * A centre and zoom that fit every feature into a `width` x `height` map, filling at most
+ * `options.fill` of it, at the closest whole zoom level - Web Mercator, as the maps draw, so the
+ * fit holds at UK latitudes where a degree of longitude is much shorter than one of latitude.
+ * An empty collection returns the England / Wales fallback view.
+ */
+export function computeFittedMapView(
+	featureCollection: { features: { geometry: GeometryLike }[] },
+	viewport: { width: number; height: number },
+	options: FitOptions
+): MapView {
+	const bounds = computeBounds(featureCollection);
+	if (!bounds) {
+		return FALLBACK_MAP_VIEW;
+	}
+	const center: LngLat = [(bounds.west + bounds.east) / 2, (bounds.south + bounds.north) / 2];
+
+	const [west, north] = worldFraction(bounds.west, bounds.north);
+	const [east, south] = worldFraction(bounds.east, bounds.south);
+	// Mercator is conformal - a metre is the same fraction of the world east-west and north-south
+	const minExtent = options.minExtentMetres / (EARTH_CIRCUMFERENCE_METRES * Math.cos((center[1] * Math.PI) / 180));
+	const width = Math.max(east - west, minExtent);
+	const height = Math.max(south - north, minExtent);
+	const scale = Math.min(
+		(viewport.width * options.fill) / (width * WORLD_TILE_PIXELS),
+		(viewport.height * options.fill) / (height * WORLD_TILE_PIXELS)
+	);
+	return { center, zoom: Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, Math.floor(Math.log2(scale)))) };
+}

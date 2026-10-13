@@ -7,9 +7,9 @@ import {
 import type { AsyncRequestHandler, AsyncRequestHandlerWithBody } from '@planning-inspectorate/core/util';
 import { recencyRanks, styleForRank } from '../../../maps/boundary-map-styles.ts';
 import type { BoundaryMapFile } from '../../../maps/boundary-map.ts';
-import { buildBoundaryMapConfig } from '../../../maps/boundary-map.ts';
+import { BOUNDARY_FRAMING, buildBoundaryMapConfig } from '../../../maps/boundary-map.ts';
 import { buildProjectGeojson } from '../../../maps/case-geojson.ts';
-import { computeMapView } from '../../../maps/geometry-bounds.ts';
+import { computeFittedMapView } from '../../../maps/geometry-bounds.ts';
 import { MAP_VIEWPORT } from '../../../maps/sample-geojson.ts';
 import { buildConsulteeStaticMapResponse, sendStaticMapResponse } from '../../../maps/serve-static-map.ts';
 import { resolveCase, resolveCaseSummary } from '../resolve-case.ts';
@@ -169,7 +169,7 @@ export function buildBoundaryStaticMap(service: ManageService, forceSvg = false)
 		}
 
 		const projectGeojson = await withBoundaryFileStyle(db, project, buildProjectGeojson(project));
-		const view = computeMapView(projectGeojson);
+		const view = computeFittedMapView(projectGeojson, MAP_VIEWPORT, BOUNDARY_FRAMING);
 		const image = await buildConsulteeStaticMapResponse({
 			geometryId: project.id,
 			sectionId: 'boundary',

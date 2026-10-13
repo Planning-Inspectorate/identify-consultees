@@ -101,7 +101,7 @@ describe('buildCaseMapConfig with a search area', () => {
 	};
 	const display = { type: 'Point' as const, coordinates: [1.1234567, 52.1234567] as [number, number] };
 
-	it('opens on the search area without drawing it, with matches in their display geometry', () => {
+	it('opens on the site, not the search area, with matches in their display geometry', () => {
 		const config = buildCaseMapConfig(
 			project(),
 			[match('inside'), match('outside')],
@@ -112,7 +112,9 @@ describe('buildCaseMapConfig with a search area', () => {
 			}
 		);
 
-		assert.deepStrictEqual(config.center, [1.15, 52.1]);
+		// the point site at the middle, 5km across filling at most half the 960x516 map - zoom 12
+		assert.deepStrictEqual(config.center, [-1.5, 52.5]);
+		assert.strictEqual(config.zoom, 12);
 		// only the match touching the area is drawn, in its display geometry - but the count is every match
 		assert.deepStrictEqual(
 			config.consulteeGeojson.features.map((feature) => [feature.id, feature.geometry]),

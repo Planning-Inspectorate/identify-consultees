@@ -9,7 +9,8 @@ import type { ConsulteeMatch } from '@pins/identify-consultees-database/src/geos
 import { isIdentifiedByCondition } from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
 import type { Geometry } from '@pins/identify-consultees-database/src/geospatial/wkt.ts';
 import { assignCategoryColours, colourFor, UNCATEGORISED } from './category-colours.ts';
-import { computeBounds, computeMapView } from './geometry-bounds.ts';
+import type { FitOptions } from './geometry-bounds.ts';
+import { computeBounds, computeFittedMapView } from './geometry-bounds.ts';
 import type { GeoJsonFeature, GeoJsonFeatureCollection } from './sample-geojson.ts';
 import { MAP_VIEWPORT } from './sample-geojson.ts';
 
@@ -119,9 +120,16 @@ export function buildConsulteeMatchesGeojson(
 }
 
 /**
+ * How the case maps open: on the site, filling at most half the map, and at least 5km across so a
+ * small site still shows what's around it. Not on the search area or the consultees - whole
+ * counties and ambulance trusts would zoom out so far the site is lost. Zooming out on the
+ * interactive map shows the rest.
+ */
+export const SITE_FRAMING: FitOptions = { fill: 0.5, minExtentMetres: 5_000 };
+
+/**
  * A site's search area - the site grown by the nearby radius - and the matched consultee areas
- * touching it. When given, the map opens on the search area, which isn't drawn: framing on whole
- * regional areas (counties, ambulance trusts) would zoom out so far the site is lost.
+ * touching it: what the map draws (see SITE_FRAMING for where it opens). The area itself isn't drawn.
  */
 export interface SearchAreaDisplay {
 	/** The site grown by the nearby radius. */
@@ -237,9 +245,7 @@ export function buildCaseMapConfig(
 			: buildConsulteeMatchesGeojson(matches, colours),
 		searchAreaFeatures
 	);
-	const view = computeMapView({
-		features: searchAreaFeatures ?? [...projectGeojson.features, ...consulteeGeojson.features]
-	});
+	const view = computeFittedMapView(projectGeojson, MAP_VIEWPORT, SITE_FRAMING);
 	const mapLabel = `${rulesetName} for ${project.properties.caseName} (${project.properties.caseReference})`;
 
 	return {

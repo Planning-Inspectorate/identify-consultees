@@ -6,7 +6,8 @@ import type { AddedConsultee, RemovedConsultee } from '../urls.ts';
 /**
  * The exported consultee report: a Summary tab, then one tab per high-level group of the rulesets
  * workbook. Each consultee goes on the tab of the condition that identified it (a hand-added one,
- * its category's), with every column consultee_area holds except the geometries.
+ * its category's), with its consultee_area columns - less the geometries and the ids and version the
+ * reference data leaves empty - and its metadata spread into a column per attribute.
  */
 
 /** The tabs after Summary, in order. "Other Cases" is a placeholder - nothing fills it yet. */
@@ -74,25 +75,20 @@ export function tabForCategory(category: string, ruleset: Ruleset): GroupTab {
 	return tabForGroup(ruleset.rules.find((rule) => rule.categories.includes(category))?.group);
 }
 
+// every tab's first columns - then the metadata keys its consultees have (see metadataColumns)
 const HEADER = [
 	'Consultee',
 	'Category',
 	'Region',
 	'Why identified',
 	'Distance from site (km)',
-	'Source',
 	'Consultee area id',
 	'Geometry type',
 	'Case reference',
-	'Document id',
-	'Consultee id',
-	'Organisation id',
-	'Current version',
-	'Last updated',
-	'Metadata (JSON)'
+	'Last updated'
 ] as const;
 
-export const GROUP_TAB_COLUMN_WIDTHS = [36, 28, 22, 60, 12, 16, 38, 16, 14, 38, 38, 38, 10, 20, 80];
+export const GROUP_TAB_COLUMN_WIDTHS = [36, 28, 22, 60, 12, 38, 16, 14, 18];
 
 type Cell = SheetData[number][number];
 
@@ -104,17 +100,46 @@ function kilometres(metres: number | null): Cell {
 	return metres === null ? null : { type: Number, value: Math.round(metres / 10) / 100, format: '0.00' };
 }
 
+type Metadata = Record<string, unknown>;
+
+/**
+ * A stored row's metadata as an object: the data's own attributes, which differ from one source
+ * dataset to another. Anything that isn't a JSON object is kept whole, under "Metadata".
+ */
+export function parseMetadata(raw: string | undefined): Metadata {
+	if (!raw) {
+		return {};
+	}
+	try {
+		const parsed: unknown = JSON.parse(raw);
+		return parsed !== null && typeof parsed === 'object' && !Array.isArray(parsed)
+			? (parsed as Metadata)
+			: { Metadata: raw };
+	} catch {
+		return { Metadata: raw };
+	}
+}
+
+/** A metadata value as a cell: numbers and true/false as such, objects and lists as JSON. */
+function metadataCell(value: unknown): Cell {
+	if (value === null || value === undefined || value === '') {
+		return null;
+	}
+	if (typeof value === 'number') {
+		return { type: Number, value };
+	}
+	if (typeof value === 'boolean') {
+		return { type: Boolean, value };
+	}
+	return { value: typeof value === 'string' ? value : JSON.stringify(value) };
+}
+
 // the stored row's columns after the area id - blank when there's no stored row
 function storedCells(record: ConsulteeAreaRecord | undefined): Cell[] {
 	return [
 		text(record?.geometryType),
 		text(record?.caseReference),
-		text(record?.documentId),
-		text(record?.consulteeId),
-		text(record?.organisationId),
-		record ? { type: Number, value: record.currentVersion } : null,
-		record ? { type: Date, value: record.lastUpdated, format: 'yyyy-mm-dd hh:mm' } : null,
-		text(record?.metadata)
+		record ? { type: Date, value: record.lastUpdated, format: 'yyyy-mm-dd hh:mm' } : null
 	];
 }
 
@@ -126,21 +151,19 @@ function matchRow(match: ConsulteeMatch, ruleset: Ruleset, record: ConsulteeArea
 		text(record?.region ?? properties.region),
 		{ value: describeReasons(match, ruleset, { nearby: false }).join('\n'), wrap: true },
 		kilometres(match.distanceMetres),
-		{ value: 'Ruleset' },
 		{ value: match.feature.id },
 		...storedCells(record)
 	];
 }
 
-// a picked nearby consultee has its stored row and distance; one typed in by name has neither
+// a matched nearby consultee has its stored row and distance; any other name has neither
 function addedRow(add: ReportExport['added'][number], record: ConsulteeAreaRecord | undefined): Cell[] {
 	return [
 		{ value: add.name },
 		{ value: add.category },
 		text(record?.region),
-		{ value: add.reason || 'Manually added', wrap: true },
+		{ value: add.reason ? `Added by hand: ${add.reason}` : 'Added by hand', wrap: true },
 		kilometres(add.distanceMetres ?? null),
-		{ value: 'Added by hand' },
 		text(add.id),
 		...storedCells(record)
 	];
@@ -150,30 +173,65 @@ interface SortableRow {
 	category: string;
 	name: string;
 	cells: Cell[];
+	metadata: Metadata;
 }
 
 function byCategoryThenName(a: SortableRow, b: SortableRow): number {
 	return a.category.localeCompare(b.category, 'en-GB') || a.name.localeCompare(b.name, 'en-GB');
 }
 
-function groupTabs(report: ReportExport): Map<GroupTab, Cell[][]> {
+/** One group tab: its columns (the fixed ones, then its metadata keys) and a row per consultee. */
+interface GroupTabContent {
+	header: string[];
+	widths: number[];
+	rows: Cell[][];
+}
+
+/**
+ * Every metadata key the tab's consultees have, in the order they first appear - a column each.
+ * A consultee without one leaves that cell blank.
+ */
+function metadataColumns(rows: SortableRow[]): string[] {
+	const keys = new Set<string>();
+	for (const row of rows) {
+		for (const key of Object.keys(row.metadata)) {
+			keys.add(key);
+		}
+	}
+	return [...keys];
+}
+
+function tabContent(rows: SortableRow[]): GroupTabContent {
+	const sorted = rows.sort(byCategoryThenName);
+	const keys = metadataColumns(sorted);
+	return {
+		header: [...HEADER, ...keys],
+		widths: [...GROUP_TAB_COLUMN_WIDTHS, ...keys.map((key) => Math.min(40, Math.max(12, key.length + 2)))],
+		rows: sorted.map((row) => [...row.cells, ...keys.map((key) => metadataCell(row.metadata[key]))])
+	};
+}
+
+function groupTabs(report: ReportExport): Map<GroupTab, GroupTabContent> {
 	const rows = new Map<GroupTab, SortableRow[]>(GROUP_TABS.map((tab) => [tab, []]));
 	for (const match of report.identified) {
 		const record = report.records.get(match.feature.id);
 		rows.get(tabForMatch(match, report.ruleset))!.push({
 			category: record?.consulteeCategory ?? match.feature.properties.consulteeCategory ?? '',
 			name: record?.consultee ?? match.feature.properties.consultee ?? '',
-			cells: matchRow(match, report.ruleset, record)
+			cells: matchRow(match, report.ruleset, record),
+			metadata: parseMetadata(record?.metadata)
 		});
 	}
 	for (const add of report.added) {
+		const record = add.id ? report.records.get(add.id) : undefined;
 		rows.get(tabForCategory(add.category, report.ruleset))!.push({
 			category: add.category,
 			name: add.name,
-			cells: addedRow(add, add.id ? report.records.get(add.id) : undefined)
+			cells: addedRow(add, record),
+			metadata: parseMetadata(record?.metadata)
 		});
 	}
-	return new Map([...rows].map(([tab, tabRows]) => [tab, tabRows.sort(byCategoryThenName).map((row) => row.cells)]));
+	return new Map([...rows].map(([tab, tabRows]) => [tab, tabContent(tabRows)]));
 }
 
 /** A date as the report writes it: "6 July 2026". */
@@ -186,7 +244,7 @@ export function formatDate(date: Date): string {
 	});
 }
 
-function summarySheet(report: ReportExport, tabs: Map<GroupTab, Cell[][]>): SheetData {
+function summarySheet(report: ReportExport, tabs: Map<GroupTab, GroupTabContent>): SheetData {
 	const detail = (label: string, value: string | null): Cell[] => [bold(label), text(value)];
 	const sheet: SheetData = [
 		[{ value: 'Consultee report', fontWeight: 'bold', fontSize: 16 }],
@@ -199,7 +257,7 @@ function summarySheet(report: ReportExport, tabs: Map<GroupTab, Cell[][]>): Shee
 		[bold('Generated'), { type: Date, value: report.generatedAt, format: 'd mmmm yyyy hh:mm' }],
 		[],
 		headerRow(['Tab', 'Consultees']),
-		...GROUP_TABS.map((tab): Cell[] => [{ value: tab }, { type: Number, value: tabs.get(tab)!.length }]),
+		...GROUP_TABS.map((tab): Cell[] => [{ value: tab }, { type: Number, value: tabs.get(tab)!.rows.length }]),
 		[bold('Total'), { type: Number, value: report.identified.length + report.added.length, fontWeight: 'bold' }],
 		[],
 		detail('Identified by the ruleset', String(report.identified.length)),
@@ -220,12 +278,15 @@ export function buildReportSheets(report: ReportExport) {
 	const tabs = groupTabs(report);
 	return [
 		{ sheet: 'Summary', data: summarySheet(report, tabs), columns: [{ width: 28 }, { width: 50 }, { width: 60 }] },
-		...GROUP_TABS.map((tab) => ({
-			sheet: tab,
-			data: [headerRow(HEADER), ...tabs.get(tab)!] as SheetData,
-			columns: GROUP_TAB_COLUMN_WIDTHS.map((width) => ({ width })),
-			stickyRowsCount: 1
-		})),
+		...GROUP_TABS.map((tab) => {
+			const { header, widths, rows } = tabs.get(tab)!;
+			return {
+				sheet: tab,
+				data: [headerRow(header), ...rows] as SheetData,
+				columns: widths.map((width) => ({ width })),
+				stickyRowsCount: 1
+			};
+		}),
 		{
 			sheet: OTHER_CASES_TAB,
 			data: [[bold('Other cases')], [{ value: 'Not filled yet.' }]] as SheetData,
