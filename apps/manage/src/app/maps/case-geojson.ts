@@ -61,9 +61,27 @@ function categoryOf(match: Pick<ConsulteeMatch, 'feature'>): string {
 	return match.feature.properties.consulteeCategory || UNCATEGORISED;
 }
 
-type DrawableMatch = ConsulteeMatch & { feature: { geometry: Geometry } };
+/** A match, perhaps one a user added by hand from the nearby search (see markAddedByHand). */
+export type MapMatch = ConsulteeMatch & { addedByHand?: boolean };
 
-function isDrawable(match: ConsulteeMatch): match is DrawableMatch {
+/**
+ * `matches` with the ones in `ids` - nearby consultees picked on the Add consultee page - marked
+ * as added by hand, so the map draws them as identified rather than as faint context.
+ */
+export function markAddedByHand(matches: ConsulteeMatch[], ids: ReadonlySet<string>): MapMatch[] {
+	return ids.size === 0
+		? matches
+		: matches.map((match) => (ids.has(match.feature.id) ? { ...match, addedByHand: true } : match));
+}
+
+/** True when the map draws the match as identified: a condition found it, or a user added it. */
+function isDrawnAsIdentified(match: MapMatch): boolean {
+	return match.addedByHand === true || isIdentifiedByCondition(match);
+}
+
+type DrawableMatch = MapMatch & { feature: { geometry: Geometry } };
+
+function isDrawable(match: MapMatch): match is DrawableMatch {
 	return match.feature.geometry !== undefined;
 }
 
@@ -72,7 +90,7 @@ function isDrawable(match: ConsulteeMatch): match is DrawableMatch {
  * without original geometry, so they're drawn only from display geometry (see buildCaseMapConfig).
  */
 export function buildConsulteeMatchesGeojson(
-	matches: ConsulteeMatch[],
+	matches: MapMatch[],
 	colours: Map<string, string> = assignCategoryColours(matches.map(categoryOf)),
 	sample = true
 ): GeoJsonFeatureCollection {
@@ -91,8 +109,9 @@ export function buildConsulteeMatchesGeojson(
 				consulteeCategory: categoryOf(match),
 				region: match.feature.properties.region ?? '',
 				colour: colourFor(colours, categoryOf(match)),
-				// 'false' when only the nearby search found it: drawn fainter, as context (see withFillOpacity)
-				identified: String(isIdentifiedByCondition(match))
+				// 'false' when only the nearby search found it, and no one added it: drawn fainter, as
+				// context (see withFillOpacity)
+				identified: String(isDrawnAsIdentified(match))
 			},
 			geometry: match.feature.geometry
 		}))
@@ -193,7 +212,7 @@ function withFillOpacity(
 }
 
 /** `matches` with their display geometry from `geometries`; any with none (not touching the area) are left out. */
-function withDisplayGeometry(matches: ConsulteeMatch[], geometries: Map<string, Geometry>): ConsulteeMatch[] {
+function withDisplayGeometry(matches: MapMatch[], geometries: Map<string, Geometry>): MapMatch[] {
 	return matches.flatMap((match) => {
 		const geometry = geometries.get(match.feature.id);
 		return geometry ? [{ ...match, feature: { ...match.feature, geometry: roundGeometry(geometry) } }] : [];
@@ -202,7 +221,7 @@ function withDisplayGeometry(matches: ConsulteeMatch[], geometries: Map<string, 
 
 export function buildCaseMapConfig(
 	project: CaseBoundaryFeature,
-	matches: ConsulteeMatch[],
+	matches: MapMatch[],
 	rulesetName: string,
 	searchArea?: SearchAreaDisplay,
 	fallback?: { src: string; alt: string }

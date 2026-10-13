@@ -230,7 +230,7 @@ describe('manage router wiring', () => {
 				`/consultees/${homePageTestCaseId}/report/consultees/add?ruleset=england-wales-post-20240430&category=Parish%20Council`
 			)
 			.type('form')
-			.send({ _csrf: csrf, name: 'Router Test Consultee', reason: 'Adjacent landowner' });
+			.send({ _csrf: csrf, consultee: 'not-listed', name: 'Router Test Consultee', reason: 'Adjacent landowner' });
 		assert.equal(response.status, 302);
 		const location = response.headers.location;
 		assert.match(location, /\/report\/consultees\?ruleset=england-wales-post-20240430&category=Parish%20Council&add=/);
@@ -254,7 +254,7 @@ describe('manage router wiring', () => {
 				`/consultees/${homePageTestCaseId}/report/consultees/add?ruleset=england-wales-post-20240430&category=Parish%20Council`
 			)
 			.type('form')
-			.send({ _csrf: csrf, name: '', reason: 'no name' });
+			.send({ _csrf: csrf, consultee: 'not-listed', name: '', reason: 'no name' });
 		assert.equal(response.status, 200);
 		assert.match(response.text, /There is a problem/);
 		assert.match(response.text, /Enter the consultee name/);
@@ -273,7 +273,7 @@ describe('manage router wiring', () => {
 				`/consultees/${homePageTestCaseId}/report/consultees/add?ruleset=england-wales-post-20240430&category=Parish%20Council`
 			)
 			.type('form')
-			.send({ _csrf: csrf, name: 'Router Test Consultee', reason: '' });
+			.send({ _csrf: csrf, consultee: 'not-listed', name: 'Router Test Consultee', reason: '' });
 		assert.equal(response.status, 200);
 		assert.match(response.text, /There is a problem/);
 		assert.match(response.text, /Enter a reason for adding this consultee\./);
@@ -291,7 +291,7 @@ describe('manage router wiring', () => {
 				`/consultees/${homePageTestCaseId}/report/consultees/add?ruleset=england-wales-post-20240430&category=Parish%20Council`
 			)
 			.type('form')
-			.send({ _csrf: addCsrf, name: 'Router Test Consultee', reason: 'Adjacent landowner' });
+			.send({ _csrf: addCsrf, consultee: 'not-listed', name: 'Router Test Consultee', reason: 'Adjacent landowner' });
 		const categoryPageUrl = added.headers.location;
 
 		// the row's Remove link opens the remove page - here, targeting the add by index
@@ -330,7 +330,7 @@ describe('manage router wiring', () => {
 				`/consultees/${homePageTestCaseId}/report/consultees/add?ruleset=england-wales-post-20240430&category=Parish%20Council`
 			)
 			.type('form')
-			.send({ _csrf: csrf, name: 'Router Test Consultee', reason: 'Adjacent landowner' });
+			.send({ _csrf: csrf, consultee: 'not-listed', name: 'Router Test Consultee', reason: 'Adjacent landowner' });
 		const removeUrl = added.headers.location.replace('/report/consultees?', '/report/consultees/remove?') + '&added=0';
 
 		const response = await agent.post(removeUrl).type('form').send({ _csrf: csrf, reason: '' });

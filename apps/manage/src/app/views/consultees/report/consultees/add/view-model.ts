@@ -7,6 +7,16 @@ export interface AddConsulteeViewModel {
 	backLinkUrl: string;
 	/** The form's POST target - this same URL, so the selection params ride along. */
 	formAction: string;
+	/**
+	 * govukRadios items: the category's consultees the nearby search found, nearest first, each with
+	 * its distance as a hint. Empty when there are none - the form is then the name input alone.
+	 */
+	nearbyOptions: { value: string; text: string; hint: { text: string }; checked: boolean }[];
+	/** The radio value for "not listed", which reveals the name input. */
+	notListedValue: string;
+	notListedChecked: boolean;
+	/** govukRadios' errorMessage param - present only when nothing was picked. */
+	consulteeError?: { text: string };
 	/** Entered values, re-rendered when the form fails validation. */
 	nameValue: string;
 	reasonValue: string;

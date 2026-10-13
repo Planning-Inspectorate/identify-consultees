@@ -204,6 +204,34 @@ describe('report workbook', () => {
 		assert.ok(!summary.some((cells) => cells[0] === 'Removed consultees'));
 	});
 
+	it('gives a nearby consultee picked on an Add consultee page its stored row and distance', () => {
+		const admin = buildReportSheets(
+			report({
+				records: new Map([['p', record('p', { region: 'Stored region', documentId: 'doc-p' })]]),
+				added: [
+					{
+						id: 'p',
+						category: 'Parish Council',
+						name: 'Picked Parish',
+						reason: 'Borders the site',
+						distanceMetres: 2500
+					}
+				]
+			})
+		).find((sheet) => sheet.sheet === 'Administrative boundaries')!;
+		const row = rowValues(admin.data[1]);
+		assert.deepStrictEqual(row.slice(0, 7), [
+			'Picked Parish',
+			'Parish Council',
+			'Stored region',
+			'Borders the site',
+			2.5,
+			'Added by hand',
+			'p'
+		]);
+		assert.equal(row[9], 'doc-p');
+	});
+
 	it('leaves cells blank for a consultee with no distance, name or category anywhere', () => {
 		const unnamed = {
 			feature: { id: 'u', properties: { consulteeCategory: null, consultee: null, region: null } },
@@ -226,6 +254,8 @@ describe('report workbook', () => {
 
 	it('names the file by reference, ruleset and date, without characters file systems reject', () => {
 		assert.equal(reportFileName(report()), 'EN010001 Test ruleset consultees 2026-10-13.xlsx');
+		// the ZIP holding the workbook and the maps
+		assert.equal(reportFileName(report(), 'zip'), 'EN010001 Test ruleset consultee report 2026-10-13.zip');
 		assert.equal(
 			reportFileName(report({ caseReference: 'EN/01:02' })),
 			'EN-01-02 Test ruleset consultees 2026-10-13.xlsx'

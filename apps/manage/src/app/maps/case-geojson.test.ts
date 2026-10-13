@@ -8,6 +8,7 @@ import {
 	buildConsulteeMatchesGeojson,
 	LOCAL_FILL_OPACITY,
 	MAP_SAMPLING_THRESHOLD,
+	markAddedByHand,
 	MAX_SAMPLED_MAP_MATCHES,
 	NEARBY_LOCAL_FILL_OPACITY,
 	NEARBY_REGIONAL_FILL_OPACITY,
@@ -206,6 +207,35 @@ describe('buildCaseMapConfig with a search area', () => {
 				['county', 'true', String(REGIONAL_FILL_OPACITY)],
 				['nearby-parish', 'false', String(NEARBY_LOCAL_FILL_OPACITY)],
 				['parish', 'true', String(LOCAL_FILL_OPACITY)]
+			]
+		);
+	});
+
+	it('draws a nearby consultee a user added by hand as identified, leaving the others faint', () => {
+		const nearby = (id: string): ConsulteeMatch => ({
+			...match(id),
+			reasons: [{ type: 'nearby', radiusMetres: 20000 }]
+		});
+		const matches = [nearby('picked'), nearby('not-picked')];
+		// nothing picked - the matches as they are
+		assert.strictEqual(markAddedByHand(matches, new Set()), matches);
+		const config = buildCaseMapConfig(project(), markAddedByHand(matches, new Set(['picked'])), 'Railway', {
+			area,
+			geometries: new Map<string, Geometry>([
+				['picked', display],
+				['not-picked', display]
+			])
+		});
+
+		assert.deepStrictEqual(
+			config.consulteeGeojson.features.map((feature) => [
+				feature.id,
+				feature.properties.identified,
+				feature.properties.fillOpacity
+			]),
+			[
+				['not-picked', 'false', String(NEARBY_LOCAL_FILL_OPACITY)],
+				['picked', 'true', String(LOCAL_FILL_OPACITY)]
 			]
 		);
 	});

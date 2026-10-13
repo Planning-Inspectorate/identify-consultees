@@ -53,7 +53,7 @@ export function createRoutes(service: ManageService): IRouter {
 	// its "Remove consultee" form - records the removal reason and returns to the Change page
 	router.get('/:caseId/report/consultees/remove', asyncHandler(reportConsulteeRemovePage));
 	router.post('/:caseId/report/consultees/remove', asyncHandler(reportConsulteeRemoveSubmit));
-	// "Create report": confirmation page with the report download link (a placeholder for now)
+	// "Create report": confirmation page with the report download link
 	router.get('/:caseId/report/created', asyncHandler(reportCreatedPage));
 	router.get('/:caseId/report/download', asyncHandler(reportDownload));
 	// the consultee report (tables) for the current shapefile/ruleset selection
