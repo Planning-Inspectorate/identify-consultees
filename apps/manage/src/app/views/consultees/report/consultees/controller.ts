@@ -1,6 +1,10 @@
 import type { ManageService } from '#service';
 import { stringifyForInlineScript } from '#util/inline-json.ts';
-import { getRuleset, RULESETS } from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
+import {
+	getRuleset,
+	isIdentifiedByCondition,
+	RULESETS
+} from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
 import type { AsyncRequestHandler } from '@planning-inspectorate/core/util';
 import { buildCaseMapConfig, MAX_SAMPLED_MAP_MATCHES } from '../../../../maps/case-geojson.ts';
 import { MAP_VIEWPORT } from '../../../../maps/sample-geojson.ts';
@@ -59,18 +63,23 @@ export function buildReportConsulteesPage(service: ManageService): AsyncRequestH
 			logger
 		);
 
-		// a category is a page if the ruleset covers it or the run found consultees in it (the
-		// nearby search finds categories no condition names) - anything else has nothing to change.
-		// A failed run can't tell, so it shows its error rather than a 404
-		const found = consultees.some((consultee) => consultee.feature.properties.consulteeCategory === category);
+		// a category is a page if the ruleset covers it or its conditions identified consultees in it -
+		// anything else has nothing to change. A failed run can't tell, so it shows its error rather
+		// than a 404
+		const found = consultees.some(
+			(consultee) => consultee.feature.properties.consulteeCategory === category && isIdentifiedByCondition(consultee)
+		);
 		if (!failed && !found && !rulesetCategories(ruleset).includes(category)) {
 			res.status(404).render('views/errors/404.njk', { pageHeading: 'Page not found' });
 			return;
 		}
 
+		// the map shows the category's consultees the nearby search found too, fainter (see
+		// case-geojson.ts) - what's nearby is useful context - but only identified ones are listed
 		const visible = consultees.filter(
 			(match) => match.feature.properties.consulteeCategory === category && !excluded.has(match.feature.id)
 		);
+		const identified = visible.filter(isIdentifiedByCondition);
 		const searchArea = await buildSearchAreaSafely(db, project, visible, nearbyConsulteeRadiusMetres, logger);
 		const staticMapSrc = categoryStaticMapUrl(project.id, ruleset.id, category, selection);
 		const staticMapAlt = `Static map showing ${category} consultees for ${project.properties.caseName}`;
@@ -79,9 +88,9 @@ export function buildReportConsulteesPage(service: ManageService): AsyncRequestH
 		// ruleset matches first, then hand-added consultees - every Remove link opens the "Remove
 		// consultee" page, which records the reason before excluding the match or dropping the add
 		const rows: ConsulteeRow[] = [
-			...visible.map((match) => ({
+			...identified.map((match) => ({
 				name: consulteeName(match),
-				identified: describeReasons(match, ruleset),
+				identified: describeReasons(match, ruleset, { nearby: false }),
 				removeUrl: removeConsulteeUrl(project.id, ruleset.id, category, { matchId: match.feature.id }, selection)
 			})),
 			...selection.adds.flatMap((add, index) => {

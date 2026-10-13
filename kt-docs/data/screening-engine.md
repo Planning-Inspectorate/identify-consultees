@@ -47,9 +47,9 @@ The report pages turn reasons into **Why identified** text (`apps/manage/src/app
 | Intersection, buffer 0   | `"B" host District Councils: intersects the site`                                                |
 | Intersection, buffer > 0 | `Hospitals: within 10km of the site`                                                             |
 | Bordering                | The condition's description, e.g. `"A" Community Councils bordering "B" host Community Councils` |
-| Nearby                   | `Within 20km of the site`                                                                        |
+| Nearby                   | `Within 20km of the site` (the `/results` page only - see below)                                 |
 
-Consultees found only by the nearby search, in categories no condition names (e.g. Interconnector), are counted and listed after the ruleset's own categories.
+**The report is what the conditions identified.** The check page, category pages, remove page and report created page list only consultees that met at least one condition (`isIdentifiedByCondition`), and leave the nearby reason out of **Why identified**. Consultees only the nearby search found are context, not report content: the category maps draw them fainter (see [Maps](../maps.md#layers)), and the unlinked `/results` page still lists everything.
 
 ## Tolerances
 

@@ -1,4 +1,5 @@
 import type { ConsulteeMatch, Ruleset } from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
+import { isIdentifiedByCondition } from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
 import { describeReasons } from '../reasons.ts';
 import { reportCategories } from './categories.ts';
 import type { AddedConsultee, ConsulteeSelection } from './urls.ts';
@@ -28,7 +29,8 @@ export function addedConsulteeReason(add: AddedConsultee): string {
 }
 
 /**
- * The report's consultees, by category: what the run found, less anything removed on a category's
+ * The report's consultees, by category: what the ruleset's conditions identified (not consultees
+ * only the nearby search found - they're map context, not report content), less anything removed on a category's
  * Change page, plus anything added by hand - each with why it's in the report. Categories follow
  * the check page's order (see reportCategories), then any category only a hand-added consultee is
  * in; a category with nothing in it is left out.
@@ -38,7 +40,8 @@ export function reportByCategory(
 	consultees: ConsulteeMatch[],
 	selection: ConsulteeSelection
 ): ReportCategory[] {
-	const categories = reportCategories(ruleset, consultees);
+	const identified = consultees.filter(isIdentifiedByCondition);
+	const categories = reportCategories(ruleset, identified);
 	for (const add of selection.adds) {
 		if (!categories.includes(add.category)) {
 			categories.push(add.category);
@@ -50,9 +53,12 @@ export function reportByCategory(
 		.map((category) => ({
 			category,
 			consultees: [
-				...consultees
+				...identified
 					.filter((match) => match.feature.properties.consulteeCategory === category && !excluded.has(match.feature.id))
-					.map((match) => ({ name: consulteeName(match), identified: describeReasons(match, ruleset) })),
+					.map((match) => ({
+						name: consulteeName(match),
+						identified: describeReasons(match, ruleset, { nearby: false })
+					})),
 				...selection.adds
 					.filter((add) => add.category === category)
 					.map((add) => ({ name: add.name, identified: [addedConsulteeReason(add)] }))

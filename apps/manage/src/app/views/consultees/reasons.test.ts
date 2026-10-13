@@ -56,5 +56,7 @@ describe('describeReasons', () => {
 			'Host councils: intersects the site',
 			'Within 20km of the site'
 		]);
+		// the report pages leave the nearby search out
+		assert.deepEqual(describeReasons(match, ruleset, { nearby: false }), ['Host councils: intersects the site']);
 	});
 });

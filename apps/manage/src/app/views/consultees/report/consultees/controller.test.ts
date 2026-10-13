@@ -132,7 +132,7 @@ describe('report consultees change page', () => {
 		assert.doesNotMatch(html, /Removed consultees/);
 	});
 
-	it('should list every reason a consultee was identified - its conditions, then the nearby search', async () => {
+	it('should list every condition a consultee met, but not the nearby search', async () => {
 		const mockRes = { status: mock.fn(() => mockRes), render: mock.fn() };
 		const hospitalRow = {
 			...parishMatchRow(),
@@ -152,8 +152,7 @@ describe('report consultees change page', () => {
 
 		const viewModel = mockRes.render.mock.calls[0].arguments[1];
 		assert.deepStrictEqual(viewModel.rows[0].identified, [
-			'Hospitals operated by NHS Trusts and NHS Foundation Trusts (England): within 10km of the site',
-			'Within 20km of the site'
+			'Hospitals operated by NHS Trusts and NHS Foundation Trusts (England): within 10km of the site'
 		]);
 	});
 
@@ -177,22 +176,50 @@ describe('report consultees change page', () => {
 		]);
 	});
 
-	it('should be a page for a category only the nearby search found, though the ruleset does not cover it', async () => {
+	it('should 404 a category only the nearby search found - it is not in the report', async () => {
 		const mockRes = { status: mock.fn(() => mockRes), render: mock.fn() };
-		const { geometryWkt: _noGeometry, ...interconnector } = {
+		// no ruleset covers Corporate Joint Committee, so only the nearby search ever finds one
+		const { geometryWkt: _noGeometry, ...committee } = {
 			...parishMatchRow(),
-			consulteeCategory: 'Interconnector',
-			consultee: 'NeuConnect Interconnector',
+			consulteeCategory: 'Corporate Joint Committee',
+			consultee: 'South East Wales Corporate Joint Committee',
 			distanceMetres: 4_000,
 			reasons: [{ type: 'nearby' as const, radiusMetres: 20_000 }]
 		};
-		const db = dbReturning([[realProjectRow()], [interconnector]]);
-		await handlerFor(db)({ params: { caseId: realProjectId }, query: { category: 'Interconnector' } }, mockRes);
+		const db = dbReturning([[realProjectRow()], [committee]]);
+		await handlerFor(db)(
+			{ params: { caseId: realProjectId }, query: { category: 'Corporate Joint Committee' } },
+			mockRes
+		);
 
-		assert.strictEqual(mockRes.status.mock.callCount(), 0);
+		assert.strictEqual(mockRes.status.mock.calls[0].arguments[0], 404);
+	});
+
+	it("should list only identified consultees, but map the category's nearby ones too, fainter", async () => {
+		const mockRes = { status: mock.fn(() => mockRes), render: mock.fn() };
+		const nearbyParish = {
+			...parishMatchRow('88888888-8888-8888-8888-888888888888', 'Nearby Parish Council', 9_000),
+			reasons: [{ type: 'nearby' as const, radiusMetres: 20_000 }]
+		};
+		const db = dbReturning([[realProjectRow()], [parishMatchRow(), nearbyParish]]);
+		await handlerFor(db)({ params: { caseId: realProjectId }, query: { category: 'Parish Council' } }, mockRes);
+
 		const viewModel = mockRes.render.mock.calls[0].arguments[1];
-		assert.strictEqual(viewModel.rows[0].name, 'NeuConnect Interconnector');
-		assert.deepStrictEqual(viewModel.rows[0].identified, ['Within 20km of the site']);
+		assert.deepStrictEqual(
+			viewModel.rows.map((row: { name: string }) => row.name),
+			['Little Snoring Parish Council']
+		);
+		const map = JSON.parse(viewModel.mapConfigJson);
+		assert.deepStrictEqual(
+			map.consulteeGeojson.features.map((feature: { properties: { name: string; identified: string } }) => [
+				feature.properties.name,
+				feature.properties.identified
+			]),
+			[
+				['Nearby Parish Council', 'false'],
+				['Little Snoring Parish Council', 'true']
+			]
+		);
 	});
 
 	it('should fall back to a condition id the ruleset does not have, rather than drop the reason', async () => {

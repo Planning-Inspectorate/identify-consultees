@@ -8,6 +8,7 @@ import {
 	CATEGORIES_AWAITING_DATA,
 	DEFAULT_RULESET_ID,
 	getRuleset,
+	isIdentifiedByCondition,
 	loadRulesets,
 	parseCsv,
 	parseRulesetCsv,
@@ -231,6 +232,21 @@ describe('loadRulesets', () => {
 		} finally {
 			rmSync(dir, { recursive: true, force: true });
 		}
+	});
+});
+
+describe('isIdentifiedByCondition', () => {
+	test('is true when any condition matched, false when only the nearby search found it', () => {
+		assert.equal(
+			isIdentifiedByCondition({
+				reasons: [
+					{ type: 'nearby', radiusMetres: 20000 },
+					{ type: 'condition', conditionId: 'railways_10km' }
+				]
+			}),
+			true
+		);
+		assert.equal(isIdentifiedByCondition({ reasons: [{ type: 'nearby', radiusMetres: 20000 }] }), false);
 	});
 });
 

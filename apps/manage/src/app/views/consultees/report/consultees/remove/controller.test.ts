@@ -169,6 +169,16 @@ describe('report consultee remove page', () => {
 		});
 	}
 
+	it('should 404 for a consultee only the nearby search found - it is not in the report', async () => {
+		const mockRes = { status: mock.fn(() => mockRes), render: mock.fn() };
+		const nearbyOnly = { ...parishMatchRow(), reasons: [{ type: 'nearby' as const, radiusMetres: 20_000 }] };
+		await removePage(dbReturning([[realProjectRow()]], [nearbyOnly]))(
+			{ params: { caseId: realProjectId }, query: { ...parishQuery, match: matchId } },
+			mockRes
+		);
+		assert.strictEqual(mockRes.status.mock.calls[0].arguments[0], 404);
+	});
+
 	it('should 404 when caseId is missing, malformed or matches no project', async () => {
 		const mockRes = { status: mock.fn(() => mockRes), render: mock.fn() };
 		const handler = removePage(dbReturning([[realProjectRow()]], [parishMatchRow()]));

@@ -121,7 +121,11 @@ describe('consultees-map client helpers', () => {
 			matches.sublayers.map((sublayer) => sublayer.label),
 			['Hospital (1)', 'Parish Council (1)']
 		);
-		assert.deepEqual(matches.sublayers[0].filter, ['==', ['get', 'consulteeCategory'], 'Hospital']);
+		assert.deepEqual(matches.sublayers[0].filter, [
+			'all',
+			['==', ['get', 'consulteeCategory'], 'Hospital'],
+			['!=', ['get', 'identified'], 'false']
+		]);
 		// points as small circles
 		assert.equal(matches.sublayers[0].style.symbol, 'circle');
 		assert.match(matches.sublayers[0].style.symbolSvgContent, /{{haloColor}}/);
@@ -149,6 +153,60 @@ describe('consultees-map client helpers', () => {
 				['Ambulance Trust (1)', 'rgba(29, 112, 184, 0.35)']
 			]
 		);
+	});
+
+	test('buildCategorySublayers draws nearby-only consultees as their own fainter, dashed sublayer', () => {
+		const sublayers = buildCategorySublayers(
+			[
+				{
+					properties: {
+						consulteeCategory: 'Parish Council',
+						colour: '#28a197',
+						fillOpacity: '0.35',
+						identified: 'true'
+					}
+				},
+				{
+					properties: {
+						consulteeCategory: 'Parish Council',
+						colour: '#28a197',
+						fillOpacity: '0.1',
+						identified: 'false'
+					}
+				},
+				{
+					properties: {
+						consulteeCategory: 'Parish Council',
+						colour: '#28a197',
+						fillOpacity: '0.1',
+						identified: 'false'
+					}
+				},
+				{
+					geometry: { type: 'Point' },
+					properties: { consulteeCategory: 'Hospital', colour: '#d53880', fillOpacity: '0.1', identified: 'false' }
+				}
+			],
+			'consultees'
+		);
+
+		assert.deepEqual(
+			sublayers.map((sublayer) => [sublayer.label, sublayer.filter[2]]),
+			[
+				['Hospital: nearby, not identified (1)', ['==', ['get', 'identified'], 'false']],
+				['Parish Council: nearby, not identified (2)', ['==', ['get', 'identified'], 'false']],
+				['Parish Council (1)', ['!=', ['get', 'identified'], 'false']]
+			]
+		);
+		const [hospitalDots, nearbyParishes, parishes] = sublayers.map((sublayer) => sublayer.style);
+		assert.equal(hospitalDots.symbolBackgroundColor, 'rgba(213, 56, 128, 0.45)');
+		assert.deepEqual(nearbyParishes, {
+			stroke: '#28a197',
+			strokeWidth: 1,
+			strokeDashArray: [2, 2],
+			fill: 'rgba(40, 161, 151, 0.1)'
+		});
+		assert.deepEqual(parishes, { stroke: '#28a197', strokeWidth: 2, fill: 'rgba(40, 161, 151, 0.35)' });
 	});
 
 	test('buildCategorySublayers groups uncategorised features and defaults missing colours', () => {

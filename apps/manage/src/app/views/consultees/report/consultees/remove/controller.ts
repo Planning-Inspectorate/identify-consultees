@@ -1,6 +1,10 @@
 import type { ManageService } from '#service';
 import type { Ruleset } from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
-import { getRuleset, RULESETS } from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
+import {
+	getRuleset,
+	isIdentifiedByCondition,
+	RULESETS
+} from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
 import type { AsyncRequestHandler, AsyncRequestHandlerWithBody } from '@planning-inspectorate/core/util';
 import type { Response } from 'express';
 import { describeReasons } from '../../../reasons.ts';
@@ -77,9 +81,11 @@ async function removeConsulteeContext(
 			};
 		}
 		const match = consultees.find((consultee) => consultee.feature.id === matchId);
-		// a stale or crafted link - the match has to be in this category and still listed there
+		// a stale or crafted link - the match has to be listed in this category: identified by a
+		// condition (nearby-only consultees aren't in the report) and not already removed
 		if (
 			!match ||
+			!isIdentifiedByCondition(match) ||
 			match.feature.properties.consulteeCategory !== category ||
 			excludedMatchIds(selection.removed).has(matchId)
 		) {
@@ -94,7 +100,7 @@ async function removeConsulteeContext(
 			selection,
 			target: { matchId },
 			name: consulteeName(match),
-			identified: describeReasons(match, ruleset),
+			identified: describeReasons(match, ruleset, { nearby: false }),
 			rulesetFailed: false
 		};
 	}

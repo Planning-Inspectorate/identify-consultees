@@ -69,6 +69,28 @@ function handlerFor(db: unknown) {
 }
 
 describe('consultee report check page', () => {
+	it('should count only consultees a condition identified, not ones only the nearby search found', async () => {
+		const mockRes = { status: mock.fn(() => mockRes), render: mock.fn() };
+		const nearbyParish = {
+			...parishMatchRow('88888888-8888-8888-8888-888888888888', 'Nearby Parish Council'),
+			reasons: [{ type: 'nearby' as const, radiusMetres: 20_000 }]
+		};
+		const nearbyCommittee = {
+			...parishMatchRow('99999999-9999-9999-9999-999999999999', 'South East Wales Corporate Joint Committee'),
+			consulteeCategory: 'Corporate Joint Committee',
+			reasons: [{ type: 'nearby' as const, radiusMetres: 20_000 }]
+		};
+		const db = dbReturning([[realProjectRow()], [parishMatchRow(), nearbyParish, nearbyCommittee]]);
+		await handlerFor(db)({ params: { caseId: realProjectId }, query: {} }, mockRes);
+
+		const categories = mockRes.render.mock.calls[0].arguments[1].consultees as { name: string; names: string[] }[];
+		assert.deepStrictEqual(categories.find((category) => category.name === 'Parish Council')?.names, [
+			'Little Snoring Parish Council'
+		]);
+		// a category only the nearby search found isn't listed at all
+		assert.ok(!categories.some((category) => category.name === 'Corporate Joint Committee'));
+	});
+
 	it('should render the report details and per-category consultee counts', async () => {
 		const nunjucks = configureNunjucks();
 		const mockRes = {
@@ -326,8 +348,7 @@ describe('report created page', () => {
 					{
 						name: 'Norfolk Hospital',
 						identified: [
-							'Hospitals operated by NHS Trusts and NHS Foundation Trusts (England): within 10km of the site',
-							'Within 20km of the site'
+							'Hospitals operated by NHS Trusts and NHS Foundation Trusts (England): within 10km of the site'
 						]
 					}
 				]
@@ -342,8 +363,30 @@ describe('report created page', () => {
 		assert.match(html, /Why identified/);
 		assert.match(
 			html,
-			/Hospitals operated by NHS Trusts and NHS Foundation Trusts \(England\): within 10km of the site<br>Within 20km of the site/
+			/Hospitals operated by NHS Trusts and NHS Foundation Trusts \(England\): within 10km of the site/
 		);
+		// being near the site is map context, not a reason to be in the report
+		assert.doesNotMatch(html, /Within 20km of the site/);
+	});
+
+	it('should leave out consultees only the nearby search found', async () => {
+		const nearbyOnly = {
+			...parishMatchRow(),
+			id: '77777777-7777-7777-7777-777777777777',
+			consulteeCategory: 'Interconnector',
+			consultee: 'NeuConnect Interconnector',
+			reasons: [{ type: 'nearby' as const, radiusMetres: 20_000 }]
+		};
+		const { handler, mockRes } = createdPage([parishRow(), nearbyOnly]);
+		await handler({ params: { caseId: realProjectId }, query: {} }, mockRes);
+
+		const viewModel = mockRes.render.mock.calls[0].arguments[1];
+		assert.deepStrictEqual(
+			viewModel.report.map((section: { category: string }) => section.category),
+			['Parish Council']
+		);
+		assert.strictEqual(viewModel.consulteeCount, 1);
+		assert.doesNotMatch(mockRes.render.mock.calls[0].result, /NeuConnect/);
 	});
 
 	it('should leave out removed consultees and include hand-added ones, with the reason given', async () => {
@@ -370,8 +413,7 @@ describe('report created page', () => {
 					{
 						name: 'Norfolk Hospital',
 						identified: [
-							'Hospitals operated by NHS Trusts and NHS Foundation Trusts (England): within 10km of the site',
-							'Within 20km of the site'
+							'Hospitals operated by NHS Trusts and NHS Foundation Trusts (England): within 10km of the site'
 						]
 					},
 					{ name: 'Added Hospital', identified: ['Asked to be consulted'] }
