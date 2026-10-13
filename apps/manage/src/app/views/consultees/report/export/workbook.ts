@@ -167,7 +167,7 @@ function addedRow(add: ReportExport['added'][number], record: ConsulteeAreaRecor
 		text(record?.region),
 		{ value: add.reason || 'Manually added', wrap: true },
 		kilometres(add.distanceMetres ?? null),
-		{ value: 'Added by hand' },
+		{ value: 'Manually added' },
 		text(add.id),
 		...storedCells(record)
 	];
@@ -265,7 +265,7 @@ function summarySheet(report: ReportExport, tabs: Map<GroupTab, GroupTabContent>
 		[bold('Total'), { type: Number, value: report.identified.length + report.added.length, fontWeight: 'bold' }],
 		[],
 		detail('Identified by the ruleset', String(report.identified.length)),
-		detail('Added by hand', String(report.added.length)),
+		detail('Manually added', String(report.added.length)),
 		detail('Removed', String(report.removed.length))
 	];
 	if (report.removed.length > 0) {

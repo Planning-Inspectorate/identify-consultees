@@ -155,7 +155,7 @@ describe('report workbook', () => {
 				1
 			],
 			// added by hand, with the default reason
-			['Added Parish', 'Parish Council', null, 'Manually added', null, 'Added by hand', null, null, null, null, null],
+			['Added Parish', 'Parish Council', null, 'Manually added', null, 'Manually added', null, null, null, null, null],
 			// no stored row (deleted mid-request) - the run's values, and no metadata
 			[
 				'Zeal Parish Council',
@@ -237,6 +237,7 @@ describe('report workbook', () => {
 		assert.deepStrictEqual(row('Administrative boundaries'), ['Administrative boundaries', 1]);
 		assert.deepStrictEqual(row('Public bodies'), ['Public bodies', 1]);
 		assert.deepStrictEqual(row('Total'), ['Total', 2]);
+		assert.deepStrictEqual(row('Manually added'), ['Manually added', '1']);
 		assert.deepStrictEqual(row('Removed'), ['Removed', '1']);
 		assert.deepStrictEqual(row('Removed Parish'), ['Removed Parish', 'Parish Council', 'Dissolved']);
 	});
@@ -277,7 +278,7 @@ describe('report workbook', () => {
 			'Stored region',
 			'Borders the site',
 			2.5,
-			'Added by hand',
+			'Manually added',
 			'p',
 			'Polygon',
 			'EN010001',
