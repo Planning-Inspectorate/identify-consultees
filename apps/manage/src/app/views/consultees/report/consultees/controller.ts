@@ -6,7 +6,7 @@ import {
 	RULESETS
 } from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
 import type { AsyncRequestHandler } from '@planning-inspectorate/core/util';
-import { buildCaseMapConfig, MAX_SAMPLED_MAP_MATCHES } from '../../../../maps/case-geojson.ts';
+import { buildCaseMapConfig, markAddedByHand, MAX_SAMPLED_MAP_MATCHES } from '../../../../maps/case-geojson.ts';
 import { MAP_VIEWPORT } from '../../../../maps/sample-geojson.ts';
 import { describeReasons } from '../../reasons.ts';
 import { resolveCase } from '../../resolve-case.ts';
@@ -16,6 +16,7 @@ import { addedConsulteeReason, consulteeName } from '../report-consultees.ts';
 import type { ConsulteeSelection } from '../urls.ts';
 import {
 	addConsulteeUrl,
+	addedMatchIds,
 	categoryStaticMapUrl,
 	consulteeSelection,
 	consulteesUrl,
@@ -60,7 +61,8 @@ export function buildReportConsulteesPage(service: ManageService): AsyncRequestH
 			project,
 			ruleset,
 			nearbyConsulteeRadiusMetres,
-			logger
+			logger,
+			req.session
 		);
 
 		// a category is a page if the ruleset covers it or its conditions identified consultees in it -
@@ -75,7 +77,8 @@ export function buildReportConsulteesPage(service: ManageService): AsyncRequestH
 		}
 
 		// the map shows the category's consultees the nearby search found too, fainter (see
-		// case-geojson.ts) - what's nearby is useful context - but only identified ones are listed
+		// case-geojson.ts) - what's nearby is useful context - but only identified ones are listed.
+		// Nearby ones picked on the Add consultee page are drawn as identified
 		const visible = consultees.filter(
 			(match) => match.feature.properties.consulteeCategory === category && !excluded.has(match.feature.id)
 		);
@@ -83,7 +86,13 @@ export function buildReportConsulteesPage(service: ManageService): AsyncRequestH
 		const searchArea = await buildSearchAreaSafely(db, project, visible, service.nearbySearchRadiusMetres, logger);
 		const staticMapSrc = categoryStaticMapUrl(project.id, ruleset.id, category, selection);
 		const staticMapAlt = `Static map showing ${category} consultees for ${project.properties.caseName}`;
-		const map = buildCaseMapConfig(project, visible, category, searchArea, { src: staticMapSrc, alt: staticMapAlt });
+		const map = buildCaseMapConfig(
+			project,
+			markAddedByHand(visible, addedMatchIds(selection.adds)),
+			category,
+			searchArea,
+			{ src: staticMapSrc, alt: staticMapAlt }
+		);
 
 		// ruleset matches first, then hand-added consultees - every Remove link opens the "Remove
 		// consultee" page, which records the reason before excluding the match or dropping the add

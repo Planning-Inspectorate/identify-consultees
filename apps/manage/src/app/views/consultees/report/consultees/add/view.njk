@@ -2,6 +2,7 @@
 
 {% from "govuk/components/button/macro.njk" import govukButton %}
 {% from "govuk/components/input/macro.njk" import govukInput %}
+{% from "govuk/components/radios/macro.njk" import govukRadios %}
 {% from "govuk/components/textarea/macro.njk" import govukTextarea %}
 
 {% block pageTitle %}
@@ -9,17 +10,47 @@
 {% endblock %}
 
 {% block pageContent %}
+	{% set nameInput = govukInput({
+		label: {
+			text: "Name of consultee"
+		},
+		id: "consultee-name",
+		name: "name",
+		value: nameValue,
+		errorMessage: nameError
+	}) %}
+
 	<form method="post" action="{{ formAction }}" novalidate>
 		<input type="hidden" name="_csrf" value="{{ _csrf }}">
-		{{ govukInput({
-			label: {
-				text: "Name of consultee"
-			},
-			id: "consultee-name",
-			name: "name",
-			value: nameValue,
-			errorMessage: nameError
-		}) }}
+
+		{% if nearbyOptions | length %}
+			{# the category's consultees the nearby search found - the faint ones on its map #}
+			{{ govukRadios({
+				idPrefix: "consultee",
+				name: "consultee",
+				fieldset: {
+					legend: {
+						text: "Which consultee do you want to add?",
+						classes: "govuk-fieldset__legend--m"
+					}
+				},
+				hint: {
+					text: "These are near the site but the ruleset did not identify them. They are shown faintly on the map."
+				},
+				errorMessage: consulteeError,
+				items: nearbyOptions.concat([
+					{ divider: "or" },
+					{
+						value: notListedValue,
+						text: "A consultee not listed",
+						checked: notListedChecked,
+						conditional: { html: nameInput }
+					}
+				])
+			}) }}
+		{% else %}
+			{{ nameInput | safe }}
+		{% endif %}
 
 		{{ govukTextarea({
 			label: {

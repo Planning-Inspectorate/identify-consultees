@@ -344,6 +344,9 @@ describe('manage page accessibility smoke', () => {
 				'/consultees/11111111-1111-1111-1111-111111111111/report/consultees?ruleset=england-wales-post-20240430&category=Parish%20Council',
 			formAction:
 				'/consultees/11111111-1111-1111-1111-111111111111/report/consultees/add?ruleset=england-wales-post-20240430&category=Parish%20Council',
+			nearbyOptions: [],
+			notListedValue: 'not-listed',
+			notListedChecked: false,
 			nameValue: '',
 			reasonValue: ''
 		});
@@ -359,6 +362,9 @@ describe('manage page accessibility smoke', () => {
 				'/consultees/11111111-1111-1111-1111-111111111111/report/consultees?ruleset=england-wales-post-20240430&category=Parish%20Council',
 			formAction:
 				'/consultees/11111111-1111-1111-1111-111111111111/report/consultees/add?ruleset=england-wales-post-20240430&category=Parish%20Council',
+			nearbyOptions: [],
+			notListedValue: 'not-listed',
+			notListedChecked: false,
 			nameValue: '',
 			reasonValue: '',
 			nameError: { text: 'Enter the consultee name' },
@@ -369,6 +375,44 @@ describe('manage page accessibility smoke', () => {
 			]
 		});
 		assert.match(html, /There is a problem/);
+		await assertNoSeriousA11yViolations(html);
+	});
+
+	test('add consultee page offering nearby consultees, in its error state, has no serious a11y violations', async () => {
+		const html = nunjucks.render('views/consultees/report/consultees/add/view.njk', {
+			...pageLocals,
+			pageHeading: 'Add consultee',
+			pageCaption: 'Parish Council',
+			backLinkUrl:
+				'/consultees/11111111-1111-1111-1111-111111111111/report/consultees?ruleset=england-wales-post-20240430&category=Parish%20Council',
+			formAction:
+				'/consultees/11111111-1111-1111-1111-111111111111/report/consultees/add?ruleset=england-wales-post-20240430&category=Parish%20Council',
+			nearbyOptions: [
+				{
+					value: '22222222-2222-2222-2222-222222222222',
+					text: 'Little Snoring Parish Council',
+					hint: { text: '1.3 km from the site' },
+					checked: false
+				},
+				{
+					value: '33333333-3333-3333-3333-333333333333',
+					text: 'Great Snoring Parish Council',
+					hint: { text: '4.0 km from the site' },
+					checked: false
+				}
+			],
+			notListedValue: 'not-listed',
+			notListedChecked: true,
+			nameValue: '',
+			reasonValue: '',
+			nameError: { text: 'Enter the consultee name' },
+			reasonError: { text: 'Enter a reason for adding this consultee.' },
+			errorSummary: [
+				{ text: 'Enter the consultee name', href: '#consultee-name' },
+				{ text: 'Enter a reason for adding this consultee.', href: '#consultee-reason' }
+			]
+		});
+		assert.match(html, /Which consultee do you want to add\?/);
 		await assertNoSeriousA11yViolations(html);
 	});
 
@@ -423,7 +467,7 @@ describe('manage page accessibility smoke', () => {
 			reference: 'EN0110007',
 			downloadUrl:
 				'/consultees/11111111-1111-1111-1111-111111111111/report/download?ruleset=england-wales-post-20240430',
-			downloadText: 'Download Longfield Solar Farm consultee report (Excel)',
+			downloadText: 'Download Longfield Solar Farm consultee report and maps (ZIP)',
 			rulesetName: 'England Wales post 30 April 2024',
 			report: [
 				{
@@ -457,7 +501,7 @@ describe('manage page accessibility smoke', () => {
 			reference: 'EN0110007',
 			downloadUrl:
 				'/consultees/11111111-1111-1111-1111-111111111111/report/download?ruleset=england-wales-post-20240430',
-			downloadText: 'Download Longfield Solar Farm consultee report (Excel)',
+			downloadText: 'Download Longfield Solar Farm consultee report and maps (ZIP)',
 			rulesetName: 'England Wales post 30 April 2024',
 			report: [],
 			consulteeCount: 0,

@@ -338,7 +338,8 @@ describe('report created page', () => {
 				consultees: [
 					{
 						name: 'Little Snoring Parish Council',
-						identified: ['"B" host Parish / Town / Community Councils: intersects the site']
+						identified: ['"B" host Parish / Town / Community Councils: intersects the site'],
+						mapped: true
 					}
 				]
 			},
@@ -349,7 +350,8 @@ describe('report created page', () => {
 						name: 'Norfolk Hospital',
 						identified: [
 							'Hospitals operated by NHS Trusts and NHS Foundation Trusts (England): within 10km of the site'
-						]
+						],
+						mapped: true
 					}
 				]
 			}
@@ -358,7 +360,7 @@ describe('report created page', () => {
 
 		const html = mockRes.render.mock.calls[0].result;
 		assert.match(html, /Report created/);
-		assert.match(html, /Download Real Test Project consultee report \(Excel\)/);
+		assert.match(html, /Download Real Test Project consultee report and maps \(ZIP\)/);
 		assert.match(html, new RegExp(`href="/consultees/${realProjectId}/report/download\\?ruleset=`));
 		assert.match(html, /Consultees in the report \(2\)/);
 		assert.match(html, /Why identified/);
@@ -415,12 +417,17 @@ describe('report created page', () => {
 						name: 'Norfolk Hospital',
 						identified: [
 							'Hospitals operated by NHS Trusts and NHS Foundation Trusts (England): within 10km of the site'
-						]
+						],
+						mapped: true
 					},
-					{ name: 'Added Hospital', identified: ['Asked to be consulted'] }
+					// typed in by name - no area to map
+					{ name: 'Added Hospital', identified: ['Asked to be consulted'], mapped: false }
 				]
 			},
-			{ category: 'Landowner', consultees: [{ name: 'Mr Smith', identified: ['Manually added'] }] }
+			{
+				category: 'Landowner',
+				consultees: [{ name: 'Mr Smith', identified: ['Manually added'], mapped: false }]
+			}
 		]);
 		assert.strictEqual(consulteeCount, 3);
 	});

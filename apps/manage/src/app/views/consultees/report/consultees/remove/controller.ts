@@ -9,6 +9,7 @@ import type { AsyncRequestHandler, AsyncRequestHandlerWithBody } from '@planning
 import type { Response } from 'express';
 import { describeReasons } from '../../../reasons.ts';
 import { resolveCase, resolveCaseSummary } from '../../../resolve-case.ts';
+import type { RulesetRunStore } from '../../../run-ruleset.ts';
 import { firstQueryValue, runRulesetSafely } from '../../../run-ruleset.ts';
 import { addedConsulteeReason, consulteeName } from '../../report-consultees.ts';
 import type { ConsulteeSelection, RemovalTarget } from '../../urls.ts';
@@ -42,7 +43,8 @@ async function removeConsulteeContext(
 	service: ManageService,
 	caseId: string,
 	query: Record<string, unknown>,
-	res: Response
+	res: Response,
+	store?: RulesetRunStore
 ): Promise<RemoveConsulteeContext | undefined> {
 	const requestedRuleset = firstQueryValue(query.ruleset);
 	const ruleset = requestedRuleset ? getRuleset(requestedRuleset) : RULESETS[0];
@@ -65,7 +67,8 @@ async function removeConsulteeContext(
 			project,
 			ruleset,
 			service.nearbyConsulteeRadiusMetres,
-			service.logger
+			service.logger,
+			store
 		);
 		if (failed) {
 			return {
@@ -166,7 +169,7 @@ function viewModel(context: RemoveConsulteeContext, reasonValue = '', reasonErro
  */
 export function buildReportConsulteeRemovePage(service: ManageService): AsyncRequestHandler {
 	return async (req, res) => {
-		const context = await removeConsulteeContext(service, String(req.params.caseId ?? ''), req.query, res);
+		const context = await removeConsulteeContext(service, String(req.params.caseId ?? ''), req.query, res, req.session);
 		if (!context) {
 			return;
 		}
@@ -185,7 +188,7 @@ export function buildReportConsulteeRemoveSubmit(
 	service: ManageService
 ): AsyncRequestHandlerWithBody<{ reason?: unknown }> {
 	return async (req, res) => {
-		const context = await removeConsulteeContext(service, String(req.params.caseId ?? ''), req.query, res);
+		const context = await removeConsulteeContext(service, String(req.params.caseId ?? ''), req.query, res, req.session);
 		if (!context) {
 			return;
 		}

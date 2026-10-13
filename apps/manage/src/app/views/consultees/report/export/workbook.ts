@@ -40,9 +40,13 @@ export interface ReportExport {
 	generatedAt: Date;
 	/** The consultees the ruleset's conditions identified, less any removed. */
 	identified: ConsulteeMatch[];
-	/** Each identified consultee's full row, by id - missing only if it was deleted mid-request. */
+	/**
+	 * Each identified consultee's full row, and each picked nearby one's, by id - missing only if it
+	 * was deleted mid-request.
+	 */
 	records: Map<string, ConsulteeAreaRecord>;
-	added: readonly AddedConsultee[];
+	/** Consultees added by hand - a picked nearby one with its distance from the site. */
+	added: readonly (AddedConsultee & { distanceMetres?: number })[];
 	removed: readonly RemovedConsultee[];
 }
 
@@ -100,16 +104,9 @@ function kilometres(metres: number | null): Cell {
 	return metres === null ? null : { type: Number, value: Math.round(metres / 10) / 100, format: '0.00' };
 }
 
-function matchRow(match: ConsulteeMatch, ruleset: Ruleset, record: ConsulteeAreaRecord | undefined): Cell[] {
-	const properties = match.feature.properties;
+// the stored row's columns after the area id - blank when there's no stored row
+function storedCells(record: ConsulteeAreaRecord | undefined): Cell[] {
 	return [
-		text(record?.consultee ?? properties.consultee),
-		text(record?.consulteeCategory ?? properties.consulteeCategory),
-		text(record?.region ?? properties.region),
-		{ value: describeReasons(match, ruleset, { nearby: false }).join('\n'), wrap: true },
-		kilometres(match.distanceMetres),
-		{ value: 'Ruleset' },
-		{ value: match.feature.id },
 		text(record?.geometryType),
 		text(record?.caseReference),
 		text(record?.documentId),
@@ -121,15 +118,31 @@ function matchRow(match: ConsulteeMatch, ruleset: Ruleset, record: ConsulteeArea
 	];
 }
 
-function addedRow(add: AddedConsultee): Cell[] {
+function matchRow(match: ConsulteeMatch, ruleset: Ruleset, record: ConsulteeAreaRecord | undefined): Cell[] {
+	const properties = match.feature.properties;
+	return [
+		text(record?.consultee ?? properties.consultee),
+		text(record?.consulteeCategory ?? properties.consulteeCategory),
+		text(record?.region ?? properties.region),
+		{ value: describeReasons(match, ruleset, { nearby: false }).join('\n'), wrap: true },
+		kilometres(match.distanceMetres),
+		{ value: 'Ruleset' },
+		{ value: match.feature.id },
+		...storedCells(record)
+	];
+}
+
+// a picked nearby consultee has its stored row and distance; one typed in by name has neither
+function addedRow(add: ReportExport['added'][number], record: ConsulteeAreaRecord | undefined): Cell[] {
 	return [
 		{ value: add.name },
 		{ value: add.category },
-		null,
+		text(record?.region),
 		{ value: add.reason || 'Manually added', wrap: true },
-		null,
+		kilometres(add.distanceMetres ?? null),
 		{ value: 'Added by hand' },
-		...Array<Cell>(HEADER.length - 6).fill(null)
+		text(add.id),
+		...storedCells(record)
 	];
 }
 
@@ -154,14 +167,17 @@ function groupTabs(report: ReportExport): Map<GroupTab, Cell[][]> {
 		});
 	}
 	for (const add of report.added) {
-		rows
-			.get(tabForCategory(add.category, report.ruleset))!
-			.push({ category: add.category, name: add.name, cells: addedRow(add) });
+		rows.get(tabForCategory(add.category, report.ruleset))!.push({
+			category: add.category,
+			name: add.name,
+			cells: addedRow(add, add.id ? report.records.get(add.id) : undefined)
+		});
 	}
 	return new Map([...rows].map(([tab, tabRows]) => [tab, tabRows.sort(byCategoryThenName).map((row) => row.cells)]));
 }
 
-function formatDate(date: Date): string {
+/** A date as the report writes it: "6 July 2026". */
+export function formatDate(date: Date): string {
 	return date.toLocaleDateString('en-GB', {
 		day: 'numeric',
 		month: 'long',
@@ -218,8 +234,20 @@ export function buildReportSheets(report: ReportExport) {
 	];
 }
 
-/** A file name for the download: reference, ruleset and date, without characters file systems reject. */
-export function reportFileName(report: Pick<ReportExport, 'caseReference' | 'ruleset' | 'generatedAt'>): string {
+/** `name` without the characters file systems reject. */
+export function safeFileName(name: string): string {
+	return name.replace(/[\\/:*?"<>|]+/g, '-');
+}
+
+/**
+ * The download's file names - the workbook, or the ZIP holding it and the maps: reference, ruleset
+ * and date, without characters file systems reject.
+ */
+export function reportFileName(
+	report: Pick<ReportExport, 'caseReference' | 'ruleset' | 'generatedAt'>,
+	extension: 'xlsx' | 'zip' = 'xlsx'
+): string {
 	const date = report.generatedAt.toISOString().slice(0, 10);
-	return `${report.caseReference} ${report.ruleset.name} consultees ${date}.xlsx`.replace(/[\\/:*?"<>|]+/g, '-');
+	const kind = extension === 'zip' ? 'consultee report' : 'consultees';
+	return safeFileName(`${report.caseReference} ${report.ruleset.name} ${kind} ${date}.${extension}`);
 }

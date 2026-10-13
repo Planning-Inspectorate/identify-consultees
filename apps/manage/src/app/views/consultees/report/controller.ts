@@ -98,7 +98,8 @@ export function buildReportCheckPage(service: ManageService): AsyncRequestHandle
 			project,
 			ruleset,
 			nearbyConsulteeRadiusMetres,
-			logger
+			logger,
+			req.session
 		);
 		const selection: ConsulteeSelection = consulteeSelection(req.query);
 
@@ -125,8 +126,8 @@ export function buildReportCheckPage(service: ManageService): AsyncRequestHandle
 }
 
 /**
- * "Generate report" lands here: a confirmation naming the case, a link to download the report as an
- * Excel workbook (see export/controller.ts), and the report's consultees by category with why each
+ * "Generate report" lands here: a confirmation naming the case, a link to download the report - an
+ * Excel workbook and a PDF of each category's map, in a ZIP (see export/controller.ts) - and the report's consultees by category with why each
  * is in it - the run's results less anything removed, plus anything added by hand (the selection
  * rides along in the URL, as on the check page).
  */
@@ -155,7 +156,8 @@ export function buildReportCreatedPage(service: ManageService): AsyncRequestHand
 			project,
 			ruleset,
 			nearbyConsulteeRadiusMetres,
-			logger
+			logger,
+			req.session
 		);
 		const report = failed ? [] : reportByCategory(ruleset, consultees, selection);
 
@@ -166,7 +168,7 @@ export function buildReportCreatedPage(service: ManageService): AsyncRequestHand
 			reference: project.properties.caseReference,
 			rulesetName: ruleset.name,
 			downloadUrl: reportDownloadUrl(project.id, ruleset.id, selection),
-			downloadText: `Download ${project.properties.caseName} consultee report (Excel)`,
+			downloadText: `Download ${project.properties.caseName} consultee report and maps (ZIP)`,
 			report,
 			consulteeCount: report.reduce((total, section) => total + section.consultees.length, 0),
 			rulesetFailed: failed,

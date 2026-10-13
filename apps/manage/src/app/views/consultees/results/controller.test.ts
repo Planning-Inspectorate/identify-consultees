@@ -1,6 +1,7 @@
 import { mockLogger } from '@planning-inspectorate/core/testing';
 import assert from 'node:assert';
 import { describe, it, mock } from 'node:test';
+import { NEARBY_REGIONAL_FILL_OPACITY, REGIONAL_FILL_OPACITY } from '../../../maps/case-geojson.ts';
 import { configureNunjucks } from '../../../nunjucks.ts';
 import type { ConsulteeAreaMatchRow } from '../../../testing/ruleset-runner-stub.ts';
 import { failingRulesetRunner, rulesetRunnerReturning } from '../../../testing/ruleset-runner-stub.ts';
@@ -508,6 +509,34 @@ describe('consultees results static map', () => {
 		});
 		assert.notStrictEqual(unfiltered, excludingAMatch);
 		assert.strictEqual(unfiltered, excludingNothing);
+	});
+
+	it('should draw the nearby consultees picked on an Add consultee page (`include`) as identified', async () => {
+		// a filled area, so its fill opacity shows - wider than the point site's search area, so regional
+		const nearbyRow = {
+			...railwayMatchRow(),
+			geometryWkt: 'POLYGON((-1.51 52.49, -1.49 52.49, -1.49 52.51, -1.51 52.51, -1.51 52.49))',
+			reasons: [{ type: 'nearby' as const, radiusMetres: 20_000 }]
+		};
+		const svg = async (query: Record<string, unknown>) => {
+			const db = dbReturning([[realProjectRow()], [nearbyRow]]);
+			const handler = buildResultsStaticMap(
+				{ db, logger: mockLogger(), nearbyConsulteeRadiusMetres: 20_000, rulesetRunner: rulesetRunnerFor(db) },
+				true
+			);
+			const mockRes = {
+				status: mock.fn(() => mockRes),
+				type: mock.fn(() => mockRes),
+				set: mock.fn(() => mockRes),
+				send: mock.fn()
+			};
+			await handler({ params: { caseId: realProjectId }, query, headers: {} }, mockRes);
+			return String(mockRes.send.mock.calls[0].arguments[0]);
+		};
+		const query = { ruleset: 'england-wales-post-20240430', category: 'Railway' };
+
+		assert.match(await svg(query), new RegExp(`fill-opacity="${NEARBY_REGIONAL_FILL_OPACITY}"`));
+		assert.match(await svg({ ...query, include: nearbyRow.id }), new RegExp(`fill-opacity="${REGIONAL_FILL_OPACITY}"`));
 	});
 
 	it('should 503 rather than serve a cacheable empty map if the ruleset query fails', async () => {

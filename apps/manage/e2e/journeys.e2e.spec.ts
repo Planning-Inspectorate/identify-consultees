@@ -1,5 +1,7 @@
 import { newDatabaseClient } from '@pins/identify-consultees-database';
 import { expect, test } from '@playwright/test';
+import { unzipSync } from 'fflate';
+import { readFile } from 'node:fs/promises';
 import { loadCaseBoundaries } from '../../../packages/database/src/geospatial/case-boundaries.ts';
 import {
 	SAMPLE_CASE_ID,
@@ -74,8 +76,8 @@ test.describe('manage journeys', () => {
 	});
 
 	test('choosing a project starts the boundary-ruleset-check journey', async ({ page }) => {
-		// every report page, and the download, re-runs the ruleset - a dozen of them outgrow 30s on
-		// a full reference data load
+		// a dozen pages, a ruleset run and the download's maps come close to 30s on a full reference
+		// data load
 		test.slow();
 		await page.goto(`/?q=${SAMPLE_CASE_REFERENCE}`);
 		// a caseReference isn't guaranteed unique (a project can have several boundary submissions),
@@ -135,17 +137,29 @@ test.describe('manage journeys', () => {
 			removed = 1;
 		}
 
-		// "Add consultee" opens its form - name and reason are both required (mirroring
-		// the removal reason), so a blank submit fails on both fields; a blank name then
-		// fails validation with the entered reason kept
+		// "Add consultee" opens its form: the category's consultees only the nearby search found (the
+		// faint ones on its map) to pick from, or one not listed by name - with nothing nearby, the
+		// name alone. Which one and the reason are both required (mirroring the removal reason), so a
+		// blank submit fails on both; a blank name then fails validation with the entered reason kept
+		const notListed = page.getByRole('radio', { name: 'A consultee not listed' });
+		// the seeded data decides whether anything nearby is left to offer
+		const chooseNotListed = async () => {
+			if ((await notListed.count()) > 0) {
+				await notListed.check();
+			}
+		};
 		await page.getByRole('button', { name: 'Add consultee' }).click();
 		await expect(page).toHaveURL(/\/report\/consultees\/add\?.*category=Parish/);
 		await expect(page.getByRole('heading', { level: 1 })).toContainText('Add consultee');
+		const offersNearby = (await notListed.count()) > 0;
 		await page.getByRole('button', { name: 'Add consultee' }).click();
 		await expect(page.getByText('There is a problem')).toBeVisible();
-		await expect(page.getByRole('link', { name: 'Enter the consultee name' })).toBeVisible();
+		await expect(
+			page.getByRole('link', { name: offersNearby ? 'Select the consultee to add' : 'Enter the consultee name' })
+		).toBeVisible();
 		await expect(page.getByRole('link', { name: 'Enter a reason for adding this consultee.' })).toBeVisible();
 		await page.getByLabel('Reason for adding').fill('Entered first');
+		await chooseNotListed();
 		await page.getByRole('button', { name: 'Add consultee' }).click();
 		await expect(page.getByRole('link', { name: 'Enter the consultee name' })).toBeVisible();
 		await expect(page.getByText('Error: Enter the consultee name')).toBeVisible();
@@ -159,13 +173,29 @@ test.describe('manage journeys', () => {
 		await expect(page.getByRole('rowheader', { name: 'First Test Consultee' })).toBeVisible();
 		await expect(page.getByText('Entered first')).toBeVisible();
 
+		// a nearby consultee picked from the list joins the report by name - and the map draws it as
+		// identified rather than faint
+		let picked = 0;
+		if (offersNearby) {
+			await page.getByRole('button', { name: 'Add consultee' }).click();
+			const nearest = page.getByRole('radio').first();
+			const pickedName = (await page.locator(`label[for="${await nearest.getAttribute('id')}"]`).innerText()).trim();
+			await nearest.check();
+			await page.getByLabel('Reason for adding').fill('Picked from nearby');
+			await page.getByRole('button', { name: 'Add consultee' }).click();
+			await expect(page.getByRole('rowheader', { name: pickedName })).toBeVisible();
+			await expect(page.getByText('Picked from nearby')).toBeVisible();
+			picked = 1;
+		}
+
 		await page.getByRole('button', { name: 'Add consultee' }).click();
+		await chooseNotListed();
 		await page.getByLabel('Name of consultee').fill('Second Test Consultee');
 		await page.getByLabel('Reason for adding').fill('Borders the site');
 		await page.getByRole('button', { name: 'Add consultee' }).click();
 		await expect(page.getByRole('rowheader', { name: 'Second Test Consultee' })).toBeVisible();
 		await expect(page.getByText('Borders the site')).toBeVisible();
-		await expect(page.getByRole('link', { name: /Remove/ })).toHaveCount(parishCount - removed + 2);
+		await expect(page.getByRole('link', { name: /Remove/ })).toHaveCount(parishCount - removed + picked + 2);
 
 		// a hand-added consultee's Remove link goes through the same reason page -
 		// its row leaves the Consultees table and joins Removed consultees instead
@@ -180,7 +210,7 @@ test.describe('manage journeys', () => {
 		const removedTable = page.getByRole('table', { name: 'Removed consultees' });
 		await expect(removedTable.getByRole('rowheader', { name: 'Second Test Consultee' })).toBeVisible();
 		await expect(removedTable.getByRole('row', { name: /Added in error/ })).toBeVisible();
-		await expect(page.getByRole('link', { name: /Remove/ })).toHaveCount(parishCount - removed + 1);
+		await expect(page.getByRole('link', { name: /Remove/ })).toHaveCount(parishCount - removed + picked + 1);
 
 		// "Save and return" lands back on the check page - the row's list/total matching the rows
 		// just listed (a hand-added consultee shows by name when the list isn't capped)
@@ -191,7 +221,7 @@ test.describe('manage journeys', () => {
 			.locator('.govuk-summary-list__row', { hasText: 'Parish Council' })
 			.locator('.govuk-summary-list__value')
 			.first();
-		const expectedTotal = parishCount - removed + 1;
+		const expectedTotal = parishCount - removed + picked + 1;
 		if (expectedTotal > 10) {
 			await expect(returnedValue).toContainText(`Showing 10 of ${expectedTotal} consultees`);
 		} else {
@@ -205,11 +235,15 @@ test.describe('manage journeys', () => {
 			new RegExp(`/consultees/${SAMPLE_CASE_ID}/report/created\\?ruleset=${SAMPLE_RULESET_ID}`)
 		);
 		await expect(page.getByRole('heading', { level: 1 })).toContainText('Report created');
-		// the download is the report as an Excel workbook, with the selection carried into it
+		// the download is a ZIP of the report as an Excel workbook and a PDF of each category's map,
+		// with the selection carried into it
 		const downloadLink = page.getByRole('link', { name: new RegExp(`Download ${SAMPLE_CASE_NAME} consultee report`) });
 		await expect(downloadLink).toBeVisible();
 		const [download] = await Promise.all([page.waitForEvent('download'), downloadLink.click()]);
-		expect(download.suggestedFilename()).toMatch(/consultees \d{4}-\d{2}-\d{2}\.xlsx$/);
+		expect(download.suggestedFilename()).toMatch(/consultee report \d{4}-\d{2}-\d{2}\.zip$/);
+		const files = Object.keys(unzipSync(new Uint8Array(await readFile(await download.path()))));
+		expect(files.filter((file) => file.endsWith('.xlsx'))).toHaveLength(1);
+		expect(files.filter((file) => /^maps\/\d{2} Parish Council\.pdf$/.test(file))).toHaveLength(1);
 		// and lists the report's consultees by category with why each is in it - the hand-added one
 		// with the reason entered for it, the removed one and the removed hand-added one left out
 		await expect(page.getByRole('heading', { level: 2, name: /Consultees in the report/ })).toBeVisible();
@@ -217,7 +251,7 @@ test.describe('manage journeys', () => {
 		await expect(parishTable.getByRole('columnheader', { name: 'Why identified' })).toBeVisible();
 		await expect(parishTable.getByRole('row', { name: /First Test Consultee.*Entered first/ })).toBeVisible();
 		await expect(parishTable.getByRole('rowheader', { name: 'Second Test Consultee' })).toHaveCount(0);
-		await expect(parishTable.getByRole('rowheader')).toHaveCount(parishCount - removed + 1);
+		await expect(parishTable.getByRole('rowheader')).toHaveCount(parishCount - removed + picked + 1);
 
 		// the same selection's report page still lists the matched consultees
 		await page.goto(`/consultees/${SAMPLE_CASE_ID}/results?ruleset=${SAMPLE_RULESET_ID}`);

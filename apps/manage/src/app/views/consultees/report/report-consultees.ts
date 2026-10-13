@@ -10,6 +10,8 @@ export interface ReportConsultee {
 	name: string;
 	/** Every reason it's in the report, one per line - see reasons.ts. */
 	identified: string[];
+	/** False for one added by hand by name - it has no area, so the maps can't draw it. */
+	mapped: boolean;
 }
 
 /** The report's consultees in one category. */
@@ -57,11 +59,12 @@ export function reportByCategory(
 					.filter((match) => match.feature.properties.consulteeCategory === category && !excluded.has(match.feature.id))
 					.map((match) => ({
 						name: consulteeName(match),
-						identified: describeReasons(match, ruleset, { nearby: false })
+						identified: describeReasons(match, ruleset, { nearby: false }),
+						mapped: true
 					})),
 				...selection.adds
 					.filter((add) => add.category === category)
-					.map((add) => ({ name: add.name, identified: [addedConsulteeReason(add)] }))
+					.map((add) => ({ name: add.name, identified: [addedConsulteeReason(add)], mapped: add.id !== undefined }))
 			]
 		}))
 		.filter((section) => section.consultees.length > 0);

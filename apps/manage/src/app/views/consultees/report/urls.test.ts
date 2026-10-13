@@ -3,6 +3,7 @@ import { describe, it } from 'node:test';
 import {
 	addConsulteeUrl,
 	addedConsultees,
+	addedMatchIds,
 	categoryStaticMapUrl,
 	consulteeSelection,
 	consulteesUrl,
@@ -146,6 +147,8 @@ describe('report url helpers', () => {
 			addedConsultees([
 				'{"c":"Parish Council","n":"A Consultee","r":"borders"}',
 				'{"c":"Parish Council","n":"No Reason Given"}',
+				'{"i":"m-1","c":"Parish Council","n":"Picked Nearby","r":"borders"}',
+				'{"i":"","c":"Parish Council","n":"Empty Id","r":"r"}',
 				'not json',
 				'{}',
 				'{"c":"","n":"empty category"}',
@@ -155,8 +158,32 @@ describe('report url helpers', () => {
 			]),
 			[
 				{ category: 'Parish Council', name: 'A Consultee', reason: 'borders' },
-				{ category: 'Parish Council', name: 'No Reason Given', reason: '' }
+				{ category: 'Parish Council', name: 'No Reason Given', reason: '' },
+				// picked from the nearby consultees on the Add consultee page
+				{ id: 'm-1', category: 'Parish Council', name: 'Picked Nearby', reason: 'borders' },
+				{ category: 'Parish Council', name: 'Empty Id', reason: 'r' }
 			]
+		);
+	});
+
+	it('should carry a picked nearby consultee by id, and draw it as identified on its category map', () => {
+		const selection = {
+			removed: [],
+			adds: [
+				{ id: 'm-1', category: 'Parish Council', name: 'Picked Nearby', reason: 'borders' },
+				{ id: 'm-2', category: 'Hospital', name: 'Picked Hospital', reason: 'r' },
+				{ category: 'Parish Council', name: 'Typed In', reason: 'r' }
+			]
+		};
+		assert.strictEqual(
+			reportUrl('case-1', 'rs-1', { removed: [], adds: selection.adds.slice(0, 1) }),
+			`/consultees/case-1/report?ruleset=rs-1&add=${encodeURIComponent('{"i":"m-1","c":"Parish Council","n":"Picked Nearby","r":"borders"}')}`
+		);
+		assert.deepStrictEqual(addedMatchIds(selection.adds), new Set(['m-1', 'm-2']));
+		// only this category's picked consultees - one typed in by name has no area to draw
+		assert.strictEqual(
+			categoryStaticMapUrl('case-1', 'rs-1', 'Parish Council', selection),
+			'/consultees/case-1/results/static-map?ruleset=rs-1&category=Parish%20Council&include=m-1'
 		);
 	});
 });

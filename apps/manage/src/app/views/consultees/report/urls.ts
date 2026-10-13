@@ -61,6 +61,11 @@ export function removedConsultees(value: unknown): RemovedConsultee[] {
 	});
 }
 
+/** The consultee_area ids of the nearby consultees picked on the Add consultee page. */
+export function addedMatchIds(adds: readonly AddedConsultee[]): Set<string> {
+	return new Set(adds.flatMap((add) => (add.id ? [add.id] : [])));
+}
+
 /** The consultee_area ids a removal list excludes, as a Set for `has()` lookups. */
 export function excludedMatchIds(removed: readonly RemovedConsultee[]): Set<string> {
 	return new Set(removed.flatMap((removal) => (removal.id ? [removal.id] : [])));
@@ -71,8 +76,13 @@ export function excludedIds(value: unknown): Set<string> {
 	return excludedMatchIds(removedConsultees(value));
 }
 
-/** A consultee added by hand on a category's Change page - a table row, not a map feature. */
+/**
+ * A consultee added by hand on a category's Change page: one the nearby search found (picked on the
+ * Add consultee page, so it has an area to map), or one typed in by name (a table row only).
+ */
 export interface AddedConsultee {
+	/** The picked nearby consultee's consultee_area id - absent for one typed in by name. */
+	id?: string;
 	/** The ruleset category it was added under - the page and check-page count it belongs to. */
 	category: string;
 	name: string;
@@ -82,18 +92,26 @@ export interface AddedConsultee {
 
 /**
  * The manually-added consultees on the request: each `add` param is a small JSON object
- * (`{"c":category,"n":name,"r":reason}`) - one param per entry so they can't drift out of step,
+ * (`{"i":consulteeAreaId,"c":category,"n":name,"r":reason}`, `i` only for a picked nearby
+ * consultee) - one param per entry so they can't drift out of step,
  * and encoded JSON so any name/reason text survives a query string unambiguously. Malformed or
  * incomplete entries are ignored rather than failing the page.
  */
 export function addedConsultees(value: unknown): AddedConsultee[] {
 	return queryValues(value).flatMap((raw) => {
 		try {
-			const parsed = JSON.parse(raw) as { c?: unknown; n?: unknown; r?: unknown };
+			const parsed = JSON.parse(raw) as { i?: unknown; c?: unknown; n?: unknown; r?: unknown };
 			if (typeof parsed.c !== 'string' || parsed.c === '' || typeof parsed.n !== 'string' || parsed.n === '') {
 				return [];
 			}
-			return [{ category: parsed.c, name: parsed.n, reason: typeof parsed.r === 'string' ? parsed.r : '' }];
+			return [
+				{
+					...(typeof parsed.i === 'string' && parsed.i !== '' ? { id: parsed.i } : {}),
+					category: parsed.c,
+					name: parsed.n,
+					reason: typeof parsed.r === 'string' ? parsed.r : ''
+				}
+			];
 		} catch {
 			return [];
 		}
@@ -101,7 +119,12 @@ export function addedConsultees(value: unknown): AddedConsultee[] {
 }
 
 function encodeAdd(consultee: AddedConsultee): string {
-	return JSON.stringify({ c: consultee.category, n: consultee.name, r: consultee.reason });
+	return JSON.stringify({
+		...(consultee.id ? { i: consultee.id } : {}),
+		c: consultee.category,
+		n: consultee.name,
+		r: consultee.reason
+	});
 }
 
 function encodeRemoval(removal: RemovedConsultee): string {
@@ -175,7 +198,7 @@ export function reportCreatedUrl(
 	);
 }
 
-/** The Report created page's download: the report as an Excel workbook (see export/controller.ts). */
+/** The Report created page's download: the report's workbook and maps in a ZIP (see export/controller.ts). */
 export function reportDownloadUrl(
 	caseId: string,
 	rulesetId: string,
@@ -237,7 +260,11 @@ export function removeConsulteeUrl(
 	);
 }
 
-/** The static map for one category's visible (non-excluded) matches - manual adds aren't mapped. */
+/**
+ * The static map for one category's visible (non-excluded) matches, with the nearby consultees
+ * picked on the Add consultee page (`include`) drawn as identified - consultees typed in by name
+ * have no area to map.
+ */
 export function categoryStaticMapUrl(
 	caseId: string,
 	rulesetId: string,
@@ -247,6 +274,11 @@ export function categoryStaticMapUrl(
 	let url = `/consultees/${encodeURIComponent(caseId)}/results/static-map?ruleset=${encodeURIComponent(rulesetId)}&category=${encodeURIComponent(category)}`;
 	for (const id of excludedMatchIds(selection.removed)) {
 		url += `&exclude=${encodeURIComponent(id)}`;
+	}
+	for (const add of selection.adds) {
+		if (add.id && add.category === category) {
+			url += `&include=${encodeURIComponent(add.id)}`;
+		}
 	}
 	return url;
 }
