@@ -6,6 +6,7 @@ Everything that changes **what the service does**, rather than how it does it, l
 | ---- | -------- | ------- |
 | [`rulesets/*_ruleset.csv`](./rulesets/) | The rulesets: which consultees each one identifies, and why. One file per sheet of the rulesets workbook (`Rulesets.xlsx`) | `packages/database/src/geospatial/rulesets.ts` |
 | [`nearby-consultees.yaml`](./nearby-consultees.yaml) | How far around a site the maps show consultees the ruleset didn't identify (faint context, not in the report), per category | `apps/manage/src/app/nearby-consultees.ts` |
+| [`map-view.yaml`](./map-view.yaml) | How much the maps show around a project's site when they open: the consultee maps, and the boundary page's map | `apps/manage/src/app/maps/map-view.ts` |
 | [`map-styles/boundary-map.yaml`](./map-styles/boundary-map.yaml) | The project boundary page's map: the most recent boundary file red, earlier ones in other colours | `apps/manage/src/app/maps/boundary-map-styles.ts` |
 | [`map-styles/consultee-map.example.yaml`](./map-styles/consultee-map.example.yaml) | **Not read yet.** The proposed colours and opacities for the consultee maps, per category and sub-category | Nothing yet: waits for the consultee sub-category column |
 

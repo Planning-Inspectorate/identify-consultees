@@ -144,23 +144,16 @@ function worldFraction(longitude: number, latitude: number): [number, number] {
 	return [(longitude + 180) / 360, 0.5 - Math.log((1 + sinLatitude) / (1 - sinLatitude)) / (4 * Math.PI)];
 }
 
-export interface FitOptions {
-	/** The largest share of the map's width and height the features fill, leaving the rest as surroundings. */
-	fill: number;
-	/** The least distance the view spans across, so a small site isn't shown at street level. */
-	minExtentMetres: number;
-}
-
 /**
- * A centre and zoom that fit every feature into a `width` x `height` map, filling at most
- * `options.fill` of it, at the closest whole zoom level - Web Mercator, as the maps draw, so the
- * fit holds at UK latitudes where a degree of longitude is much shorter than one of latitude.
- * An empty collection returns the England / Wales fallback view.
+ * A centre and zoom that show every feature with at least `marginMetres` around it on every side,
+ * in a `width` x `height` map, at the closest whole zoom level that does - Web Mercator, as the maps
+ * draw, so the fit holds at UK latitudes where a degree of longitude is much shorter than one of
+ * latitude. An empty collection returns the England / Wales fallback view.
  */
 export function computeFittedMapView(
 	featureCollection: { features: { geometry: GeometryLike }[] },
 	viewport: { width: number; height: number },
-	options: FitOptions
+	marginMetres: number
 ): MapView {
 	const bounds = computeBounds(featureCollection);
 	if (!bounds) {
@@ -171,12 +164,10 @@ export function computeFittedMapView(
 	const [west, north] = worldFraction(bounds.west, bounds.north);
 	const [east, south] = worldFraction(bounds.east, bounds.south);
 	// Mercator is conformal - a metre is the same fraction of the world east-west and north-south
-	const minExtent = options.minExtentMetres / (EARTH_CIRCUMFERENCE_METRES * Math.cos((center[1] * Math.PI) / 180));
-	const width = Math.max(east - west, minExtent);
-	const height = Math.max(south - north, minExtent);
-	const scale = Math.min(
-		(viewport.width * options.fill) / (width * WORLD_TILE_PIXELS),
-		(viewport.height * options.fill) / (height * WORLD_TILE_PIXELS)
-	);
+	const margin = marginMetres / (EARTH_CIRCUMFERENCE_METRES * Math.cos((center[1] * Math.PI) / 180));
+	// a point site with no margin has no span - it opens at the closest zoom the maps go to
+	const width = Math.max(east - west + 2 * margin, Number.EPSILON);
+	const height = Math.max(south - north + 2 * margin, Number.EPSILON);
+	const scale = Math.min(viewport.width / (width * WORLD_TILE_PIXELS), viewport.height / (height * WORLD_TILE_PIXELS));
 	return { center, zoom: Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, Math.floor(Math.log2(scale)))) };
 }
