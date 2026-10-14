@@ -6,6 +6,9 @@ import type { ConsulteeAreaMatchRow } from '../../../testing/ruleset-runner-stub
 import { failingRulesetRunner, rulesetRunnerReturning } from '../../../testing/ruleset-runner-stub.ts';
 import { buildReportCheckPage, buildReportCreatedPage } from './controller.ts';
 
+// a selection entry as the app's URLs carry it - base64url-encoded JSON (see urls.ts's ENCODED_JSON)
+const urlParam = (json: string) => Buffer.from(json).toString('base64url');
+
 const realProjectId = '44444444-4444-4444-4444-444444444444';
 
 function realProjectRow(overrides: Record<string, unknown> = {}) {
@@ -189,9 +192,9 @@ describe('consultee report check page', () => {
 		assert.strictEqual(hospitalRow.total, 1);
 		assert.deepStrictEqual(hospitalRow.names, ['Other Test Consultee']);
 		// the adds reach the Change pages and the report-created link unchanged
-		assert.ok(parishRow.changeUrl.includes(`add=${encodeURIComponent(parishAdd)}`));
-		assert.ok(hospitalRow.changeUrl.includes(`add=${encodeURIComponent(hospitalAdd)}`));
-		assert.ok(viewModel.generateReportUrl.includes(`add=${encodeURIComponent(parishAdd)}`));
+		assert.ok(parishRow.changeUrl.includes(`add=${urlParam(parishAdd)}`));
+		assert.ok(hospitalRow.changeUrl.includes(`add=${urlParam(hospitalAdd)}`));
+		assert.ok(viewModel.generateReportUrl.includes(`add=${urlParam(parishAdd)}`));
 	});
 
 	it('should cap the listed names at 10 and say how many the category really has', async () => {

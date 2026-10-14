@@ -237,7 +237,9 @@ test.describe('manage journeys', () => {
 			await addButton.click();
 			await expect(page.getByRole('rowheader', { name: pickedName, exact: true })).toBeVisible();
 			await expect(page.getByText('Picked from nearby')).toBeVisible();
-			expect(decodeURIComponent(page.url())).toContain('"i":');
+			// added by its id - the selection travels base64url-encoded, so read the last add back
+			const lastAdd = new URL(page.url()).searchParams.getAll('add').at(-1) ?? '';
+			expect(JSON.parse(Buffer.from(lastAdd, 'base64url').toString('utf8'))).toHaveProperty('i');
 			picked = 1;
 		}
 

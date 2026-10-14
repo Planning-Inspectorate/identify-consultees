@@ -6,6 +6,22 @@
  * counts, the category page's rows and the maps drawn from the same URL always agree.
  */
 
+// Front Door's firewall (the managed rule set in infrastructure/front-door.tf) scores plain JSON in
+// a query string as an injection attempt - its quotes, colons and words add up past the block
+// threshold, and the request never reaches the app. So each entry travels base64url-encoded
+// (`eyJ...` is how `{"` encodes); one that arrives as plain JSON, from a link made before, still reads.
+const ENCODED_JSON = /^eyJ[A-Za-z0-9_-]*$/;
+
+/** A selection entry as its URL param carries it: JSON, base64url-encoded. */
+export function encodeSelectionEntry(entry: Record<string, string>): string {
+	return Buffer.from(JSON.stringify(entry), 'utf8').toString('base64url');
+}
+
+/** A selection entry's JSON, from its URL param - base64url-encoded, or plain from an older link. */
+export function decodeSelectionEntry(raw: string): string {
+	return ENCODED_JSON.test(raw) ? Buffer.from(raw, 'base64url').toString('utf8') : raw;
+}
+
 /** Every value of a possibly-repeated query param (`?exclude=a&exclude=b` parses to an array). */
 export function queryValues(value: unknown): string[] {
 	if (Array.isArray(value)) {
@@ -30,16 +46,16 @@ export interface RemovedConsultee {
 
 /**
  * The consultee removals on the request: each `exclude` param is a small JSON object
- * (`{"i":matchId,"c":category,"n":name,"r":reason}`) - one param per entry so a removal and its
- * reason can't drift out of step, and encoded JSON so any name/reason text survives a query
- * string unambiguously. A bare `exclude=<id>` value (a link predating reasons, or the static
+ * (`{"i":matchId,"c":category,"n":name,"r":reason}`, base64url-encoded - see ENCODED_JSON) - one
+ * param per entry so a removal and its reason can't drift out of step, and encoded JSON so any
+ * name/reason text survives a query string unambiguously. A bare `exclude=<id>` value (a link predating reasons, or the static
  * map's) still excludes that match but has nothing to list in a Removed consultees section.
  * Malformed or incomplete entries are ignored rather than failing the page.
  */
 export function removedConsultees(value: unknown): RemovedConsultee[] {
 	return queryValues(value).flatMap((raw) => {
 		try {
-			const parsed: unknown = JSON.parse(raw);
+			const parsed: unknown = JSON.parse(decodeSelectionEntry(raw));
 			if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
 				return [{ id: raw, category: '', name: '', reason: '' }];
 			}
@@ -93,14 +109,15 @@ export interface AddedConsultee {
 /**
  * The manually-added consultees on the request: each `add` param is a small JSON object
  * (`{"i":consulteeAreaId,"c":category,"n":name,"r":reason}`, `i` only for a picked nearby
- * consultee) - one param per entry so they can't drift out of step,
+ * consultee; base64url-encoded - see ENCODED_JSON) - one param per entry so they can't drift out
+ * of step,
  * and encoded JSON so any name/reason text survives a query string unambiguously. Malformed or
  * incomplete entries are ignored rather than failing the page.
  */
 export function addedConsultees(value: unknown): AddedConsultee[] {
 	return queryValues(value).flatMap((raw) => {
 		try {
-			const parsed = JSON.parse(raw) as { i?: unknown; c?: unknown; n?: unknown; r?: unknown };
+			const parsed = JSON.parse(decodeSelectionEntry(raw)) as { i?: unknown; c?: unknown; n?: unknown; r?: unknown };
 			if (typeof parsed.c !== 'string' || parsed.c === '' || typeof parsed.n !== 'string' || parsed.n === '') {
 				return [];
 			}
@@ -119,7 +136,7 @@ export function addedConsultees(value: unknown): AddedConsultee[] {
 }
 
 function encodeAdd(consultee: AddedConsultee): string {
-	return JSON.stringify({
+	return encodeSelectionEntry({
 		...(consultee.id ? { i: consultee.id } : {}),
 		c: consultee.category,
 		n: consultee.name,
@@ -133,7 +150,7 @@ function encodeRemoval(removal: RemovedConsultee): string {
 	if (!removal.name) {
 		return removal.id ?? '';
 	}
-	return JSON.stringify({
+	return encodeSelectionEntry({
 		...(removal.id ? { i: removal.id } : {}),
 		c: removal.category,
 		n: removal.name,

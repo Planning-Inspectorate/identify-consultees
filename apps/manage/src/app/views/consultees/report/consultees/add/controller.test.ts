@@ -5,6 +5,9 @@ import { configureNunjucks } from '../../../../../nunjucks.ts';
 import { failingRulesetRunner, rulesetRunnerReturning } from '../../../../../testing/ruleset-runner-stub.ts';
 import { buildReportConsulteeAddPage, buildReportConsulteeAddSubmit, notAConsulteeError } from './controller.ts';
 
+// a selection entry as the app's URLs carry it - base64url-encoded JSON (see urls.ts's ENCODED_JSON)
+const urlParam = (json: string) => Buffer.from(json).toString('base64url');
+
 const realProjectId = '44444444-4444-4444-4444-444444444444';
 const matchId = '55555555-5555-5555-5555-555555555555';
 const nearbyId = '77777777-7777-7777-7777-777777777777';
@@ -187,7 +190,7 @@ describe('add a consultee page', () => {
 
 		assert.strictEqual(
 			res.redirect.mock.calls[0].arguments[0],
-			`${categoryUrl}&add=${encodeURIComponent(JSON.stringify({ i: nearbyId, c: 'Parish Council', n: 'Barton', r: 'Borders the site' }))}#consultees`
+			`${categoryUrl}&add=${urlParam(JSON.stringify({ i: nearbyId, c: 'Parish Council', n: 'Barton', r: 'Borders the site' }))}#consultees`
 		);
 	});
 
@@ -201,11 +204,11 @@ describe('add a consultee page', () => {
 		const location = res.redirect.mock.calls[0].arguments[0] as string;
 		assert.match(location, /exclude=55555555/);
 		// the stored spelling and its id, lowercase as the report's ids are
-		const newAdd = encodeURIComponent(
+		const newAdd = urlParam(
 			JSON.stringify({ i: storedId, c: 'Parish Council', n: 'Mr Smith', r: 'Owns the access road' })
 		);
-		assert.ok(location.indexOf(encodeURIComponent(earlier)) > 0);
-		assert.ok(location.indexOf(encodeURIComponent(earlier)) < location.indexOf(newAdd));
+		assert.ok(location.indexOf(urlParam(earlier)) > 0);
+		assert.ok(location.indexOf(urlParam(earlier)) < location.indexOf(newAdd));
 	});
 
 	it('refuses a name that is not a consultee of the category, saying so above the form', async () => {
@@ -283,7 +286,7 @@ describe('add a consultee page', () => {
 		const res = await submit({ name: 'Barton', reason: 'r' }, parishQuery, failingRulesetRunner());
 		assert.ok(
 			(res.redirect.mock.calls[0].arguments[0] as string).endsWith(
-				`&add=${encodeURIComponent(JSON.stringify({ i: nearbyId, c: 'Parish Council', n: 'Barton', r: 'r' }))}#consultees`
+				`&add=${urlParam(JSON.stringify({ i: nearbyId, c: 'Parish Council', n: 'Barton', r: 'r' }))}#consultees`
 			)
 		);
 	});

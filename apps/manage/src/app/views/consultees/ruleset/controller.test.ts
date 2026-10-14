@@ -3,6 +3,9 @@ import { describe, it, mock } from 'node:test';
 import { configureNunjucks } from '../../../nunjucks.ts';
 import { buildRulesetPickerPage, buildRulesetPickerSubmit } from './controller.ts';
 
+// a selection entry as the app's URLs carry it - base64url-encoded JSON (see urls.ts's ENCODED_JSON)
+const urlParam = (json: string) => Buffer.from(json).toString('base64url');
+
 const realProjectId = '44444444-4444-4444-4444-444444444444';
 
 function realProjectRow() {
@@ -95,7 +98,7 @@ describe('ruleset picker page', () => {
 
 		const viewModel = mockRes.render.mock.calls[0].arguments[1];
 		assert.ok(viewModel.formAction.includes('&exclude=abc'));
-		assert.ok(viewModel.formAction.includes(`&add=${encodeURIComponent(add)}`));
+		assert.ok(viewModel.formAction.includes(`&add=${urlParam(add)}`));
 	});
 
 	it('should 404 when caseId is missing', async () => {
@@ -164,7 +167,7 @@ describe('ruleset picker submit', () => {
 		const location = mockRes.redirect.mock.calls[0].arguments[0];
 		assert.ok(location.startsWith(`/consultees/${realProjectId}/report?ruleset=england-wales-post-20240430`));
 		assert.ok(location.includes('&exclude=abc'));
-		assert.ok(location.includes(`&add=${encodeURIComponent(add)}`));
+		assert.ok(location.includes(`&add=${urlParam(add)}`));
 	});
 
 	it('should return to the picker when the submitted ruleset is unknown or missing', async () => {

@@ -6,6 +6,9 @@ import type { ConsulteeAreaMatchRow } from '../../../../testing/ruleset-runner-s
 import { failingRulesetRunner, rulesetRunnerReturning } from '../../../../testing/ruleset-runner-stub.ts';
 import { buildReportConsulteesPage, comparableName } from './controller.ts';
 
+// a selection entry as the app's URLs carry it - base64url-encoded JSON (see urls.ts's ENCODED_JSON)
+const urlParam = (json: string) => Buffer.from(json).toString('base64url');
+
 const realProjectId = '44444444-4444-4444-4444-444444444444';
 const matchId = '55555555-5555-5555-5555-555555555555';
 const otherMatchId = '66666666-6666-6666-6666-666666666666';
@@ -48,8 +51,7 @@ function parishMatchRow(id = matchId, consultee = 'Little Snoring Parish Council
 // hold the encoded form
 const addJson = (name: string, reason = '', category = 'Parish Council') =>
 	JSON.stringify({ c: category, n: name, r: reason });
-const addParam = (name: string, reason = '', category = 'Parish Council') =>
-	encodeURIComponent(addJson(name, reason, category));
+const addParam = (name: string, reason = '', category = 'Parish Council') => urlParam(addJson(name, reason, category));
 
 // rows[0] answers the project lookup; rows[1], if given, is what the ruleset matched - returned by
 // the stand-in Python function (see rulesetRunnerFor), and by the database as the map's display geometry
@@ -311,7 +313,7 @@ describe('report consultees change page', () => {
 
 		// a hand-added row's remove link opens the remove page targeting that add's index - the
 		// adds all ride along so the page can drop the right one on submit
-		const addsParam = `&add=${encodeURIComponent(firstAdd)}&add=${encodeURIComponent(secondAdd)}&add=${encodeURIComponent(otherCategoryAdd)}`;
+		const addsParam = `&add=${urlParam(firstAdd)}&add=${urlParam(secondAdd)}&add=${urlParam(otherCategoryAdd)}`;
 		assert.strictEqual(
 			viewModel.rows[1].removeUrl,
 			`/consultees/${realProjectId}/report/consultees/remove?ruleset=england-wales-post-20240430&category=Parish%20Council&added=0${addsParam}`
@@ -321,11 +323,11 @@ describe('report consultees change page', () => {
 			`/consultees/${realProjectId}/report/consultees/remove?ruleset=england-wales-post-20240430&category=Parish%20Council&added=1${addsParam}`
 		);
 		// the adds ride along to the check page and the next add
-		assert.ok(viewModel.saveAndReturnUrl.includes(`add=${encodeURIComponent(firstAdd)}`));
-		assert.ok(viewModel.addConsulteeUrl.includes(`add=${encodeURIComponent(firstAdd)}`));
+		assert.ok(viewModel.saveAndReturnUrl.includes(`add=${urlParam(firstAdd)}`));
+		assert.ok(viewModel.addConsulteeUrl.includes(`add=${urlParam(firstAdd)}`));
 		// a ruleset match's remove link keeps the adds while targeting the match
 		assert.match(viewModel.rows[0].removeUrl, /match=55555555/);
-		assert.ok(viewModel.rows[0].removeUrl.includes(`add=${encodeURIComponent(firstAdd)}`));
+		assert.ok(viewModel.rows[0].removeUrl.includes(`add=${urlParam(firstAdd)}`));
 	});
 
 	it('should list this category’s recorded removals in the Removed consultees section, open when asked', async () => {
@@ -373,8 +375,8 @@ describe('report consultees change page', () => {
 		// along in the page's links - it just has nothing the section can list)
 		assert.doesNotMatch(html, /A Hospital/);
 		// but every removal rides along in the page's links
-		assert.ok(viewModel.saveAndReturnUrl.includes(`exclude=${encodeURIComponent(removal)}`));
-		assert.ok(viewModel.saveAndReturnUrl.includes(`exclude=${encodeURIComponent(otherCategoryRemoval)}`));
+		assert.ok(viewModel.saveAndReturnUrl.includes(`exclude=${urlParam(removal)}`));
+		assert.ok(viewModel.saveAndReturnUrl.includes(`exclude=${urlParam(otherCategoryRemoval)}`));
 		assert.ok(viewModel.saveAndReturnUrl.includes('exclude=id-without-reason'));
 	});
 

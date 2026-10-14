@@ -7,6 +7,8 @@ import {
 	categoryStaticMapUrl,
 	consulteeSelection,
 	consulteesUrl,
+	decodeSelectionEntry,
+	encodeSelectionEntry,
 	excludedIds,
 	queryValues,
 	removeConsulteeUrl,
@@ -15,6 +17,9 @@ import {
 	reportUrl,
 	rulesetUrl
 } from './urls.ts';
+
+// a selection entry as the app's URLs carry it - base64url-encoded JSON (see ENCODED_JSON)
+const urlParam = (json: string) => Buffer.from(json).toString('base64url');
 
 describe('report url helpers', () => {
 	it('should build report URLs without any selection', () => {
@@ -57,9 +62,9 @@ describe('report url helpers', () => {
 		};
 		assert.strictEqual(
 			rulesetUrl('case-1', 'rs-1', selection),
-			`/consultees/case-1/ruleset?ruleset=rs-1&exclude=${encodeURIComponent(removalJson)}&exclude=${encodeURIComponent(
+			`/consultees/case-1/ruleset?ruleset=rs-1&exclude=${urlParam(removalJson)}&exclude=${urlParam(
 				JSON.stringify({ c: 'Parish Council', n: 'Added Consultee', r: 'duplicate' })
-			)}&exclude=c&add=%7B%22c%22%3A%22Parish%20Council%22%2C%22n%22%3A%22A%26B%20Consultee%22%2C%22r%22%3A%22it%20borders%22%7D`
+			)}&exclude=c&add=${urlParam('{"c":"Parish Council","n":"A&B Consultee","r":"it borders"}')}`
 		);
 		// the static map carries exclusions only, as bare ids - hand-added consultees have no
 		// geometry to draw and reasons don't affect the map
@@ -177,7 +182,7 @@ describe('report url helpers', () => {
 		};
 		assert.strictEqual(
 			reportUrl('case-1', 'rs-1', { removed: [], adds: selection.adds.slice(0, 1) }),
-			`/consultees/case-1/report?ruleset=rs-1&add=${encodeURIComponent('{"i":"m-1","c":"Parish Council","n":"Picked Nearby","r":"borders"}')}`
+			`/consultees/case-1/report?ruleset=rs-1&add=${urlParam('{"i":"m-1","c":"Parish Council","n":"Picked Nearby","r":"borders"}')}`
 		);
 		assert.deepStrictEqual(addedMatchIds(selection.adds), new Set(['m-1', 'm-2']));
 		// only this category's picked consultees - one typed in by name has no area to draw
@@ -185,5 +190,37 @@ describe('report url helpers', () => {
 			categoryStaticMapUrl('case-1', 'rs-1', 'Parish Council', selection),
 			'/consultees/case-1/results/static-map?ruleset=rs-1&category=Parish%20Council&include=m-1'
 		);
+	});
+
+	it("encodes each selection entry so the firewall in front of the service doesn't read it as an attack", () => {
+		const entry = {
+			i: 'm-1',
+			c: 'Parish Council',
+			n: "O'Brien & Sons",
+			r: "Asked to be consulted - 'select' sites only"
+		};
+		const encoded = encodeSelectionEntry(entry);
+		// nothing a query-string rule scores: no quotes, braces, colons, spaces or SQL words
+		assert.match(encoded, /^eyJ[A-Za-z0-9_-]+$/);
+		assert.deepStrictEqual(JSON.parse(decodeSelectionEntry(encoded)), entry);
+		// read back from a request, whichever way the link carried it
+		const raw = JSON.stringify({ c: 'Parish Council', n: 'Plain Link', r: 'from before' });
+		assert.strictEqual(decodeSelectionEntry(raw), raw);
+		assert.deepStrictEqual(addedConsultees([encodeSelectionEntry({ c: 'Hospital', n: 'Encoded', r: 'r' }), raw]), [
+			{ category: 'Hospital', name: 'Encoded', reason: 'r' },
+			{ category: 'Parish Council', name: 'Plain Link', reason: 'from before' }
+		]);
+		assert.deepStrictEqual(removedConsultees(encoded), [
+			{
+				id: 'm-1',
+				category: 'Parish Council',
+				name: "O'Brien & Sons",
+				reason: "Asked to be consulted - 'select' sites only"
+			}
+		]);
+		// a bare id isn't mistaken for an encoded entry
+		assert.deepStrictEqual(removedConsultees('e95b2b20-d5b4-8f58-8c5b-3febc472d176'), [
+			{ id: 'e95b2b20-d5b4-8f58-8c5b-3febc472d176', category: '', name: '', reason: '' }
+		]);
 	});
 });
