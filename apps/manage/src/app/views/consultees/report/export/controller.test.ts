@@ -157,13 +157,16 @@ describe('report download', () => {
 		const names = Object.keys(files);
 		assert.deepStrictEqual(names.slice(1), ['maps/01 Parish Council.pdf', 'maps/02 Landowner.pdf']);
 		assert.match(names[0], /^EN010099 England Wales post 30 April 2024 consultees \d{4}-\d{2}-\d{2}\.xlsx$/);
-		// the workbook carries the picked parish's stored row
+		// the workbook lists the picked parish, manually added, with the reason given - and none of
+		// the columns the report leaves out
 		const workbook = unzipSync(files[names[0]]);
 		const sheets = Object.entries(workbook)
 			.filter(([name]) => name.startsWith('xl/'))
 			.map(([, data]) => strFromU8(data))
 			.join('');
-		assert.ok(sheets.includes(pickedParish));
+		assert.ok(sheets.includes('Borders the site'));
+		assert.ok(sheets.includes('Manually added'));
+		assert.ok(!sheets.includes(pickedParish) && !sheets.includes('Consultee area id'));
 
 		const parish = pdfTextLines(Buffer.from(files['maps/01 Parish Council.pdf']));
 		assert.ok(parish.includes('Parish Council: 2 in the report'));
