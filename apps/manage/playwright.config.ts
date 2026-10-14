@@ -21,9 +21,10 @@ export default defineConfig({
 	fullyParallel: true,
 	forbidOnly: isCi,
 	retries: isCi ? 1 : 0,
-	// half the agent's cores, floor of 2 - a hardcoded 2 left a 4+-core CI
-	// agent mostly idle during the 51-test run
-	workers: isCi ? Math.max(2, Math.ceil(cpus().length / 2)) : undefined,
+	// all the agent's cores, floor of 2 - the e2e suite spends most of its time
+	// waiting on the browser/server rather than burning CPU, so a worker per core
+	// is a better fit than the half-cores default
+	workers: isCi ? Math.max(2, cpus().length) : undefined,
 	reporter: isCi ? [['list'], ['html', { open: 'never' }]] : 'list',
 	use: {
 		baseURL,
