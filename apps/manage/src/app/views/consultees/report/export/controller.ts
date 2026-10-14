@@ -130,7 +130,6 @@ export function buildReportDownload(service: ManageService): AsyncRequestHandler
 
 		const excluded = excludedMatchIds(selection.removed);
 		const identified = consultees.filter((match) => isIdentifiedByCondition(match) && !excluded.has(match.feature.id));
-		const distances = new Map(consultees.map((match) => [match.feature.id, match.distanceMetres]));
 		const report = {
 			caseName: project.properties.caseName,
 			caseReference: project.properties.caseReference,
@@ -143,7 +142,7 @@ export function buildReportDownload(service: ManageService): AsyncRequestHandler
 				...identified.map((match) => match.feature.id),
 				...addedMatchIds(selection.adds)
 			]),
-			added: selection.adds.map((add) => ({ ...add, distanceMetres: add.id ? distances.get(add.id) : undefined })),
+			added: selection.adds,
 			removed: selection.removed
 		};
 		const files: Record<string, Uint8Array> = {

@@ -6,9 +6,9 @@ import type { AddedConsultee, RemovedConsultee } from '../urls.ts';
 /**
  * The exported consultee report: a Summary tab, then one tab per high-level group of the rulesets
  * workbook. Each consultee goes on the tab of the condition that identified it (a hand-added one,
- * its category's), with where it came from (the ruleset, or added by hand), its consultee_area
- * columns - less the geometries and the ids and version the reference data leaves empty - and its
- * metadata spread into a column per attribute.
+ * its category's), with its name, category, region, why it's in the report, where it came from (the
+ * ruleset, or manually added) and its version, then the source data's metadata, a column per
+ * attribute.
  */
 
 /** The tabs after Summary, in order. "Other Cases" is a placeholder - nothing fills it yet. */
@@ -47,8 +47,8 @@ export interface ReportExport {
 	 * was deleted mid-request.
 	 */
 	records: Map<string, ConsulteeAreaRecord>;
-	/** Consultees added by hand - a picked nearby one with its distance from the site. */
-	added: readonly (AddedConsultee & { distanceMetres?: number })[];
+	/** Consultees added by hand. */
+	added: readonly AddedConsultee[];
 	removed: readonly RemovedConsultee[];
 }
 
@@ -77,20 +77,11 @@ export function tabForCategory(category: string, ruleset: Ruleset): GroupTab {
 }
 
 // every tab's first columns - then the metadata keys its consultees have (see metadataColumns)
-const HEADER = [
-	'Consultee',
-	'Category',
-	'Region',
-	'Why identified',
-	'Distance from site (km)',
-	'Source',
-	'Consultee area id',
-	'Geometry type',
-	'Case reference',
-	'Last updated'
-] as const;
+// every tab's first columns - then the source data's metadata attributes its consultees have (see
+// metadataColumns)
+const HEADER = ['Consultee', 'Category', 'Region', 'Why identified', 'Source', 'Version'] as const;
 
-export const GROUP_TAB_COLUMN_WIDTHS = [36, 28, 22, 60, 12, 16, 38, 16, 14, 18];
+export const GROUP_TAB_COLUMN_WIDTHS = [36, 28, 22, 60, 16, 10];
 
 type Cell = SheetData[number][number];
 
@@ -98,15 +89,11 @@ const text = (value: string | null | undefined): Cell => (value ? { value } : nu
 const bold = (value: string): Cell => ({ value, fontWeight: 'bold' });
 const headerRow = (labels: readonly string[]) => labels.map(bold);
 
-function kilometres(metres: number | null): Cell {
-	return metres === null ? null : { type: Number, value: Math.round(metres / 10) / 100, format: '0.00' };
-}
-
 type Metadata = Record<string, unknown>;
 
 /**
- * A stored row's metadata as an object: the data's own attributes, which differ from one source
- * dataset to another. Anything that isn't a JSON object is kept whole, under "Metadata".
+ * A stored row's metadata as an object: the source data's own attributes, which differ from one
+ * source dataset to another. Anything that isn't a JSON object is kept whole, under "Metadata".
  */
 export function parseMetadata(raw: string | undefined): Metadata {
 	if (!raw) {
@@ -136,13 +123,9 @@ function metadataCell(value: unknown): Cell {
 	return { value: typeof value === 'string' ? value : JSON.stringify(value) };
 }
 
-// the stored row's columns after the area id - blank when there's no stored row
-function storedCells(record: ConsulteeAreaRecord | undefined): Cell[] {
-	return [
-		text(record?.geometryType),
-		text(record?.caseReference),
-		record ? { type: Date, value: record.lastUpdated, format: 'yyyy-mm-dd hh:mm' } : null
-	];
+/** The stored row's version - blank when there's no stored row. */
+function versionCell(record: ConsulteeAreaRecord | undefined): Cell {
+	return record ? { type: Number, value: record.currentVersion } : null;
 }
 
 function matchRow(match: ConsulteeMatch, ruleset: Ruleset, record: ConsulteeAreaRecord | undefined): Cell[] {
@@ -152,24 +135,21 @@ function matchRow(match: ConsulteeMatch, ruleset: Ruleset, record: ConsulteeArea
 		text(record?.consulteeCategory ?? properties.consulteeCategory),
 		text(record?.region ?? properties.region),
 		{ value: describeReasons(match, ruleset, { nearby: false }).join('\n'), wrap: true },
-		kilometres(match.distanceMetres),
 		{ value: 'Ruleset' },
-		{ value: match.feature.id },
-		...storedCells(record)
+		versionCell(record)
 	];
 }
 
-// a matched nearby consultee has its stored row and distance; any other name has neither
-function addedRow(add: ReportExport['added'][number], record: ConsulteeAreaRecord | undefined): Cell[] {
+// added by hand, with the reason given - one from before additions had to be real consultees may
+// have no stored row
+function addedRow(add: AddedConsultee, record: ConsulteeAreaRecord | undefined): Cell[] {
 	return [
 		{ value: add.name },
 		{ value: add.category },
 		text(record?.region),
 		{ value: add.reason || 'Manually added', wrap: true },
-		kilometres(add.distanceMetres ?? null),
 		{ value: 'Manually added' },
-		text(add.id),
-		...storedCells(record)
+		versionCell(record)
 	];
 }
 
