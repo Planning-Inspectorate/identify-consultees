@@ -11,14 +11,6 @@ export interface ConsulteeRow {
 	removeUrl: string;
 }
 
-/** The add form's state: what was entered, and govukInput/govukTextarea errorMessage params. */
-export interface AddConsulteeForm {
-	nameValue: string;
-	reasonValue: string;
-	nameError?: { text: string };
-	reasonError?: { text: string };
-}
-
 /** One row of the expandable Removed consultees section - a removal and the reason given. */
 export interface RemovedConsulteeRow {
 	name: string;
@@ -31,18 +23,8 @@ export interface ReportConsulteesViewModel {
 	pageCaption: string;
 	backLinkUrl: string;
 	rows: ConsulteeRow[];
-	/** The add form's POST target - this page's URL, so the selection params ride along. */
-	addFormAction: string;
-	/**
-	 * The category's consultees only the nearby search found, nearest first, one per name - what a
-	 * typed name is matched against, suggested as it's typed (a datalist, enhanced by
-	 * consultee-autocomplete.js).
-	 */
-	nearbySuggestions: { name: string; hint: string }[];
-	/** The add form's entered values and errors - errors only after a failed submit. */
-	addForm: AddConsulteeForm;
-	/** The layout's error summary - present only after a failed submit, one entry per field. */
-	errorSummary?: { text: string; href: string }[];
+	/** The "Add a consultee" page the Add consultee link opens, keeping the current selection. */
+	addConsulteeUrl: string;
 	/** Back to the check page, carrying the current exclusions. */
 	saveAndReturnUrl: string;
 	mapId: string;

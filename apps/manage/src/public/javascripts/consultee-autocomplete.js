@@ -1,5 +1,5 @@
 /**
- * The category page's add form: swaps the name input's native datalist for the GOV.UK accessible
+ * The "Add a consultee" page: swaps the name input's native datalist for the GOV.UK accessible
  * autocomplete (accessible-autocomplete.min.js, loaded before this as `window.accessibleAutocomplete`).
  *
  * Suggestions are the consultees near the site the ruleset didn't identify, each with its distance.

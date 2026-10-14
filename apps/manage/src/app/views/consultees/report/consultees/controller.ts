@@ -7,7 +7,7 @@ import {
 	isIdentifiedByCondition,
 	RULESETS
 } from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
-import type { AsyncRequestHandler, AsyncRequestHandlerWithBody } from '@planning-inspectorate/core/util';
+import type { AsyncRequestHandler } from '@planning-inspectorate/core/util';
 import type { Request, Response } from 'express';
 import { buildCaseMapConfig, markAddedByHand, MAX_SAMPLED_MAP_MATCHES } from '../../../../maps/case-geojson.ts';
 import { MAP_VIEWPORT } from '../../../../maps/sample-geojson.ts';
@@ -16,8 +16,9 @@ import { resolveCase } from '../../resolve-case.ts';
 import { buildSearchAreaSafely, firstQueryValue, runRulesetSafely } from '../../run-ruleset.ts';
 import { rulesetCategories } from '../categories.ts';
 import { addedConsulteeReason, consulteeName } from '../report-consultees.ts';
-import type { AddedConsultee, ConsulteeSelection } from '../urls.ts';
+import type { ConsulteeSelection } from '../urls.ts';
 import {
+	addConsulteeUrl,
 	addedMatchIds,
 	categoryStaticMapUrl,
 	consulteeSelection,
@@ -26,12 +27,12 @@ import {
 	removeConsulteeUrl,
 	reportUrl
 } from '../urls.ts';
-import type { AddConsulteeForm, ConsulteeRow, ReportConsulteesViewModel } from './view-model.ts';
+import type { ConsulteeRow, ReportConsulteesViewModel } from './view-model.ts';
 
 const VIEW = 'views/consultees/report/consultees/view.njk';
 
 /** A category page's case, ruleset, category, selection and run - everything both its handlers need. */
-interface CategoryContext {
+export interface CategoryContext {
 	project: CaseBoundaryFeature;
 	ruleset: Ruleset;
 	category: string;
@@ -47,7 +48,7 @@ interface CategoryContext {
  * nothing to change. A failed run can't tell, so it shows its error rather than a 404.
  * `undefined` means a response has already been sent.
  */
-async function categoryContext(
+export async function categoryContext(
 	service: ManageService,
 	req: Request,
 	res: Response
@@ -82,9 +83,9 @@ async function categoryContext(
 
 /**
  * The category's consultees only the nearby search found, nearest first, less any already added -
- * the ones a typed name is matched against (and the add form suggests as it's typed).
+ * the ones a typed name is matched against (and the Add a consultee page suggests as it's typed).
  */
-function nearbyCandidates({ consultees, category, selection }: CategoryContext): ConsulteeMatch[] {
+export function nearbyCandidates({ consultees, category, selection }: CategoryContext): ConsulteeMatch[] {
 	const added = addedMatchIds(selection.adds);
 	return consultees.filter(
 		(match) =>
@@ -99,17 +100,16 @@ export function comparableName(name: string): string {
 	return name.trim().replace(/\s+/g, ' ').toLowerCase();
 }
 
-function kilometresFromSite(metres: number): string {
+export function kilometresFromSite(metres: number): string {
 	return `${(metres / 1000).toFixed(1)} km from the site`;
 }
 
-/** The page, with the add form's entered values and errors if a submit failed. */
+/** The page: map, the category's identified consultees, and the removed-consultees section. */
 async function renderCategoryPage(
 	service: ManageService,
 	req: Request,
 	res: Response,
-	context: CategoryContext,
-	form: AddConsulteeForm = { nameValue: '', reasonValue: '' }
+	context: CategoryContext
 ): Promise<void> {
 	const { project, ruleset, category, selection, consultees, failed } = context;
 	const excluded = excludedMatchIds(selection.removed);
@@ -160,28 +160,12 @@ async function renderCategoryPage(
 		})
 	];
 
-	// one suggestion per name, at its nearest - a typed name is matched to the nearest of that name
-	const suggestions = new Map<string, { name: string; hint: string }>();
-	for (const match of nearbyCandidates(context)) {
-		const name = consulteeName(match);
-		if (!suggestions.has(comparableName(name))) {
-			suggestions.set(comparableName(name), { name, hint: kilometresFromSite(match.distanceMetres) });
-		}
-	}
-
-	const errorSummary = [
-		...(form.nameError ? [{ text: form.nameError.text, href: '#consultee-name' }] : []),
-		...(form.reasonError ? [{ text: form.reasonError.text, href: '#consultee-reason' }] : [])
-	];
 	const viewModel: ReportConsulteesViewModel = {
 		pageHeading: category,
 		pageCaption: project.properties.caseName,
 		backLinkUrl: reportUrl(project.id, ruleset.id, selection),
 		rows,
-		addFormAction: consulteesUrl(project.id, ruleset.id, category, selection),
-		nearbySuggestions: [...suggestions.values()],
-		addForm: form,
-		...(errorSummary.length ? { errorSummary } : {}),
+		addConsulteeUrl: addConsulteeUrl(project.id, ruleset.id, category, selection),
 		saveAndReturnUrl: reportUrl(project.id, ruleset.id, selection),
 		mapId: 'case-map',
 		mapRegionLabel: `Map showing ${category} consultees for ${project.properties.caseName}`,
@@ -209,8 +193,8 @@ async function renderCategoryPage(
 /**
  * A check-page category's Change page: the consultees the ruleset identified in that category,
  * mapped and listed, each with a Remove link to the "Remove consultee" page (which records the
- * reason for the removal), then any added by hand. Its add form takes a name - matched to the
- * category's nearby consultees as it's typed - and a reason (see buildReportConsulteeAddSubmit).
+ * reason for the removal), then any added by hand. The "Add a consultee" page (see add/) adds a
+ * consultee by a typed name, matched to the category's nearby consultees as it's typed.
  * The whole selection lives in the URL (see urls.ts), so the check page's counts stay in step.
  * "Save and return" goes back to the check page.
  */
@@ -220,69 +204,5 @@ export function buildReportConsulteesPage(service: ManageService): AsyncRequestH
 		if (context) {
 			await renderCategoryPage(service, req, res, context);
 		}
-	};
-}
-
-/**
- * The category page's add form. The name and the reason are both required - like the removal
- * reason, the reason is recorded for auditing and shows in the Identified column. A name matching
- * one of the category's nearby consultees (case and spacing aside) adds that consultee, by its id,
- * so the maps draw it as identified and the report has its stored row; any other name is added as
- * typed, with no area to map. A name already listed is refused. A failed submit shows the page
- * again with the entered values and an error per field; a successful one adds the consultee to the
- * URL's `add` params and returns to the page.
- */
-export function buildReportConsulteeAddSubmit(
-	service: ManageService
-): AsyncRequestHandlerWithBody<{ name?: unknown; reason?: unknown }> {
-	return async (req, res) => {
-		const context = await categoryContext(service, req, res);
-		if (!context) {
-			return;
-		}
-		const { project, ruleset, category, selection, consultees } = context;
-
-		const nameValue = typeof req.body?.name === 'string' ? req.body.name : '';
-		const reasonValue = typeof req.body?.reason === 'string' ? req.body.reason : '';
-		const name = nameValue.trim().replace(/\s+/g, ' ');
-		const reason = reasonValue.trim();
-
-		const excluded = excludedMatchIds(selection.removed);
-		const listed = [
-			...consultees
-				.filter(
-					(match) =>
-						match.feature.properties.consulteeCategory === category &&
-						isIdentifiedByCondition(match) &&
-						!excluded.has(match.feature.id)
-				)
-				.map(consulteeName),
-			...selection.adds.filter((add) => add.category === category).map((add) => add.name)
-		].map(comparableName);
-		const nameError = !name
-			? 'Enter the consultee name'
-			: listed.includes(comparableName(name))
-				? `${name} is already listed in ${category}`
-				: undefined;
-		const reasonError = reason ? undefined : 'Enter a reason for adding this consultee.';
-		if (nameError || reasonError) {
-			return renderCategoryPage(service, req, res, context, {
-				nameValue,
-				reasonValue,
-				...(nameError ? { nameError: { text: nameError } } : {}),
-				...(reasonError ? { reasonError: { text: reasonError } } : {})
-			});
-		}
-
-		// candidates come nearest first, so a name shared by several is matched to the nearest
-		const match = nearbyCandidates(context).find(
-			(candidate) => comparableName(consulteeName(candidate)) === comparableName(name)
-		);
-		const add: AddedConsultee = match
-			? { id: match.feature.id, category, name: consulteeName(match), reason }
-			: { category, name, reason };
-		return res.redirect(
-			`${consulteesUrl(project.id, ruleset.id, category, { removed: selection.removed, adds: [...selection.adds, add] })}#consultees`
-		);
 	};
 }

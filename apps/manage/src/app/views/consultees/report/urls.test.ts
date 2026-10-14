@@ -1,6 +1,7 @@
 import assert from 'node:assert';
 import { describe, it } from 'node:test';
 import {
+	addConsulteeUrl,
 	addedConsultees,
 	addedMatchIds,
 	categoryStaticMapUrl,
@@ -23,6 +24,10 @@ describe('report url helpers', () => {
 		assert.strictEqual(
 			consulteesUrl('case-1', 'rs-1', 'Parish Council'),
 			'/consultees/case-1/report/consultees?ruleset=rs-1&category=Parish%20Council'
+		);
+		assert.strictEqual(
+			addConsulteeUrl('case-1', 'rs-1', 'Parish Council'),
+			'/consultees/case-1/report/consultees/add?ruleset=rs-1&category=Parish%20Council'
 		);
 		assert.strictEqual(
 			removeConsulteeUrl('case-1', 'rs-1', 'Parish Council', { matchId: 'm-1' }),
