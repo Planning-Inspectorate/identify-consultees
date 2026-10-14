@@ -205,6 +205,22 @@ resource "azurerm_cdn_frontdoor_firewall_policy" "web" {
       operator       = "Equals"
       selector       = "connect.sid"
     }
+
+    # the report pages' free-text fields - a consultee's name and the reason for adding or removing
+    # it. Ordinary prose trips the SQL-injection rules ("Asked to be consulted - 'select' sites
+    # only" is blocked), and the app never builds SQL from them (Prisma parameters) and escapes
+    # them wherever it shows them
+    exclusion {
+      match_variable = "RequestBodyPostArgNames"
+      operator       = "Equals"
+      selector       = "name"
+    }
+
+    exclusion {
+      match_variable = "RequestBodyPostArgNames"
+      operator       = "Equals"
+      selector       = "reason"
+    }
   }
 
   managed_rule {

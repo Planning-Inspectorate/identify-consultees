@@ -6,6 +6,9 @@ import type { ConsulteeAreaMatchRow } from '../../../../../testing/ruleset-runne
 import { failingRulesetRunner, rulesetRunnerReturning } from '../../../../../testing/ruleset-runner-stub.ts';
 import { buildReportConsulteeRemovePage, buildReportConsulteeRemoveSubmit } from './controller.ts';
 
+// a selection entry as the app's URLs carry it - base64url-encoded JSON (see urls.ts's ENCODED_JSON)
+const urlParam = (json: string) => Buffer.from(json).toString('base64url');
+
 const realProjectId = '44444444-4444-4444-4444-444444444444';
 const matchId = '55555555-5555-5555-5555-555555555555';
 
@@ -243,7 +246,7 @@ describe('report consultee remove submit', () => {
 		const location = mockRes.redirect.mock.calls[0].arguments[0];
 		assert.strictEqual(
 			location,
-			`/consultees/${realProjectId}/report/consultees?ruleset=england-wales-post-20240430&category=Parish%20Council&exclude=${encodeURIComponent(
+			`/consultees/${realProjectId}/report/consultees?ruleset=england-wales-post-20240430&category=Parish%20Council&exclude=${urlParam(
 				removalJson('Little Snoring Parish Council', 'Outside the search area', matchId)
 			)}&removed=open`
 		);
@@ -263,9 +266,9 @@ describe('report consultee remove submit', () => {
 
 		const location = mockRes.redirect.mock.calls[0].arguments[0];
 		// the removal is recorded (with no match id to exclude) and only the kept add remains
-		assert.ok(location.includes(`exclude=${encodeURIComponent(removalJson('Manual Consultee', 'Added in error'))}`));
-		assert.strictEqual(location.includes(encodeURIComponent(addJson('Manual Consultee'))), false);
-		assert.ok(location.includes(`add=${encodeURIComponent(kept)}`));
+		assert.ok(location.includes(`exclude=${urlParam(removalJson('Manual Consultee', 'Added in error'))}`));
+		assert.strictEqual(location.includes(urlParam(addJson('Manual Consultee'))), false);
+		assert.ok(location.includes(`add=${urlParam(kept)}`));
 	});
 
 	it('should keep earlier removals and adds so any number can be removed one at a time', async () => {
@@ -278,13 +281,13 @@ describe('report consultee remove submit', () => {
 		);
 
 		const location = mockRes.redirect.mock.calls[0].arguments[0];
-		assert.ok(location.includes(`exclude=${encodeURIComponent(earlierRemoval)}`));
+		assert.ok(location.includes(`exclude=${urlParam(earlierRemoval)}`));
 		assert.ok(
 			location.includes(
-				`exclude=${encodeURIComponent(removalJson('Little Snoring Parish Council', 'Outside the search area', matchId))}`
+				`exclude=${urlParam(removalJson('Little Snoring Parish Council', 'Outside the search area', matchId))}`
 			)
 		);
-		assert.ok(location.includes(`add=${encodeURIComponent(existingAdd)}`));
+		assert.ok(location.includes(`add=${urlParam(existingAdd)}`));
 	});
 
 	it('should re-render the form with an error when the reason is blank', async () => {
