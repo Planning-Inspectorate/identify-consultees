@@ -67,7 +67,7 @@ Dev pages mount only when `devPagesEnabled` is on (not production, or `ENABLE_DE
 
 The report pages, their maps and the download share one ruleset run: the first to need it runs it and keeps it in the session (`runRulesetSafely`), without geometry or metadata, for an hour; a different case or ruleset replaces it. Nothing is stored beyond the session. Only the first page waits for the function (about 5s on a full data load).
 
-The case maps (category pages, results, static images and the report's PDFs) open on the site, filling at most half the map and at least 5km across (`SITE_FRAMING` in `maps/case-geojson.ts`); the boundary page's map fills most of the map with the shapefiles (`BOUNDARY_FRAMING`). The interactive maps zoom out for the rest. Static images leave out path points beyond the map's edges (`visiblePathPoints`), so regional areas don't run to megabytes at that zoom.
+The case maps (category pages, results, static images and the report's PDFs) open on the site with `consulteeMapsKm` around it, and the boundary page's map on the shapefiles with `boundaryMapKm` around them - both set in [`config/map-view.yaml`](../config/map-view.yaml), fitted to the 960x516 map in Web Mercator at the closest whole zoom (`computeFittedMapView`). The interactive maps zoom out for the rest. Static images leave out path points beyond the map's edges (`visiblePathPoints`), so regional areas don't run to megabytes at that zoom.
 
 If the ruleset can't be run (function down, timeout, bad key) the pages say so instead of showing an empty list. With no database the search shows an empty list and logs the error.
 

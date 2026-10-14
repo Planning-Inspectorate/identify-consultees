@@ -6,6 +6,7 @@ import { describe, it } from 'node:test';
 import {
 	buildCaseMapConfig,
 	buildConsulteeMatchesGeojson,
+	buildProjectGeojson,
 	LOCAL_FILL_OPACITY,
 	MAP_SAMPLING_THRESHOLD,
 	markAddedByHand,
@@ -14,6 +15,8 @@ import {
 	NEARBY_REGIONAL_FILL_OPACITY,
 	REGIONAL_FILL_OPACITY
 } from './case-geojson.ts';
+import { computeFittedMapView } from './geometry-bounds.ts';
+import { MAP_VIEW } from './map-view.ts';
 import { MAP_VIEWPORT } from './sample-geojson.ts';
 
 function project(): CaseBoundaryFeature {
@@ -112,9 +115,13 @@ describe('buildCaseMapConfig with a search area', () => {
 			}
 		);
 
-		// the point site at the middle, 5km across filling at most half the 960x516 map - zoom 12
+		// the point site at the middle, with config/map-view.yaml's distance around it
 		assert.deepStrictEqual(config.center, [-1.5, 52.5]);
-		assert.strictEqual(config.zoom, 12);
+		assert.strictEqual(
+			config.zoom,
+			computeFittedMapView(buildProjectGeojson(project()), MAP_VIEWPORT, MAP_VIEW.consulteeMapsMarginMetres).zoom
+		);
+		assert.ok(config.zoom < 12, 'expected the 10km default to open further out than zoom 12');
 		// only the match touching the area is drawn, in its display geometry - but the count is every match
 		assert.deepStrictEqual(
 			config.consulteeGeojson.features.map((feature) => [feature.id, feature.geometry]),
