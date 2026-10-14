@@ -12,6 +12,7 @@ import { buildBoundaryMapConfig } from '../../../maps/boundary-map.ts';
 import { buildProjectGeojson } from '../../../maps/case-geojson.ts';
 import { computeFittedMapView } from '../../../maps/geometry-bounds.ts';
 import { MAP_VIEW } from '../../../maps/map-view.ts';
+import type { GeoJsonFeature, GeoJsonFeatureCollection } from '../../../maps/sample-geojson.ts';
 import { MAP_VIEWPORT } from '../../../maps/sample-geojson.ts';
 import { buildConsulteeStaticMapResponse, sendStaticMapResponse } from '../../../maps/serve-static-map.ts';
 import { resolveCase } from '../resolve-case.ts';
@@ -38,7 +39,6 @@ async function mapFiles(
 			files.push({
 				id: option.id,
 				label: option.label,
-				checked: option.current,
 				receivedDate: option.receivedDate,
 				geometry
 			});
@@ -156,29 +156,35 @@ export function buildBoundarySubmit(service: ManageService): AsyncRequestHandler
 }
 
 /**
- * The boundary page's noscript/init-failure static map: the current file's boundary alone,
- * matching what the interactive map draws first (other files stay unchecked in its Layers menu).
+ * Every file the case holds, for the boundary page's noscript/init-failure static map - as the
+ * interactive map draws them: each in its own style by how recent it is (see
+ * config/map-styles/boundary-map.yaml), the most recent drawn last, on top.
  */
-/**
- * The opened file's colour on the static map, by how recent it is among the case's files - the
- * same style the interactive map draws it in (see config/map-styles/boundary-map.yaml).
- */
-async function withBoundaryFileStyle(
+async function allBoundaryFilesGeojson(
 	db: ManageService['db'],
-	project: NonNullable<Awaited<ReturnType<typeof resolveCase>>>,
-	geojson: ReturnType<typeof buildProjectGeojson>
-): Promise<ReturnType<typeof buildProjectGeojson>> {
-	const files = await listCaseBoundaryFiles(db, project.properties.caseReference);
+	project: CaseBoundaryFeature
+): Promise<GeoJsonFeatureCollection> {
+	const listed = await listCaseBoundaryFiles(db, project.properties.caseReference);
+	// the page's own file, even if it's gone from the list since the page loaded
+	const files = listed.some((file) => file.id === project.id)
+		? listed
+		: [...listed, { id: project.id, receivedDate: project.properties.receivedDate ?? null }];
 	const ranks = recencyRanks(files.map((file) => file.receivedDate));
-	const index = files.findIndex((file) => file.id === project.id);
-	const style = styleForRank(index >= 0 ? ranks[index] : 0);
-	return {
-		...geojson,
-		features: geojson.features.map((feature) => ({
-			...feature,
-			properties: { ...feature.properties, colour: style.colour, fillOpacity: String(style.fillOpacity) }
-		}))
-	};
+	const features: GeoJsonFeature[] = [];
+	// highest rank (oldest) first, so the most recent is drawn over the rest
+	for (const index of files.map((_file, i) => i).sort((a, b) => ranks[b] - ranks[a])) {
+		const file = files[index];
+		const geometry = (file.id === project.id ? project : await getCaseBoundaryById(db, file.id))?.geometry;
+		if (geometry) {
+			const style = styleForRank(ranks[index]);
+			const [feature] = buildProjectGeojson({ ...project, id: file.id, geometry }).features;
+			features.push({
+				...feature,
+				properties: { ...feature.properties, colour: style.colour, fillOpacity: String(style.fillOpacity) }
+			});
+		}
+	}
+	return { type: 'FeatureCollection', features };
 }
 
 export function buildBoundaryStaticMap(service: ManageService, forceSvg = false): AsyncRequestHandler {
@@ -192,7 +198,7 @@ export function buildBoundaryStaticMap(service: ManageService, forceSvg = false)
 			return;
 		}
 
-		const projectGeojson = await withBoundaryFileStyle(db, project, buildProjectGeojson(project));
+		const projectGeojson = await allBoundaryFilesGeojson(db, project);
 		const view = computeFittedMapView(projectGeojson, MAP_VIEWPORT, MAP_VIEW.boundaryMapMarginMetres);
 		const image = await buildConsulteeStaticMapResponse({
 			geometryId: project.id,

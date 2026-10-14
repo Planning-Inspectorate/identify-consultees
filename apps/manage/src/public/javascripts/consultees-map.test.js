@@ -8,6 +8,7 @@ import {
 	featureDetailsHtml,
 	initAllConsulteeMaps,
 	initConsulteeMap,
+	interactiveZoom,
 	readMapConfig,
 	registerConsulteeMaps,
 	translucent
@@ -235,14 +236,14 @@ describe('consultees-map client helpers', () => {
 		assert.deepEqual(buildDatasets({ projectGeojson: { features: [] }, consulteeGeojson: null }), []);
 	});
 
-	test('buildDatasets lists each shapefile under the GIS shapefiles group, checked only when selected', () => {
+	test('buildDatasets lists each shapefile under the GIS shapefiles group, every one visible', () => {
 		const feature = { type: 'Feature', geometry: { type: 'Point', coordinates: [0, 0] } };
 		const datasets = buildDatasets({
 			shapefileDatasets: [
-				{ id: 'file-a', label: 'a.geojson', checked: true, geojson: { features: [feature] } },
-				{ id: 'file-b', label: 'b.geojson', checked: false, geojson: { features: [feature] } },
+				{ id: 'file-a', label: 'a.geojson', geojson: { features: [feature] } },
+				{ id: 'file-b', label: 'b.geojson', geojson: { features: [feature] } },
 				// a file with no geometry produces no dataset at all
-				{ id: 'file-empty', label: 'empty.geojson', checked: false, geojson: { features: [] } }
+				{ id: 'file-empty', label: 'empty.geojson', geojson: { features: [] } }
 			]
 		});
 
@@ -250,7 +251,7 @@ describe('consultees-map client helpers', () => {
 			datasets.map((dataset) => [dataset.id, dataset.visible, dataset.groupLabel]),
 			[
 				['file-a', true, 'GIS shapefiles'],
-				['file-b', false, 'GIS shapefiles']
+				['file-b', true, 'GIS shapefiles']
 			]
 		);
 		assert.equal(datasets[0].idProperty, 'fileKey');
@@ -260,9 +261,7 @@ describe('consultees-map client helpers', () => {
 	test('buildDatasets honours a custom shapefile group label', () => {
 		const datasets = buildDatasets({
 			shapefileGroupLabel: 'Boundary submissions',
-			shapefileDatasets: [
-				{ id: 'file-a', label: 'a.geojson', checked: true, geojson: { features: [{ type: 'Feature' }] } }
-			]
+			shapefileDatasets: [{ id: 'file-a', label: 'a.geojson', geojson: { features: [{ type: 'Feature' }] } }]
 		});
 		assert.equal(datasets[0].groupLabel, 'Boundary submissions');
 	});
@@ -271,8 +270,8 @@ describe('consultees-map client helpers', () => {
 		const style = { stroke: '#1d70b8', strokeWidth: 2, strokeDashArray: [4, 2], fill: 'rgba(29, 112, 184, 0.15)' };
 		const datasets = buildDatasets({
 			shapefileDatasets: [
-				{ id: 'file-a', label: 'a.geojson', checked: true, style, geojson: { features: [{ type: 'Feature' }] } },
-				{ id: 'file-b', label: 'b.geojson', checked: false, geojson: { features: [{ type: 'Feature' }] } }
+				{ id: 'file-a', label: 'a.geojson', style, geojson: { features: [{ type: 'Feature' }] } },
+				{ id: 'file-b', label: 'b.geojson', geojson: { features: [{ type: 'Feature' }] } }
 			]
 		});
 
@@ -332,6 +331,8 @@ describe('consultees-map client helpers', () => {
 
 		initConsulteeMap('map-2');
 		assert.equal(InteractiveMap.mock.callCount(), 1);
+		// the page's zoom 8 is on 256px raster tiles - MapLibre's 512px levels count one fewer
+		assert.equal(InteractiveMap.mock.calls[0].arguments[1].zoom, 7);
 
 		// the static-map fallback is registered as a plugin, carrying the page's
 		// fallback config for the failure paths the map can't reach itself
@@ -475,5 +476,10 @@ describe('consultees-map client helpers', () => {
 		assert.equal(addEventListener.mock.callCount(), 1);
 
 		registerConsulteeMaps(undefined);
+	});
+
+	test('interactiveZoom counts MapLibre zoom levels, on 512px tiles, from the page config', () => {
+		assert.equal(interactiveZoom(12), 11);
+		assert.equal(interactiveZoom(0), 0);
 	});
 });

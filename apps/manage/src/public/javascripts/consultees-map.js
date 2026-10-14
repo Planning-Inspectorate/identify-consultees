@@ -134,8 +134,8 @@ export function buildDatasets(config) {
 	const datasets = [];
 
 	// the boundary page's shapefiles: one dataset each, grouped under the same Layers-menu
-	// heading - only the confirmed file starts visible (checked), the rest are toggled on. Each
-	// carries its own style, by how recent it is (config/map-styles/boundary-map.yaml); red if it doesn't
+	// heading, every one visible to start with - any can be unticked. Each carries its own style,
+	// by how recent it is (config/map-styles/boundary-map.yaml); red if it doesn't
 	for (const file of config.shapefileDatasets ?? []) {
 		if (file.geojson?.features?.length > 0) {
 			datasets.push({
@@ -146,7 +146,7 @@ export function buildDatasets(config) {
 				geojson: file.geojson,
 				minZoom: 0,
 				maxZoom: 24,
-				visible: file.checked !== false,
+				visible: true,
 				showInKey: true,
 				showInMenu: true,
 				style: file.style ?? {
@@ -348,7 +348,7 @@ export function initConsulteeMap(mapId) {
 				backgroundColor: '#f5f5f0'
 			},
 			center: config.center,
-			zoom: config.zoom,
+			zoom: interactiveZoom(config.zoom),
 			containerHeight: `${config.height ?? 516}px`,
 			mapLabel: config.mapLabel,
 			plugins: [datasetsPlugin, layersKeyPlugin, staticMapPlugin, ...(interactPlugin ? [interactPlugin] : [])]
@@ -359,6 +359,17 @@ export function initConsulteeMap(mapId) {
 	} catch {
 		staticMapPlugin.showFallback();
 	}
+}
+
+/**
+ * The page config's zoom as MapLibre counts it. The server works zooms out for the static-map
+ * image, on 256px OpenStreetMap tiles; MapLibre's zoom levels are on 512px tiles, so the same
+ * number shows half the distance. One level less shows what the image shows.
+ * @param {number} rasterZoom
+ * @returns {number}
+ */
+export function interactiveZoom(rasterZoom) {
+	return Math.max(0, rasterZoom - 1);
 }
 
 export function initAllConsulteeMaps() {

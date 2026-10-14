@@ -1,9 +1,8 @@
 /**
  * Build the map config for the project boundary page: one dataset per shapefile the case holds,
  * grouped under "GIS shapefiles" in the map's Layers menu so each file can be toggled on or off,
- * each in its own style - the most recent red (see config/map-styles/boundary-map.yaml).
- * Only the page's own file starts visible - the rest are unchecked in the Layers menu (the radios
- * below the map are never pre-selected; this is which layer the map draws, not a form answer).
+ * each in its own style - the most recent red (see config/map-styles/boundary-map.yaml). Every
+ * file starts visible, so the case's whole history shows at a glance; any can be unticked.
  */
 
 import type { Geometry } from '@pins/identify-consultees-database/src/geospatial/wkt.ts';
@@ -38,8 +37,6 @@ export interface BoundaryMapFile {
 	id: string;
 	/** The file's name - the dataset's label in the Layers menu and the radio's text. */
 	label: string;
-	/** True for the file the page was opened on - it starts checked (visible) in the Layers menu. */
-	checked: boolean;
 	/** When the file was received - the most recent is drawn red (see config/map-styles/boundary-map.yaml). */
 	receivedDate: Date | null;
 	geometry: Geometry;
@@ -57,7 +54,6 @@ export interface BoundaryMapConfig {
 	shapefileDatasets: {
 		id: string;
 		label: string;
-		checked: boolean;
 		/** The file's style, by how recent it is - see config/map-styles/boundary-map.yaml. */
 		style: BoundaryDatasetStyle;
 		geojson: GeoJsonFeatureCollection;
@@ -90,7 +86,6 @@ export function buildBoundaryMapConfig(
 	const datasets = files.map((file, index) => ({
 		id: `shapefile-${file.id}`,
 		label: file.label,
-		checked: file.checked,
 		style: toDatasetStyle(styleForRank(ranks[index])),
 		geojson: toGeojson(file, caseReference)
 	}));
