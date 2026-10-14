@@ -83,8 +83,6 @@ describe('consultee project boundary page', () => {
 		const mapConfig = JSON.parse(viewModel.mapConfigJson);
 		assert.strictEqual(mapConfig.shapefileGroupLabel, 'GIS shapefiles');
 		assert.strictEqual(mapConfig.shapefileDatasets.length, 1);
-		// the map still draws the page's own file first - layer state, not a form answer
-		assert.strictEqual(mapConfig.shapefileDatasets[0].checked, true);
 		assert.strictEqual(mapConfig.fallback.src, `/consultees/${realProjectId}/boundary-map`);
 
 		const html = mockRes.render.mock.calls[0].result;
@@ -111,9 +109,8 @@ describe('consultee project boundary page', () => {
 		assert.ok(viewModel.files.every((file) => !('checked' in file)));
 
 		const mapConfig = JSON.parse(viewModel.mapConfigJson);
-		// the file the page was opened on is the layer the map draws first
-		assert.strictEqual(mapConfig.shapefileDatasets[0].checked, false);
-		assert.strictEqual(mapConfig.shapefileDatasets[1].checked, true);
+		// both drawn, every file visible - no layer is singled out
+		assert.ok(mapConfig.shapefileDatasets.every((dataset: object) => !('checked' in dataset)));
 		// the sibling's geometry came from its own case_boundary row
 		assert.deepStrictEqual(mapConfig.shapefileDatasets[0].geojson.features[0].geometry, {
 			type: 'Point',
@@ -260,10 +257,11 @@ describe('project boundary static map', () => {
 		}
 	});
 
-	it("should draw the opened file in its own style - an earlier file's colour, else red", async () => {
+	it('should draw every file the case holds, each in its own style, the most recent on top', async () => {
 		const originalFetch = globalThis.fetch;
 		globalThis.fetch = async () => new Response(null, { status: 503 });
-		const svgFor = async (files: ReturnType<typeof boundaryFile>[]) => {
+		// the case's own row, the file list, then each other file's geometry
+		const svgFor = async (calls: unknown[][]) => {
 			const mockRes = {
 				status: mock.fn(() => mockRes),
 				type: mock.fn(() => mockRes),
@@ -271,25 +269,34 @@ describe('project boundary static map', () => {
 				send: mock.fn(),
 				end: mock.fn()
 			};
-			const handler = buildBoundaryStaticMap(
-				{ db: dbReturning([[realProjectRow()], files]), logger: mockLogger() },
-				true
-			);
+			const handler = buildBoundaryStaticMap({ db: dbReturning(calls), logger: mockLogger() }, true);
 			await handler({ params: { caseId: realProjectId }, query: {}, headers: {} }, mockRes);
 			return String(mockRes.send.mock.calls[0].arguments[0]);
 		};
+		const earlier = new RegExp(BOUNDARY_MAP_STYLES.earlier[0].colour, 'i');
+		const mostRecent = new RegExp(BOUNDARY_MAP_STYLES.mostRecent.colour, 'i');
 		try {
-			// a newer sibling makes the opened file an earlier one
-			const older = await svgFor([boundaryFile(siblingProjectRow()), boundaryFile(realProjectRow())]);
-			assert.match(older, new RegExp(BOUNDARY_MAP_STYLES.earlier[0].colour, 'i'));
-			assert.doesNotMatch(older, new RegExp(BOUNDARY_MAP_STYLES.mostRecent.colour, 'i'));
+			// a newer sibling: both drawn, the opened (earlier) file first, the newest over it
+			const both = await svgFor([
+				[realProjectRow()],
+				[boundaryFile(siblingProjectRow()), boundaryFile(realProjectRow())],
+				[siblingProjectRow()]
+			]);
+			assert.ok(both.search(earlier) >= 0 && both.search(mostRecent) > both.search(earlier));
 
-			// the newest file, or one missing from the list, is red
-			assert.match(
-				await svgFor([boundaryFile(realProjectRow())]),
-				new RegExp(BOUNDARY_MAP_STYLES.mostRecent.colour, 'i')
-			);
-			assert.match(await svgFor([]), new RegExp(BOUNDARY_MAP_STYLES.mostRecent.colour, 'i'));
+			// a sibling gone by the time its geometry is fetched isn't drawn
+			const gone = await svgFor([
+				[realProjectRow()],
+				[boundaryFile(siblingProjectRow()), boundaryFile(realProjectRow())],
+				[]
+			]);
+			assert.match(gone, earlier);
+			assert.doesNotMatch(gone, mostRecent);
+
+			// the opened file alone is the newest - red - even when it's missing from the list
+			assert.match(await svgFor([[realProjectRow()], [boundaryFile(realProjectRow())]]), mostRecent);
+			assert.match(await svgFor([[realProjectRow()], []]), mostRecent);
+			assert.match(await svgFor([[realProjectRow({ receivedDate: null })], []]), mostRecent);
 		} finally {
 			globalThis.fetch = originalFetch;
 		}

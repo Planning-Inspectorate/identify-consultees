@@ -4,11 +4,10 @@ import { BOUNDARY_MAP_STYLES } from './boundary-map-styles.ts';
 import { buildBoundaryMapConfig } from './boundary-map.ts';
 import { MAP_VIEWPORT } from './sample-geojson.ts';
 
-function boundaryFile(id: string, checked = false, receivedDate: Date | null = null) {
+function boundaryFile(id: string, receivedDate: Date | null = null) {
 	return {
 		id,
 		label: `${id}.geojson`,
-		checked,
 		receivedDate,
 		geometry: {
 			type: 'Polygon' as const,
@@ -28,7 +27,7 @@ function boundaryFile(id: string, checked = false, receivedDate: Date | null = n
 describe('buildBoundaryMapConfig', () => {
 	it('should build one dataset per file, grouped under GIS shapefiles, framed on all of them', () => {
 		const config = buildBoundaryMapConfig('Test Project', 'EN010099', [
-			boundaryFile('first-file', true),
+			boundaryFile('first-file'),
 			boundaryFile('second-file')
 		]);
 
@@ -38,8 +37,7 @@ describe('buildBoundaryMapConfig', () => {
 		const [first, second] = config.shapefileDatasets;
 		assert.strictEqual(first.id, 'shapefile-first-file');
 		assert.strictEqual(first.label, 'first-file.geojson');
-		assert.strictEqual(first.checked, true);
-		assert.strictEqual(second.checked, false);
+		assert.strictEqual(second.id, 'shapefile-second-file');
 		// each feature carries its file key so the client can filter/select it
 		assert.strictEqual(first.geojson.features[0].properties.fileKey, 'first-file');
 		assert.strictEqual(first.geojson.features[0].properties.reference, 'EN010099');
@@ -52,10 +50,10 @@ describe('buildBoundaryMapConfig', () => {
 		assert.match(config.mapLabel, /Test Project \(EN010099\)/);
 	});
 
-	it('should draw each file in its own style, the most recent red whichever is checked', () => {
+	it('should draw each file in its own style, the most recent red', () => {
 		const config = buildBoundaryMapConfig('Test Project', 'EN010099', [
-			boundaryFile('older', true, new Date('2025-11-01')),
-			boundaryFile('newest', false, new Date('2026-04-01')),
+			boundaryFile('older', new Date('2025-11-01')),
+			boundaryFile('newest', new Date('2026-04-01')),
 			boundaryFile('undated')
 		]);
 
@@ -69,7 +67,7 @@ describe('buildBoundaryMapConfig', () => {
 	it('should round each member of a geometry collection', () => {
 		const config = buildBoundaryMapConfig('Test Project', 'EN010099', [
 			{
-				...boundaryFile('collection-file', true),
+				...boundaryFile('collection-file'),
 				geometry: {
 					type: 'GeometryCollection' as const,
 					geometries: [
@@ -90,7 +88,7 @@ describe('buildBoundaryMapConfig', () => {
 	});
 
 	it('should carry the static-map fallback when given one', () => {
-		const config = buildBoundaryMapConfig('Test Project', 'EN010099', [boundaryFile('only-file', true)], {
+		const config = buildBoundaryMapConfig('Test Project', 'EN010099', [boundaryFile('only-file')], {
 			src: '/consultees/abc/boundary-map',
 			alt: 'Static map'
 		});
