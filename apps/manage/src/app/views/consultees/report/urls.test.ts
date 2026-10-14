@@ -81,7 +81,7 @@ describe('report url helpers', () => {
 				removed: [{ id: 'm-1', category: '', name: '', reason: '' }],
 				adds: [{ category: 'Parish Council', name: 'A Consultee', reason: 'borders' }]
 			}),
-			`/consultees/case-1/ruleset?exclude=m-1&add=${encodeURIComponent(
+			`/consultees/case-1/ruleset?exclude=m-1&add=${urlParam(
 				JSON.stringify({ c: 'Parish Council', n: 'A Consultee', r: 'borders' })
 			)}`
 		);
