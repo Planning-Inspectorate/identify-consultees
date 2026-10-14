@@ -173,7 +173,7 @@ describe('report download', () => {
 		assert.ok(!parish.includes('Parish 2') && !parish.includes('Parish 4'));
 		assert.ok(!parish.some((line) => line.startsWith('The consultee areas could not be drawn')));
 		const landowner = pdfTextLines(Buffer.from(files['maps/02 Landowner.pdf']));
-		assert.ok(landowner.includes('Added by name - not on the map'));
+		assert.ok(landowner.includes('Manually added - not on the map'));
 	});
 
 	it('uses the run the session keeps, and notes a map that then has no areas to draw', async () => {

@@ -3,6 +3,7 @@ import { expect, test } from '@playwright/test';
 import { unzipSync } from 'fflate';
 import { readFile } from 'node:fs/promises';
 import { loadCaseBoundaries } from '../../../packages/database/src/geospatial/case-boundaries.ts';
+import { loadConsulteeAreas } from '../../../packages/database/src/geospatial/consultee-areas.ts';
 import {
 	SAMPLE_CASE_ID,
 	SAMPLE_CASE_NAME,
@@ -33,6 +34,23 @@ function e2ePageFeatures() {
 
 async function deleteE2ePageRows(db: ReturnType<typeof newDatabaseClient>) {
 	await db.$executeRaw`DELETE FROM case_boundary WHERE caseReference LIKE ${E2E_PAGE_PREFIX + '%'}`;
+}
+
+// the consultees the journey adds by hand - the add page only takes names that are consultees in
+// the reference data. Far from the sample case (Shetland), so they're never its nearby consultees
+const E2E_ADDED_CONSULTEES = ['First Test Consultee', 'Second Test Consultee'].map((consultee, i) => ({
+	id: `e2e00000-0000-0000-0001-${String(i + 1).padStart(12, '0')}`,
+	type: 'Feature' as const,
+	geometry: { type: 'Point' as const, coordinates: [-1.3, 60.3 + i * 0.01] },
+	properties: { consulteeCategory: 'Parish Council', consultee }
+}));
+
+const JOURNEY_TITLE = 'choosing a project starts the boundary-ruleset-check journey';
+
+async function deleteE2eAddedConsultees(db: ReturnType<typeof newDatabaseClient>) {
+	for (const { id } of E2E_ADDED_CONSULTEES) {
+		await db.$executeRaw`DELETE FROM consultee_area WHERE id = ${id}`;
+	}
 }
 
 test.describe('manage journeys', () => {
@@ -75,10 +93,33 @@ test.describe('manage journeys', () => {
 		}
 	});
 
-	test('choosing a project starts the boundary-ruleset-check journey', async ({ page }) => {
+	// only the journey uses the added consultees, and Playwright runs beforeAll/afterAll once per
+	// worker - so they're set up by the journey itself and removed after it alone, never while
+	// another worker's journey (a retry included) is using them
+	// eslint-disable-next-line no-empty-pattern -- Playwright requires its fixtures argument destructured
+	test.afterEach(async ({}, testInfo) => {
+		if (testInfo.title !== JOURNEY_TITLE) {
+			return;
+		}
+		const db = newDatabaseClient(connectionString);
+		try {
+			await deleteE2eAddedConsultees(db);
+		} finally {
+			await db.$disconnect();
+		}
+	});
+
+	test(JOURNEY_TITLE, async ({ page }) => {
 		// a dozen pages, a ruleset run and the download's maps come close to 30s on a full reference
 		// data load
 		test.slow();
+		const db = newDatabaseClient(connectionString);
+		try {
+			await deleteE2eAddedConsultees(db);
+			await loadConsulteeAreas(db, { type: 'FeatureCollection', features: E2E_ADDED_CONSULTEES });
+		} finally {
+			await db.$disconnect();
+		}
 		await page.goto(`/?q=${SAMPLE_CASE_REFERENCE}`);
 		// a caseReference isn't guaranteed unique (a project can have several boundary submissions),
 		// so follow the link by its href (a specific case id) rather than by its visible text
@@ -154,6 +195,14 @@ test.describe('manage journeys', () => {
 		await expect(page.getByRole('link', { name: 'Enter the consultee name' })).toBeVisible();
 		await expect(page.getByText('Error: Enter the consultee name')).toBeVisible();
 		await expect(page.getByLabel('Reason for adding')).toHaveValue('Entered first');
+
+		// a name that isn't a consultee in the reference data is refused, saying so above the form
+		await nameInput.fill('Banana');
+		await addButton.click();
+		await expect(page.getByText('There is a problem')).toBeVisible();
+		await expect(
+			page.getByRole('link', { name: 'Banana does not exist as a Parish Council consultee. Enter a valid consultee.' })
+		).toBeVisible();
 
 		// adding a consultee returns to the category page with it listed below the map - and any
 		// number can be added one at a time

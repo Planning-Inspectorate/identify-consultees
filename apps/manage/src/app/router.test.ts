@@ -1,5 +1,6 @@
 import { ManageService } from '#service';
 import { loadCaseBoundaries } from '@pins/identify-consultees-database/src/geospatial/case-boundaries.ts';
+import { loadConsulteeAreas } from '@pins/identify-consultees-database/src/geospatial/consultee-areas.ts';
 import assert from 'node:assert/strict';
 import { after, before, describe, test } from 'node:test';
 import request from 'supertest';
@@ -9,6 +10,8 @@ import { buildManageTestConfig, createManageTestApp, createManageTestService } f
 // a fixed id, rather than depending on whatever sample data may or may not be seeded (CI's
 // database is migrated but never seeded - see .azure/pipelines/pr.yml)
 const homePageTestCaseId = '33333333-3333-3333-3333-333333333333';
+// a consultee the add form can add - it only takes names that are consultees in the reference data
+const routerTestConsulteeId = '33333333-3333-3333-3333-333333333334';
 
 // footer hrefs are literal strings (including an external URL) - escape them before
 // they go into a RegExp, otherwise '.' etc. match more than the literal href
@@ -20,6 +23,19 @@ describe('manage router wiring', () => {
 
 	before(async () => {
 		await authDisabledService.db.$executeRaw`DELETE FROM case_boundary WHERE id = ${homePageTestCaseId}`;
+		await authDisabledService.db.$executeRaw`DELETE FROM consultee_area WHERE id = ${routerTestConsulteeId}`;
+		await loadConsulteeAreas(authDisabledService.db, {
+			type: 'FeatureCollection',
+			features: [
+				{
+					id: routerTestConsulteeId,
+					type: 'Feature',
+					// well away from the test case, so it isn't one of its nearby consultees
+					geometry: { type: 'Point', coordinates: [1.5, 55.5] },
+					properties: { consulteeCategory: 'Parish Council', consultee: 'Router Test Consultee' }
+				}
+			]
+		});
 		await loadCaseBoundaries(authDisabledService.db, {
 			type: 'FeatureCollection',
 			features: [
@@ -35,6 +51,7 @@ describe('manage router wiring', () => {
 
 	after(async () => {
 		await authDisabledService.db.$executeRaw`DELETE FROM case_boundary WHERE id = ${homePageTestCaseId}`;
+		await authDisabledService.db.$executeRaw`DELETE FROM consultee_area WHERE id = ${routerTestConsulteeId}`;
 		await authDisabledService.db.$disconnect().catch(() => undefined);
 	});
 
@@ -249,6 +266,21 @@ describe('manage router wiring', () => {
 		assert.equal(categoryPage.status, 200);
 		assert.match(categoryPage.text, /Router Test Consultee/);
 		assert.match(categoryPage.text, /Adjacent landowner/);
+	});
+
+	test('POST /consultees/:id/report/consultees/add refuses a name that is not a consultee', async () => {
+		const agent = request.agent(authDisabledApp);
+		const addUrl = `/consultees/${homePageTestCaseId}/report/consultees/add?ruleset=england-wales-post-20240430&category=Parish%20Council`;
+		const page = await agent.get(addUrl);
+		const csrf = /name="_csrf" value="([^"]+)"/.exec(page.text)?.[1];
+
+		const response = await agent
+			.post(addUrl)
+			.type('form')
+			.send({ _csrf: csrf, name: 'Banana', reason: 'Not a consultee' });
+		assert.equal(response.status, 200);
+		assert.match(response.text, /There is a problem/);
+		assert.match(response.text, /Banana does not exist as a Parish Council consultee\. Enter a valid consultee\./);
 	});
 
 	test('POST /consultees/:id/report/consultees/add re-renders with an error when the name is blank', async () => {

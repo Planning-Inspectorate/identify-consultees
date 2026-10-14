@@ -343,3 +343,36 @@ export async function listConsulteeCategories(dbClient: PrismaClient): Promise<s
 	);
 	return rows.map((row) => row.consulteeCategory);
 }
+
+/** A consultee found by its name - see findConsulteeAreaByName. */
+export interface NamedConsulteeArea {
+	/** Lowercase, as the Python function and the report's URLs give consultee_area ids. */
+	id: string;
+	/** As the reference data spells it. */
+	consultee: string;
+	distanceMetres: number;
+}
+
+/**
+ * The consultee_area row in `category` called `name` - case aside, as names are compared when
+ * consultees are added by hand - nearest `site` when several share it, or `undefined` when there's
+ * none: the check that a name typed on the Add a consultee page is a real consultee.
+ */
+export async function findConsulteeAreaByName(
+	dbClient: PrismaClient,
+	category: string,
+	name: string,
+	site: Geometry
+): Promise<NamedConsulteeArea | undefined> {
+	const [row] = await withDeadlockRetry(
+		() => dbClient.$queryRaw<{ id: string; consultee: string; distanceMetres: number }[]>`
+			SELECT TOP 1 id, consultee,
+				geometrySimplified.STDistance(geography::STGeomFromText(${geometryToWkt(site)}, 4326)) AS distanceMetres
+			FROM consultee_area
+			WHERE consulteeCategory = ${category}
+				AND LOWER(consultee) = LOWER(${name})
+			ORDER BY distanceMetres, id
+		`
+	);
+	return row ? { id: row.id.toLowerCase(), consultee: row.consultee, distanceMetres: row.distanceMetres } : undefined;
+}

@@ -6,6 +6,7 @@ import { newDatabaseClient } from '../index.ts';
 import type { ConsulteeAreaFeatureCollection } from './consultee-areas.ts';
 import {
 	bufferGeometryForDisplay,
+	findConsulteeAreaByName,
 	getConsulteeAreaById,
 	getConsulteeAreaDisplayGeometries,
 	listConsulteeAreas,
@@ -244,6 +245,55 @@ describe('consultee areas (requires a local SQL Server - see docker-compose.yml)
 			// This just confirms it went through the UPDATE branch, not NOT MATCHED/INSERT again
 			const updated = await getConsulteeAreaById(dbClient, testAreaId);
 			assert.equal(updated?.properties.consultee, 'Updated');
+		} finally {
+			await cleanup();
+		}
+	});
+
+	test('finds a consultee by name in its category, case aside, nearest the site', async (t) => {
+		if (!dbAvailable) return t.skip('SQL Server database not available');
+
+		await cleanup();
+		try {
+			const square = (west: number) => ({
+				type: 'Polygon' as const,
+				coordinates: [
+					[
+						[west, 51.5],
+						[west + 0.01, 51.5],
+						[west + 0.01, 51.51],
+						[west, 51.51],
+						[west, 51.5]
+					]
+				]
+			});
+			// two areas share the test name - one near the site, one far from it
+			const testName = 'Findconsulteebyname Test Parish';
+			await loadConsulteeAreas(dbClient, {
+				type: 'FeatureCollection',
+				features: [
+					{
+						id: testAreaId,
+						type: 'Feature',
+						geometry: square(-2),
+						properties: { consulteeCategory: 'Parish Council', consultee: testName, region: 'Far' }
+					},
+					{
+						id: secondAreaId,
+						type: 'Feature',
+						geometry: square(-0.15),
+						properties: { consulteeCategory: 'Parish Council', consultee: testName, region: 'Near' }
+					}
+				]
+			});
+			const site = { type: 'Point' as const, coordinates: [-0.14, 51.505] };
+
+			const found = await findConsulteeAreaByName(dbClient, 'Parish Council', testName.toUpperCase(), site);
+			assert.deepEqual(found, { id: secondAreaId, consultee: testName, distanceMetres: 0 });
+
+			// another category, or a name that isn't a consultee - nothing
+			assert.equal(await findConsulteeAreaByName(dbClient, 'Hospital', testName, site), undefined);
+			assert.equal(await findConsulteeAreaByName(dbClient, 'Parish Council', 'Banana', site), undefined);
 		} finally {
 			await cleanup();
 		}

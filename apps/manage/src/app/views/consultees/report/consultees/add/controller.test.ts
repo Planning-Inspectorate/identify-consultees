@@ -3,7 +3,7 @@ import assert from 'node:assert';
 import { describe, it, mock } from 'node:test';
 import { configureNunjucks } from '../../../../../nunjucks.ts';
 import { failingRulesetRunner, rulesetRunnerReturning } from '../../../../../testing/ruleset-runner-stub.ts';
-import { buildReportConsulteeAddPage, buildReportConsulteeAddSubmit } from './controller.ts';
+import { buildReportConsulteeAddPage, buildReportConsulteeAddSubmit, notAConsulteeError } from './controller.ts';
 
 const realProjectId = '44444444-4444-4444-4444-444444444444';
 const matchId = '55555555-5555-5555-5555-555555555555';
@@ -67,14 +67,34 @@ const RUN = [
 	}
 ];
 
+// the reference data's consultees, as the name lookup finds them (ids as SQL Server returns them)
+const storedId = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';
+const STORED = [
+	{ id: storedId.toUpperCase(), consultee: 'Mr Smith', consulteeCategory: 'Parish Council', distanceMetres: 31_000 },
+	{ id: nearbyId.toUpperCase(), consultee: 'Barton', consulteeCategory: 'Parish Council', distanceMetres: 1_250 },
+	{
+		id: 'cccccccc-cccc-cccc-cccc-cccccccccccc',
+		consultee: 'Banana Hospital',
+		consulteeCategory: 'Hospital',
+		distanceMetres: 5
+	}
+];
+
 // rows[0] answers the project lookup; the ruleset run is answered by the stand-in Python
-// function (see rulesetRunnerReturning) rather than a query
+// function (see rulesetRunnerReturning) rather than a query, and the name lookup from STORED
 function dbReturning(rows: unknown[][]) {
 	let call = 0;
 	return {
-		$queryRaw: mock.fn(async (sql: TemplateStringsArray) => {
+		$queryRaw: mock.fn(async (sql: TemplateStringsArray, ...values: unknown[]) => {
+			const text = sql.join('');
 			// a query on the site alone (no table) - answer it with the site
-			if (!/\bFROM\b/.test(sql.join(''))) return [realProjectRow().geometryWkt];
+			if (!/\bFROM\b/.test(text)) return [realProjectRow().geometryWkt];
+			if (text.includes('LOWER(consultee)')) {
+				const [, category, name] = values as string[];
+				return STORED.filter(
+					(row) => row.consulteeCategory === category && row.consultee.toLowerCase() === name.toLowerCase()
+				).map(({ id, consultee, distanceMetres }) => ({ id, consultee, distanceMetres }));
+			}
 			return rows[Math.min(call++, rows.length - 1)] ?? [];
 		})
 	};
@@ -171,18 +191,47 @@ describe('add a consultee page', () => {
 		);
 	});
 
-	it('adds any other name as typed, with no area to map, after the earlier adds and keeping removals', async () => {
+	it('adds a consultee from the reference data that is not nearby, by its id, after the earlier adds', async () => {
 		const earlier = addJson('First Test Consultee', 'First reason');
 		const res = await submit(
-			{ name: 'Mr  Smith', reason: 'Owns the access road' },
+			{ name: 'mr  smith', reason: 'Owns the access road' },
 			{ ...parishQuery, exclude: matchId, add: earlier }
 		);
 
 		const location = res.redirect.mock.calls[0].arguments[0] as string;
 		assert.match(location, /exclude=55555555/);
-		const newAdd = encodeURIComponent(addJson('Mr Smith', 'Owns the access road'));
+		// the stored spelling and its id, lowercase as the report's ids are
+		const newAdd = encodeURIComponent(
+			JSON.stringify({ i: storedId, c: 'Parish Council', n: 'Mr Smith', r: 'Owns the access road' })
+		);
 		assert.ok(location.indexOf(encodeURIComponent(earlier)) > 0);
 		assert.ok(location.indexOf(encodeURIComponent(earlier)) < location.indexOf(newAdd));
+	});
+
+	it('refuses a name that is not a consultee of the category, saying so above the form', async () => {
+		const res = await submit({ name: 'Banana', reason: 'Looks important' });
+
+		assert.strictEqual(res.redirect.mock.callCount(), 0);
+		const viewModel = viewModelOf(res);
+		assert.strictEqual(
+			viewModel.addForm.nameError.text,
+			'Banana does not exist as a Parish Council consultee. Enter a valid consultee.'
+		);
+		assert.strictEqual(viewModel.addForm.nameValue, 'Banana');
+		assert.strictEqual(viewModel.addForm.reasonValue, 'Looks important');
+		assert.deepStrictEqual(viewModel.errorSummary, [
+			{ text: notAConsulteeError('Banana', 'Parish Council'), href: '#consultee-name' }
+		]);
+		const html = res.render.mock.calls[0].result as string;
+		assert.match(html, /There is a problem/);
+		assert.match(html, /Banana does not exist as a Parish Council consultee/);
+
+		// a consultee of another category isn't one of this one's - and a missing reason is said too
+		const otherCategory = await submit({ name: 'Banana Hospital', reason: '' });
+		assert.deepStrictEqual(
+			viewModelOf(otherCategory).errorSummary.map((error: { text: string }) => error.text),
+			[notAConsulteeError('Banana Hospital', 'Parish Council'), 'Enter a reason for adding this consultee.']
+		);
 	});
 
 	it('shows the page again with an error per missing field and the entered values', async () => {
@@ -230,11 +279,11 @@ describe('add a consultee page', () => {
 		}
 	});
 
-	it("still adds a typed name when the ruleset can't be run", async () => {
+	it("still adds a consultee, from the reference data, when the ruleset can't be run", async () => {
 		const res = await submit({ name: 'Barton', reason: 'r' }, parishQuery, failingRulesetRunner());
 		assert.ok(
 			(res.redirect.mock.calls[0].arguments[0] as string).endsWith(
-				`&add=${encodeURIComponent(addJson('Barton', 'r'))}#consultees`
+				`&add=${encodeURIComponent(JSON.stringify({ i: nearbyId, c: 'Parish Council', n: 'Barton', r: 'r' }))}#consultees`
 			)
 		);
 	});

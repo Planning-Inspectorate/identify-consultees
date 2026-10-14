@@ -262,7 +262,7 @@ export function removeConsulteeUrl(
 
 /**
  * The static map for one category's visible (non-excluded) matches, with the nearby consultees
- * added by hand (`include`) drawn as identified - consultees typed in by name
+ * added by hand (`include`) drawn as identified - consultees added by name alone
  * have no area to map.
  */
 export function categoryStaticMapUrl(

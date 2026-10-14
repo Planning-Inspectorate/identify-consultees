@@ -1,4 +1,5 @@
 import type { ManageService } from '#service';
+import { findConsulteeAreaByName } from '@pins/identify-consultees-database/src/geospatial/consultee-areas.ts';
 import { isIdentifiedByCondition } from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
 import type { AsyncRequestHandler, AsyncRequestHandlerWithBody } from '@planning-inspectorate/core/util';
 import type { Response } from 'express';
@@ -59,12 +60,18 @@ export function buildReportConsulteeAddPage(service: ManageService): AsyncReques
 	};
 }
 
+/** Why a name was refused: it isn't a consultee of the category in the reference data. */
+export function notAConsulteeError(name: string, category: string): string {
+	return `${name} does not exist as a ${category} consultee. Enter a valid consultee.`;
+}
+
 /**
  * Saves a hand-added consultee. The name and the reason are both required - like the removal
- * reason, the reason is recorded for auditing and shows in the Identified column. A name matching
- * one of the category's nearby consultees (case and spacing aside) adds that consultee, by its id,
- * so the maps draw it as identified and the report has its stored row; any other name is added as
- * typed, with no area to map. A name already listed is refused. A failed submit shows the page
+ * reason, the reason is recorded for auditing and shows in the Identified column. The name has to
+ * be a real consultee of the category: one of its nearby consultees (case and spacing aside, the
+ * nearest of that name), so the maps draw it as identified, or any other in the reference data
+ * (the nearest of that name to the site), so the report has its stored row. Anything else - a
+ * typo, or a made-up name - is refused, as is a name already listed. A failed submit shows the page
  * again with the entered values and an error per field; a successful one adds the consultee to the
  * URL's `add` params and returns to the category page.
  */
@@ -95,13 +102,29 @@ export function buildReportConsulteeAddSubmit(
 				.map(consulteeName),
 			...selection.adds.filter((add) => add.category === category).map((add) => add.name)
 		].map(comparableName);
+		// the nearest consultee of that name: nearby (candidates come nearest first), else anywhere in
+		// the reference data - looked up only for a name that's given and not already listed
+		const alreadyListed = listed.includes(comparableName(name));
+		const nearby = nearbyCandidates(context).find(
+			(candidate) => comparableName(consulteeName(candidate)) === comparableName(name)
+		);
+		const stored =
+			!name || alreadyListed
+				? undefined
+				: nearby
+					? { id: nearby.feature.id, consultee: consulteeName(nearby) }
+					: await findConsulteeAreaByName(service.db, category, name, project.geometry);
+
 		const nameError = !name
 			? 'Enter the consultee name'
-			: listed.includes(comparableName(name))
+			: alreadyListed
 				? `${name} is already listed in ${category}`
-				: undefined;
+				: !stored
+					? notAConsulteeError(name, category)
+					: undefined;
 		const reasonError = reason ? undefined : 'Enter a reason for adding this consultee.';
-		if (nameError || reasonError) {
+		// no consultee found always comes with a name error
+		if (!stored || reasonError) {
 			return renderAddPage(res, context, {
 				nameValue,
 				reasonValue,
@@ -110,13 +133,7 @@ export function buildReportConsulteeAddSubmit(
 			});
 		}
 
-		// candidates come nearest first, so a name shared by several is matched to the nearest
-		const match = nearbyCandidates(context).find(
-			(candidate) => comparableName(consulteeName(candidate)) === comparableName(name)
-		);
-		const add: AddedConsultee = match
-			? { id: match.feature.id, category, name: consulteeName(match), reason }
-			: { category, name, reason };
+		const add: AddedConsultee = { id: stored.id, category, name: stored.consultee, reason };
 		return res.redirect(
 			`${consulteesUrl(project.id, ruleset.id, category, { removed: selection.removed, adds: [...selection.adds, add] })}#consultees`
 		);
