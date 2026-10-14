@@ -5,12 +5,9 @@ import { cacheNoCacheMiddleware } from '@planning-inspectorate/core/middleware';
 import type { IRouter, RequestHandler } from 'express';
 import { Router as createRouter } from 'express';
 import rateLimit from 'express-rate-limit';
+import { adminHeaderLink, createAdminRoutes } from './admin/index.ts';
 import { buildSanitisingErrorHandler } from './error-handler.ts';
 import { createDefraVendorRouter } from './maps/vendor.ts';
-import { createRoutes as createAdminCbosConnectionRoutes } from './views/admin-cbos-connection/index.ts';
-import { createRoutes as createAdminImportFromCbosRoutes } from './views/admin-import-from-cbos/index.ts';
-import { createRoutes as createAdminImportReferenceDataRoutes } from './views/admin-import-reference-data/index.ts';
-import { createRoutes as createAdminUploadToBlobRoutes } from './views/admin-upload-to-blob/index.ts';
 import { createRoutes as createComponentRoutes } from './views/components/index.ts';
 import { createRoutes as createConsulteeAreasDirectRoutes } from './views/consultee-areas-direct/index.ts';
 import { createRoutes as createConsulteeAreasPythonRoutes } from './views/consultee-areas-python/index.ts';
@@ -59,10 +56,7 @@ export function buildRouter(service: ManageService, options: BuildRouterOptions 
 	const itemsRoutes = createItemRoutes(service);
 	const consulteeAreasPythonRoutes = createConsulteeAreasPythonRoutes(service);
 	const consulteeAreasDirectRoutes = createConsulteeAreasDirectRoutes(service);
-	const adminUploadToBlobRoutes = createAdminUploadToBlobRoutes(service);
-	const adminImportReferenceDataRoutes = createAdminImportReferenceDataRoutes(service);
-	const adminCbosConnectionRoutes = createAdminCbosConnectionRoutes(service);
-	const adminImportFromCbosRoutes = createAdminImportFromCbosRoutes(service);
+	const adminRoutes = createAdminRoutes(service);
 	const authRateLimiter = options.authRateLimiter ?? buildAuthRateLimiter();
 
 	router.use('/', monitoringRoutes);
@@ -114,6 +108,8 @@ export function buildRouter(service: ManageService, options: BuildRouterOptions 
 		});
 	}
 
+	// the header's Admin link - see admin/index.ts
+	router.use(adminHeaderLink);
 	router.use('/', homeRoutes);
 	router.use('/consultees', consulteeRoutes);
 	// prototype/debug pages - not part of the service; only mounted when enabled
@@ -125,10 +121,8 @@ export function buildRouter(service: ManageService, options: BuildRouterOptions 
 		router.use('/consultee-areas-python', consulteeAreasPythonRoutes);
 		router.use('/consultee-areas-direct', consulteeAreasDirectRoutes);
 	}
-	router.use('/admin/upload-to-blob', adminUploadToBlobRoutes);
-	router.use('/admin/import-reference-data', adminImportReferenceDataRoutes);
-	router.use('/admin/cbos-connection', adminCbosConnectionRoutes);
-	router.use('/admin/import-from-cbos', adminImportFromCbosRoutes);
+	// the admin section - see admin/index.ts
+	router.use('/admin', adminRoutes);
 	router.use('/error', createErrorRoutes(service));
 
 	// last: route errors render generic copy (full detail goes to the logs only) rather

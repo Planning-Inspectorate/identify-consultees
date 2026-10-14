@@ -68,6 +68,7 @@ const pages = [
 	{ path: '/items', name: 'items-list' },
 	{ path: '/consultee-areas-python', name: 'consultee-areas-python' },
 	{ path: '/consultee-areas-direct', name: 'consultee-areas-direct' },
+	{ path: '/admin', name: 'admin-overview' },
 	{ path: '/admin/upload-to-blob', name: 'admin-upload-to-blob' },
 	{ path: '/admin/import-reference-data', name: 'admin-import-reference-data' },
 	{ path: '/unauthenticated', name: 'unauthenticated-401' },

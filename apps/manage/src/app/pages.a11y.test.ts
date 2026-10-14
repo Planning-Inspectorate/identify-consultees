@@ -1,5 +1,3 @@
-import axe from 'axe-core';
-import { JSDOM } from 'jsdom';
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
 import {
@@ -10,52 +8,7 @@ import {
 	scopeFixtureIds
 } from './govuk-frontend-components.ts';
 import { configureNunjucks } from './nunjucks.ts';
-
-const pageLocals = {
-	config: {
-		styleFile: 'style.css',
-		govukFrontendJs: 'assets/js/govuk-frontend.min.js',
-		consulteesMapJs: 'javascripts/consultees-map.js',
-		mapLayersDemoJs: 'javascripts/map-layers-demo.js',
-		accessibleAutocompleteJs: 'assets/js/accessible-autocomplete.min.js',
-		accessibleAutocompleteCss: 'assets/css/accessible-autocomplete.min.css',
-		consulteeAutocompleteJs: 'javascripts/consultee-autocomplete.js',
-		vendorInteractiveMapJs: 'vendor/interactive-map/js/index.js',
-		vendorInteractiveMapCss: 'vendor/interactive-map/css/index.css',
-		vendorMaplibreProviderJs: 'vendor/maplibre-provider/js/index.js',
-		interactiveMapExamplesJs: 'javascripts/interactive-map-examples.js',
-		headerTitle: 'Identify consultees',
-		// the same support links config-middleware puts on every page
-		footerLinks: [
-			{ text: 'Terms and conditions', link: '/terms-and-conditions' },
-			{ text: 'Accessibility statement', link: '/accessibility-statement' },
-			{
-				text: 'Privacy',
-				link: 'https://www.gov.uk/government/publications/planning-inspectorate-privacy-notices/customer-privacy-notice'
-			},
-			{ text: 'Cookies', link: '/cookies' },
-			{ text: 'Contact', link: '/contact' }
-		]
-	},
-	cspNonce: 'test-nonce'
-};
-
-async function assertNoSeriousA11yViolations(html: string) {
-	const dom = new JSDOM(html);
-	const results = await axe.run(dom.window.document.documentElement, {
-		// jsdom cannot compute styles reliably
-		rules: {
-			'color-contrast': { enabled: false },
-			'link-in-text-block': { enabled: false }
-		}
-	});
-
-	const serious = results.violations.filter(
-		(violation) => violation.impact === 'critical' || violation.impact === 'serious'
-	);
-
-	assert.equal(serious.length, 0, serious.map((violation) => `${violation.id}: ${violation.help}`).join('\n'));
-}
+import { assertNoSeriousA11yViolations, pageLocals } from './testing/a11y.ts';
 
 describe('manage page accessibility smoke', () => {
 	const nunjucks = configureNunjucks();
@@ -727,69 +680,6 @@ describe('manage page accessibility smoke', () => {
 			pageHeading: 'Consultee areas (Python function)',
 			_csrf: 'test-csrf',
 			error: 'PYTHON_FUNCTION_URL is not configured'
-		});
-		await assertNoSeriousA11yViolations(html);
-	});
-
-	test('admin import from CBOS page has no serious a11y violations', async () => {
-		const html = nunjucks.render('views/admin-import-from-cbos/view.njk', {
-			...pageLocals,
-			pageHeading: 'Import case boundaries from CBOS',
-			_csrf: 'test-csrf',
-			loadedCaseBoundaries: 300,
-			loadedFromCbos: 120
-		});
-		await assertNoSeriousA11yViolations(html);
-	});
-
-	test('admin import from CBOS page with a result has no serious a11y violations', async () => {
-		const html = nunjucks.render('views/admin-import-from-cbos/view.njk', {
-			...pageLocals,
-			pageHeading: 'Import case boundaries from CBOS',
-			_csrf: 'test-csrf',
-			filesFound: 3,
-			imported: 2,
-			failures: [{ caseReference: 'EN010001', fileName: 'broken.geojson', reason: 'status 500' }]
-		});
-		await assertNoSeriousA11yViolations(html);
-	});
-
-	test('admin import from CBOS page with an error has no serious a11y violations', async () => {
-		const html = nunjucks.render('views/admin-import-from-cbos/view.njk', {
-			...pageLocals,
-			pageHeading: 'Import case boundaries from CBOS',
-			_csrf: 'test-csrf',
-			error: 'Could not import case boundaries from CBOS.'
-		});
-		await assertNoSeriousA11yViolations(html);
-	});
-
-	test('admin CBOS connection page has no serious a11y violations', async () => {
-		const html = nunjucks.render('views/admin-cbos-connection/view.njk', {
-			...pageLocals,
-			pageHeading: 'Check the CBOS connection',
-			_csrf: 'test-csrf'
-		});
-		await assertNoSeriousA11yViolations(html);
-	});
-
-	test('admin CBOS connection page with a result has no serious a11y violations', async () => {
-		const html = nunjucks.render('views/admin-cbos-connection/view.njk', {
-			...pageLocals,
-			pageHeading: 'Check the CBOS connection',
-			_csrf: 'test-csrf',
-			database: { status: 'ERROR', detail: 'OperationalError: Login failed' },
-			storage: { status: 'OK', detail: 'listed 5 blob name(s) in document-service-uploads' }
-		});
-		await assertNoSeriousA11yViolations(html);
-	});
-
-	test('admin CBOS connection page with an error has no serious a11y violations', async () => {
-		const html = nunjucks.render('views/admin-cbos-connection/view.njk', {
-			...pageLocals,
-			pageHeading: 'Check the CBOS connection',
-			_csrf: 'test-csrf',
-			error: 'Could not reach the Python function.'
 		});
 		await assertNoSeriousA11yViolations(html);
 	});

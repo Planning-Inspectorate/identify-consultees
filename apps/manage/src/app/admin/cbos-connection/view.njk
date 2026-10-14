@@ -1,4 +1,4 @@
-{% extends "views/layouts/main.njk" %}
+{% extends "admin/layout.njk" %}
 
 {% from "govuk/components/button/macro.njk" import govukButton %}
 {% from "govuk/components/error-message/macro.njk" import govukErrorMessage %}
@@ -17,7 +17,7 @@
     {{ pageHeading }} - {{ config.headerTitle }}
 {% endblock %}
 
-{% block pageContent %}
+{% block adminContent %}
     <h1 class="govuk-heading-l">{{ pageHeading }}</h1>
 
     <p class="govuk-body">

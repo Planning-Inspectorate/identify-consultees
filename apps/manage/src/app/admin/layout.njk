@@ -1,0 +1,28 @@
+{% extends "views/layouts/main.njk" %}
+
+{#
+  Every admin page: the admin menu (adminNav, set by admin/index.ts) beside the page's own
+  content, in `adminContent`. Each page sets its own h1, so the main layout's is left out.
+#}
+
+{% block pageHeading %}{% endblock %}
+
+{% block pageContent %}
+	<div class="govuk-grid-row">
+		<div class="govuk-grid-column-one-quarter">
+			<nav class="pins-admin-nav" aria-labelledby="admin-nav-heading">
+				<h2 class="govuk-heading-s" id="admin-nav-heading">Admin</h2>
+				<ul class="govuk-list pins-admin-nav__list">
+					{% for item in adminNav %}
+						<li class="pins-admin-nav__item{% if item.current %} pins-admin-nav__item--current{% endif %}">
+							<a class="govuk-link govuk-link--no-visited-state" href="{{ item.href }}"{% if item.current %} aria-current="page"{% endif %}>{{ item.text }}</a>
+						</li>
+					{% endfor %}
+				</ul>
+			</nav>
+		</div>
+		<div class="govuk-grid-column-three-quarters">
+			{% block adminContent %}{% endblock %}
+		</div>
+	</div>
+{% endblock %}

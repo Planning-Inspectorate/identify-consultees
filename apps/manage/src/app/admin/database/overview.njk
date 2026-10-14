@@ -1,0 +1,57 @@
+{% extends "admin/layout.njk" %}
+
+{% from "govuk/components/table/macro.njk" import govukTable %}
+
+{% block pageTitle %}
+	{{ pageHeading }} - Admin - {{ config.headerTitle }}
+{% endblock %}
+
+{% block adminContent %}
+	<h1 class="govuk-heading-l">{{ pageHeading }}</h1>
+	<p class="govuk-body">What this environment's database holds. Read only - the geometries aren't shown.</p>
+
+	{% set tableRows = [] %}
+	{% for table in tables %}
+		{% set tableRows = (tableRows.push([
+			{ html: '<a class="govuk-link" href="' ~ table.href ~ '"><code>' ~ table.name ~ '</code></a>' },
+			{ text: table.description },
+			{ text: table.rows, format: "numeric" },
+			{ text: table.lastUpdated or "Never" }
+		]), tableRows) %}
+	{% endfor %}
+	{{ govukTable({
+		caption: "Tables",
+		captionClasses: "govuk-table__caption--m",
+		firstCellIsHeader: true,
+		head: [
+			{ text: "Table" },
+			{ text: "Holds" },
+			{ text: "Rows", format: "numeric" },
+			{ text: "Last updated" }
+		],
+		rows: tableRows
+	}) }}
+
+	{% set categoryRows = [] %}
+	{% for category in categories %}
+		{% set categoryRows = (categoryRows.push([
+			{ html: ('<a class="govuk-link" href="' ~ category.href ~ '">' ~ (category.name | escape) ~ '</a>') if category.href else (category.name | escape) },
+			{ text: category.rows, format: "numeric" }
+		]), categoryRows) %}
+	{% endfor %}
+	{% if categoryRows | length %}
+		{{ govukTable({
+			caption: "Consultee areas by category",
+			captionClasses: "govuk-table__caption--m",
+			firstCellIsHeader: true,
+			head: [
+				{ text: "Category" },
+				{ text: "Rows", format: "numeric" }
+			],
+			rows: categoryRows
+		}) }}
+	{% else %}
+		<h2 class="govuk-heading-m">Consultee areas by category</h2>
+		<p class="govuk-body">No consultee areas are loaded.</p>
+	{% endif %}
+{% endblock %}

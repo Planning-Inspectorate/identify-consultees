@@ -7,7 +7,7 @@ import { downloadBlobToTempFile } from '@pins/identify-consultees-database/src/s
 import type { AsyncRequestHandler } from '@planning-inspectorate/core/util';
 import type { ImportReferenceDataViewModel } from './view-model.ts';
 
-const VIEW = 'views/admin-import-reference-data/view.njk';
+const VIEW = 'admin/import-reference-data/view.njk';
 const PAGE_HEADING = 'Import reference data into the database';
 
 // the two blob names the DB Seed pipeline's loadFullReferenceData option also looks for

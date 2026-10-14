@@ -16,7 +16,7 @@ describe('admin upload to blob', () => {
 		const page = buildUploadToBlobPage();
 		await page({}, res);
 		assert.strictEqual(res.render.mock.callCount(), 1);
-		assert.strictEqual(res.render.mock.calls[0].arguments[0], 'views/admin-upload-to-blob/view.njk');
+		assert.strictEqual(res.render.mock.calls[0].arguments[0], 'admin/upload-to-blob/view.njk');
 		assert.strictEqual(res.render.mock.calls[0].arguments[1].uploadedBlobName, undefined);
 	});
 

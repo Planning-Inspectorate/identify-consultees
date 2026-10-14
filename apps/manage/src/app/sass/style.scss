@@ -137,3 +137,26 @@ $font-family: arial, helvetica, sans-serif;
 .pins-autocomplete--error input {
 	border-color: index.govuk-functional-colour(error);
 }
+
+// The admin section's menu (admin/layout.njk): the current page in bold, marked by a left border
+.pins-admin-nav__item {
+	padding-left: index.govuk-spacing(2);
+	border-left: 4px solid transparent;
+
+	&--current {
+		font-weight: bold;
+		border-left-color: index.govuk-functional-colour(link);
+	}
+}
+
+// a stored row's metadata on the admin Database pages - long, so it scrolls rather than widening the page
+.pins-admin-json {
+	max-height: 40rem;
+	padding: index.govuk-spacing(3);
+	overflow: auto;
+	font-family: ui-monospace, Menlo, Consolas, monospace;
+	font-size: 16px;
+	overflow-wrap: anywhere;
+	white-space: pre-wrap;
+	background: index.govuk-colour('black', $variant: 'tint-95');
+}

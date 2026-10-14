@@ -1,0 +1,23 @@
+{% extends "admin/layout.njk" %}
+
+{% from "govuk/components/summary-list/macro.njk" import govukSummaryList %}
+
+{% block pageTitle %}
+	{{ pageHeading }} - Admin - {{ config.headerTitle }}
+{% endblock %}
+
+{% block adminContent %}
+	<h1 class="govuk-heading-l"><span class="govuk-caption-l">Database</span>{{ pageHeading }}</h1>
+
+	{% set summaryRows = [] %}
+	{% for column in columns %}
+		{% set summaryRows = (summaryRows.push({
+			key: { html: '<code>' ~ column.name ~ '</code>' },
+			value: { text: column.value }
+		}), summaryRows) %}
+	{% endfor %}
+	{{ govukSummaryList({ rows: summaryRows }) }}
+
+	<h2 class="govuk-heading-m"><code>metadata</code></h2>
+	<pre class="pins-admin-json" tabindex="0">{{ metadata }}</pre>
+{% endblock %}

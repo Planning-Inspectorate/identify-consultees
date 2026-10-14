@@ -14,14 +14,26 @@
 	{{ pinsHeader({ isExternal: false }) }}
 {% endmacro %}
 
-{% macro pinsServiceNavigation(serviceName, hideSignOut = false, showComponents = false) %}
+{#
+  adminLink: { href, active } when the admin section is mounted (admin/index.ts sets it) - its
+  header link, active on the admin pages.
+#}
+{% macro pinsServiceNavigation(serviceName, hideSignOut = false, showComponents = false, adminLink = undefined) %}
 	{% set navigationItems = [
 		{
 			href: "/",
 			text: "Home",
-			active: not hideSignOut
+			active: not hideSignOut and not (adminLink and adminLink.active)
 		}
 	] %}
+
+	{% if adminLink %}
+		{% set navigationItems = (navigationItems.push({
+			href: adminLink.href,
+			text: "Admin",
+			active: adminLink.active
+		}), navigationItems) %}
+	{% endif %}
 
 	{% if showComponents %}
 		{% set navigationItems = (navigationItems.push({

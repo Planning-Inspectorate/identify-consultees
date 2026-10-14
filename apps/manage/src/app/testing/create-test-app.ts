@@ -8,6 +8,7 @@ import { createStaticAssetsMiddleware } from '#util/static-assets-middleware.ts'
 import { createBaseApp } from '@planning-inspectorate/core/app';
 import { mockLogger } from '@planning-inspectorate/core/testing';
 import type { Express } from 'express';
+import { ADMIN_MULTIPART_ROUTES } from '../admin/index.ts';
 import type { Config } from '../config.ts';
 import { loadBuildConfig } from '../config.ts';
 import { configureNunjucks } from '../nunjucks.ts';
@@ -76,7 +77,7 @@ export function createManageTestApp(service: ManageService, options: CreateManag
 			createStaticAssetsMiddleware(service.assetsStaticDir),
 			addLocalsConfiguration({ devPagesEnabled: service.devPagesEnabled })
 		],
-		multiPartFormRoutes: ['/admin/upload-to-blob/run']
+		multiPartFormRoutes: ADMIN_MULTIPART_ROUTES
 	});
 }
 
