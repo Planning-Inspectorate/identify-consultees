@@ -137,15 +137,15 @@ test.describe('manage journeys', () => {
 			removed = 1;
 		}
 
-		// the page's own add form: a name - matched to the category's consultees only the nearby
-		// search found (the faint ones on its map) as it's typed - and a reason, both required. A blank
-		// submit fails on both and stays on the page; a blank name then fails with the reason kept
+		// "Add consultee" opens its own page: a name - matched to the category's consultees only the
+		// nearby search found (the faint ones on its map) as it's typed - and a reason, both required.
+		// A blank submit fails on both and stays on the page; a blank name then fails with the reason kept
+		await page.getByRole('button', { name: 'Add consultee' }).click();
+		await expect(page).toHaveURL(/\/report\/consultees\/add\?.*category=Parish/);
+		await expect(page.getByRole('heading', { level: 1 })).toContainText('Add a consultee');
 		const nameInput = page.getByLabel('Name of consultee');
 		const addButton = page.getByRole('button', { name: 'Add consultee' });
-		await expect(page.getByRole('heading', { level: 2, name: 'Add a consultee' })).toBeVisible();
 		await addButton.click();
-		await expect(page).toHaveURL(/\/report\/consultees\?.*category=Parish/);
-		await expect(page.getByRole('heading', { level: 1 })).toContainText('Parish Council');
 		await expect(page.getByText('There is a problem')).toBeVisible();
 		await expect(page.getByRole('link', { name: 'Enter the consultee name' })).toBeVisible();
 		await expect(page.getByRole('link', { name: 'Enter a reason for adding this consultee.' })).toBeVisible();
@@ -155,18 +155,20 @@ test.describe('manage journeys', () => {
 		await expect(page.getByText('Error: Enter the consultee name')).toBeVisible();
 		await expect(page.getByLabel('Reason for adding')).toHaveValue('Entered first');
 
-		// adding a consultee returns to the page with it listed below the map - and any number can be
-		// added one at a time
+		// adding a consultee returns to the category page with it listed below the map - and any
+		// number can be added one at a time
 		await nameInput.fill('First Test Consultee');
 		await addButton.click();
 		await expect(page).toHaveURL(/\/report\/consultees\?.*category=Parish.*add=/);
 		await expect(page.getByRole('rowheader', { name: 'First Test Consultee' })).toBeVisible();
 		await expect(page.getByText('Entered first')).toBeVisible();
 
-		// with nearby consultees to suggest, the GOV.UK accessible autocomplete offers them as a name
-		// is typed - picking one adds it by name, and the map draws it as identified. The seeded data
-		// decides whether there are any
+		// back on the add page, with nearby consultees to suggest, the GOV.UK accessible autocomplete
+		// offers them as a name is typed - picking one adds it by name, and the map draws it as
+		// identified. The seeded data decides whether there are any
 		let picked = 0;
+		await page.getByRole('button', { name: 'Add consultee' }).click();
+		await expect(page).toHaveURL(/\/report\/consultees\/add\?.*category=Parish.*add=/);
 		if ((await page.locator('.autocomplete__wrapper').count()) > 0) {
 			const suggestions = page.locator('.autocomplete__option');
 			for (const letter of 'aeiourn') {
@@ -190,6 +192,10 @@ test.describe('manage journeys', () => {
 			picked = 1;
 		}
 
+		// a successful add landed back on the category page - open the add page again for the next one
+		if (picked === 1) {
+			await page.getByRole('button', { name: 'Add consultee' }).click();
+		}
 		await nameInput.fill('Second Test Consultee');
 		await page.getByLabel('Reason for adding').fill('Borders the site');
 		await addButton.click();

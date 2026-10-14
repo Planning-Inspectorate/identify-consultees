@@ -4,7 +4,7 @@ import { describe, it, mock } from 'node:test';
 import { configureNunjucks } from '../../../../nunjucks.ts';
 import type { ConsulteeAreaMatchRow } from '../../../../testing/ruleset-runner-stub.ts';
 import { failingRulesetRunner, rulesetRunnerReturning } from '../../../../testing/ruleset-runner-stub.ts';
-import { buildReportConsulteeAddSubmit, buildReportConsulteesPage, comparableName } from './controller.ts';
+import { buildReportConsulteesPage, comparableName } from './controller.ts';
 
 const realProjectId = '44444444-4444-4444-4444-444444444444';
 const matchId = '55555555-5555-5555-5555-555555555555';
@@ -118,23 +118,18 @@ describe('report consultees change page', () => {
 		);
 		assert.strictEqual(viewModel.removedRows.length, 0);
 		assert.strictEqual(viewModel.removedOpen, false);
-		// the add form posts back to this page
+		// the Add consultee link opens the add page, keeping the current selection
 		assert.strictEqual(
-			viewModel.addFormAction,
-			`/consultees/${realProjectId}/report/consultees?ruleset=england-wales-post-20240430&category=Parish%20Council`
+			viewModel.addConsulteeUrl,
+			`/consultees/${realProjectId}/report/consultees/add?ruleset=england-wales-post-20240430&category=Parish%20Council`
 		);
-		assert.deepStrictEqual(viewModel.addForm, { nameValue: '', reasonValue: '' });
-		assert.strictEqual(viewModel.errorSummary, undefined);
 		assert.ok(viewModel.mapConfigJson.includes('FeatureCollection'));
 
 		const html = mockRes.render.mock.calls[0].result;
 		assert.match(html, /Remove/);
-		assert.match(html, /<h2[^>]*id="add-consultee"[^>]*>Add a consultee<\/h2>/);
-		assert.match(html, /<form method="post" action="[^"]*\/report\/consultees\?[^"]*"/);
-		// nothing nearby to suggest - a plain name input, no datalist
-		assert.match(html, /<input[^>]*name="name"/);
-		assert.doesNotMatch(html, /<datalist|data-consultee-autocomplete/);
-		assert.match(html, /<textarea[^>]*name="reason"/);
+		assert.match(html, /href="[^"]*\/report\/consultees\/add\?[^"]*"[^>]*>\s*Add consultee/);
+		// the add form lives on its own page now - no name input or datalist here
+		assert.doesNotMatch(html, /<datalist|data-consultee-autocomplete|name="name"/);
 		assert.match(html, /Save and return/);
 		// nothing has been removed - the expandable Removed consultees section doesn't render
 		assert.doesNotMatch(html, /Removed consultees/);
@@ -327,7 +322,7 @@ describe('report consultees change page', () => {
 		);
 		// the adds ride along to the check page and the next add
 		assert.ok(viewModel.saveAndReturnUrl.includes(`add=${encodeURIComponent(firstAdd)}`));
-		assert.ok(viewModel.addFormAction.includes(`add=${encodeURIComponent(firstAdd)}`));
+		assert.ok(viewModel.addConsulteeUrl.includes(`add=${encodeURIComponent(firstAdd)}`));
 		// a ruleset match's remove link keeps the adds while targeting the match
 		assert.match(viewModel.rows[0].removeUrl, /match=55555555/);
 		assert.ok(viewModel.rows[0].removeUrl.includes(`add=${encodeURIComponent(firstAdd)}`));
@@ -479,177 +474,6 @@ describe('report consultees change page', () => {
 		assert.strictEqual(viewModel.rows.length, 0);
 		assert.strictEqual(logger.error.mock.callCount(), 1);
 		assert.doesNotMatch(mockRes.render.mock.calls[0].result, />Consultees</);
-	});
-});
-
-describe('report consultees change page add form', () => {
-	const nearbyId = '77777777-7777-7777-7777-777777777777';
-	const fartherNearbyId = '88888888-8888-8888-8888-888888888888';
-	const nearby = [{ type: 'nearby' as const, radiusMetres: 20_000 }];
-	// one identified parish; two nearby-only parishes sharing a name, and one more; a nearby-only
-	// consultee in another category
-	const RUN = [
-		parishMatchRow(),
-		{ ...parishMatchRow(nearbyId, 'Barton', 1_250), reasons: nearby },
-		{ ...parishMatchRow(fartherNearbyId, 'Barton', 4_000), reasons: nearby },
-		{ ...parishMatchRow('99999999-9999-9999-9999-999999999999', 'Christleton', 7_300), reasons: nearby },
-		{
-			...parishMatchRow('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'Nearby Hospital', 900),
-			consulteeCategory: 'Hospital',
-			reasons: nearby
-		}
-	];
-	const service = (rulesetRunner: unknown = rulesetRunnerReturning(RUN)) => ({
-		db: dbReturning([[realProjectRow()], RUN]),
-		logger: mockLogger(),
-		nearbyConsulteeRadiusMetres: 20_000,
-		rulesetRunner
-	});
-	const parishQuery = { ruleset: 'england-wales-post-20240430', category: 'Parish Council' };
-	const categoryUrl = `/consultees/${realProjectId}/report/consultees?ruleset=england-wales-post-20240430&category=Parish%20Council`;
-	const rendering = () => {
-		const nunjucks = configureNunjucks();
-		const res = {
-			status: mock.fn(() => res),
-			render: mock.fn((view: string, data: object) => nunjucks.render(view, data)),
-			redirect: mock.fn()
-		};
-		return res;
-	};
-	const submit = async (body: unknown, query: Record<string, unknown> = parishQuery, rulesetRunner?: unknown) => {
-		const res = rendering();
-		await buildReportConsulteeAddSubmit(service(rulesetRunner) as never)(
-			{ params: { caseId: realProjectId }, query, body } as never,
-			res as never
-		);
-		return res;
-	};
-	const viewModelOf = (res: ReturnType<typeof rendering>) =>
-		res.render.mock.calls[0].arguments[1] as unknown as Record<string, any>;
-
-	it("suggests the category's nearby consultees as the name is typed, nearest first, once per name", async () => {
-		const res = rendering();
-		await buildReportConsulteesPage(service() as never)(
-			{ params: { caseId: realProjectId }, query: parishQuery } as never,
-			res as never
-		);
-
-		assert.deepStrictEqual(viewModelOf(res).nearbySuggestions, [
-			{ name: 'Barton', hint: '1.3 km from the site' },
-			{ name: 'Christleton', hint: '7.3 km from the site' }
-		]);
-		const html = res.render.mock.calls[0].result as string;
-		assert.match(html, /<input[^>]*name="name"[^>]*list="nearby-consultees"[^>]*data-consultee-autocomplete/);
-		assert.match(html, /<option value="Barton" label="1\.3 km from the site"><\/option>/);
-		assert.doesNotMatch(html, /Nearby Hospital|value="Little Snoring/);
-	});
-
-	it('stops suggesting a nearby consultee once it has been added', async () => {
-		const res = rendering();
-		const added = JSON.stringify({ i: nearbyId, c: 'Parish Council', n: 'Barton', r: 'r' });
-		await buildReportConsulteesPage(service() as never)(
-			{ params: { caseId: realProjectId }, query: { ...parishQuery, add: added } } as never,
-			res as never
-		);
-		// the farther Barton is still there to suggest
-		assert.deepStrictEqual(
-			viewModelOf(res).nearbySuggestions.map((suggestion: { name: string }) => suggestion.name),
-			['Barton', 'Christleton']
-		);
-	});
-
-	it('adds a typed name matching a nearby consultee by its id - the nearest of that name', async () => {
-		const res = await submit({ name: '  barton ', reason: ' Borders the site ' });
-
-		assert.strictEqual(
-			res.redirect.mock.calls[0].arguments[0],
-			`${categoryUrl}&add=${encodeURIComponent(JSON.stringify({ i: nearbyId, c: 'Parish Council', n: 'Barton', r: 'Borders the site' }))}#consultees`
-		);
-	});
-
-	it('adds any other name as typed, with no area to map, after the earlier adds and keeping removals', async () => {
-		const earlier = addJson('First Test Consultee', 'First reason');
-		const res = await submit(
-			{ name: 'Mr  Smith', reason: 'Owns the access road' },
-			{ ...parishQuery, exclude: matchId, add: earlier }
-		);
-
-		const location = res.redirect.mock.calls[0].arguments[0] as string;
-		assert.match(location, /exclude=55555555/);
-		const newAdd = encodeURIComponent(addJson('Mr Smith', 'Owns the access road'));
-		assert.ok(location.indexOf(encodeURIComponent(earlier)) > 0);
-		assert.ok(location.indexOf(encodeURIComponent(earlier)) < location.indexOf(newAdd));
-	});
-
-	it('shows the page again with an error per missing field and the entered values', async () => {
-		const res = await submit({ name: '  ', reason: '' });
-
-		assert.strictEqual(res.redirect.mock.callCount(), 0);
-		assert.strictEqual(res.status.mock.callCount(), 0);
-		const viewModel = viewModelOf(res);
-		assert.deepStrictEqual(viewModel.addForm, {
-			nameValue: '  ',
-			reasonValue: '',
-			nameError: { text: 'Enter the consultee name' },
-			reasonError: { text: 'Enter a reason for adding this consultee.' }
-		});
-		assert.deepStrictEqual(viewModel.errorSummary, [
-			{ text: 'Enter the consultee name', href: '#consultee-name' },
-			{ text: 'Enter a reason for adding this consultee.', href: '#consultee-reason' }
-		]);
-		const html = res.render.mock.calls[0].result as string;
-		assert.match(html, /<title>\s*Error: Parish Council/);
-		assert.match(html, /There is a problem/);
-		assert.match(html, /govuk-input--error/);
-		assert.match(html, /govuk-textarea--error/);
-	});
-
-	it('refuses a name already listed in the category, identified or added', async () => {
-		const identified = await submit({ name: 'little snoring parish council', reason: 'r' });
-		assert.strictEqual(
-			viewModelOf(identified).addForm.nameError.text,
-			'little snoring parish council is already listed in Parish Council'
-		);
-
-		const added = await submit(
-			{ name: 'Mr Smith', reason: 'r' },
-			{ ...parishQuery, add: addJson('MR SMITH', 'first time') }
-		);
-		assert.strictEqual(viewModelOf(added).addForm.nameError.text, 'Mr Smith is already listed in Parish Council');
-	});
-
-	it('treats a missing or non-string name, or no body at all, as no name', async () => {
-		for (const body of [{ reason: 'r' }, { name: ['a'], reason: 'r' }, undefined]) {
-			const res = await submit(body);
-			assert.strictEqual(viewModelOf(res).addForm.nameError.text, 'Enter the consultee name');
-			assert.strictEqual(viewModelOf(res).addForm.nameValue, '');
-		}
-	});
-
-	it("still adds a typed name when the ruleset can't be run", async () => {
-		const res = await submit({ name: 'Barton', reason: 'r' }, parishQuery, failingRulesetRunner());
-		assert.ok(
-			(res.redirect.mock.calls[0].arguments[0] as string).endsWith(
-				`&add=${encodeURIComponent(addJson('Barton', 'r'))}#consultees`
-			)
-		);
-	});
-
-	it('404s a case, ruleset or category the page would', async () => {
-		for (const query of [
-			{ ...parishQuery, ruleset: 'not-a-real-ruleset' },
-			{ ...parishQuery, category: 'Not A Category' }
-		]) {
-			const res = await submit({ name: 'n', reason: 'r' }, query);
-			assert.strictEqual(res.status.mock.calls[0].arguments[0], 404);
-			assert.strictEqual(res.redirect.mock.callCount(), 0);
-		}
-		const res = rendering();
-		await buildReportConsulteeAddSubmit(service() as never)(
-			{ params: { caseId: 'not-a-uuid' }, query: parishQuery, body: {} } as never,
-			res as never
-		);
-		assert.strictEqual(res.status.mock.calls[0].arguments[0], 404);
 	});
 
 	it('compares names without case or extra spaces', () => {

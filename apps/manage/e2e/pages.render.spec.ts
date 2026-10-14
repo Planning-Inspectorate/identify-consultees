@@ -56,7 +56,13 @@ const pages = [
 		path: `/consultees/${SAMPLE_CASE_ID}/report/consultees?ruleset=${SAMPLE_RULESET_ID}&category=Parish%20Council`,
 		name: 'report consultees',
 		heading: /Parish Council/i,
-		mustSee: [/Consultees/i, /Add a consultee/i, /Name of consultee/i, /Reason for adding/i, /Save and return/i]
+		mustSee: [/Consultees/i, /Add consultee/i, /Save and return/i]
+	},
+	{
+		path: `/consultees/${SAMPLE_CASE_ID}/report/consultees/add?ruleset=${SAMPLE_RULESET_ID}&category=Parish%20Council`,
+		name: 'report consultee add',
+		heading: /Add a consultee/i,
+		mustSee: [/Name of consultee/i, /Reason for adding/i]
 	},
 	{
 		path: `/consultees/${SAMPLE_CASE_ID}/report/consultees/remove?ruleset=${SAMPLE_RULESET_ID}&category=Parish%20Council&add=${encodeURIComponent('{"c":"Parish Council","n":"A Consultee","r":"borders"}')}&added=0`,

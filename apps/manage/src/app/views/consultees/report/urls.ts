@@ -223,6 +223,19 @@ export function consulteesUrl(
 	);
 }
 
+/** The "Add a consultee" page a category page's Add consultee link opens - posts back to the same URL. */
+export function addConsulteeUrl(
+	caseId: string,
+	rulesetId: string,
+	category: string,
+	selection: ConsulteeSelection = NO_SELECTION
+): string {
+	return appendSelection(
+		`/consultees/${encodeURIComponent(caseId)}/report/consultees/add?ruleset=${encodeURIComponent(rulesetId)}&category=${encodeURIComponent(category)}`,
+		selection
+	);
+}
+
 /**
  * The consultee a Change page row's Remove link targets: a ruleset match by feature id, or a
  * hand-added consultee by its index in the `add` params.

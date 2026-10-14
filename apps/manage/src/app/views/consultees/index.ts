@@ -3,7 +3,8 @@ import { asyncHandler } from '@planning-inspectorate/core/util';
 import type { IRouter } from 'express';
 import { Router as createRouter } from 'express';
 import { buildBoundaryStaticMap, buildBoundarySubmit, buildConsulteeProjectPage } from './project/controller.ts';
-import { buildReportConsulteeAddSubmit, buildReportConsulteesPage } from './report/consultees/controller.ts';
+import { buildReportConsulteeAddPage, buildReportConsulteeAddSubmit } from './report/consultees/add/controller.ts';
+import { buildReportConsulteesPage } from './report/consultees/controller.ts';
 import {
 	buildReportConsulteeRemovePage,
 	buildReportConsulteeRemoveSubmit
@@ -23,6 +24,7 @@ export function createRoutes(service: ManageService): IRouter {
 	const rulesetPickerSubmit = buildRulesetPickerSubmit();
 	const reportCheckPage = buildReportCheckPage(service);
 	const reportConsulteesPage = buildReportConsulteesPage(service);
+	const reportConsulteeAddPage = buildReportConsulteeAddPage(service);
 	const reportConsulteeAddSubmit = buildReportConsulteeAddSubmit(service);
 	const reportConsulteeRemovePage = buildReportConsulteeRemovePage(service);
 	const reportConsulteeRemoveSubmit = buildReportConsulteeRemoveSubmit(service);
@@ -43,10 +45,11 @@ export function createRoutes(service: ManageService): IRouter {
 	router.post('/:caseId/ruleset', asyncHandler(rulesetPickerSubmit));
 	// "Identify consultees": check the identified consultees before generating the report
 	router.get('/:caseId/report', asyncHandler(reportCheckPage));
-	// each identified category's "Change" page - remove consultees, save and return to the check page;
-	// its add form posts back to it
+	// each identified category's "Change" page - remove consultees, save and return to the check page
 	router.get('/:caseId/report/consultees', asyncHandler(reportConsulteesPage));
-	router.post('/:caseId/report/consultees', asyncHandler(reportConsulteeAddSubmit));
+	// its "Add a consultee" page - adds a consultee to the category and returns to the Change page
+	router.get('/:caseId/report/consultees/add', asyncHandler(reportConsulteeAddPage));
+	router.post('/:caseId/report/consultees/add', asyncHandler(reportConsulteeAddSubmit));
 	// its "Remove consultee" form - records the removal reason and returns to the Change page
 	router.get('/:caseId/report/consultees/remove', asyncHandler(reportConsulteeRemovePage));
 	router.post('/:caseId/report/consultees/remove', asyncHandler(reportConsulteeRemoveSubmit));
