@@ -5,7 +5,7 @@ import type { AsyncRequestHandler } from '@planning-inspectorate/core/util';
 import { unlink } from 'node:fs/promises';
 import type { UploadToBlobViewModel } from './view-model.ts';
 
-const VIEW = 'views/admin-upload-to-blob/view.njk';
+const VIEW = 'admin/upload-to-blob/view.njk';
 const PAGE_HEADING = 'Upload a file to blob storage';
 
 export type BlobStoreConfig = { host: string; container: string };

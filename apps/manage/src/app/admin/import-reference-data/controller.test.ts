@@ -25,7 +25,7 @@ describe('admin import reference data', () => {
 		const page = buildImportReferenceDataPage({ db: countingDb(), logger: mockLogger() });
 		await page({}, res);
 		assert.strictEqual(res.render.mock.callCount(), 1);
-		assert.strictEqual(res.render.mock.calls[0].arguments[0], 'views/admin-import-reference-data/view.njk');
+		assert.strictEqual(res.render.mock.calls[0].arguments[0], 'admin/import-reference-data/view.njk');
 		const viewModel = res.render.mock.calls[0].arguments[1];
 		assert.strictEqual(viewModel.consulteeAreasImported, undefined);
 		assert.strictEqual(viewModel.caseBoundariesImported, undefined);

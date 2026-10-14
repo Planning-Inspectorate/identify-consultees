@@ -25,7 +25,7 @@ describe('admin import from CBOS', () => {
 		const res = newRes();
 		await buildImportFromCbosPage(newService() as never)({}, res);
 
-		assert.strictEqual(res.render.mock.calls[0].arguments[0], 'views/admin-import-from-cbos/view.njk');
+		assert.strictEqual(res.render.mock.calls[0].arguments[0], 'admin/import-from-cbos/view.njk');
 		assert.strictEqual(viewModel(res).loadedCaseBoundaries, 300);
 		assert.strictEqual(viewModel(res).loadedFromCbos, 120);
 		assert.strictEqual(viewModel(res).imported, undefined);

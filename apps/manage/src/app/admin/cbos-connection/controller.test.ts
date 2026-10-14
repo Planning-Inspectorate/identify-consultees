@@ -26,7 +26,7 @@ describe('admin CBOS connection', () => {
 		const res = newRes();
 		await buildCbosConnectionPage()({}, res);
 
-		assert.strictEqual(res.render.mock.calls[0].arguments[0], 'views/admin-cbos-connection/view.njk');
+		assert.strictEqual(res.render.mock.calls[0].arguments[0], 'admin/cbos-connection/view.njk');
 		assert.strictEqual(viewModel(res).database, undefined);
 	});
 

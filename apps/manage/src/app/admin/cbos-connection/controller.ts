@@ -2,7 +2,7 @@ import type { ManageService } from '#service';
 import { fetchWithTimeout, type AsyncRequestHandler } from '@planning-inspectorate/core/util';
 import type { CbosCheck, CbosConnectionViewModel } from './view-model.ts';
 
-const VIEW = 'views/admin-cbos-connection/view.njk';
+const VIEW = 'admin/cbos-connection/view.njk';
 const PAGE_HEADING = 'Check the CBOS connection';
 // the function signs in to CBOS's database and storage in turn, each with its own 15s login limit
 const CHECK_TIMEOUT_MS = 45_000;

@@ -1,0 +1,67 @@
+{% extends "admin/layout.njk" %}
+
+{% from "govuk/components/button/macro.njk" import govukButton %}
+{% from "govuk/components/input/macro.njk" import govukInput %}
+{% from "govuk/components/pagination/macro.njk" import govukPagination %}
+{% from "govuk/components/select/macro.njk" import govukSelect %}
+{% from "govuk/components/table/macro.njk" import govukTable %}
+
+{% block pageTitle %}
+	{{ pageHeading }} - Admin - {{ config.headerTitle }}
+{% endblock %}
+
+{% block adminContent %}
+	<h1 class="govuk-heading-l"><span class="govuk-caption-l">Database</span>{{ pageHeading }}</h1>
+
+	<form method="get" action="/admin/database/consultee-areas" class="pins-inline-search">
+		{{ govukSelect({
+			id: "category",
+			name: "category",
+			label: { text: "Category" },
+			items: categoryItems
+		}) }}
+		<div class="pins-inline-search__field">
+			{{ govukInput({
+				id: "q",
+				name: "q",
+				label: { text: "Consultee name contains" },
+				value: search,
+				classes: "pins-inline-search__input",
+				spellcheck: false
+			}) }}
+		</div>
+		{{ govukButton({ text: "Filter", classes: "govuk-button--secondary pins-inline-search__button" }) }}
+	</form>
+
+	<p class="govuk-body" role="status">{{ showing }}</p>
+
+	{% if rows | length %}
+		{% set tableRows = [] %}
+		{% for row in rows %}
+			{% set tableRows = (tableRows.push([
+				{ html: '<a class="govuk-link" href="' ~ row.href ~ '">' ~ (row.consultee | escape) ~ '</a>' },
+				{ text: row.category },
+				{ text: row.region },
+				{ text: row.geometryType },
+				{ text: row.lastUpdated }
+			]), tableRows) %}
+		{% endfor %}
+		{{ govukTable({
+			caption: "Consultee areas",
+			captionClasses: "govuk-visually-hidden",
+			firstCellIsHeader: true,
+			head: [
+				{ text: "Consultee" },
+				{ text: "Category" },
+				{ text: "Region" },
+				{ text: "Geometry" },
+				{ text: "Last updated" }
+			],
+			rows: tableRows
+		}) }}
+	{% endif %}
+
+	{% if pagination %}
+		{{ govukPagination(pagination) }}
+	{% endif %}
+{% endblock %}

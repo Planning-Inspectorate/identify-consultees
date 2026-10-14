@@ -1,9 +1,9 @@
 import type { ManageService } from '#service';
 import type { AsyncRequestHandler } from '@planning-inspectorate/core/util';
-import { importCaseBoundariesFromCbos } from '../../cbos-boundaries.ts';
+import { importCaseBoundariesFromCbos } from './cbos-boundaries.ts';
 import type { ImportFromCbosViewModel } from './view-model.ts';
 
-const VIEW = 'views/admin-import-from-cbos/view.njk';
+const VIEW = 'admin/import-from-cbos/view.njk';
 const PAGE_HEADING = 'Import case boundaries from CBOS';
 
 /**

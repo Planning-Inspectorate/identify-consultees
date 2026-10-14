@@ -5,6 +5,7 @@ import { createStaticAssetsMiddleware } from '#util/static-assets-middleware.ts'
 import { createBaseApp } from '@planning-inspectorate/core/app';
 import type { Express } from 'express';
 import { Router as createRouter } from 'express';
+import { ADMIN_MULTIPART_ROUTES } from './admin/index.ts';
 import { configureNunjucks } from './nunjucks.ts';
 import { buildRouter } from './router.ts';
 import { buildContentSecurityPolicyDirectives } from './security/owasp-headers.ts';
@@ -35,6 +36,6 @@ export function createApp(service: ManageService): Express {
 		cspDirectives: buildContentSecurityPolicyDirectives({ isProduction }),
 		// multer needs the raw multipart body before lusca CSRF can read a token from it - see
 		// node_modules/@planning-inspectorate/core/dist/app/csrf.js
-		multiPartFormRoutes: ['/admin/upload-to-blob/run']
+		multiPartFormRoutes: ADMIN_MULTIPART_ROUTES
 	});
 }

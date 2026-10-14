@@ -1,0 +1,15 @@
+{% extends "admin/layout.njk" %}
+
+{% block pageTitle %}
+	{{ pageHeading }} - {{ config.headerTitle }}
+{% endblock %}
+
+{% block adminContent %}
+	<h1 class="govuk-heading-l">{{ pageHeading }}</h1>
+	<p class="govuk-body">Internal tools for loading and checking this environment's data.</p>
+
+	{% for page in pages %}
+		<h2 class="govuk-heading-s govuk-!-margin-bottom-1"><a class="govuk-link" href="{{ page.href }}">{{ page.text }}</a></h2>
+		<p class="govuk-body">{{ page.description }}</p>
+	{% endfor %}
+{% endblock %}
