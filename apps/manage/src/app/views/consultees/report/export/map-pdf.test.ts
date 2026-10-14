@@ -44,11 +44,11 @@ describe('report map PDF', () => {
 			'"B" host Parish Councils: intersects the site',
 			'Asked to be consulted',
 			// one typed in by name has no area to draw
-			'Added by name - not on the map'
+			'Manually added - not on the map'
 		]) {
 			assert.ok(lines.includes(line), `missing "${line}"`);
 		}
-		assert.equal(lines.filter((line) => line === 'Added by name - not on the map').length, 1);
+		assert.equal(lines.filter((line) => line === 'Manually added - not on the map').length, 1);
 	});
 
 	it("leaves out a boundary file it doesn't have, and notes a map that couldn't draw its consultees", async () => {

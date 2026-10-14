@@ -11,7 +11,7 @@ import { formatDate } from './workbook.ts';
 export interface MapPdfConsultee {
 	name: string;
 	identified: string[];
-	/** False for one added by hand by name - it has no area, so it isn't on the map. */
+	/** False for one added by hand that the map doesn't draw - see ReportConsultee.mapped. */
 	mapped: boolean;
 }
 
@@ -135,7 +135,7 @@ export function buildMapPdf(input: MapPdfInput): Promise<Buffer> {
 			doc.text(pdfText(line), { width });
 		}
 		if (!consultee.mapped) {
-			doc.font('Helvetica-Oblique').text('Added by name - not on the map', { width });
+			doc.font('Helvetica-Oblique').text('Manually added - not on the map', { width });
 		}
 		doc.moveDown(0.4);
 	}

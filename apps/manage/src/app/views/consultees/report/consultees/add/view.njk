@@ -22,7 +22,7 @@
 			consultee-autocomplete.js swaps it for the GOV.UK accessible autocomplete #}
 			{{ govukInput({
 				label: { text: "Name of consultee", classes: "govuk-label--s" },
-				hint: { text: "Start typing to choose a consultee near the site that the ruleset did not identify. They are shown faintly on the map. You can also enter a consultee that is not suggested." },
+				hint: { text: "Start typing to choose a consultee near the site that the ruleset did not identify. They are shown faintly on the map. You can also enter any other " ~ pageCaption ~ " consultee by its name." },
 				id: "consultee-name",
 				name: "name",
 				value: addForm.nameValue,

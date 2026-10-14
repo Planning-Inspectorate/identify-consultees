@@ -10,7 +10,10 @@ export interface ReportConsultee {
 	name: string;
 	/** Every reason it's in the report, one per line - see reasons.ts. */
 	identified: string[];
-	/** False for one added by hand by name - it has no area, so the maps can't draw it. */
+	/**
+	 * False for one added by hand that the maps don't draw: one beyond the nearby search, or (in an
+	 * older link) one added by name alone, with no area.
+	 */
 	mapped: boolean;
 }
 
@@ -50,6 +53,8 @@ export function reportByCategory(
 		}
 	}
 	const excluded = excludedMatchIds(selection.removed);
+	// a consultee added by hand is drawn only if the run found it - see markAddedByHand
+	const runIds = new Set(consultees.map((match) => match.feature.id));
 
 	return categories
 		.map((category) => ({
@@ -64,7 +69,11 @@ export function reportByCategory(
 					})),
 				...selection.adds
 					.filter((add) => add.category === category)
-					.map((add) => ({ name: add.name, identified: [addedConsulteeReason(add)], mapped: add.id !== undefined }))
+					.map((add) => ({
+						name: add.name,
+						identified: [addedConsulteeReason(add)],
+						mapped: add.id !== undefined && runIds.has(add.id)
+					}))
 			]
 		}))
 		.filter((section) => section.consultees.length > 0);
