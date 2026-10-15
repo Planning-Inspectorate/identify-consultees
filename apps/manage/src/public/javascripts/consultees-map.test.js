@@ -412,6 +412,8 @@ describe('consultees-map client helpers', () => {
 		assert.ok(plugins.some((plugin) => plugin.id === 'featureDetails'));
 		// the measure tool needs the draw bundle, which this page's scripts omit - so neither registers
 		assert.ok(!plugins.some((plugin) => plugin.id === 'measure'));
+		// and the plugin mirroring the consultees table's selected row with the map
+		assert.ok(plugins.some((plugin) => plugin.id === 'featureRowSelect'));
 	});
 
 	test('initConsulteeMap registers the draw and measure plugins when the draw bundle is loaded', () => {
