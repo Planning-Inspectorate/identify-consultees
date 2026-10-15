@@ -6,20 +6,110 @@ import { describe, test } from 'node:test';
 import {
 	buildRulesetFromCsv,
 	CATEGORIES_AWAITING_DATA,
-	DEFAULT_RULESET_ID,
 	getRuleset,
 	isIdentifiedByCondition,
 	loadRulesets,
 	parseCsv,
 	parseRulesetCsv,
+	parseRulesetSettings,
+	RULESET_SETTINGS,
 	rulesetIdFromFileName,
 	rulesetNameFromFileName,
-	RULESETS
+	RULESETS,
+	type RulesetSettings
 } from './rulesets.ts';
 
 // running a ruleset is the Python function's job now - see apps/function-python/intersector/test_screening.py
 
 const HEADER = 'Group hierarchy,Group,Category,Consultee Type(s),Logic,Buffer (km)';
+
+const SETTINGS = `
+version: 1
+default: b
+names:
+  c: Ruleset C
+consulteeTypes:
+  Railways:
+    categories: [Railway]
+  Parish Councils bordering Host Parish Councils:
+    categories: [Parish Council]
+    hostCategory: Parish Council
+logic:
+  Intersects application site: intersection
+  Intersects application site buffer: buffer
+  Borders host authority: bordering
+categoriesAwaitingData: [Canal]
+`;
+
+describe('parseRulesetSettings', () => {
+	test('reads the default, the names, and what each wording means, keyed case- and space-insensitively', () => {
+		const settings = parseRulesetSettings(SETTINGS);
+		assert.equal(settings.default, 'b');
+		assert.deepEqual(settings.names, { c: 'Ruleset C' });
+		assert.deepEqual(
+			[...settings.consulteeTypes],
+			[
+				['railways', { categories: ['Railway'] }],
+				[
+					'parish councils bordering host parish councils',
+					{ categories: ['Parish Council'], hostCategory: 'Parish Council' }
+				]
+			]
+		);
+		assert.equal(settings.logic.get('intersects application site buffer'), 'buffer');
+		assert.deepEqual([...settings.categoriesAwaitingData], ['Canal']);
+	});
+
+	test('treats names and categoriesAwaitingData as optional', () => {
+		const settings = parseRulesetSettings(
+			SETTINGS.replace(/names:\n {2}c: Ruleset C\n/, '').replace('categoriesAwaitingData: [Canal]', '')
+		);
+		assert.deepEqual(settings.names, {});
+		assert.deepEqual([...settings.categoriesAwaitingData], []);
+	});
+
+	test('reads config/rulesets/rulesets.yaml', () => {
+		assert.ok(RULESET_SETTINGS.consulteeTypes.size > 0);
+		assert.equal(CATEGORIES_AWAITING_DATA, RULESET_SETTINGS.categoriesAwaitingData);
+	});
+
+	for (const [title, text, message] of [
+		['an empty file', '', /must be a version 1 document/],
+		['another version', 'version: 2', /must be a version 1 document/],
+		['an unknown top-level key', `${SETTINGS}\nname: {}`, /the document has "name"/],
+		['no default', SETTINGS.replace('default: b', ''), /default must be the file name/],
+		['names as a list', SETTINGS.replace(/names:\n {2}c: Ruleset C/, 'names: [c]'), /names must map file names/],
+		['a blank name', SETTINGS.replace('Ruleset C', '" "'), /names.c must be a display name/],
+		[
+			'no consultee types',
+			SETTINGS.replace(/consulteeTypes:[^]*?logic:/, 'consulteeTypes: {}\nlogic:'),
+			/consulteeTypes must map/
+		],
+		[
+			'a repeated wording',
+			SETTINGS.replace('  Railways:', '  RAILWAYS:\n    categories: [Railway]\n  Railways:'),
+			/consulteeTypes lists "Railways" twice/
+		],
+		[
+			'a consultee type without settings',
+			SETTINGS.replace('  Railways:\n    categories: [Railway]', '  Railways: Railway'),
+			/consulteeTypes.Railways must set categories/
+		],
+		['a typo in a consultee type', SETTINGS.replace('    hostCategory:', '    host:'), /has "host"/],
+		['no categories', SETTINGS.replace('categories: [Railway]', 'categories: []'), /Railways.categories must list/],
+		[
+			'a blank host category',
+			SETTINGS.replace('hostCategory: Parish Council', 'hostCategory: ""'),
+			/hostCategory must be a consultee category/
+		],
+		['an unknown logic', SETTINGS.replace(': buffer', ': nearby'), /must be intersection, buffer or bordering/],
+		['awaiting categories as text', SETTINGS.replace('[Canal]', 'Canal'), /categoriesAwaitingData must list/]
+	] as const) {
+		test(`refuses ${title}, naming the setting`, () => {
+			assert.throws(() => parseRulesetSettings(text), message);
+		});
+	}
+});
 
 describe('parseCsv', () => {
 	test('splits rows and fields as Excel saves them, including quoted commas and quotes', () => {
@@ -103,9 +193,13 @@ describe('parseRulesetCsv', () => {
 		[
 			'an unknown consultee type',
 			'2,Public bodies,,Space Agencies,Intersects application site,0',
-			/Unknown consultee type in ruleset row 2/
+			/Unknown consultee type in ruleset row 2 .* add it to consulteeTypes in config\/rulesets\/rulesets.yaml/
 		],
-		['an unknown logic', '2,Public bodies,,Ambulance Trusts,Near the site,0', /Unknown logic "Near the site"/],
+		[
+			'an unknown logic',
+			'2,Public bodies,,Ambulance Trusts,Near the site,0',
+			/Unknown logic "Near the site" .* add it to logic/
+		],
 		[
 			'a buffer that is not a number',
 			'2,Public bodies,,Ambulance Trusts,Intersects application site buffer,ten',
@@ -119,7 +213,7 @@ describe('parseRulesetCsv', () => {
 		[
 			'a buffer without the buffer logic',
 			'2,Public bodies,,Ambulance Trusts,Intersects application site,5',
-			/can have a buffer/
+			/Only a buffer logic can have a buffer/
 		],
 		[
 			'a bordering row with no host',
@@ -183,58 +277,81 @@ describe('ruleset names from file names', () => {
 });
 
 describe('loadRulesets', () => {
-	const header = HEADER;
 	const row = '4,Transport,,Railways,Intersects application site buffer,10';
 
-	test('loads every *_ruleset.csv in file-name order, named from the file, and ignores other files', () => {
+	function withRulesets(files: string[], run: (dir: string) => void) {
 		const dir = mkdtempSync(path.join(tmpdir(), 'rulesets-'));
 		try {
-			for (const file of ['wales_ruleset.csv', 'england_post_20240430_ruleset.csv']) {
-				writeFileSync(path.join(dir, file), `${header}\n${row}\n`);
+			for (const file of files) {
+				writeFileSync(path.join(dir, file), `${HEADER}\n${row}\n`);
 			}
-			writeFileSync(path.join(dir, 'notes.csv'), 'not a ruleset');
+			run(dir);
+		} finally {
+			rmSync(dir, { recursive: true, force: true });
+		}
+	}
 
-			const rulesets = loadRulesets(dir);
+	const settings = (overrides: Partial<RulesetSettings>): RulesetSettings => ({
+		...parseRulesetSettings(SETTINGS),
+		names: {},
+		...overrides
+	});
 
+	test('loads every *_ruleset.csv in file-name order, named from the file, and ignores other files', () => {
+		withRulesets(['wales_ruleset.csv', 'england_post_20240430_ruleset.csv', 'notes.csv'], (dir) => {
 			assert.deepEqual(
-				rulesets.map((ruleset) => [ruleset.id, ruleset.name, ruleset.rules.length]),
+				loadRulesets(dir, settings({ default: 'england_post_20240430' })).map((ruleset) => [
+					ruleset.id,
+					ruleset.name,
+					ruleset.rules.length
+				]),
 				[
 					['england-post-20240430', 'England post 30 April 2024', 1],
 					['wales', 'Wales', 1]
 				]
 			);
-		} finally {
-			rmSync(dir, { recursive: true, force: true });
-		}
+		});
 	});
 
-	test('puts the default ruleset first, wherever its file sorts', () => {
-		const dir = mkdtempSync(path.join(tmpdir(), 'rulesets-'));
-		try {
-			for (const file of ['a_ruleset.csv', 'b_ruleset.csv', 'c_ruleset.csv']) {
-				writeFileSync(path.join(dir, file), `${header}\n${row}\n`);
-			}
+	test('puts the default ruleset first, wherever its file sorts, and names any the settings name', () => {
+		withRulesets(['a_ruleset.csv', 'b_ruleset.csv', 'c_ruleset.csv'], (dir) => {
 			assert.deepEqual(
-				loadRulesets(dir, 'b').map((ruleset) => ruleset.id),
-				['b', 'a', 'c']
+				loadRulesets(dir, parseRulesetSettings(SETTINGS)).map((ruleset) => [ruleset.id, ruleset.name]),
+				[
+					['b', 'B'],
+					['a', 'A'],
+					['c', 'Ruleset C']
+				]
 			);
-			// an unknown default leaves file-name order
-			assert.deepEqual(
-				loadRulesets(dir, 'missing').map((ruleset) => ruleset.id),
-				['a', 'b', 'c']
+		});
+	});
+
+	test("refuses a default or a name for a file that isn't there, naming it", () => {
+		withRulesets(['a_ruleset.csv', 'b_ruleset.csv'], (dir) => {
+			assert.throws(
+				() => loadRulesets(dir, settings({ default: 'missing' })),
+				/rulesets.yaml: default names "missing", but there's no missing_ruleset.csv - use one of a, b/
 			);
-		} finally {
-			rmSync(dir, { recursive: true, force: true });
-		}
+			assert.throws(
+				() => loadRulesets(dir, settings({ default: 'a', names: { c: 'Ruleset C' } })),
+				/names.c names "c", but there's no c_ruleset.csv/
+			);
+		});
+	});
+
+	test('refuses two rulesets with the same name', () => {
+		withRulesets(['a_ruleset.csv', 'b_ruleset.csv'], (dir) => {
+			assert.throws(
+				() => loadRulesets(dir, settings({ default: 'a', names: { b: 'A' } })),
+				/two rulesets would both be named "A"/
+			);
+		});
 	});
 
 	test('fails loudly rather than starting with no rulesets', () => {
-		const dir = mkdtempSync(path.join(tmpdir(), 'rulesets-'));
-		try {
+		withRulesets([], (dir) => {
 			assert.throws(() => loadRulesets(dir), /No ruleset exports/);
-		} finally {
-			rmSync(dir, { recursive: true, force: true });
-		}
+		});
 	});
 });
 
@@ -263,7 +380,7 @@ describe('rulesets registry', () => {
 				['wales-pre-20240430', 'Wales pre 30 April 2024', 23]
 			]
 		);
-		assert.equal(RULESETS[0].id, DEFAULT_RULESET_ID);
+		assert.equal(RULESETS[0].id, rulesetIdFromFileName(`${RULESET_SETTINGS.default}_ruleset.csv`));
 	});
 
 	test('every condition matches a category the reference data has, or one deliberately awaiting data', () => {
