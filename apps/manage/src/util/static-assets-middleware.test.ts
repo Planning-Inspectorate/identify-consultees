@@ -157,6 +157,26 @@ describe('static-assets-middleware', () => {
 		assert.equal(response.headers['cache-control'], staticAssetCacheControl.unfingerprinted);
 	});
 
+	test('serves .mjs modules with no-cache so un-fingerprinted imports always revalidate', async () => {
+		tempDir = await mkdtemp(path.join(tmpdir(), 'static-assets-mw-mjs-'));
+		const relative = 'javascripts/plugin.mjs';
+		const absolute = path.join(tempDir, ...relative.split('/'));
+		await mkdir(path.dirname(absolute), { recursive: true });
+		await writeFile(absolute, 'export const x = 1;');
+
+		const app = express();
+		app.use(
+			createStaticAssetsMiddleware(tempDir, {
+				rateLimiter: buildStaticAssetsRateLimiter({ limit: 100, windowMs: 60_000 })
+			})
+		);
+		app.use((_req, res) => res.status(404).end());
+
+		const response = await request(app).get(`/${relative}`);
+		assert.equal(response.status, 200);
+		assert.equal(response.headers['cache-control'], staticAssetCacheControl.module);
+	});
+
 	test('does not serve path traversal requests', async () => {
 		tempDir = await mkdtemp(path.join(tmpdir(), 'static-assets-mw-traverse-'));
 		await writeFile(path.join(tempDir, 'safe-aabbccdd.js'), 'ok');

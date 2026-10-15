@@ -180,6 +180,15 @@ $font-family: arial, helvetica, sans-serif;
 	overflow-wrap: anywhere;
 }
 
+// the external-controls demo's "How this map is configured" JSON panels
+.pins-config-snippet {
+	padding: index.govuk-spacing(3);
+	overflow: auto;
+	font-size: 16px;
+	white-space: pre-wrap;
+	background: index.govuk-colour('black', $variant: 'tint-95');
+}
+
 // a stored row's metadata on the admin Database pages - long, so it scrolls rather than widening the page
 .pins-admin-json {
 	max-height: 40rem;
