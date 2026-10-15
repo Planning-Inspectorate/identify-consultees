@@ -16,6 +16,7 @@ import { createRoutes as createErrorTestRoutes } from './views/error-test/index.
 import { createFooterRoutes } from './views/footer/index.ts';
 import { createRoutes as createHelpRoutes } from './views/help/index.ts';
 import { createRoutes as createHomeRoutes } from './views/home/index.ts';
+import { createRoutes as createMapExternalControlsDemoRoutes } from './views/map-external-controls-demo/index.ts';
 import { createRoutes as createMapLayersDemoRoutes } from './views/map-layers-demo/index.ts';
 import { createErrorRoutes } from './views/static/error/index.ts';
 
@@ -53,6 +54,7 @@ export function buildRouter(service: ManageService, options: BuildRouterOptions 
 	const homeRoutes = createHomeRoutes(service);
 	const consulteeRoutes = createConsulteeRoutes(service);
 	const mapLayersDemoRoutes = createMapLayersDemoRoutes();
+	const mapExternalControlsDemoRoutes = createMapExternalControlsDemoRoutes();
 	const errorTestRoutes = createErrorTestRoutes(service);
 	const componentRoutes = createComponentRoutes();
 	const consulteeAreasPythonRoutes = createConsulteeAreasPythonRoutes(service);
@@ -120,6 +122,7 @@ export function buildRouter(service: ManageService, options: BuildRouterOptions 
 	// TEMPORARY - remove before go-live (see README.md's "Before go-live: code to remove")
 	if (service.devPagesEnabled) {
 		router.use('/map-layers-demo', mapLayersDemoRoutes);
+		router.use('/map-external-controls-demo', mapExternalControlsDemoRoutes);
 		router.use('/error-test', errorTestRoutes);
 		router.use('/components', componentRoutes);
 		router.use('/consultee-areas-python', consulteeAreasPythonRoutes);

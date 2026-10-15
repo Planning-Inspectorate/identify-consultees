@@ -467,6 +467,91 @@ describe('consultees-map client helpers', () => {
 		assert.ok(dom.window.document.querySelector('img.app-case-map-static'));
 	});
 
+	test('initConsulteeMap builds the external-controls plugin when the page config carries it', () => {
+		installDom(
+			`<!DOCTYPE html><html><body>
+				<div id="map-ec" class="app-consultee-map"></div>
+				<div id="map-no-ec" class="app-consultee-map"></div>
+				<script id="map-ec-data" type="application/json">{"center":[0,0],"zoom":8,"shapefileDatasets":[{"id":"shapefile-a","label":"a.geojson","geojson":{"type":"FeatureCollection","features":[{"type":"Feature","properties":{"fileKey":"a"},"geometry":{"type":"Polygon","coordinates":[]}}]}}],"externalControls":{"control":"#f input","bindings":[{"value":"a","featureId":"a","idProperty":"fileKey","datasetId":"shapefile-a","layerId":"shapefile-a"}],"primaryControl":"external"}}</script>
+				<script id="map-no-ec-data" type="application/json">{"center":[0,0],"zoom":8}</script>
+			</body></html>`
+		);
+		const InteractiveMap = mock.fn(function InteractiveMap() {});
+		globalThis.defra = {
+			InteractiveMap,
+			maplibreProvider: mock.fn(() => ({})),
+			datasetsPlugin: mock.fn((options) => options),
+			interactPlugin: mock.fn(() => ({}))
+		};
+		globalThis.window.defra = globalThis.defra;
+
+		initConsulteeMap('map-ec');
+		const plugins = InteractiveMap.mock.calls[0].arguments[1].plugins;
+		const externalControls = plugins.find((plugin) => plugin.id === 'externalControls');
+		assert.ok(externalControls);
+		assert.equal(externalControls.control, '#f input');
+		assert.equal(externalControls.bindings.length, 1);
+		// the datasets array rides on the plugin (it can't cross the JSON page config),
+		// and primaryControl 'external' has already taken the bound dataset out of the Layers menu
+		assert.equal(externalControls.datasets[0].id, 'shapefile-a');
+		assert.equal(externalControls.datasets[0].showInMenu, false);
+
+		initConsulteeMap('map-no-ec');
+		const plain = InteractiveMap.mock.calls[1].arguments[1].plugins;
+		assert.equal(
+			plain.find((plugin) => plugin.id === 'externalControls'),
+			undefined
+		);
+	});
+
+	test('initConsulteeMap names the details panel per map so several maps can share a page', () => {
+		installDom(
+			`<!DOCTYPE html><html><body>
+				<div id="map-dp" class="app-consultee-map"></div>
+				<script id="map-dp-data" type="application/json">{"center":[0,0],"zoom":8,"detailsPanelId":"details-x","projectGeojson":{"features":[{"type":"Feature"}]}}</script>
+			</body></html>`
+		);
+		const handlers = {};
+		const map = {
+			on: (event, handler) => {
+				handlers[event] = handler;
+			},
+			addPanel: mock.fn((id, options) => {
+				document.body.insertAdjacentHTML('beforeend', options.html);
+			}),
+			showPanel: mock.fn(),
+			hidePanel: mock.fn()
+		};
+		const interact = { enable: mock.fn(), clear: mock.fn() };
+		globalThis.defra = {
+			InteractiveMap: function InteractiveMap() {
+				return map;
+			},
+			maplibreProvider: mock.fn(() => ({})),
+			datasetsPlugin: mock.fn(() => ({})),
+			interactPlugin: mock.fn(() => interact)
+		};
+		globalThis.window.defra = globalThis.defra;
+
+		initConsulteeMap('map-dp');
+
+		// a selection before map:ready has no panel content to write into - ignored, no crash
+		handlers['interact:selectionchange']({ selectedFeatures: [{ properties: { name: 'x' } }] });
+		assert.equal(map.showPanel.mock.callCount(), 0);
+
+		handlers['map:ready']();
+		assert.equal(map.addPanel.mock.calls[0].arguments[0], 'details-x');
+
+		handlers['interact:selectionchange']({ selectedFeatures: [{ properties: { name: 'Luton' } }] });
+		assert.match(document.getElementById('details-x-content').innerHTML, /Luton/);
+		assert.equal(map.showPanel.mock.callCount(), 1);
+	});
+
+	test('featureDetailsHtml copes with a programmatic selection carrying no properties', () => {
+		assert.match(featureDetailsHtml(), /Unnamed/);
+		assert.match(featureDetailsHtml({ name: 'a.geojson' }), /a\.geojson/);
+	});
+
 	test('registerConsulteeMaps runs immediately or on DOMContentLoaded', () => {
 		const dom = installDom(
 			'<!DOCTYPE html><html><body><div id="map-4" class="app-consultee-map"></div><script id="map-4-data" type="application/json">{"center":[0,0],"zoom":8}</script></body></html>'
