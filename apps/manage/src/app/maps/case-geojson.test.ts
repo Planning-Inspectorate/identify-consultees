@@ -3,6 +3,7 @@ import type { ConsulteeMatch } from '@pins/identify-consultees-database/src/geos
 import type { Geometry } from '@pins/identify-consultees-database/src/geospatial/wkt.ts';
 import assert from 'node:assert';
 import { describe, it } from 'node:test';
+import { REPORT_CONFIG } from '../report-config.ts';
 import {
 	buildCaseMapConfig,
 	buildConsulteeMatchesGeojson,
@@ -16,7 +17,6 @@ import {
 	REGIONAL_FILL_OPACITY
 } from './case-geojson.ts';
 import { computeFittedMapView } from './geometry-bounds.ts';
-import { MAP_VIEW } from './map-view.ts';
 import { MAP_VIEWPORT } from './sample-geojson.ts';
 
 function project(): CaseBoundaryFeature {
@@ -115,13 +115,16 @@ describe('buildCaseMapConfig with a search area', () => {
 			}
 		);
 
-		// the point site at the middle, with config/map-view.yaml's distance around it
+		// the point site at the middle, with config/report.yaml's default distance around it
 		assert.deepStrictEqual(config.center, [-1.5, 52.5]);
 		assert.strictEqual(
 			config.zoom,
-			computeFittedMapView(buildProjectGeojson(project()), MAP_VIEWPORT, MAP_VIEW.consulteeMapsMarginMetres).zoom
+			computeFittedMapView(buildProjectGeojson(project()), MAP_VIEWPORT, REPORT_CONFIG.defaults.mapMarginMetres).zoom
 		);
-		assert.ok(config.zoom < 12, 'expected the 10km default to open further out than zoom 12');
+		// a category's own distance, when its map is given one
+		const closer = buildCaseMapConfig(project(), [], 'Parish Council', undefined, undefined, 500);
+		assert.strictEqual(closer.zoom, computeFittedMapView(buildProjectGeojson(project()), MAP_VIEWPORT, 500).zoom);
+		assert.ok(closer.zoom > config.zoom);
 		// only the match touching the area is drawn, in its display geometry - but the count is every match
 		assert.deepStrictEqual(
 			config.consulteeGeojson.features.map((feature) => [feature.id, feature.geometry]),

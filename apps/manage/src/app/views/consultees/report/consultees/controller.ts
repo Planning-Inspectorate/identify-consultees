@@ -11,6 +11,7 @@ import type { AsyncRequestHandler } from '@planning-inspectorate/core/util';
 import type { Request, Response } from 'express';
 import { buildCaseMapConfig, markAddedByHand, MAX_SAMPLED_MAP_MATCHES } from '../../../../maps/case-geojson.ts';
 import { MAP_VIEWPORT } from '../../../../maps/sample-geojson.ts';
+import { categorySettings } from '../../../../report-config.ts';
 import { describeReasons } from '../../reasons.ts';
 import { resolveCase } from '../../resolve-case.ts';
 import { buildSearchAreaSafely, firstQueryValue, runRulesetSafely } from '../../run-ruleset.ts';
@@ -135,7 +136,8 @@ async function renderCategoryPage(
 		markAddedByHand(visible, addedMatchIds(selection.adds)),
 		category,
 		searchArea,
-		{ src: staticMapSrc, alt: staticMapAlt }
+		{ src: staticMapSrc, alt: staticMapAlt },
+		categorySettings(category).mapMarginMetres
 	);
 
 	// ruleset matches first, then hand-added consultees - every Remove link opens the "Remove

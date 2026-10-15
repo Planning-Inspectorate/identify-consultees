@@ -1,8 +1,16 @@
 import type { ConsulteeMatch, Ruleset } from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
 import assert from 'node:assert';
 import { describe, it } from 'node:test';
+import { parseReportConfig } from '../../../../report-config.ts';
 import type { ConsulteeAreaRecord, ReportExport } from './workbook.ts';
-import { buildReportSheets, GROUP_TABS, reportFileName, tabForCategory, tabForMatch } from './workbook.ts';
+import {
+	buildReportSheets,
+	exportedMetadata,
+	GROUP_TABS,
+	reportFileName,
+	tabForCategory,
+	tabForMatch
+} from './workbook.ts';
 
 const ruleset: Ruleset = {
 	id: 'test-ruleset',
@@ -290,5 +298,129 @@ describe('report workbook', () => {
 			reportFileName(report({ caseReference: 'EN/01:02' })),
 			'EN-01-02 Test ruleset consultees 2026-10-13.xlsx'
 		);
+	});
+
+	it('has the columns config/report.yaml lists, in its order - any of the stored ones', () => {
+		const config = parseReportConfig(
+			[
+				'version: 1',
+				'columns: [lastUpdated, consultee, distanceKm, consulteeAreaId, geometryType, caseReference, version, source]',
+				'defaults: { mapKm: 10, metadata: none }'
+			].join('\n')
+		);
+		const admin = buildReportSheets(
+			report({
+				identified: [match('a', 'Parish Council', 'Abbey', 'b_host_parish', 2500)],
+				records: new Map([['a', record('a', { consultee: 'Abbey', caseReference: 'EN010001', currentVersion: 2 })]]),
+				// one the run found, with its distance; one added by name alone
+				added: [
+					{ id: 'p', category: 'Parish Council', name: 'Picked', reason: 'r', distanceMetres: 1000 },
+					{ category: 'Parish Council', name: 'Typed', reason: 'r' }
+				]
+			}),
+			config
+		).find((sheet) => sheet.sheet === 'Administrative boundaries')!;
+		assert.deepStrictEqual(rowValues(admin.data[0]), [
+			'Last updated',
+			'Consultee',
+			'Distance from site (km)',
+			'Consultee area id',
+			'Geometry type',
+			'Case reference',
+			'Version',
+			'Source'
+		]);
+		assert.deepStrictEqual(admin.data.slice(1).map(rowValues), [
+			[new Date('2026-10-01T09:00:00Z'), 'Abbey', 2.5, 'a', 'Polygon', 'EN010001', 2, 'Ruleset'],
+			[null, 'Picked', 1, 'p', null, null, null, 'Manually added'],
+			[null, 'Typed', null, null, null, null, null, 'Manually added']
+		]);
+		assert.deepStrictEqual(
+			admin.columns.map((column) => column.width),
+			[18, 36, 12, 38, 16, 14, 10, 16]
+		);
+	});
+
+	it("exports each category's metadata as config/report.yaml sets - shared headings share a column", () => {
+		const config = parseReportConfig(
+			[
+				'version: 1',
+				'columns: [consultee]',
+				'defaults: { mapKm: 10, metadata: all }',
+				'categories:',
+				'  Parish Council:',
+				'    metadata: { PARNCP23CD: ONS code, PARNCP23NM: Name }',
+				'  Unitary Authority:',
+				'    metadata: { LAD24CD: ONS code }',
+				'  Hospital:',
+				'    metadata: none'
+			].join('\n')
+		);
+		const withUnitaries: Ruleset = {
+			...ruleset,
+			rules: [
+				...ruleset.rules,
+				{
+					id: 'b_host_ua',
+					name: '"B" host Unitary Authorities',
+					group: 'Administative boundaries',
+					logicType: 'intersection',
+					categories: ['Unitary Authority'],
+					bufferMetres: 0
+				}
+			]
+		};
+		const sheets = buildReportSheets(
+			report({
+				ruleset: withUnitaries,
+				identified: [
+					match('p', 'Parish Council', 'Abbey', 'b_host_parish'),
+					match('u', 'Unitary Authority', 'Cheshire West', 'b_host_ua'),
+					match('h', 'Hospital', 'General Hospital', 'hospitals_10km')
+				],
+				records: new Map([
+					[
+						'p',
+						record('p', { consultee: 'Abbey', metadata: '{"PARNCP23CD":"E04000001","PARNCP23NM":"Abbey","FID":1}' })
+					],
+					[
+						'u',
+						record('u', {
+							consultee: 'Cheshire West',
+							consulteeCategory: 'Unitary Authority',
+							metadata: '{"LAD24CD":"E06000050"}'
+						})
+					],
+					['h', record('h', { consulteeCategory: 'Hospital', metadata: '{"ODS":"RX1"}' })]
+				])
+			}),
+			config
+		);
+		const admin = sheets.find((sheet) => sheet.sheet === 'Administrative boundaries')!;
+		// the listed attributes only, under their headings - both ONS codes in one column
+		assert.deepStrictEqual(rowValues(admin.data[0]), ['Consultee', 'ONS code', 'Name']);
+		assert.deepStrictEqual(admin.data.slice(1).map(rowValues), [
+			['Abbey', 'E04000001', 'Abbey'],
+			['Cheshire West', 'E06000050', null]
+		]);
+		// none - no metadata columns at all
+		const publicBodies = sheets.find((sheet) => sheet.sheet === 'Public bodies')!;
+		assert.deepStrictEqual(rowValues(publicBodies.data[0]), ['Consultee']);
+	});
+
+	it('fills a shared heading from the first listed attribute with a value', () => {
+		const selection = [
+			{ attribute: 'NAME_W', heading: 'Name' },
+			{ attribute: 'NAME', heading: 'Name' },
+			{ attribute: 'MISSING', heading: 'Code' }
+		];
+		assert.deepStrictEqual(
+			[...exportedMetadata({ NAME_W: '', NAME: 'Abbey' }, selection)],
+			[
+				['Name', 'Abbey'],
+				['Code', undefined]
+			]
+		);
+		assert.deepStrictEqual([...exportedMetadata({ NAME_W: 'Abaty', NAME: 'Abbey' }, selection)][0], ['Name', 'Abaty']);
 	});
 });

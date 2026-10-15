@@ -6,6 +6,7 @@ import type { AsyncRequestHandler } from '@planning-inspectorate/core/util';
 import { buildCaseMapConfig, markAddedByHand, MAX_SAMPLED_MAP_MATCHES } from '../../../maps/case-geojson.ts';
 import { MAP_VIEWPORT } from '../../../maps/sample-geojson.ts';
 import { buildConsulteeStaticMapResponse, sendStaticMapResponse } from '../../../maps/serve-static-map.ts';
+import { categorySettings } from '../../../report-config.ts';
 import { describeReasons } from '../reasons.ts';
 import { excludedIds, queryValues, reportUrl } from '../report/urls.ts';
 import { resolveCase } from '../resolve-case.ts';
@@ -141,11 +142,14 @@ export function buildResultsStaticMap(service: ManageService, forceSvg = false):
 			service.nearbySearchRadiusMetres,
 			logger
 		);
+		// a category's map is framed as config/report.yaml sets for the category
 		const map = buildCaseMapConfig(
 			project,
 			markAddedByHand(displayMatches, new Set(queryValues(req.query.include))),
 			category || ruleset.name,
-			searchArea
+			searchArea,
+			undefined,
+			categorySettings(category).mapMarginMetres
 		);
 		const ifNoneMatch = typeof req.headers['if-none-match'] === 'string' ? req.headers['if-none-match'] : undefined;
 		const accept = typeof req.headers.accept === 'string' ? req.headers.accept : undefined;

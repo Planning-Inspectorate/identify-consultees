@@ -12,6 +12,7 @@ import writeExcelFile from 'write-excel-file/node';
 import { buildCaseMapConfig, markAddedByHand } from '../../../../maps/case-geojson.ts';
 import { buildConsulteeStaticMapResponse } from '../../../../maps/serve-static-map.ts';
 import { consulteeColours, projectColours } from '../../../../maps/static-map.ts';
+import { categorySettings } from '../../../../report-config.ts';
 import { resolveCase } from '../../resolve-case.ts';
 import { buildSearchAreaSafely, firstQueryValue, runRulesetSafely } from '../../run-ruleset.ts';
 import { reportByCategory } from '../report-consultees.ts';
@@ -71,7 +72,9 @@ async function categoryMap(
 		project,
 		markAddedByHand(visible, addedMatchIds(selection.adds)),
 		category,
-		searchArea
+		searchArea,
+		undefined,
+		categorySettings(category).mapMarginMetres
 	);
 	const site = projectColours(map.projectGeojson.features[0]);
 	const colours = {
@@ -142,7 +145,11 @@ export function buildReportDownload(service: ManageService): AsyncRequestHandler
 				...identified.map((match) => match.feature.id),
 				...addedMatchIds(selection.adds)
 			]),
-			added: selection.adds,
+			// a hand-added consultee the run found has its distance - for the distanceKm column
+			added: selection.adds.map((add) => {
+				const found = add.id ? consultees.find((match) => match.feature.id === add.id) : undefined;
+				return found ? { ...add, distanceMetres: found.distanceMetres } : add;
+			}),
 			removed: selection.removed
 		};
 		const files: Record<string, Uint8Array> = {

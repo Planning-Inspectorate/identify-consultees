@@ -4,13 +4,11 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 
 /**
- * How much the maps show around a project's site when they open, from config/map-view.yaml - the
- * margin computeFittedMapView keeps around the site.
+ * How much the project boundary page's map shows around the case's shapefiles when it opens, from
+ * config/map-view.yaml - the margin computeFittedMapView keeps. The consultee maps' are per
+ * category, in config/report.yaml.
  */
 export interface MapView {
-	/** The consultee maps: category pages, results, and the report's PDF maps. */
-	consulteeMapsMarginMetres: number;
-	/** The project boundary page's map. */
 	boundaryMapMarginMetres: number;
 }
 
@@ -30,7 +28,6 @@ export function parseMapView(text: string): MapView {
 		throw new Error('map-view.yaml must be a version 1 document');
 	}
 	return {
-		consulteeMapsMarginMetres: marginMetres(document.consulteeMapsKm, 'consulteeMapsKm'),
 		boundaryMapMarginMetres: marginMetres(document.boundaryMapKm, 'boundaryMapKm')
 	};
 }

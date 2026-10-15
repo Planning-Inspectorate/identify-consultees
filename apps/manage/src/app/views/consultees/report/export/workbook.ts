@@ -1,14 +1,15 @@
 import type { ConsulteeMatch, Ruleset } from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
 import type { SheetData } from 'write-excel-file/node';
+import type { MetadataSelection, ReportColumn, ReportConfig } from '../../../../report-config.ts';
+import { categorySettings, REPORT_COLUMNS, REPORT_CONFIG } from '../../../../report-config.ts';
 import { describeReasons } from '../../reasons.ts';
 import type { AddedConsultee, RemovedConsultee } from '../urls.ts';
 
 /**
  * The exported consultee report: a Summary tab, then one tab per high-level group of the rulesets
  * workbook. Each consultee goes on the tab of the condition that identified it (a hand-added one,
- * its category's), with its name, category, region, why it's in the report, where it came from (the
- * ruleset, or manually added) and its version, then the source data's metadata, a column per
- * attribute.
+ * its category's), with the columns config/report.yaml sets - its fixed columns, then the metadata
+ * each category exports, a column per heading.
  */
 
 /** The tabs after Summary, in order. "Other Cases" is a placeholder - nothing fills it yet. */
@@ -47,8 +48,8 @@ export interface ReportExport {
 	 * was deleted mid-request.
 	 */
 	records: Map<string, ConsulteeAreaRecord>;
-	/** Consultees added by hand. */
-	added: readonly AddedConsultee[];
+	/** Consultees added by hand - one the run found with its distance from the site. */
+	added: readonly (AddedConsultee & { distanceMetres?: number })[];
 	removed: readonly RemovedConsultee[];
 }
 
@@ -76,18 +77,17 @@ export function tabForCategory(category: string, ruleset: Ruleset): GroupTab {
 	return tabForGroup(ruleset.rules.find((rule) => rule.categories.includes(category))?.group);
 }
 
-// every tab's first columns - then the metadata keys its consultees have (see metadataColumns)
-// every tab's first columns - then the source data's metadata attributes its consultees have (see
-// metadataColumns)
-const HEADER = ['Consultee', 'Category', 'Region', 'Why identified', 'Source', 'Version'] as const;
-
-export const GROUP_TAB_COLUMN_WIDTHS = [36, 28, 22, 60, 16, 10];
-
 type Cell = SheetData[number][number];
 
 const text = (value: string | null | undefined): Cell => (value ? { value } : null);
 const bold = (value: string): Cell => ({ value, fontWeight: 'bold' });
 const headerRow = (labels: readonly string[]) => labels.map(bold);
+
+function kilometres(metres: number | null | undefined): Cell {
+	return metres === null || metres === undefined
+		? null
+		: { type: Number, value: Math.round(metres / 10) / 100, format: '0.00' };
+}
 
 type Metadata = Record<string, unknown>;
 
@@ -123,48 +123,82 @@ function metadataCell(value: unknown): Cell {
 	return { value: typeof value === 'string' ? value : JSON.stringify(value) };
 }
 
-/** The stored row's version - blank when there's no stored row. */
-function versionCell(record: ConsulteeAreaRecord | undefined): Cell {
-	return record ? { type: Number, value: record.currentVersion } : null;
+/**
+ * The metadata a category exports, by column heading - as config/report.yaml sets for it: every
+ * attribute under its own name, none, or the attributes it lists under their headings. Attributes
+ * sharing a heading share a column; the first with a value fills it.
+ */
+export function exportedMetadata(metadata: Metadata, selection: MetadataSelection): Map<string, unknown> {
+	if (selection === 'none') {
+		return new Map();
+	}
+	if (selection === 'all') {
+		return new Map(Object.entries(metadata));
+	}
+	const exported = new Map<string, unknown>();
+	for (const { attribute, heading } of selection) {
+		const value = metadata[attribute];
+		if (!exported.has(heading) || metadataCell(exported.get(heading)) === null) {
+			exported.set(heading, value);
+		}
+	}
+	return exported;
 }
 
-function matchRow(match: ConsulteeMatch, ruleset: Ruleset, record: ConsulteeAreaRecord | undefined): Cell[] {
-	const properties = match.feature.properties;
-	return [
-		text(record?.consultee ?? properties.consultee),
-		text(record?.consulteeCategory ?? properties.consulteeCategory),
-		text(record?.region ?? properties.region),
-		{ value: describeReasons(match, ruleset, { nearby: false }).join('\n'), wrap: true },
-		{ value: 'Ruleset' },
-		versionCell(record)
-	];
+/** One consultee as a row describes it, whichever way it came into the report. */
+interface RowSource {
+	id: string | undefined;
+	name: string | null | undefined;
+	category: string | null | undefined;
+	region: string | null | undefined;
+	whyIdentified: string;
+	source: 'Ruleset' | 'Manually added';
+	distanceMetres: number | null | undefined;
+	/** Its stored row - missing for a consultee added by name alone, or deleted mid-request. */
+	record: ConsulteeAreaRecord | undefined;
 }
 
-// added by hand, with the reason given - one from before additions had to be real consultees may
-// have no stored row
-function addedRow(add: AddedConsultee, record: ConsulteeAreaRecord | undefined): Cell[] {
-	return [
-		{ value: add.name },
-		{ value: add.category },
-		text(record?.region),
-		{ value: add.reason || 'Manually added', wrap: true },
-		{ value: 'Manually added' },
-		versionCell(record)
-	];
-}
+/** Each fixed column's cell - the columns config/report.yaml can choose from. */
+const COLUMN_CELLS: Record<ReportColumn, (row: RowSource) => Cell> = {
+	consultee: (row) => text(row.name),
+	category: (row) => text(row.category),
+	region: (row) => text(row.region),
+	whyIdentified: (row) => ({ value: row.whyIdentified, wrap: true }),
+	source: (row) => ({ value: row.source }),
+	version: (row) => (row.record ? { type: Number, value: row.record.currentVersion } : null),
+	distanceKm: (row) => kilometres(row.distanceMetres),
+	consulteeAreaId: (row) => text(row.id),
+	geometryType: (row) => text(row.record?.geometryType),
+	caseReference: (row) => text(row.record?.caseReference),
+	lastUpdated: (row) => (row.record ? { type: Date, value: row.record.lastUpdated, format: 'yyyy-mm-dd hh:mm' } : null)
+};
+
+export const COLUMN_WIDTHS: Record<ReportColumn, number> = {
+	consultee: 36,
+	category: 28,
+	region: 22,
+	whyIdentified: 60,
+	source: 16,
+	version: 10,
+	distanceKm: 12,
+	consulteeAreaId: 38,
+	geometryType: 16,
+	caseReference: 14,
+	lastUpdated: 18
+};
 
 interface SortableRow {
 	category: string;
 	name: string;
 	cells: Cell[];
-	metadata: Metadata;
+	metadata: Map<string, unknown>;
 }
 
 function byCategoryThenName(a: SortableRow, b: SortableRow): number {
 	return a.category.localeCompare(b.category, 'en-GB') || a.name.localeCompare(b.name, 'en-GB');
 }
 
-/** One group tab: its columns (the fixed ones, then its metadata keys) and a row per consultee. */
+/** One group tab: its columns (the fixed ones, then its metadata headings) and a row per consultee. */
 interface GroupTabContent {
 	header: string[];
 	widths: number[];
@@ -172,50 +206,86 @@ interface GroupTabContent {
 }
 
 /**
- * Every metadata key the tab's consultees have, in the order they first appear - a column each.
- * A consultee without one leaves that cell blank.
+ * Every metadata heading the tab's consultees export, in the order they first appear - a column
+ * each. A consultee without one leaves that cell blank.
  */
 function metadataColumns(rows: SortableRow[]): string[] {
-	const keys = new Set<string>();
+	const headings = new Set<string>();
 	for (const row of rows) {
-		for (const key of Object.keys(row.metadata)) {
-			keys.add(key);
+		for (const heading of row.metadata.keys()) {
+			headings.add(heading);
 		}
 	}
-	return [...keys];
+	return [...headings];
 }
 
-function tabContent(rows: SortableRow[]): GroupTabContent {
+function tabContent(rows: SortableRow[], columns: readonly ReportColumn[]): GroupTabContent {
 	const sorted = rows.sort(byCategoryThenName);
-	const keys = metadataColumns(sorted);
+	const headings = metadataColumns(sorted);
 	return {
-		header: [...HEADER, ...keys],
-		widths: [...GROUP_TAB_COLUMN_WIDTHS, ...keys.map((key) => Math.min(40, Math.max(12, key.length + 2)))],
-		rows: sorted.map((row) => [...row.cells, ...keys.map((key) => metadataCell(row.metadata[key]))])
+		header: [...columns.map((column) => REPORT_COLUMNS[column]), ...headings],
+		widths: [
+			...columns.map((column) => COLUMN_WIDTHS[column]),
+			...headings.map((heading) => Math.min(40, Math.max(12, heading.length + 2)))
+		],
+		rows: sorted.map((row) => [...row.cells, ...headings.map((heading) => metadataCell(row.metadata.get(heading)))])
 	};
 }
 
-function groupTabs(report: ReportExport): Map<GroupTab, GroupTabContent> {
+function sortableRow(source: RowSource, config: ReportConfig): SortableRow {
+	return {
+		category: source.category ?? '',
+		name: source.name ?? '',
+		cells: config.columns.map((column) => COLUMN_CELLS[column](source)),
+		metadata: exportedMetadata(
+			parseMetadata(source.record?.metadata),
+			categorySettings(source.category, config).metadata
+		)
+	};
+}
+
+function groupTabs(report: ReportExport, config: ReportConfig): Map<GroupTab, GroupTabContent> {
 	const rows = new Map<GroupTab, SortableRow[]>(GROUP_TABS.map((tab) => [tab, []]));
 	for (const match of report.identified) {
 		const record = report.records.get(match.feature.id);
-		rows.get(tabForMatch(match, report.ruleset))!.push({
-			category: record?.consulteeCategory ?? match.feature.properties.consulteeCategory ?? '',
-			name: record?.consultee ?? match.feature.properties.consultee ?? '',
-			cells: matchRow(match, report.ruleset, record),
-			metadata: parseMetadata(record?.metadata)
-		});
+		const properties = match.feature.properties;
+		rows.get(tabForMatch(match, report.ruleset))!.push(
+			sortableRow(
+				{
+					id: match.feature.id,
+					// the stored row's values win over the run's
+					name: record?.consultee ?? properties.consultee,
+					category: record?.consulteeCategory ?? properties.consulteeCategory,
+					region: record?.region ?? properties.region,
+					whyIdentified: describeReasons(match, report.ruleset, { nearby: false }).join('\n'),
+					source: 'Ruleset',
+					distanceMetres: match.distanceMetres,
+					record
+				},
+				config
+			)
+		);
 	}
 	for (const add of report.added) {
+		// one from before additions had to be real consultees may have no stored row
 		const record = add.id ? report.records.get(add.id) : undefined;
-		rows.get(tabForCategory(add.category, report.ruleset))!.push({
-			category: add.category,
-			name: add.name,
-			cells: addedRow(add, record),
-			metadata: parseMetadata(record?.metadata)
-		});
+		rows.get(tabForCategory(add.category, report.ruleset))!.push(
+			sortableRow(
+				{
+					id: add.id,
+					name: add.name,
+					category: add.category,
+					region: record?.region,
+					whyIdentified: add.reason || 'Manually added',
+					source: 'Manually added',
+					distanceMetres: add.distanceMetres,
+					record
+				},
+				config
+			)
+		);
 	}
-	return new Map([...rows].map(([tab, tabRows]) => [tab, tabContent(tabRows)]));
+	return new Map([...rows].map(([tab, tabRows]) => [tab, tabContent(tabRows, config.columns)]));
 }
 
 /** A date as the report writes it: "6 July 2026". */
@@ -258,8 +328,8 @@ function summarySheet(report: ReportExport, tabs: Map<GroupTab, GroupTabContent>
 }
 
 /** The workbook's sheets, ready for write-excel-file: Summary, the five group tabs, then Other Cases. */
-export function buildReportSheets(report: ReportExport) {
-	const tabs = groupTabs(report);
+export function buildReportSheets(report: ReportExport, config: ReportConfig = REPORT_CONFIG) {
+	const tabs = groupTabs(report, config);
 	return [
 		{ sheet: 'Summary', data: summarySheet(report, tabs), columns: [{ width: 28 }, { width: 50 }, { width: 60 }] },
 		...GROUP_TABS.map((tab) => {
