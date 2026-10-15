@@ -13,6 +13,7 @@
  */
 
 import { createFeatureDetailsPlugin } from './feature-details-plugin.mjs';
+import { createFeatureRowSelectPlugin } from './feature-row-select-plugin.mjs';
 import { createLayersKeyPlugin } from './layers-key-plugin.mjs';
 import { createMapLoadingPlugin } from './map-loading-plugin.mjs';
 import { createStaticMapPlugin } from './static-map-plugin.mjs';
@@ -326,6 +327,9 @@ export function initConsulteeMap(mapId) {
 		// the category pages carry their add/remove page URLs - a selected consultee's details
 		// panel links to them; other maps have none and show the details alone
 		const featureDetailsPlugin = createFeatureDetailsPlugin(config.consulteeActions);
+		// and on those pages the consultees table under the map mirrors the map's
+		// selection: a row click selects its feature, a feature click greys its row
+		const featureRowSelectPlugin = createFeatureRowSelectPlugin({ datasets });
 
 		const map = new defra.InteractiveMap(mapId, {
 			behaviour: 'inline',
@@ -341,12 +345,14 @@ export function initConsulteeMap(mapId) {
 				staticMapPlugin,
 				loadingPlugin,
 				featureDetailsPlugin,
+				featureRowSelectPlugin,
 				...(interactPlugin ? [interactPlugin] : [])
 			]
 		});
 		map.on('map:firstidle', () => loadingPlugin.dismiss());
 		if (interactPlugin) {
 			featureDetailsPlugin.wire(map, interactPlugin);
+			featureRowSelectPlugin.wire(map, interactPlugin);
 		}
 	} catch {
 		loadingPlugin.dismiss();

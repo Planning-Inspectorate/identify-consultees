@@ -198,6 +198,18 @@ $map-spinner-teal: #28a197;
 	vertical-align: middle;
 }
 
+// The row-select plugin (javascripts/feature-row-select-plugin.mjs) mirrors the
+// map's selection: a row whose checkbox carries data-consultee-id can be clicked
+// to select its feature, and the selected feature's row greys
+.pins-consultees-table tbody tr:has(input[data-consultee-id]) {
+	cursor: pointer;
+}
+
+.pins-consultees-table tr.pins-consultee-row--selected > th,
+.pins-consultees-table tr.pins-consultee-row--selected > td {
+	background: index.govuk-colour('black', $variant: 'tint-95');
+}
+
 // The admin section's menu (admin/layout.njk): the current page in bold, marked by a left border
 .pins-admin-nav__item {
 	padding-left: index.govuk-spacing(2);

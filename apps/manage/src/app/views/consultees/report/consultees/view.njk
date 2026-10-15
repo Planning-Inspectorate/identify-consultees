@@ -67,7 +67,10 @@
 					{% endset %}
 					{% set selectHtml %}
 						<div class="govuk-checkboxes__item govuk-checkboxes--small moj-multi-select__checkbox">
-							<input class="govuk-checkboxes__input" id="{{ row.select.domId }}" name="{{ row.select.param }}" type="checkbox" value="{{ row.select.value }}">
+							{#- data-consultee-id names the row's map feature for the row-select
+							   plugin (javascripts/feature-row-select-plugin.mjs) - a name-only add
+							   has none, and its row can't be clicked onto the map #}
+							<input class="govuk-checkboxes__input" id="{{ row.select.domId }}" name="{{ row.select.param }}" type="checkbox" value="{{ row.select.value }}"{% if row.select.consulteeId %} data-consultee-id="{{ row.select.consulteeId }}"{% endif %}>
 							<label class="govuk-label govuk-checkboxes__label moj-multi-select__toggle-label" for="{{ row.select.domId }}"><span class="govuk-visually-hidden">Select {{ row.name }}</span></label>
 						</div>
 					{% endset %}

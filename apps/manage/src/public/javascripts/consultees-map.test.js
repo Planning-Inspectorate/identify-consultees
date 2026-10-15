@@ -410,6 +410,8 @@ describe('consultees-map client helpers', () => {
 		// so is the loading overlay, dismissed at map:firstidle
 		assert.ok(plugins.find((plugin) => plugin.id === 'mapLoading'));
 		assert.ok(plugins.some((plugin) => plugin.id === 'featureDetails'));
+		// and the plugin mirroring the consultees table's selected row with the map
+		assert.ok(plugins.some((plugin) => plugin.id === 'featureRowSelect'));
 	});
 
 	test('buildSelectableLayers lists the MapLibre layers of each consultee sublayer and the project site', () => {

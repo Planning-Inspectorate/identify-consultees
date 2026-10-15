@@ -14,8 +14,13 @@ export interface ConsulteeRow {
 	distance?: { text: string; metres: number };
 	/** The "Remove consultee" page for this row - it records the removal reason, then returns here. */
 	removeUrl: string;
-	/** The bulk-remove checkbox for this row: the query param it submits and the input's DOM id. */
-	select: { param: string; value: string; domId: string };
+	/**
+	 * The bulk-remove checkbox for this row: the query param it submits and the input's DOM id.
+	 * `consulteeId` names the row's map feature (its `consulteeId`), so the row-select plugin can
+	 * grey it when the feature is selected and select it when the row is clicked - absent for a
+	 * consultee added by name alone, which is on no map.
+	 */
+	select: { param: string; value: string; domId: string; consulteeId?: string };
 }
 
 /** One row of the expandable Removed consultees section - a removal and the reason given. */

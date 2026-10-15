@@ -134,6 +134,8 @@ describe('report consultees change page', () => {
 			viewModel.rows[0].removeUrl,
 			`/consultees/${realProjectId}/report/consultees/remove?ruleset=england-wales-post-20240430&category=Parish%2C%20town%20and%20community%20councils&match=${matchId}`
 		);
+		// the row names its map feature so the row-select plugin can link the two
+		assert.strictEqual(viewModel.rows[0].select.consulteeId, matchId);
 		assert.strictEqual(viewModel.removedRows.length, 0);
 		assert.strictEqual(viewModel.removedOpen, false);
 		// the Add a consultee link opens the add page, keeping the current selection
@@ -145,6 +147,7 @@ describe('report consultees change page', () => {
 
 		const html = mockRes.render.mock.calls[0].result;
 		assert.match(html, /Remove/);
+		assert.match(html, new RegExp(`data-consultee-id="${matchId}"`));
 		assert.match(html, /href="[^"]*\/report\/consultees\/add\?[^"]*"[^>]*>\s*Add a consultee/);
 		// the add form lives on its own page now - no name input or datalist here
 		assert.doesNotMatch(html, /<datalist|data-consultee-autocomplete|name="name"/);
@@ -727,6 +730,8 @@ describe('report consultees change page', () => {
 		const viewModel = mockRes.render.mock.calls[0].arguments[1];
 		assert.strictEqual(viewModel.rows.length, 2);
 		assert.strictEqual(viewModel.rows[0].name, 'Kept Consultee');
+		// a name-only add isn't on the map - its row gets no data-consultee-id to select by
+		assert.strictEqual(viewModel.rows[0].select.consulteeId, undefined);
 		// the dropped params aren't carried forward either
 		assert.strictEqual((viewModel.backLinkUrl.match(/add=/g) ?? []).length, 1);
 	});
