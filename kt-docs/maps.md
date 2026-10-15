@@ -39,6 +39,14 @@ Clicking a feature selects it and a "Selected on the map" panel shows its name, 
 
 The category pages also carry a Measure toolbar (distance, path and bounded-box area). `measure-plugin.mjs` is a local plugin that draws through the vendor draw plugin's adapter rather than reimplementing vertex placement, snapping and Done/Cancel chrome; `consultees-map.js` registers `defra.drawPlugin()` + `createMeasurePlugin(...)` only when the page loads the draw bundle (`vendorDrawPluginJs` in the category template), so other map hosts get no Measure button.
 
+## The consultees table's selected row
+
+`public/javascripts/feature-row-select-plugin.mjs` mirrors the map's selection onto the category page's consultees table, both ways: clicking a row selects its consultee on the map (`interact:selectFeature`, so the selection ring and details panel appear), and selecting a consultee feature on the map greys its row (`interact:selectionchange` → `pins-consultee-row--selected`).
+
+A row names its feature with `data-consultee-id` on its bulk-removal checkbox — the same id the features carry as `consulteeId` (the dataset's `idProperty`, so also the `featureId` selectionchange reports). Rows without one — a consultee added by name alone has nothing on the map — can't be clicked, and selecting a feature no row names (a nearby-only consultee, the project site) just un-greys. Clicking a row's own controls stays that control's job (the checkbox marks for removal, the Remove link navigates); a second click on the selected row deselects, like the map's click-to-deselect.
+
+Programmatic selection needs the interact plugin enabled — feature-details-plugin enables it at `map:ready`, and a row clicked earlier is replayed on `interact:active`. The emit carries the feature's `properties`/`geometry` (resolved from the `datasets` array) and the `layerId` of the sublayer whose filter matches it, so listeners see exactly what a click selection carries. `wire` no-ops when the page has no consultees table (the boundary page).
+
 ## Defra map gotchas found here
 
 - Each dataset needs an `idProperty` (`consulteeId`, `reference` for the project, `fileKey` for the boundary page's shapefiles). MapLibre drops string feature ids, so without it nothing can be selected and the console warns about "string native IDs".
@@ -47,6 +55,7 @@ The category pages also carry a Measure toolbar (distance, path and bounded-box 
 - A custom `symbolSvgContent` must include `{{haloColor}}`, `{{selectedColor}}` and `{{activeColor}}`, or it isn't drawn.
 - A sublayer is drawn as points only if its style sets `symbol`.
 - The draw adapter needs `mapStyle.id` — it builds `user_fill<id>` style expressions and crashes on a style without one (`OPENFREEMAP_STYLE` and the OS `interactiveBasemap` both set an id for this reason).
+- **One interactive map per page.** The datasets plugin's `datasetRegistry` and `layerAdapter` are module-level singletons shared by every `InteractiveMap` on the page — each map's init rebinds them to itself. With two maps, `setDatasetVisibility`/`setOpacity` read and write whichever map attached last (a Layers-menu toggle applies to the wrong map when the dataset ids match), and `datasets:changed` attaches another map's state to every panel's registry. Pages must therefore render one interactive map at a time — the boundary page is safe because it has a single map. Similarly, `im-core` memoises plugin components in a global cache keyed on component identity, capturing `pluginConfig` once — always return a fresh manifest (fresh `InitComponent`) from a plugin factory, never a shared one.
 
 ## Loading state
 

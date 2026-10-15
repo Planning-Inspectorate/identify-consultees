@@ -215,7 +215,12 @@ async function renderCategoryPage(
 			distanceMetres: match.distanceMetres,
 			identified: describeReasons(match, ruleset, { nearby: false }),
 			removeUrl: removeConsulteeUrl(project.id, ruleset.id, category, { matchId: match.feature.id }, selection),
-			select: { param: 'match', value: match.feature.id, domId: `select-match-${match.feature.id}` }
+			select: {
+				param: 'match',
+				value: match.feature.id,
+				domId: `select-match-${match.feature.id}`,
+				consulteeId: match.feature.id
+			}
 		})),
 		...selection.adds.flatMap((add, index) => {
 			if (add.category !== category) {
@@ -230,7 +235,13 @@ async function renderCategoryPage(
 					...(found ? { distanceMetres: found.distanceMetres } : {}),
 					identified: [addedConsulteeReason(add)],
 					removeUrl: removeConsulteeUrl(project.id, ruleset.id, category, { addedIndex: index }, selection),
-					select: { param: 'added', value: String(index), domId: `select-added-${index}` }
+					select: {
+						param: 'added',
+						value: String(index),
+						domId: `select-added-${index}`,
+						// the row is selectable on the map only when the add names a real consultee
+						...(add.id ? { consulteeId: add.id } : {})
+					}
 				}
 			];
 		})

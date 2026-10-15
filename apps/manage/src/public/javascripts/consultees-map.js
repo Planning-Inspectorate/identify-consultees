@@ -15,6 +15,7 @@
  */
 
 import { createFeatureDetailsPlugin } from './feature-details-plugin.mjs';
+import { createFeatureRowSelectPlugin } from './feature-row-select-plugin.mjs';
 import { createLayersKeyPlugin } from './layers-key-plugin.mjs';
 import { createMapLoadingPlugin } from './map-loading-plugin.mjs';
 import { createMeasurePlugin } from './measure-plugin.mjs';
@@ -334,6 +335,9 @@ export function initConsulteeMap(mapId) {
 		// script tag) - a map without it simply has no Measure button
 		const drawPlugin = defra.drawPlugin?.();
 		const measurePlugin = drawPlugin ? createMeasurePlugin({ modes: ['distance', 'path', 'area'] }) : null;
+		// and on those pages the consultees table under the map mirrors the map's
+		// selection: a row click selects its feature, a feature click greys its row
+		const featureRowSelectPlugin = createFeatureRowSelectPlugin({ datasets });
 
 		const map = new defra.InteractiveMap(mapId, {
 			behaviour: 'inline',
@@ -350,12 +354,14 @@ export function initConsulteeMap(mapId) {
 				loadingPlugin,
 				featureDetailsPlugin,
 				...(measurePlugin ? [drawPlugin, measurePlugin] : []),
+				featureRowSelectPlugin,
 				...(interactPlugin ? [interactPlugin] : [])
 			]
 		});
 		map.on('map:firstidle', () => loadingPlugin.dismiss());
 		if (interactPlugin) {
 			featureDetailsPlugin.wire(map, interactPlugin);
+			featureRowSelectPlugin.wire(map, interactPlugin);
 			if (drawPlugin) {
 				// a measure session's vertex clicks land on the consultee areas too - suspend
 				// interact's feature selection while draw runs, restoring it when it ends
