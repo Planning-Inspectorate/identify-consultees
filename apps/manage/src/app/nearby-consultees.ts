@@ -1,5 +1,5 @@
 import { CONFIG_DIR } from '@pins/identify-consultees-database/src/config-dir.ts';
-import yaml from 'js-yaml';
+import { load } from 'js-yaml';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 
@@ -38,7 +38,7 @@ function radiusMetres(value: unknown, name: string, allowZero: boolean): number 
 }
 
 export function parseNearbyConsultees(text: string): NearbyConsultees {
-	const document = yaml.load(text);
+	const document = text.trim() === '' ? null : load(text);
 	if (!isRecord(document) || document.version !== 1) {
 		throw new Error('nearby-consultees.yaml must be a version 1 document');
 	}

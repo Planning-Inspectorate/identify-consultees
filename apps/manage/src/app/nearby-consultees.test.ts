@@ -22,6 +22,7 @@ describe('nearby consultees', () => {
 	});
 
 	const invalid: [string, string, RegExp][] = [
+		['an empty file', '', /version 1 document/],
 		['not a document', 'just text', /version 1 document/],
 		['the wrong version', 'version: 2\ndefaultRadiusKm: 20', /version 1 document/],
 		['no default', 'version: 1', /defaultRadiusKm must be a number of km above 0/],

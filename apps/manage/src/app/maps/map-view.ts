@@ -1,5 +1,5 @@
 import { CONFIG_DIR } from '@pins/identify-consultees-database/src/config-dir.ts';
-import yaml from 'js-yaml';
+import { load } from 'js-yaml';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 
@@ -25,7 +25,7 @@ function marginMetres(value: unknown, name: string): number {
 }
 
 export function parseMapView(text: string): MapView {
-	const document = yaml.load(text) as Record<string, unknown> | null;
+	const document = (text.trim() === '' ? null : load(text)) as Record<string, unknown> | null;
 	if (typeof document !== 'object' || document === null || document.version !== 1) {
 		throw new Error('map-view.yaml must be a version 1 document');
 	}
