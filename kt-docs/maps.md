@@ -34,6 +34,24 @@ Regional categories (police, ambulance trusts, ICBs, counties) would hide everyt
 
 Clicking a feature selects it and a "Selected on the map" panel shows its name, category and region. The Defra map has no hover; selection goes through the interact plugin (`buildSelectableLayers`, `wireFeatureDetails`).
 
+## External controls (radio buttons bound to map shapes)
+
+`public/javascripts/external-controls-plugin.mjs` is a custom plugin that binds ordinary form controls outside the map component (the boundary page's "Confirm shapefile for report" radios) to datasets-plugin features, both ways: a radio `change` selects the shape (`interact:selectFeature`), and a map click that selects a bound feature checks its radio (`interact:selectionchange`). The radios stay normal form fields — they submit with the form and work without JavaScript.
+
+A page opts in by putting an `externalControls` block in the map's JSON page config — `maps/external-controls-config.ts`'s `buildExternalControlsConfig` emits it, one `binding` per file:
+
+```json
+{
+	"value": "file-a",
+	"featureId": "file-a",
+	"idProperty": "fileKey",
+	"datasetId": "shapefile-file-a",
+	"layerId": "shapefile-file-a"
+}
+```
+
+The link convention: the input's `value` equals the bound feature's `idProperty` value, and the dataset/layer ids are the `shapefile-<id>` names `buildBoundaryMapConfig` already produces. Options beside `control` (a CSS selector scoping the inputs) and `bindings`: `emphasis` (`'select'` ring only, `'solo'` hides the other bound datasets, `'dim'` fades them to `dimOpacity`), `primaryControl` (`'shared'` keeps the Layers menu entries, `'external'` removes them so the radios are the only per-file control), `ensureVisible`, `zoomTo`, and `persistent` (a map deselect re-asserts the checked radio's highlight). The plugin's file header documents every option and the interact gotchas (programmatic select needs the plugin enabled; re-selecting toggles off).
+
 ## Defra map gotchas found here
 
 - Each dataset needs an `idProperty` (`consulteeId`, `reference` for the project, `fileKey` for the boundary page's shapefiles). MapLibre drops string feature ids, so without it nothing can be selected and the console warns about "string native IDs".
@@ -41,6 +59,7 @@ Clicking a feature selects it and a "Selected on the map" panel shows its name, 
 - There's no fill-opacity option; `fillOpacity` is ignored and the fill drawn solid. Put the alpha in the colour (`translucent('#55A868', 0.05)`). The map-layers demo and component examples still draw solid fills for this reason.
 - A custom `symbolSvgContent` must include `{{haloColor}}`, `{{selectedColor}}` and `{{activeColor}}`, or it isn't drawn.
 - A sublayer is drawn as points only if its style sets `symbol`.
+- **One interactive map per page.** The datasets plugin's `datasetRegistry` and `layerAdapter` are module-level singletons shared by every `InteractiveMap` on the page — each map's init rebinds them to itself. With two maps, `setDatasetVisibility`/`setOpacity` read and write whichever map attached last (a Layers-menu toggle applies to the wrong map when the dataset ids match), and `datasets:changed` attaches another map's state to every panel's registry. The external-controls demo therefore renders one map per `?mode=`; the boundary page is safe because it has a single map. Similarly, `im-core` memoises plugin components in a global cache keyed on component identity, capturing `pluginConfig` once — always return a fresh manifest (fresh `InitComponent`) from a plugin factory, never a shared one.
 
 ## Framing
 
@@ -50,4 +69,4 @@ Every input that changes the rendered static image must be part of `buildStaticM
 
 ## Dev pages
 
-`/components/interactive-map` has worked Defra examples (style switcher, draw tools, selection panel, fullscreen variants, static parity) from `interactive-map-examples-data.ts`; it's the safest place to learn the component. `/map-layers-demo` is a layer-toggle prototype. Neither touches the database.
+`/components/interactive-map` has worked Defra examples (style switcher, draw tools, selection panel, fullscreen variants, static parity) from `interactive-map-examples-data.ts`; it's the safest place to learn the component. `/map-layers-demo` is a layer-toggle prototype. `/map-external-controls-demo` shows the external-controls plugin on three fictional overlapping shapefiles — the same page rendered under `?mode=select-shared|solo-external|dim-zoom` with `emphasis`/`primaryControl`/`zoomTo` varied, each mode with a "How this map is configured" panel showing its exact options. One map per page because of the datasets-plugin singletons (see gotchas). None touches the database.

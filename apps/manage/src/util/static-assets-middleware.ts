@@ -8,6 +8,10 @@ import { isFingerprintedAssetPath } from './fingerprint-assets.ts';
 
 const FINGERPRINTED_CACHE_CONTROL = 'public, max-age=31536000, immutable';
 const UNFINGERPRINTED_CACHE_CONTROL = 'public, max-age=86400';
+// ES module files are never fingerprinted - module import specifiers are literal
+// filenames - so a stale cached copy serves old code for a whole max-age window.
+// no-cache forces revalidation; the ETag keeps that a cheap 304 when unchanged.
+const MODULE_CACHE_CONTROL = 'public, no-cache';
 
 const CONTENT_TYPES: Record<string, string> = {
 	'.css': 'text/css; charset=utf-8',
@@ -88,10 +92,13 @@ function isFreshRequest(req: Request, entry: IndexedAsset): boolean {
 }
 
 function setCacheControl(res: Response, absolutePath: string): void {
-	res.setHeader(
-		'Cache-Control',
-		isFingerprintedAssetPath(absolutePath) ? FINGERPRINTED_CACHE_CONTROL : UNFINGERPRINTED_CACHE_CONTROL
-	);
+	let control = UNFINGERPRINTED_CACHE_CONTROL;
+	if (isFingerprintedAssetPath(absolutePath)) {
+		control = FINGERPRINTED_CACHE_CONTROL;
+	} else if (absolutePath.endsWith('.mjs')) {
+		control = MODULE_CACHE_CONTROL;
+	}
+	res.setHeader('Cache-Control', control);
 }
 
 /**
@@ -189,6 +196,9 @@ export function staticAssetRequestKey(requestPath: string): string | null {
  * - Brotli precompressed sidecars when the client accepts `br`
  * - Rate limiting
  * - `Cache-Control: public, max-age=31536000, immutable` only for fingerprinted assets
+ * - `Cache-Control: public, no-cache` for `.mjs` modules: they are never
+ *   fingerprinted (import specifiers are literal filenames), so they must
+ *   revalidate every load or a stale cached copy serves old plugin code
  * - `ETag`/`Last-Modified` validators so stale-but-unchanged assets can be
  *   revalidated cheaply with a 304 (mainly the un-fingerprinted 1-day assets)
  */
@@ -262,5 +272,6 @@ export function createStaticAssetsMiddleware(
 
 export const staticAssetCacheControl = {
 	fingerprinted: FINGERPRINTED_CACHE_CONTROL,
-	unfingerprinted: UNFINGERPRINTED_CACHE_CONTROL
+	unfingerprinted: UNFINGERPRINTED_CACHE_CONTROL,
+	module: MODULE_CACHE_CONTROL
 };
