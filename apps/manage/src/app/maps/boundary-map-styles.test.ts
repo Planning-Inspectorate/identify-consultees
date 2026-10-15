@@ -37,6 +37,7 @@ describe('boundary map styles', () => {
 	});
 
 	const invalid: [string, string, RegExp][] = [
+		['an empty file', '', /version 1 document/],
 		['not a document', 'just text', /version 1 document/],
 		['the wrong version', VALID.replace('version: 1', 'version: 2'), /version 1 document/],
 		['no earlier styles', VALID.replace(/earlier:[\s\S]*/, 'earlier: []'), /at least one style/],

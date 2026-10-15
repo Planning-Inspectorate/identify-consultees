@@ -15,7 +15,7 @@ export function addLocalsConfiguration(options: { devPagesEnabled?: boolean } = 
 			accessibleAutocompleteJs: 'assets/js/accessible-autocomplete.min-876870ee.js',
 			accessibleAutocompleteCss: 'assets/css/accessible-autocomplete.min-4b7a52dc.css',
 			vendorInteractiveMapJs: 'vendor/interactive-map/js/index-66cff150.js',
-			vendorInteractiveMapCss: 'vendor/interactive-map/css/index-9d48e3b1.css',
+			vendorInteractiveMapCss: 'vendor/interactive-map/css/index-9efb1cb7.css',
 			vendorMaplibreProviderJs: 'vendor/maplibre-provider/js/index-4bb864af.js',
 			vendorDatasetsPluginJs: 'vendor/datasets-plugin/js/index-c4efa38e.js',
 			vendorDatasetsPluginCss: 'vendor/datasets-plugin/css/index-1a74fe4f.css',
