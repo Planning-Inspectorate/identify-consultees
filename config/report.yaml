@@ -1,0 +1,60 @@
+# Report: what the consultee report shows for each consultee category - how much its map shows
+# around the site, and which columns the downloaded workbook has. Read when the app starts
+# (apps/manage/src/app/report-config.ts), which refuses to start if a value here is invalid - so a
+# change is checked by `npm test` and takes effect on the next deploy.
+#
+#   columns    - the columns every row of the workbook's group tabs starts with, in order. Any of:
+#                  consultee        Consultee           the consultee's name
+#                  category         Category
+#                  region           Region
+#                  whyIdentified    Why identified      the ruleset conditions it met, or the reason
+#                                                       it was added by hand
+#                  source           Source              Ruleset, or Manually added
+#                  version          Version             the reference data row's version
+#                  distanceKm       Distance from site (km)
+#                  consulteeAreaId  Consultee area id
+#                  geometryType     Geometry type
+#                  caseReference    Case reference
+#                  lastUpdated      Last updated
+#                Then come the metadata columns each category exports (below).
+#
+#   defaults   - for every category not listed under categories (and anything one leaves out):
+#     mapKm      the least distance, in km, its map shows around the site on every side - the
+#                category's map on the report pages, and its page in the report's PDF maps. Maps
+#                zoom in whole levels, so they open at the closest zoom that shows at least this.
+#                The results page's map, of every category, uses the default.
+#     metadata   which of the source data's metadata attributes the workbook exports:
+#                  all    every attribute, each headed by its own name
+#                  none   none
+#                  or a list of attribute: column heading - only these, in this order. Attributes
+#                  given the same heading - in this category or others on the same tab - share one
+#                  column, so different datasets' codes or names can be combined.
+#
+#   categories - a category's own settings, overriding the defaults. Names must match
+#                consultee_area.consulteeCategory exactly (see kt-docs/data/reference-data.md).
+#
+# Example:
+#   categories:
+#     Parish Council:
+#       mapKm: 5
+#       metadata:
+#         PARNCP23NW: Parish name (Welsh)
+#     Police:
+#       mapKm: 30
+#       metadata: none
+
+version: 1
+
+columns:
+  - consultee
+  - category
+  - region
+  - whyIdentified
+  - source
+  - version
+
+defaults:
+  mapKm: 10
+  metadata: all
+
+categories: {}

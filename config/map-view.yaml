@@ -1,18 +1,13 @@
-# Map view: how much the maps show around a project's site when they open. Read when the app
-# starts (apps/manage/src/app/maps/map-view.ts), which refuses to start if a value here is invalid -
-# so a change is checked by `npm test` and takes effect on the next deploy.
+# Map view: how much the project boundary page's map shows around the case's shapefiles when it
+# opens. Read when the app starts (apps/manage/src/app/maps/map-view.ts), which refuses to start if
+# a value here is invalid - so a change is checked by `npm test` and takes effect on the next deploy.
 #
-# Each is the least distance, in km, shown around the site on every side. Maps zoom in whole
-# levels, so a map opens at the closest zoom that still shows at least this much - often a little
-# more. Users can always zoom out on the interactive maps.
+#   boundaryMapKm - the least distance, in km, shown around the shapefiles on every side. Maps zoom
+#                   in whole levels, so the map opens at the closest zoom that shows at least this.
 #
-#   consulteeMapsKm - the consultee maps: each category's map on the report pages, the results
-#                     page's, and the PDF maps in the report download. Compare the nearby distances
-#                     in nearby-consultees.yaml: consultees further out than this are drawn, but
-#                     only seen on zooming out.
-#   boundaryMapKm   - the project boundary page's map, of the case's shapefiles.
+# The consultee maps (each category's, the results page's and the report's PDF maps) are set per
+# category, by mapKm in report.yaml.
 
 version: 1
 
-consulteeMapsKm: 10
 boundaryMapKm: 0.5

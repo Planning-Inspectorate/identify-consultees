@@ -8,9 +8,9 @@ import type { CaseBoundaryFeature } from '@pins/identify-consultees-database/src
 import type { ConsulteeMatch } from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
 import { isIdentifiedByCondition } from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
 import type { Geometry } from '@pins/identify-consultees-database/src/geospatial/wkt.ts';
+import { REPORT_CONFIG } from '../report-config.ts';
 import { assignCategoryColours, colourFor, UNCATEGORISED } from './category-colours.ts';
 import { computeBounds, computeFittedMapView } from './geometry-bounds.ts';
-import { MAP_VIEW } from './map-view.ts';
 import type { GeoJsonFeature, GeoJsonFeatureCollection } from './sample-geojson.ts';
 import { MAP_VIEWPORT } from './sample-geojson.ts';
 
@@ -122,8 +122,8 @@ export function buildConsulteeMatchesGeojson(
 /**
  * A site's search area - the site grown by the nearby radius - and the matched consultee areas
  * touching it: what the map draws. The area itself isn't drawn - the map opens on the site, with
- * config/map-view.yaml's consulteeMapsKm around it: framing on whole counties and ambulance trusts
- * would zoom out so far the site is lost.
+ * config/report.yaml's mapKm around it: framing on whole counties and ambulance trusts would zoom
+ * out so far the site is lost.
  */
 export interface SearchAreaDisplay {
 	/** The site grown by the nearby radius. */
@@ -226,7 +226,9 @@ export function buildCaseMapConfig(
 	matches: MapMatch[],
 	rulesetName: string,
 	searchArea?: SearchAreaDisplay,
-	fallback?: { src: string; alt: string }
+	fallback?: { src: string; alt: string },
+	/** How much the map shows around the site - a category's mapKm in config/report.yaml, else the default. */
+	marginMetres: number = REPORT_CONFIG.defaults.mapMarginMetres
 ): CaseMapConfig {
 	const projectGeojson = buildProjectGeojson(project);
 	const colours = assignCategoryColours(matches.map(categoryOf));
@@ -239,7 +241,7 @@ export function buildCaseMapConfig(
 			: buildConsulteeMatchesGeojson(matches, colours),
 		searchAreaFeatures
 	);
-	const view = computeFittedMapView(projectGeojson, MAP_VIEWPORT, MAP_VIEW.consulteeMapsMarginMetres);
+	const view = computeFittedMapView(projectGeojson, MAP_VIEWPORT, marginMetres);
 	const mapLabel = `${rulesetName} for ${project.properties.caseName} (${project.properties.caseReference})`;
 
 	return {
