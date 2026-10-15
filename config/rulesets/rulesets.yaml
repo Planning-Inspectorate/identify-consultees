@@ -1,0 +1,137 @@
+# Ruleset settings: everything about the rulesets that isn't in their CSVs. Read when the app starts
+# (packages/database/src/geospatial/rulesets.ts), which refuses to start if a value here is invalid -
+# so a change is checked by `npm test` and takes effect on the next deploy.
+#
+# Each ruleset is one sheet of the rulesets workbook, saved here as <name>_ruleset.csv. Saving a new
+# sheet is all it takes for the app to offer it - nothing here needs changing unless the sheet uses
+# a Consultee Type(s) or Logic wording this file doesn't have yet (the app says which).
+#
+#   default                - the ruleset the pages pre-select: its file name, less _ruleset.csv.
+#   names                  - optional display names, by file name less _ruleset.csv. A ruleset not
+#                            listed is named from its file name: words capitalised, joining words
+#                            like "and" or "post" lower case, and a YYYYMMDD date written out -
+#                            england_wales_post_20240430 reads "England Wales post 30 April 2024".
+#                            Its id, in ?ruleset= links, is always the file name, kebab-cased.
+#   consulteeTypes         - what each Consultee Type(s) wording in the CSVs matches in the reference
+#                            data: its consultee categories (consultee_area.consulteeCategory - see
+#                            kt-docs/data/reference-data.md), and for a bordering condition the
+#                            category of the host area it borders. Wordings are compared ignoring
+#                            case and repeated spaces.
+#   logic                  - what each Logic wording in the CSVs means:
+#                              intersection  intersects the site itself
+#                              buffer        within the row's Buffer (km) of the site - the only
+#                                            logic a row can give a buffer
+#                              bordering     shares a border with the host area the site is in
+#                            Wordings are compared ignoring case and repeated spaces.
+#   categoriesAwaitingData - categories the rulesets name that no reference data has yet. Their
+#                            conditions match nothing until the data is loaded; `npm test` checks
+#                            every other category the rulesets name is in the reference data.
+#
+# A file name under default or names that isn't a ruleset in this folder stops the app starting,
+# rather than being ignored.
+
+version: 1
+
+default: england_wales_post_20240430
+
+names: {}
+#  england_wales_post_20240430: England and Wales, from 30 April 2024
+
+consulteeTypes:
+  # administrative boundaries - see the workbook's A-D_authorities sheet
+  Parish / Town / Community Councils:
+    categories: [Parish Council]
+  Community Councils bordering B Host Community Councils:
+    categories: [Parish Council]
+    hostCategory: Parish Council
+  District Councils (Lower Tier Authorities):
+    categories: [Lower Tier Authority]
+  Unitary Authorities:
+    categories: [Unitary Authority]
+  # Broads Authority areas are expected within the National Park data
+  National Parks & Broads:
+    categories: [National Park]
+  County Councils (Upper Tier Authorities):
+    categories: [Upper Tier Authority]
+  District Councils, Unitary Authorities, National Parks & Broads bordering B Host District Councils:
+    categories: [Lower Tier Authority, Unitary Authority, National Park]
+    hostCategory: Lower Tier Authority
+  County Councils, District Councils, Unitary Authorities, National Parks & Broads bordering B Host Unitary Authorities:
+    categories: [Upper Tier Authority, Lower Tier Authority, Unitary Authority, National Park]
+    hostCategory: Unitary Authority
+  County Councils, Unitary Authorities, National Parks & Broads and District Councils bordering B Host Unitary Authorities:
+    categories: [Upper Tier Authority, Lower Tier Authority, Unitary Authority, National Park]
+    hostCategory: Unitary Authority
+  County Councils, Unitary Authorities, National Parks & Broads bordering C Host County Councils:
+    categories: [Upper Tier Authority, Unitary Authority, National Park]
+    hostCategory: Upper Tier Authority
+  Greater London Authority:
+    categories: [Greater London Authority]
+  # public bodies
+  National Landscapes (formerly AONBs):
+    categories: [National Landscape]
+  Internal Drainage Boards (England & Wales):
+    categories: [Internal Drainage Board, Internal Drainage District]
+  Ambulance Trusts:
+    categories: [Ambulance Trust]
+  Fire & Rescue Authorities:
+    categories: [Fire and Rescue Authority]
+  # police force areas, which are also the PCCs' areas
+  Police & Crime Commissioners:
+    categories: [Police]
+  Hospitals operated by NHS Trusts and NHS Foundation Trusts (England):
+    categories: [Hospital]
+  Integrated Care Boards (England):
+    categories: [ICB]
+  Local Health Boards (Wales):
+    categories: [Local Health Board]
+  Local Resilience Forums:
+    categories: [Local Resilience Forum]
+  # energy
+  Electricity Generators (Biomass, Coal, Energy from Waste, Hydroelectric, Hydrogen, Natural Gas, Nuclear, Offshore Wind, Onshore Wind, Solar, Tidal, Other, Unknown):
+    categories: [Electricity Generator]
+  Offshore Wind Sites:
+    categories: [Offshore Wind Site]
+  Wind Export Cables:
+    categories: [Offshore Wind Export Cable]
+  Electricity Distribution Networks:
+    categories: [DNO]
+  Electricity Interconnectors (Built, Proposed, Scoping):
+    categories: [Interconnector]
+  Office for Nuclear Regulation Sites:
+    categories: [ONR Site]
+  # transport
+  Canals England & Wales:
+    categories: [Canal]
+  Railways:
+    categories: [Railway]
+  Passenger Transport Executives:
+    categories: [Passenger Transport Executive]
+  Integrated Transport Authorities:
+    categories: [Integrated Transport Authority]
+  Docks / Harbours operated by Statutory Harbour Authorities:
+    categories: [Dock or Harbour]
+  Joint Transport Authorities (Wales):
+    categories: [Joint Transport Authority]
+  # other
+  MoD Safeguarding Areas:
+    categories: [MOD Safeguarding Area]
+  MoD Low Flying Areas (Green, Amber, Red, Blue):
+    categories: [MOD Low Flying Area]
+  Coal Mining Reporting Areas:
+    categories: [Coal Mining Reporting Area]
+  Cheshire Brine Area:
+    categories: [Cheshire Brine Area]
+
+logic:
+  Intersects application site: intersection
+  Intersects application site buffer: buffer
+  Borders host authority: bordering
+
+categoriesAwaitingData:
+  - Canal
+  - Joint Transport Authority
+  - MOD Safeguarding Area
+  - MOD Low Flying Area
+  - Coal Mining Reporting Area
+  - Cheshire Brine Area

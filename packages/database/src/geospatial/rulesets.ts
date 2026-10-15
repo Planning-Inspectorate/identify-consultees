@@ -1,3 +1,4 @@
+import { load } from 'js-yaml';
 import { readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { CONFIG_DIR } from '../config-dir.ts';
@@ -52,141 +53,140 @@ export interface Ruleset {
 	rules: RuleCondition[];
 }
 
-/**
- * What each "Consultee Type(s)" in the rulesets workbook matches in the reference data: the
- * consultee_area categories, and for a bordering condition the category of the host area. Keyed by
- * the workbook's own wording (compared case- and space-insensitively). A wording missing from here
- * stops the app at startup (see parseRulesetCsv) rather than silently matching nothing - add it
- * here when the workbook gains a new consultee type.
- */
-interface ConsulteeTypeMapping {
+/** What a "Consultee Type(s)" wording matches: consultee_area categories, and a bordering one's host category. */
+export interface ConsulteeTypeMapping {
 	categories: string[];
 	hostCategory?: string;
 }
 
-const LOCAL_AUTHORITIES = {
-	parish: 'Parish Council',
-	district: 'Lower Tier Authority',
-	unitary: 'Unitary Authority',
-	county: 'Upper Tier Authority',
-	nationalPark: 'National Park'
-} as const;
-
-const CONSULTEE_TYPES: [string, ConsulteeTypeMapping][] = [
-	// administrative boundaries - see the workbook's A-D_authorities sheet
-	['Parish / Town / Community Councils', { categories: [LOCAL_AUTHORITIES.parish] }],
-	[
-		'Community Councils bordering B Host Community Councils',
-		{ categories: [LOCAL_AUTHORITIES.parish], hostCategory: LOCAL_AUTHORITIES.parish }
-	],
-	['District Councils (Lower Tier Authorities)', { categories: [LOCAL_AUTHORITIES.district] }],
-	['Unitary Authorities', { categories: [LOCAL_AUTHORITIES.unitary] }],
-	// Broads Authority areas are expected within the National Park data
-	['National Parks & Broads', { categories: [LOCAL_AUTHORITIES.nationalPark] }],
-	['County Councils (Upper Tier Authorities)', { categories: [LOCAL_AUTHORITIES.county] }],
-	[
-		'District Councils, Unitary Authorities, National Parks & Broads bordering B Host District Councils',
-		{
-			categories: [LOCAL_AUTHORITIES.district, LOCAL_AUTHORITIES.unitary, LOCAL_AUTHORITIES.nationalPark],
-			hostCategory: LOCAL_AUTHORITIES.district
-		}
-	],
-	[
-		'County Councils, District Councils, Unitary Authorities, National Parks & Broads bordering B Host Unitary Authorities',
-		{
-			categories: [
-				LOCAL_AUTHORITIES.county,
-				LOCAL_AUTHORITIES.district,
-				LOCAL_AUTHORITIES.unitary,
-				LOCAL_AUTHORITIES.nationalPark
-			],
-			hostCategory: LOCAL_AUTHORITIES.unitary
-		}
-	],
-	[
-		'County Councils, Unitary Authorities, National Parks & Broads and District Councils bordering B Host Unitary Authorities',
-		{
-			categories: [
-				LOCAL_AUTHORITIES.county,
-				LOCAL_AUTHORITIES.district,
-				LOCAL_AUTHORITIES.unitary,
-				LOCAL_AUTHORITIES.nationalPark
-			],
-			hostCategory: LOCAL_AUTHORITIES.unitary
-		}
-	],
-	[
-		'County Councils, Unitary Authorities, National Parks & Broads bordering C Host County Councils',
-		{
-			categories: [LOCAL_AUTHORITIES.county, LOCAL_AUTHORITIES.unitary, LOCAL_AUTHORITIES.nationalPark],
-			hostCategory: LOCAL_AUTHORITIES.county
-		}
-	],
-	['Greater London Authority', { categories: ['Greater London Authority'] }],
-	// public bodies
-	['National Landscapes (formerly AONBs)', { categories: ['National Landscape'] }],
-	[
-		'Internal Drainage Boards (England & Wales)',
-		{ categories: ['Internal Drainage Board', 'Internal Drainage District'] }
-	],
-	['Ambulance Trusts', { categories: ['Ambulance Trust'] }],
-	['Fire & Rescue Authorities', { categories: ['Fire and Rescue Authority'] }],
-	// police force areas, which are also the PCCs' areas
-	['Police & Crime Commissioners', { categories: ['Police'] }],
-	['Hospitals operated by NHS Trusts and NHS Foundation Trusts (England)', { categories: ['Hospital'] }],
-	['Integrated Care Boards (England)', { categories: ['ICB'] }],
-	['Local Health Boards (Wales)', { categories: ['Local Health Board'] }],
-	['Local Resilience Forums', { categories: ['Local Resilience Forum'] }],
-	// energy
-	[
-		'Electricity Generators (Biomass, Coal, Energy from Waste, Hydroelectric, Hydrogen, Natural Gas, Nuclear, Offshore Wind, Onshore Wind, Solar, Tidal, Other, Unknown)',
-		{ categories: ['Electricity Generator'] }
-	],
-	['Offshore Wind Sites', { categories: ['Offshore Wind Site'] }],
-	['Wind Export Cables', { categories: ['Offshore Wind Export Cable'] }],
-	['Electricity Distribution Networks', { categories: ['DNO'] }],
-	['Electricity Interconnectors (Built, Proposed, Scoping)', { categories: ['Interconnector'] }],
-	['Office for Nuclear Regulation Sites', { categories: ['ONR Site'] }],
-	// transport
-	['Canals England & Wales', { categories: ['Canal'] }],
-	['Railways', { categories: ['Railway'] }],
-	['Passenger Transport Executives', { categories: ['Passenger Transport Executive'] }],
-	['Integrated Transport Authorities', { categories: ['Integrated Transport Authority'] }],
-	['Docks / Harbours operated by Statutory Harbour Authorities', { categories: ['Dock or Harbour'] }],
-	['Joint Transport Authorities (Wales)', { categories: ['Joint Transport Authority'] }],
-	// other
-	['MoD Safeguarding Areas', { categories: ['MOD Safeguarding Area'] }],
-	['MoD Low Flying Areas (Green, Amber, Red, Blue)', { categories: ['MOD Low Flying Area'] }],
-	['Coal Mining Reporting Areas', { categories: ['Coal Mining Reporting Area'] }],
-	['Cheshire Brine Area', { categories: ['Cheshire Brine Area'] }]
-];
+/** What a Logic wording means: intersects the site, within the row's buffer of it, or borders the host area. */
+export type RuleLogic = 'intersection' | 'buffer' | 'bordering';
 
 /**
- * Categories the rulesets name that no reference data provides yet. Their conditions match
- * nothing until data with these category names is loaded - deliberately, rather than being left
- * out of the rulesets (see kt-docs/data/screening-engine.md).
+ * Everything about the rulesets that isn't in their CSVs, from config/rulesets/rulesets.yaml - see
+ * the file for what each setting means. The workbook's wordings are keyed normalised (see
+ * normalise), so they match case- and space-insensitively.
  */
-export const CATEGORIES_AWAITING_DATA: ReadonlySet<string> = new Set([
-	'Canal',
-	'Joint Transport Authority',
-	'MOD Safeguarding Area',
-	'MOD Low Flying Area',
-	'Coal Mining Reporting Area',
-	'Cheshire Brine Area'
-]);
+export interface RulesetSettings {
+	/** The ruleset pages pre-select, by file name less `_ruleset.csv`. */
+	default: string;
+	/** Display names, by file name less `_ruleset.csv` - any other is named from its file name. */
+	names: Record<string, string>;
+	consulteeTypes: Map<string, ConsulteeTypeMapping>;
+	logic: Map<string, RuleLogic>;
+	/**
+	 * Categories the rulesets name that no reference data provides yet. Their conditions match
+	 * nothing until data with these category names is loaded - deliberately, rather than being left
+	 * out of the rulesets (see kt-docs/data/screening-engine.md).
+	 */
+	categoriesAwaitingData: ReadonlySet<string>;
+}
+
+const SETTINGS_FILE = 'rulesets.yaml';
+const RULE_LOGICS: RuleLogic[] = ['intersection', 'buffer', 'bordering'];
 
 function normalise(text: string): string {
 	return text.trim().replace(/\s+/g, ' ').toLowerCase();
 }
 
-const CONSULTEE_TYPE_MAPPINGS = new Map(CONSULTEE_TYPES.map(([type, mapping]) => [normalise(type), mapping]));
+function isRecord(value: unknown): value is Record<string, unknown> {
+	return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
 
-/** The workbook's Logic column: within the site itself, within a buffer of it, or bordering a host area. */
-const LOGIC_TYPES = new Map<string, RuleLogicType>([
-	['intersects application site', 'intersection'],
-	['intersects application site buffer', 'intersection'],
-	['borders host authority', 'bordering']
-]);
+function fail(message: string): never {
+	throw new Error(`${SETTINGS_FILE}: ${message}`);
+}
+
+/** Refuse keys a section doesn't have - a typo would otherwise be silently ignored. */
+function onlyKeys(section: Record<string, unknown>, allowed: string[], name: string): void {
+	const unknown = Object.keys(section).filter((key) => !allowed.includes(key));
+	if (unknown.length > 0) {
+		fail(`${name} has ${unknown.map((key) => `"${key}"`).join(', ')} - it can only have ${allowed.join(', ')}`);
+	}
+}
+
+function isText(value: unknown): value is string {
+	return typeof value === 'string' && value.trim() !== '';
+}
+
+/** A section keyed by the workbook's wording, each wording once however it's cased or spaced. */
+function parseWordings<T>(value: unknown, name: string, parse: (entry: unknown, where: string) => T): Map<string, T> {
+	if (!isRecord(value) || Object.keys(value).length === 0) {
+		fail(`${name} must map at least one of the workbook's wordings to what it means`);
+	}
+	const wordings = new Map<string, T>();
+	for (const [wording, entry] of Object.entries(value)) {
+		const key = normalise(wording);
+		if (wordings.has(key)) {
+			fail(`${name} lists "${wording}" twice`);
+		}
+		wordings.set(key, parse(entry, `${name}.${wording}`));
+	}
+	return wordings;
+}
+
+function parseConsulteeType(value: unknown, name: string): ConsulteeTypeMapping {
+	if (!isRecord(value)) {
+		fail(`${name} must set categories`);
+	}
+	onlyKeys(value, ['categories', 'hostCategory'], name);
+	const { categories, hostCategory } = value;
+	if (!Array.isArray(categories) || categories.length === 0 || !categories.every(isText)) {
+		fail(`${name}.categories must list at least one consultee category`);
+	}
+	if (hostCategory !== undefined && !isText(hostCategory)) {
+		fail(`${name}.hostCategory must be a consultee category`);
+	}
+	return {
+		categories: categories.map((category) => category.trim()),
+		...(hostCategory === undefined ? {} : { hostCategory: hostCategory.trim() })
+	};
+}
+
+function parseLogic(value: unknown, name: string): RuleLogic {
+	if (!RULE_LOGICS.includes(value as RuleLogic)) {
+		fail(`${name} must be intersection, buffer or bordering`);
+	}
+	return value as RuleLogic;
+}
+
+function parseRulesetFileNames(value: unknown, name: string): Record<string, string> {
+	if (!isRecord(value)) {
+		fail(`${name} must map file names to display names`);
+	}
+	for (const [file, displayName] of Object.entries(value)) {
+		if (!isText(displayName)) {
+			fail(`${name}.${file} must be a display name`);
+		}
+	}
+	return Object.fromEntries(Object.entries(value).map(([file, displayName]) => [file, String(displayName).trim()]));
+}
+
+export function parseRulesetSettings(text: string): RulesetSettings {
+	const document = text.trim() === '' ? null : load(text);
+	if (!isRecord(document) || document.version !== 1) {
+		fail('must be a version 1 document');
+	}
+	onlyKeys(
+		document,
+		['version', 'default', 'names', 'consulteeTypes', 'logic', 'categoriesAwaitingData'],
+		'the document'
+	);
+	if (!isText(document.default)) {
+		fail('default must be the file name, less _ruleset.csv, of the ruleset pages pre-select');
+	}
+	const awaiting = document.categoriesAwaitingData ?? [];
+	if (!Array.isArray(awaiting) || !awaiting.every(isText)) {
+		fail('categoriesAwaitingData must list consultee categories');
+	}
+	return {
+		default: document.default.trim(),
+		names: parseRulesetFileNames(document.names ?? {}, 'names'),
+		consulteeTypes: parseWordings(document.consulteeTypes, 'consulteeTypes', parseConsulteeType),
+		logic: parseWordings(document.logic, 'logic', parseLogic),
+		categoriesAwaitingData: new Set(awaiting.map((category) => category.trim()))
+	};
+}
 
 const RULESET_CSV_COLUMNS = [
 	'Group hierarchy',
@@ -272,11 +272,11 @@ function conditionName(category: string, consulteeType: string): string {
 
 /**
  * Parse one ruleset - one sheet of the rulesets workbook saved as CSV - into RuleConditions. Each
- * row's Consultee Type(s) is looked up in CONSULTEE_TYPES and its Logic in LOGIC_TYPES; anything
- * unrecognised, a buffer that isn't a number, a buffer on a condition that can't have one, or two
- * rows that would get the same id throws, naming the row.
+ * row's Consultee Type(s) and Logic are looked up in the settings' consulteeTypes and logic;
+ * anything unrecognised, a buffer that isn't a number, a buffer on a condition that can't have one,
+ * or two rows that would get the same id throws, naming the row.
  */
-export function parseRulesetCsv(contents: string): RuleCondition[] {
+export function parseRulesetCsv(contents: string, settings: RulesetSettings = RULESET_SETTINGS): RuleCondition[] {
 	const [header, ...rows] = parseCsv(contents);
 	const columns = (header ?? []).map((column) => column.trim().toLowerCase());
 	const indexOf = Object.fromEntries(
@@ -294,21 +294,22 @@ export function parseRulesetCsv(contents: string): RuleCondition[] {
 		const cell = (column: (typeof RULESET_CSV_COLUMNS)[number]) => (cells[indexOf[column]] ?? '').trim();
 		const where = `ruleset row ${index + 2} ("${cell('Consultee Type(s)')}")`;
 
-		const mapping = CONSULTEE_TYPE_MAPPINGS.get(normalise(cell('Consultee Type(s)')));
+		const mapping = settings.consulteeTypes.get(normalise(cell('Consultee Type(s)')));
 		if (!mapping) {
-			throw new Error(`Unknown consultee type in ${where} - add it to CONSULTEE_TYPES in rulesets.ts`);
+			throw new Error(`Unknown consultee type in ${where} - add it to consulteeTypes in ${SETTINGS_PATH}`);
 		}
-		const logicType = LOGIC_TYPES.get(normalise(cell('Logic')));
-		if (!logicType) {
-			throw new Error(`Unknown logic "${cell('Logic')}" in ${where}`);
+		const logic = settings.logic.get(normalise(cell('Logic')));
+		if (!logic) {
+			throw new Error(`Unknown logic "${cell('Logic')}" in ${where} - add it to logic in ${SETTINGS_PATH}`);
 		}
 		const bufferKm = cell('Buffer (km)') === '' ? 0 : Number(cell('Buffer (km)'));
 		if (!Number.isFinite(bufferKm) || bufferKm < 0) {
 			throw new Error(`Buffer (km) must be a number of 0 or more in ${where}`);
 		}
-		if (bufferKm > 0 && normalise(cell('Logic')) !== 'intersects application site buffer') {
-			throw new Error(`Only "Intersects application site buffer" can have a buffer, in ${where}`);
+		if (bufferKm > 0 && logic !== 'buffer') {
+			throw new Error(`Only a buffer logic can have a buffer, in ${where}`);
 		}
+		const logicType: RuleLogicType = logic === 'bordering' ? 'bordering' : 'intersection';
 		if (logicType === 'bordering' && !mapping.hostCategory) {
 			throw new Error(`A bordering condition needs a host authority, in ${where}`);
 		}
@@ -335,14 +336,26 @@ export function parseRulesetCsv(contents: string): RuleCondition[] {
 }
 
 /** Build one named Ruleset from a whole CSV export - every row becomes one of its conditions. */
-export function buildRulesetFromCsv(id: string, name: string, contents: string): Ruleset {
-	return { id, name, rules: parseRulesetCsv(contents) };
+export function buildRulesetFromCsv(
+	id: string,
+	name: string,
+	contents: string,
+	settings: RulesetSettings = RULESET_SETTINGS
+): Ruleset {
+	return { id, name, rules: parseRulesetCsv(contents, settings) };
 }
 
 // Every ruleset is one sheet of the rulesets workbook saved as `<name>_ruleset.csv` in
-// config/rulesets/ - with the other files a maintainer edits (see config/README.md)
+// config/rulesets/, with rulesets.yaml - among the other files a maintainer edits (see
+// config/README.md)
 const RULESETS_DIR = path.join(CONFIG_DIR, 'rulesets');
 const RULESET_FILE_SUFFIX = '_ruleset.csv';
+const SETTINGS_PATH = `config/rulesets/${SETTINGS_FILE}`;
+
+export const RULESET_SETTINGS = parseRulesetSettings(readFileSync(path.join(RULESETS_DIR, SETTINGS_FILE), 'utf8'));
+
+/** Categories the rulesets name that no reference data provides yet (see RulesetSettings). */
+export const CATEGORIES_AWAITING_DATA = RULESET_SETTINGS.categoriesAwaitingData;
 
 const MONTHS = [
 	'January',
@@ -407,30 +420,44 @@ export function rulesetNameFromFileName(fileName: string): string {
 }
 
 /**
- * The ruleset pages pre-select when none is chosen: England and Wales after 30 April 2024, which
- * most new applications fall under. Set explicitly rather than taken from file-name order, which
- * would make "England pre 30 April 2024" the default.
+ * Every `*_ruleset.csv` in `dir`: the settings' default first (pages use RULESETS[0]), then the
+ * rest in file-name order, each with its display name from the settings or else its file name. A
+ * default or name for a file that isn't there throws, naming it, rather than being ignored.
  */
-export const DEFAULT_RULESET_ID = 'england-wales-post-20240430';
-
-/**
- * Every `*_ruleset.csv` in `dir`: `defaultId`'s first (it's the default - pages use RULESETS[0]),
- * then the rest in file-name order.
- */
-export function loadRulesets(dir: string = RULESETS_DIR, defaultId: string = DEFAULT_RULESET_ID): Ruleset[] {
+export function loadRulesets(dir: string = RULESETS_DIR, settings: RulesetSettings = RULESET_SETTINGS): Ruleset[] {
 	const files = readdirSync(dir)
 		.filter((file) => file.endsWith(RULESET_FILE_SUFFIX))
 		.sort();
 	if (files.length === 0) {
 		throw new Error(`No ruleset exports (*${RULESET_FILE_SUFFIX}) found in ${dir}`);
 	}
+	const stems = files.map(rulesetStem);
+	for (const [setting, stem] of [
+		['default', settings.default],
+		...Object.keys(settings.names).map((stem) => [`names.${stem}`, stem])
+	]) {
+		if (!stems.includes(stem)) {
+			throw new Error(
+				`${SETTINGS_FILE}: ${setting} names "${stem}", but there's no ${stem}${RULESET_FILE_SUFFIX} - use one of ${stems.join(', ')}`
+			);
+		}
+	}
 	const rulesets = files.map((file) =>
 		buildRulesetFromCsv(
 			rulesetIdFromFileName(file),
-			rulesetNameFromFileName(file),
-			readFileSync(path.join(dir, file), 'utf8')
+			Object.hasOwn(settings.names, rulesetStem(file))
+				? settings.names[rulesetStem(file)]
+				: rulesetNameFromFileName(file),
+			readFileSync(path.join(dir, file), 'utf8'),
+			settings
 		)
 	);
+	const names = rulesets.map((ruleset) => ruleset.name);
+	const repeated = names.find((name, index) => names.indexOf(name) !== index);
+	if (repeated) {
+		throw new Error(`${SETTINGS_FILE}: two rulesets would both be named "${repeated}" - give one a name under names`);
+	}
+	const defaultId = rulesetIdFromFileName(settings.default);
 	return [
 		...rulesets.filter((ruleset) => ruleset.id === defaultId),
 		...rulesets.filter((ruleset) => ruleset.id !== defaultId)
@@ -438,7 +465,7 @@ export function loadRulesets(dir: string = RULESETS_DIR, defaultId: string = DEF
 }
 
 // Saving another sheet of the rulesets workbook as `<name>_ruleset.csv` in config/rulesets/ is all
-// it takes for the app to offer it.
+// it takes for the app to offer it - rulesets.yaml only needs changing for a new wording.
 export const RULESETS: Ruleset[] = loadRulesets();
 
 export function getRuleset(id: string): Ruleset | undefined {

@@ -14,19 +14,19 @@ A ruleset is a list of **conditions**, such as "the district council the site is
 | `en_pre_30_04_2024` | `england_pre_20240430_ruleset.csv`        | England pre 30 April 2024        |         31 |
 | `wa_pre_30_04_2024` | `wales_pre_20240430_ruleset.csv`          | Wales pre 30 April 2024          |         23 |
 
-The file name gives the id and display name: `england_wales_post_20240430_ruleset.csv` is `england-wales-post-20240430`, shown as "England Wales post 30 April 2024" (joining words stay lower case, `YYYYMMDD` dates are written out). Rename the file to change what users see. England Wales post 30 April 2024 is the default (`DEFAULT_RULESET_ID`).
+The file name gives the id and display name: `england_wales_post_20240430_ruleset.csv` is `england-wales-post-20240430`, shown as "England Wales post 30 April 2024" (joining words stay lower case, `YYYYMMDD` dates are written out). Rename the file, or give it a name under `names` in [`config/rulesets/rulesets.yaml`](../../config/rulesets/rulesets.yaml), to change what users see. England Wales post 30 April 2024 is the default (`default` in the same file).
 
-| CSV column                 | Meaning                                                                                                                                   |
-| -------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
-| `Group hierarchy`, `Group` | The workbook's grouping (administrative boundaries, public bodies, energy...). Not used by screening                                      |
-| `Category`                 | For administrative boundaries, the authority role from the workbook's A-D_authorities sheet (`B Host Authority`, `A Bordering Authority`) |
-| `Consultee Type(s)`        | Which consultees, in words. `CONSULTEE_TYPES` in `rulesets.ts` maps each wording to categories, and a bordering one to its host category  |
-| `Logic`                    | `Intersects application site`, `Intersects application site buffer`, or `Borders host authority`                                          |
-| `Buffer (km)`              | For the buffer logic: distance from the site                                                                                              |
+| CSV column                 | Meaning                                                                                                                                                                             |
+| -------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Group hierarchy`, `Group` | The workbook's grouping (administrative boundaries, public bodies, energy...). Not used by screening                                                                                |
+| `Category`                 | For administrative boundaries, the authority role from the workbook's A-D_authorities sheet (`B Host Authority`, `A Bordering Authority`)                                           |
+| `Consultee Type(s)`        | Which consultees, in words. `consulteeTypes` in `rulesets.yaml` maps each wording to categories, and a bordering one to its host category                                           |
+| `Logic`                    | `Intersects application site`, `Intersects application site buffer`, or `Borders host authority`. `logic` in `rulesets.yaml` maps each wording to intersection, buffer or bordering |
+| `Buffer (km)`              | For the buffer logic: distance from the site                                                                                                                                        |
 
 **An unrecognised Consultee Type(s), Logic or buffer stops the app at start-up**, naming the row, rather than silently matching nothing. A condition's id comes from its authority letter, consultee type and buffer (`b_host_unitary_authorities`, `ambulance_trusts_10km`); its name, shown in **Why identified**, keeps the letter (`"B" host Unitary Authorities`).
 
-Some consultee types have no reference data yet: canals, Joint Transport Authorities (Wales), MoD safeguarding and low flying areas, coal mining reporting areas and the Cheshire brine area (`CATEGORIES_AWAITING_DATA`). Their conditions stay in the rulesets and match nothing until data with those category names is loaded. The check page still lists them, with nothing found.
+Some consultee types have no reference data yet: canals, Joint Transport Authorities (Wales), MoD safeguarding and low flying areas, coal mining reporting areas and the Cheshire brine area (`categoriesAwaitingData` in `rulesets.yaml`). Their conditions stay in the rulesets and match nothing until data with those category names is loaded. The check page still lists them, with nothing found.
 
 ## How a run works
 
@@ -106,8 +106,8 @@ Long linear schemes are by far the slowest. Azure SQL is slower than a laptop an
 ## Changing a ruleset
 
 1. Update the workbook, then save each changed sheet as CSV (UTF-8) over its `<name>_ruleset.csv`, or as a new one beside them. No code change: conditions travel with each request.
-2. A new Consultee Type(s) wording needs an entry in `CONSULTEE_TYPES`; the app won't start until it has one, and `npm test` says which row.
-3. Check each condition's category exists in the [reference data](./reference-data.md); the rulesets test fails on one that doesn't, unless it's listed in `CATEGORIES_AWAITING_DATA`.
+2. A new Consultee Type(s) or Logic wording needs an entry in `consulteeTypes` or `logic` in `config/rulesets/rulesets.yaml`; the app won't start until it has one, and `npm test` says which row.
+3. Check each condition's category exists in the [reference data](./reference-data.md); the rulesets test fails on one that doesn't, unless it's listed in `categoriesAwaitingData`.
 4. Regenerate the golden expectations from an independent calculation, not the app's own output.
 
 ## What screening needs from the data

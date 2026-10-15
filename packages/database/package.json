@@ -19,7 +19,8 @@
     "@azure/identity": "*",
     "@azure/storage-blob": "*",
     "@prisma/adapter-mssql": "*",
-    "@prisma/client": "*"
+    "@prisma/client": "*",
+    "js-yaml": "^5.4.3"
   },
   "devDependencies": {
     "prisma": "*"
