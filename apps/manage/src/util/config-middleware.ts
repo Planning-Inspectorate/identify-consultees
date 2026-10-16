@@ -7,9 +7,9 @@ import type { Handler } from 'express';
 export function addLocalsConfiguration(options: { devPagesEnabled?: boolean } = {}): Handler {
 	return (req, res, next) => {
 		res.locals.config = {
-			styleFile: 'style-ef5a9465.css',
+			styleFile: 'style-cc66c70c.css',
 			govukFrontendJs: 'assets/js/govuk-frontend.min-0391e416.js',
-			consulteesMapJs: 'javascripts/consultees-map-5c408849.js',
+			consulteesMapJs: 'javascripts/consultees-map-5855bb06.js',
 			mapLayersDemoJs: 'javascripts/map-layers-demo-130dc1a5.js',
 			consulteeAutocompleteJs: 'javascripts/consultee-autocomplete-8efbbdc4.js',
 			accessibleAutocompleteJs: 'assets/js/accessible-autocomplete.min-876870ee.js',
@@ -25,7 +25,7 @@ export function addLocalsConfiguration(options: { devPagesEnabled?: boolean } = 
 			vendorDrawPluginJs: 'vendor/draw-plugin/js/index-1f40ff7e.js',
 			vendorMapStylesPluginJs: 'vendor/map-styles-plugin/js/index-c9ffb685.js',
 			vendorMapStylesPluginCss: 'vendor/map-styles-plugin/css/index-d8fa9e70.css',
-			interactiveMapExamplesJs: 'javascripts/interactive-map-examples-df5dc723.js',
+			interactiveMapExamplesJs: 'javascripts/interactive-map-examples-8b09e791.js',
 			headerTitle: 'Identify consultees',
 			// the support links the site footer lists - generic Planning Inspectorate pages
 			footerLinks: [

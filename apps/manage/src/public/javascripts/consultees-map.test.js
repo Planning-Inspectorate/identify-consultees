@@ -331,6 +331,8 @@ describe('consultees-map client helpers', () => {
 
 		initConsulteeMap('map-2');
 		assert.equal(InteractiveMap.mock.callCount(), 1);
+		// the map-key bundle is loaded so the Key tab can borrow its component
+		assert.equal(defra.mapKeyPlugin.mock.callCount(), 1);
 		// the page's zoom 8 is on 256px raster tiles - MapLibre's 512px levels count one fewer
 		assert.equal(InteractiveMap.mock.calls[0].arguments[1].zoom, 7);
 
@@ -389,9 +391,14 @@ describe('consultees-map client helpers', () => {
 			</body></html>`
 		);
 		const handlers = {};
+		const fire = (event, payload) => {
+			for (const handler of handlers[event] ?? []) {
+				handler(payload);
+			}
+		};
 		const map = {
 			on: (event, handler) => {
-				handlers[event] = handler;
+				(handlers[event] ??= []).push(handler);
 			},
 			addPanel: mock.fn((id, options) => {
 				document.body.insertAdjacentHTML('beforeend', options.html);
@@ -415,23 +422,23 @@ describe('consultees-map client helpers', () => {
 		initConsulteeMap('map-4');
 		assert.deepEqual(interactPlugin.mock.calls[0].arguments[0].interactionModes, ['selectFeature']);
 
-		handlers['map:ready']();
+		fire('map:ready');
 		assert.equal(interact.enable.mock.callCount(), 1);
 		assert.equal(map.addPanel.mock.calls[0].arguments[0], 'consultee-details');
 		assert.equal(map.hidePanel.mock.callCount(), 1);
 
-		handlers['interact:selectionchange']({
+		fire('interact:selectionchange', {
 			selectedFeatures: [{ properties: { consulteeId: 'x', name: 'Offley', consulteeCategory: 'Parish Council' } }]
 		});
 		assert.equal(map.showPanel.mock.callCount(), 1);
 		assert.match(document.getElementById('consultee-details-content').innerHTML, /Offley/);
 
-		handlers['interact:selectionchange']({ selectedFeatures: [] });
+		fire('interact:selectionchange', { selectedFeatures: [] });
 		assert.equal(map.hidePanel.mock.callCount(), 2);
 
-		handlers['app:panelclosed']({ panelId: 'some-other-panel' });
+		fire('app:panelclosed', { panelId: 'some-other-panel' });
 		assert.equal(interact.clear.mock.callCount(), 0);
-		handlers['app:panelclosed']({ panelId: 'consultee-details' });
+		fire('app:panelclosed', { panelId: 'consultee-details' });
 		assert.equal(interact.clear.mock.callCount(), 1);
 	});
 
@@ -443,13 +450,13 @@ describe('consultees-map client helpers', () => {
 			</body></html>`
 		);
 
+		// no mapKeyPlugin on purpose - a page without the bundle must still init
 		globalThis.defra = {
 			InteractiveMap: mock.fn(() => {
 				throw new Error('boom');
 			}),
 			maplibreProvider: mock.fn(() => ({})),
-			datasetsPlugin: mock.fn(() => ({})),
-			mapKeyPlugin: mock.fn(() => ({}))
+			datasetsPlugin: mock.fn(() => ({}))
 		};
 		globalThis.window.defra = globalThis.defra;
 
