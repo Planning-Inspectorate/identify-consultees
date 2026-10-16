@@ -2,8 +2,8 @@
  * Initialise Defra Interactive Maps for each consultee section on the results page.
  *
  * Pattern ported from PINS-data-spike `uploads-map.js` / `case-map.js`:
- * - datasetsPlugin (its own Layers menu hidden) + layers-key-plugin for a combined
- *   layers/legend panel
+ * - datasetsPlugin's built-in Layers menu + a "Key" tab injected into its panel
+ *   via the component's slot system (layers-key-slot.mjs)
  * - OpenFreeMap Liberty basemap
  * - Static map fallback (PNG or SVG) via `config.fallback` when interactive init fails,
  *   owned by static-map-plugin.mjs. Fallback details travel in the page's JSON
@@ -11,7 +11,7 @@
  *   every data-* attribute on its container.
  */
 
-import { createLayersKeyPlugin } from './layers-key-plugin.mjs';
+import { injectLayersKeyTab } from './layers-key-slot.mjs';
 import { createStaticMapPlugin } from './static-map-plugin.mjs';
 
 // consultee features carry their category colour (`colour`), assigned server-side so the static map
@@ -329,10 +329,9 @@ export function initConsulteeMap(mapId) {
 
 	try {
 		const datasets = buildDatasets(config);
-		// hasMenu:false hides the plugin's own Layers button/panel - the layers-key plugin
-		// below shows the same toggles with each layer's key symbol inline
-		const datasetsPlugin = defra.datasetsPlugin({ datasets, hasMenu: false });
-		const layersKeyPlugin = createLayersKeyPlugin({ datasets });
+		const datasetsPlugin = defra.datasetsPlugin({ datasets });
+		// not registered as a plugin - injectLayersKeyTab only borrows its Key component
+		const mapKeyPlugin = defra.mapKeyPlugin?.();
 		const interactPlugin = defra.interactPlugin?.({
 			interactionModes: ['selectFeature'],
 			deselectOnClickOutside: true,
@@ -351,8 +350,9 @@ export function initConsulteeMap(mapId) {
 			zoom: interactiveZoom(config.zoom),
 			containerHeight: `${config.height ?? 516}px`,
 			mapLabel: config.mapLabel,
-			plugins: [datasetsPlugin, layersKeyPlugin, staticMapPlugin, ...(interactPlugin ? [interactPlugin] : [])]
+			plugins: [datasetsPlugin, staticMapPlugin, ...(interactPlugin ? [interactPlugin] : [])]
 		});
+		map.on('map:ready', () => injectLayersKeyTab(map, mapKeyPlugin));
 		if (interactPlugin) {
 			wireFeatureDetails(map, interactPlugin);
 		}
