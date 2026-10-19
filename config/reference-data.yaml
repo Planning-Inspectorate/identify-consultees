@@ -19,6 +19,12 @@
 version: 1
 
 datasets:
+  # local authorities
+  PAR_EW: Parish Council
+  LTA_EW: Lower Tier Authority
+  UTA_EW: Unitary Authority
+  UPT_EW: Upper Tier Authority
+  GLA_EW: Greater London Authority
   # administrative boundaries
   FRS_EW: Fire and Rescue Authority
   POL_EW: Police
