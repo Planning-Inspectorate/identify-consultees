@@ -19,8 +19,8 @@ export const pageLocals = {
 		headerTitle: 'Identify consultees',
 		// the same support links config-middleware puts on every page
 		footerLinks: [
-			{ text: 'Terms and conditions', link: '/terms-and-conditions' },
-			{ text: 'Accessibility statement', link: '/accessibility-statement' },
+			{ text: 'Terms and conditions', link: '/terms-and-conditions', hidden: true },
+			{ text: 'Accessibility statement', link: '/accessibility-statement', hidden: true },
 			{
 				text: 'Privacy',
 				link: 'https://www.gov.uk/government/publications/planning-inspectorate-privacy-notices/customer-privacy-notice'

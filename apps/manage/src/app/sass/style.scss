@@ -58,6 +58,12 @@ $font-family: arial, helvetica, sans-serif;
 	white-space: pre-wrap;
 }
 
+// a footer link kept routed but taken out of the list (config-middleware marks it `hidden`)
+// while its content is unaudited - hiding the whole list item leaves no gap in the inline list
+.pins-footer__item--hidden {
+	display: none;
+}
+
 // Component showcase (/components): box around each rendered fixture example
 .pins-component-example {
 	padding: index.govuk-spacing(4);
