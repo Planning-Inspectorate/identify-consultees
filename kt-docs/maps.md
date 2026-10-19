@@ -42,6 +42,23 @@ Clicking a feature selects it and a "Selected on the map" panel shows its name, 
 - A custom `symbolSvgContent` must include `{{haloColor}}`, `{{selectedColor}}` and `{{activeColor}}`, or it isn't drawn.
 - A sublayer is drawn as points only if its style sets `symbol`.
 
+## Loading state
+
+The Defra component has no built-in "loading map" message. `im-is-loading` only hides the `<body>` until the app mounts (anti-flicker for fullscreen behaviour); there's no spinner or `loadingText` option; and a plugin manifest can't help — a plugin's `load()` runs inside `loadApp()`, after the `im-core` and provider chunks have downloaded, so nothing registered there can cover the download phase. The `middle` slot is documented for loading screens but only exists after the React app mounts, and `createRoot()` discards anything already inside the container at that point.
+
+`map-loading-plugin.mjs` manages the overlay outside the app instead: the container is wrapped in `.app-map-loading-wrap` and the `.app-map-loading` overlay sits beside it, so it survives the React mount and covers the whole window from script execution to tiles-idle. `consultee-map-region.njk` and `example.njk` server-render the same markup inside the container (hidden by a `noscript` style), which the plugin adopts — moves out of the container before `replaceChildren()`/`createRoot()` would discard it — so one seamless overlay covers first paint to first idle.
+
+Dismissal is `map:firstidle` — the first MapLibre `idle`, once style, sources and tiles have settled (the provider emits it once, `map:ready`/`map:loaded` fire earlier on `load`) — or the `.im-c-error` watcher it shares with the static fallback, or a 60s safety timeout: the provider forwards no MapLibre `error` event, so a failed style or tile fetch would otherwise leave the overlay up forever.
+
+It only suits `behaviour: 'inline'` — buttonFirst's collapsed launcher is inside the covered area and a fullscreen app escapes the sibling overlay (`position: fixed`), so `interactive-map-examples.js` skips it for other behaviours. A fullscreen-capable variant would need a `middle`-slot panel (post-mount coverage only) or the component gaining a loading API upstream.
+
+## Serving map data at scale
+
+Embedded GeoJSON in the page config is fine at current sizes. If a map ever needs more features than a page can carry (for example every project boundary nationwide), the datasets plugin offers two paths, both with backend implications:
+
+- `dynamicGeoJSON` — the plugin fetches GeoJSON per viewport (`bbox` via `transformRequest`). Needs a backend endpoint that clips/filters by bounding box (PostGIS `ST_Intersects` + `ST_MakeEnvelope`) and honours `maxFeatures`/simplification; auth headers are supported through `transformRequest`.
+- `tiles` + `sourceLayer` — vector tiles. Either generated on demand (PostGIS `ST_AsMVT` behind an endpoint) or pre-built archives. **PMTiles and FlatGeobuf need HTTP range requests**: the server (or CDN/front door in front of it) must accept `Range` headers and return `206 Partial Content` with `Accept-Ranges: bytes`. Azure Blob Storage supports ranges natively, but an app-proxied or fronted endpoint must forward the header and stream partial responses — worth verifying early, as a broken range path fails silently into full-file downloads or missing data. The bundled MapLibre provider does not register the `pmtiles://` protocol, so that would need wiring too.
+
 ## Framing
 
 Both maps frame the search area, or the project and matches when there isn't one. If you change `buildCaseMapConfig` or the geometry helpers, check both. **Known issue:** the static image comes out much wider than the interactive map for the same centre and zoom (Hinkley Point C's spans South Wales to the south coast). Not yet investigated.

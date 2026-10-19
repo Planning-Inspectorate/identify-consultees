@@ -28,6 +28,12 @@
 		role="region"
 		aria-label="{{ mapRegionLabel }}"
 	>
+		{% if isInline %}
+		<div class="app-map-loading app-js-only" role="status">
+			<span class="app-map-loading__spinner" aria-hidden="true"></span>
+			<span class="app-map-loading__text">Loading map</span>
+		</div>
+		{% endif %}
 		<noscript>
 			<img
 				class="app-case-map-static"
