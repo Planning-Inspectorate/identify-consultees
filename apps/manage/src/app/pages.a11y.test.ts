@@ -382,25 +382,7 @@ describe('manage page accessibility smoke', () => {
 			reference: 'EN0110007',
 			downloadUrl:
 				'/consultees/11111111-1111-1111-1111-111111111111/report/download?ruleset=england-wales-post-20240430',
-			downloadText: 'Download Longfield Solar Farm consultee report and maps (ZIP)',
-			rulesetName: 'England Wales post 30 April 2024',
-			report: [
-				{
-					category: 'Parish Council',
-					consultees: [
-						{
-							name: 'Little Snoring Parish Council',
-							identified: ['"B" host Parishes or Community Councils: intersects the site', 'Within 20km of the site']
-						},
-						{ name: 'Added Parish Council', identified: ['Asked to be consulted'] }
-					]
-				},
-				{
-					category: 'Hospital',
-					consultees: [{ name: 'Norfolk Hospital', identified: ['Hospitals: within 10km of the site'] }]
-				}
-			],
-			consulteeCount: 3,
+			downloadText: 'Download Longfield Solar Farm Consultee List report (ZIP, 25MB)',
 			rulesetFailed: false,
 			retryUrl: '/consultees/11111111-1111-1111-1111-111111111111/report/created?ruleset=england-wales-post-20240430'
 		});
@@ -416,10 +398,7 @@ describe('manage page accessibility smoke', () => {
 			reference: 'EN0110007',
 			downloadUrl:
 				'/consultees/11111111-1111-1111-1111-111111111111/report/download?ruleset=england-wales-post-20240430',
-			downloadText: 'Download Longfield Solar Farm consultee report and maps (ZIP)',
-			rulesetName: 'England Wales post 30 April 2024',
-			report: [],
-			consulteeCount: 0,
+			downloadText: 'Download Longfield Solar Farm Consultee List report (ZIP)',
 			rulesetFailed: true,
 			retryUrl: '/consultees/11111111-1111-1111-1111-111111111111/report/created?ruleset=england-wales-post-20240430'
 		});

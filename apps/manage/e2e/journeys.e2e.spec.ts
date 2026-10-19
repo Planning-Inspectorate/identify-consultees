@@ -288,29 +288,23 @@ test.describe('manage journeys', () => {
 			await expect(returnedValue).toContainText('First Test Consultee');
 		}
 
-		// "Create report" leads to the confirmation page with the download link
+		// "Create report" leads to the confirmation page with the download link, naming the built ZIP's size
 		await page.getByRole('button', { name: 'Create report' }).click();
 		await expect(page).toHaveURL(
 			new RegExp(`/consultees/${SAMPLE_CASE_ID}/report/created\\?ruleset=${SAMPLE_RULESET_ID}`)
 		);
 		await expect(page.getByRole('heading', { level: 1 })).toContainText('Report created');
-		// the download is a ZIP of the report as an Excel workbook and a PDF of each category's map,
-		// with the selection carried into it
-		const downloadLink = page.getByRole('link', { name: new RegExp(`Download ${SAMPLE_CASE_NAME} consultee report`) });
+		// the download is the ZIP the page built - an Excel workbook and a PDF of each category's map,
+		// with the selection carried into it - kept for the link to serve
+		const downloadLink = page.getByRole('link', {
+			name: new RegExp(`Download ${SAMPLE_CASE_NAME} Consultee List report \\(ZIP, `)
+		});
 		await expect(downloadLink).toBeVisible();
 		const [download] = await Promise.all([page.waitForEvent('download'), downloadLink.click()]);
 		expect(download.suggestedFilename()).toMatch(/consultee report \d{4}-\d{2}-\d{2}\.zip$/);
 		const files = Object.keys(unzipSync(new Uint8Array(await readFile(await download.path()))));
 		expect(files.filter((file) => file.endsWith('.xlsx'))).toHaveLength(1);
 		expect(files.filter((file) => /^maps\/\d{2} Parish Council\.pdf$/.test(file))).toHaveLength(1);
-		// and lists the report's consultees by category with why each is in it - the hand-added one
-		// with the reason entered for it, the removed one and the removed hand-added one left out
-		await expect(page.getByRole('heading', { level: 2, name: /Consultees in the report/ })).toBeVisible();
-		const parishTable = page.getByRole('table', { name: /^Parish Council \(/ });
-		await expect(parishTable.getByRole('columnheader', { name: 'Why identified' })).toBeVisible();
-		await expect(parishTable.getByRole('row', { name: /First Test Consultee.*Entered first/ })).toBeVisible();
-		await expect(parishTable.getByRole('rowheader', { name: 'Second Test Consultee' })).toHaveCount(0);
-		await expect(parishTable.getByRole('rowheader')).toHaveCount(parishCount - removed + picked + 1);
 
 		// the same selection's report page still lists the matched consultees
 		await page.goto(`/consultees/${SAMPLE_CASE_ID}/results?ruleset=${SAMPLE_RULESET_ID}`);

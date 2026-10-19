@@ -1,10 +1,13 @@
 import { mockLogger } from '@planning-inspectorate/core/testing';
+import { unzipSync } from 'fflate';
 import assert from 'node:assert';
-import { describe, it, mock } from 'node:test';
+import { after, before, describe, it, mock } from 'node:test';
 import { configureNunjucks } from '../../../nunjucks.ts';
+import { ONE_PIXEL_PNG } from '../../../testing/pdf-text.ts';
 import type { ConsulteeAreaMatchRow } from '../../../testing/ruleset-runner-stub.ts';
 import { failingRulesetRunner, rulesetRunnerReturning } from '../../../testing/ruleset-runner-stub.ts';
 import { buildReportCheckPage, buildReportCreatedPage } from './controller.ts';
+import { rememberedReportZip } from './export/report-zip.ts';
 
 // a selection entry as the app's URLs carry it - base64url-encoded JSON (see urls.ts's ENCODED_JSON)
 const urlParam = (json: string) => Buffer.from(json).toString('base64url');
@@ -51,10 +54,36 @@ function dbReturning(rows: unknown[][]) {
 	return {
 		matchRows: (rows[1] ?? []) as ConsulteeAreaMatchRow[],
 		$queryRaw: mock.fn(async (sql: TemplateStringsArray) => {
+			const text = sql.join('');
 			// the map's search area is a query on the site alone (no table) - answer it with the site
-			if (!/\bFROM\b/.test(sql.join(''))) return [{ wkt: realProjectRow().geometryWkt }];
+			if (!/\bFROM\b/.test(text)) return [{ wkt: realProjectRow().geometryWkt }];
+			// the report maps' display-geometry query - each matched consultee's shape
+			if (text.includes('AS tolerance')) {
+				return ((rows[1] ?? []) as { id: string; geometryWkt?: string }[]).map((row) => ({
+					id: row.id,
+					geometryWkt: row.geometryWkt ?? 'POINT(-1.5 52.5)'
+				}));
+			}
 			return rows[Math.min(call++, rows.length - 1)] ?? [];
-		})
+		}),
+		consulteeArea: {
+			findMany: mock.fn(async ({ where }: { where: { id: { in: string[] } } }) =>
+				where.id.in.map((id) => ({
+					id,
+					geometryType: 'Point',
+					consulteeCategory: 'Parish Council',
+					consultee: `Parish ${id}`,
+					region: 'East',
+					caseReference: null,
+					documentId: null,
+					consulteeId: null,
+					organisationId: null,
+					currentVersion: 1,
+					metadata: '{}',
+					lastUpdated: new Date('2026-10-01T09:00:00Z')
+				}))
+			)
+		}
 	};
 }
 
@@ -306,22 +335,37 @@ describe('report created page', () => {
 		reasons: [{ type: 'condition' as const, conditionId: 'b_host_parish_town_community_councils' }]
 	});
 
-	function createdPage(rows: ConsulteeAreaMatchRow[], rulesetRunner = rulesetRunnerReturning(rows)) {
+	// the report's map PDFs fetch basemap tiles - never the real tile server from a test
+	const originalFetch = globalThis.fetch;
+	before(() => {
+		globalThis.fetch = async () =>
+			new Response(ONE_PIXEL_PNG, { status: 200, headers: { 'content-type': 'image/png' } });
+	});
+	after(() => {
+		globalThis.fetch = originalFetch;
+	});
+
+	function createdPage(
+		rows: ConsulteeAreaMatchRow[],
+		rulesetRunner = rulesetRunnerReturning(rows),
+		db = dbReturning([[realProjectRow()]])
+	) {
 		const nunjucks = configureNunjucks();
 		const mockRes = {
 			status: mock.fn(() => mockRes),
 			render: mock.fn((view, data) => nunjucks.render(view, data))
 		};
 		const handler = buildReportCreatedPage({
-			db: dbReturning([[realProjectRow()]]),
+			db,
 			logger: mockLogger(),
 			nearbyConsulteeRadiusMetres: 20_000,
+			nearbySearchRadiusMetres: 20_000,
 			rulesetRunner
 		});
-		return { handler, mockRes };
+		return { handler, mockRes, db };
 	}
 
-	it("should render the confirmation panel, the download link and the report's consultees with why", async () => {
+	it("should render the confirmation panel and the download link with the built report's size", async () => {
 		const { handler, mockRes } = createdPage([parishRow(), hospitalRow()]);
 		await handler({ params: { caseId: realProjectId }, query: {} }, mockRes);
 
@@ -335,124 +379,113 @@ describe('report created page', () => {
 			viewModel.backLinkUrl,
 			`/consultees/${realProjectId}/report?ruleset=england-wales-post-20240430`
 		);
-		// by category, in the check page's order (the ruleset names parishes before hospitals)
-		assert.deepStrictEqual(viewModel.report, [
-			{
-				category: 'Parish Council',
-				consultees: [
-					{
-						name: 'Little Snoring Parish Council',
-						identified: ['"B" host Parish / Town / Community Councils: intersects the site'],
-						mapped: true
-					}
-				]
-			},
-			{
-				category: 'Hospital',
-				consultees: [
-					{
-						name: 'Norfolk Hospital',
-						identified: [
-							'Hospitals operated by NHS Trusts and NHS Foundation Trusts (England): within 10km of the site'
-						],
-						mapped: true
-					}
-				]
-			}
-		]);
-		assert.strictEqual(viewModel.consulteeCount, 2);
 
 		const html = mockRes.render.mock.calls[0].result;
 		assert.match(html, /Report created/);
-		assert.match(html, /Download Real Test Project consultee report and maps \(ZIP\)/);
+		assert.match(html, /Project: Real Test Project/);
+		assert.match(html, /govuk-grid-column-two-thirds/);
+		// the report ZIP is built as the page renders, so the link can give its real size
+		assert.match(html, /Download Real Test Project Consultee List report \(ZIP, [\d.]+[KM]B\)/);
 		assert.match(html, new RegExp(`href="/consultees/${realProjectId}/report/download\\?ruleset=`));
-		assert.match(html, /Consultees in the report \(2\)/);
-		assert.match(html, /Why identified/);
-		assert.match(
-			html,
-			/Hospitals operated by NHS Trusts and NHS Foundation Trusts \(England\): within 10km of the site/
-		);
-		// being near the site is map context, not a reason to be in the report
-		assert.doesNotMatch(html, /Within 20km of the site/);
+		// the page no longer lists the report's consultees
+		assert.doesNotMatch(html, /Consultees in the report/);
+		assert.doesNotMatch(html, /Little Snoring/);
+
+		// and the built report is kept for the download link to serve
+		const kept = rememberedReportZip(viewModel.downloadUrl);
+		assert.ok(kept);
+		const files = unzipSync(new Uint8Array(kept.contents));
+		assert.ok(Object.keys(files).some((name) => name.endsWith('.xlsx')));
+		assert.ok(files['maps/01 Parish Council.pdf']);
+		assert.ok(files['maps/02 Hospital.pdf']);
 	});
 
-	it('should leave out consultees only the nearby search found', async () => {
-		const nearbyOnly = {
-			...parishMatchRow(),
-			id: '77777777-7777-7777-7777-777777777777',
-			consulteeCategory: 'Interconnector',
-			consultee: 'NeuConnect Interconnector',
-			reasons: [{ type: 'nearby' as const, radiusMetres: 20_000 }]
-		};
-		const { handler, mockRes } = createdPage([parishRow(), nearbyOnly]);
-		await handler({ params: { caseId: realProjectId }, query: {} }, mockRes);
-
-		const viewModel = mockRes.render.mock.calls[0].arguments[1];
-		assert.deepStrictEqual(
-			viewModel.report.map((section: { category: string }) => section.category),
-			['Parish Council']
-		);
-		assert.strictEqual(viewModel.consulteeCount, 1);
-		assert.doesNotMatch(mockRes.render.mock.calls[0].result, /NeuConnect/);
-	});
-
-	it('should leave out removed consultees and include hand-added ones, with the reason given', async () => {
+	it('should carry the consultee selection into the download link and the report it serves', async () => {
 		const { handler, mockRes } = createdPage([parishRow(), hospitalRow()]);
-		const add = (category: string, name: string, reason = '') => JSON.stringify({ c: category, n: name, r: reason });
+		const add = JSON.stringify({ c: 'Landowner', n: 'Mr Smith', r: 'Owns the access road' });
 		await handler(
 			{
 				params: { caseId: realProjectId },
-				query: {
-					exclude: '55555555-5555-5555-5555-555555555555',
-					add: [add('Hospital', 'Added Hospital', 'Asked to be consulted'), add('Landowner', 'Mr Smith')]
-				}
+				query: { exclude: '55555555-5555-5555-5555-555555555555', add }
 			},
 			mockRes
 		);
 
-		const { report, consulteeCount } = mockRes.render.mock.calls[0].arguments[1];
-		// the removed parish leaves its category empty, so it's not listed; a category only a
-		// hand-added consultee is in comes last
-		assert.deepStrictEqual(report, [
-			{
-				category: 'Hospital',
-				consultees: [
-					{
-						name: 'Norfolk Hospital',
-						identified: [
-							'Hospitals operated by NHS Trusts and NHS Foundation Trusts (England): within 10km of the site'
-						],
-						mapped: true
-					},
-					// typed in by name - no area to map
-					{ name: 'Added Hospital', identified: ['Asked to be consulted'], mapped: false }
-				]
-			},
-			{
-				category: 'Landowner',
-				consultees: [{ name: 'Mr Smith', identified: ['Manually added'], mapped: false }]
+		const { downloadUrl } = mockRes.render.mock.calls[0].arguments[1];
+		assert.match(downloadUrl, /exclude=/);
+		assert.match(downloadUrl, /add=/);
+		// the kept report reflects the selection: the removed parish is out, the added landowner in
+		const kept = rememberedReportZip(downloadUrl);
+		assert.ok(kept);
+		const files = unzipSync(new Uint8Array(kept.contents));
+		assert.ok(files['maps/01 Hospital.pdf']);
+		assert.ok(files['maps/02 Landowner.pdf']);
+		assert.ok(!files['maps/01 Parish Council.pdf']);
+	});
+
+	it('should build the report once for a URL and serve the kept copy on a refresh', async () => {
+		const { handler, mockRes, db } = createdPage([parishRow()]);
+		const request = {
+			params: { caseId: realProjectId },
+			query: {
+				add: urlParam(
+					JSON.stringify({ i: '99999999-9999-9999-9999-999999999999', c: 'Parish Council', n: 'Kept', r: '' })
+				)
 			}
-		]);
-		assert.strictEqual(consulteeCount, 3);
+		};
+		await handler(request, mockRes);
+		const downloadText = mockRes.render.mock.calls[0].arguments[1].downloadText;
+		await handler(request, mockRes);
+
+		// the second render served the kept report - the stored rows were fetched only once
+		assert.strictEqual(db.consulteeArea.findMany.mock.callCount(), 1);
+		assert.strictEqual(mockRes.render.mock.calls[1].arguments[1].downloadText, downloadText);
 	});
 
-	it('should say when no consultees are in the report', async () => {
+	it('should render without the size when the report cannot be built - the download builds it on click', async () => {
+		const db = dbReturning([[realProjectRow()]]);
+		db.consulteeArea.findMany = mock.fn(async () => {
+			throw new Error('db down');
+		});
+		const { handler, mockRes } = createdPage([parishRow()], rulesetRunnerReturning([parishRow()]), db);
+		await handler(
+			{
+				params: { caseId: realProjectId },
+				// a URL no other test uses - a kept copy would hide that the build failed
+				query: { exclude: 'cccccccc-0000-0000-0000-000000000042' }
+			},
+			mockRes
+		);
+
+		const html = mockRes.render.mock.calls[0].result;
+		assert.match(html, /Download Real Test Project Consultee List report \(ZIP\)/);
+	});
+
+	it('should show the size even when no consultees are in the report', async () => {
 		const { handler, mockRes } = createdPage([]);
-		await handler({ params: { caseId: realProjectId }, query: {} }, mockRes);
-		assert.match(mockRes.render.mock.calls[0].result, /No consultees are in the report/);
+		await handler(
+			{
+				params: { caseId: realProjectId },
+				query: { exclude: 'dddddddd-0000-0000-0000-000000000042' }
+			},
+			mockRes
+		);
+		assert.match(mockRes.render.mock.calls[0].result, /\(ZIP, [\d.]+[KM]B\)/);
 	});
 
-	it('should say the ruleset could not be run rather than show an empty report', async () => {
-		const { handler, mockRes } = createdPage([], failingRulesetRunner());
+	it('should say the ruleset could not be run rather than build a report', async () => {
+		const { handler, mockRes, db } = createdPage([], failingRulesetRunner());
 		await handler({ params: { caseId: realProjectId }, query: { exclude: 'abc' } }, mockRes);
 
 		const viewModel = mockRes.render.mock.calls[0].arguments[1];
 		assert.strictEqual(viewModel.rulesetFailed, true);
-		assert.deepStrictEqual(viewModel.report, []);
 		assert.match(viewModel.retryUrl, /\/report\/created\?ruleset=england-wales-post-20240430/);
+		// no report was built, so the link can't give a size
+		assert.strictEqual(db.consulteeArea.findMany.mock.callCount(), 0);
 		const html = mockRes.render.mock.calls[0].result;
 		assert.match(html, /The ruleset could not be run/);
-		assert.doesNotMatch(html, /Consultees in the report/);
+		assert.match(html, /The report could not be created/);
+		assert.match(html, /\(ZIP\)/);
 	});
 
 	it('should 404 for a present-but-unknown ruleset', async () => {

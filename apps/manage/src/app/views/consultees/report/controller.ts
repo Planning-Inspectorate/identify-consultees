@@ -9,7 +9,8 @@ import type { AsyncRequestHandler } from '@planning-inspectorate/core/util';
 import { resolveCase } from '../resolve-case.ts';
 import { firstQueryValue, runRulesetSafely } from '../run-ruleset.ts';
 import { reportCategories } from './categories.ts';
-import { consulteeName, reportByCategory } from './report-consultees.ts';
+import { buildReportZip, formatFileSize, rememberedReportZip, rememberReportZip } from './export/report-zip.ts';
+import { consulteeName } from './report-consultees.ts';
 import type { ConsulteeSelection } from './urls.ts';
 import {
 	consulteeSelection,
@@ -126,10 +127,10 @@ export function buildReportCheckPage(service: ManageService): AsyncRequestHandle
 }
 
 /**
- * "Generate report" lands here: a confirmation naming the case, a link to download the report - an
- * Excel workbook and a PDF of each category's map, in a ZIP (see export/controller.ts) - and the report's consultees by category with why each
- * is in it - the run's results less anything removed, plus anything added by hand (the selection
- * rides along in the URL, as on the check page).
+ * "Create report" lands here: a confirmation naming the case and a link to download the report -
+ * an Excel workbook and a PDF of each category's map, in a ZIP. The ZIP is built here so the link
+ * can give its size, and kept for the download to serve (see export/report-zip.ts); if it can't be
+ * built the page still renders, the link just says "(ZIP)" and the download builds it when clicked.
  */
 export function buildReportCreatedPage(service: ManageService): AsyncRequestHandler {
 	const { db, logger, nearbyConsulteeRadiusMetres, rulesetRunner } = service;
@@ -151,6 +152,7 @@ export function buildReportCreatedPage(service: ManageService): AsyncRequestHand
 		}
 
 		const selection: ConsulteeSelection = consulteeSelection(req.query);
+		const downloadUrl = reportDownloadUrl(project.id, ruleset.id, selection);
 		const { consultees, failed } = await runRulesetSafely(
 			rulesetRunner,
 			project,
@@ -159,18 +161,27 @@ export function buildReportCreatedPage(service: ManageService): AsyncRequestHand
 			logger,
 			req.session
 		);
-		const report = failed ? [] : reportByCategory(ruleset, consultees, selection);
+
+		let downloadSize = '';
+		if (!failed) {
+			try {
+				const report =
+					rememberedReportZip(downloadUrl) ??
+					(await buildReportZip({ service, project, ruleset, consultees, selection }));
+				rememberReportZip(downloadUrl, report);
+				downloadSize = formatFileSize(report.contents.length);
+			} catch (error) {
+				logger.error({ error, caseId: project.id, rulesetId: ruleset.id }, 'Failed to build the report ZIP');
+			}
+		}
 
 		const viewModel: ReportCreatedViewModel = {
 			pageHeading: 'Report created',
 			backLinkUrl: reportUrl(project.id, ruleset.id, selection),
 			caseName: project.properties.caseName,
 			reference: project.properties.caseReference,
-			rulesetName: ruleset.name,
-			downloadUrl: reportDownloadUrl(project.id, ruleset.id, selection),
-			downloadText: `Download ${project.properties.caseName} consultee report and maps (ZIP)`,
-			report,
-			consulteeCount: report.reduce((total, section) => total + section.consultees.length, 0),
+			downloadUrl,
+			downloadText: `Download ${project.properties.caseName} Consultee List report (ZIP${downloadSize ? `, ${downloadSize}` : ''})`,
 			rulesetFailed: failed,
 			retryUrl: reportCreatedUrl(project.id, ruleset.id, selection)
 		};

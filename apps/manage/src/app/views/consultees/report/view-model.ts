@@ -1,5 +1,3 @@
-import type { ReportCategory } from './report-consultees.ts';
-
 export interface IdentifiedConsultee {
 	/** The consultee category (e.g. "Parish Council") the row is for. */
 	name: string;
@@ -35,13 +33,10 @@ export interface ReportCreatedViewModel {
 	backLinkUrl: string;
 	caseName: string;
 	reference: string;
-	rulesetName: string;
 	downloadUrl: string;
+	/** The download link's text, with the built report's size when it built - "(ZIP, 1.4MB)". */
 	downloadText: string;
-	/** The report's consultees by category, each with why it's in the report - see reportByCategory. */
-	report: ReportCategory[];
-	consulteeCount: number;
-	/** True when the ruleset couldn't be run - the report's contents are unknown, not empty. */
+	/** True when the ruleset couldn't be run - the report couldn't be created. */
 	rulesetFailed: boolean;
 	retryUrl: string;
 }
