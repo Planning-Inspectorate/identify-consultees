@@ -26,7 +26,7 @@ The file name gives the id and display name: `england_wales_post_20240430_rulese
 
 **An unrecognised Consultee Type(s), Logic or buffer stops the app at start-up**, naming the row, rather than silently matching nothing. A condition's id comes from its authority letter, consultee type and buffer (`b_host_unitary_authorities`, `ambulance_trusts_10km`); its name, shown in **Why identified**, keeps the letter (`"B" host Unitary Authorities`).
 
-Some consultee types have no reference data yet: canals, Joint Transport Authorities (Wales), MoD safeguarding and low flying areas, coal mining reporting areas and the Cheshire brine area (`categoriesAwaitingData` in `rulesets.yaml`). Their conditions stay in the rulesets and match nothing until data with those category names is loaded. The check page still lists them, with nothing found.
+Some consultee types have no reference data yet: MoD safeguarding and low flying areas, coal mining reporting areas and the Cheshire brine area (`categoriesAwaitingData` in `rulesets.yaml`). Joint Transport Authorities (Wales) match Wales's Corporate Joint Committees, which hold its regional transport planning duties. Their conditions stay in the rulesets and match nothing until data with those category names is loaded. The check page still lists them, with nothing found.
 
 ## How a run works
 

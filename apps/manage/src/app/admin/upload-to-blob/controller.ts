@@ -46,7 +46,7 @@ export function buildRunUploadToBlob(
 			return res.render(VIEW, viewModel);
 		}
 		if (!file) {
-			viewModel.error = 'Select a file to upload (up to 250MB).';
+			viewModel.error = 'Select a file to upload (up to 1GB).';
 			return res.render(VIEW, viewModel);
 		}
 

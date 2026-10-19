@@ -1,0 +1,54 @@
+# Reference data: which consultee category each of the reference data's source datasets loads
+# as. Read when the app starts, and by every import (packages/database/src/seed/reference-data.ts),
+# which refuses to start or import if a value here is invalid - so a change is checked by
+# `npm test` and takes effect on the next deploy.
+#
+# Each feature's id names its dataset: health_AMB_EW_00001 is from AMB_EW, the ambulance trusts
+# of England and Wales. The file's own consultee_category is a broad group (Health, Transport,
+# Other...), so the import gives each feature its dataset's category instead - the names the
+# rulesets (rulesets/rulesets.yaml), the report (report.yaml) and the maps (nearby-consultees.yaml)
+# use. The group is kept in the row's metadata, as sourceCategory.
+#
+#   datasets - each dataset code (the id's capitals and area: AMB_EW) and its consultee category.
+#              A file holding a dataset not listed here isn't imported - nothing is changed - and
+#              the import names it, so a new dataset can't load as a category nothing matches.
+#
+# A feature whose id has no dataset code (parish_council_E04000001, railway_RAILWAY_0001) keeps
+# the category the file gives it.
+
+version: 1
+
+datasets:
+  # administrative boundaries
+  FRS_EW: Fire and Rescue Authority
+  POL_EW: Police
+  NPK_EN: National Park
+  NPK_WA: National Park
+  NPK_EW: National Park
+  CJC_EW: Corporate Joint Committee
+  # health
+  AMB_EW: Ambulance Trust
+  ICB_EW: ICB
+  LHB_WA: Local Health Board
+  # landscape and water
+  NLA_EN: National Landscape
+  NLA_WA: National Landscape
+  IDB_EN: Internal Drainage Board
+  IDB_WA: Internal Drainage District
+  # emergency planning
+  LRF_EW: Local Resilience Forum
+  # transport
+  RAIL_EW: Railway
+  CAN_EW: Canal
+  DKH_WE: Dock or Harbour
+  ITA_EW: Integrated Transport Authority
+  PTE_EW: Passenger Transport Executive
+  # energy
+  ELG_EW: Electricity Generator
+  DNO_EW: DNO
+  ICN_EW: Interconnector
+  OWF_EW: Offshore Wind Site
+  ONR_EW: ONR Site
+  # earlier exports' codes for the same datasets
+  OWS_NA: Offshore Wind Site
+  ONR_NA: ONR Site

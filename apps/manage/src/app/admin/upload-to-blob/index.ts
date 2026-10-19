@@ -7,9 +7,10 @@ import { tmpdir } from 'node:os';
 import type { BlobUploader } from './controller.ts';
 import { buildRunUploadToBlob, buildUploadToBlobPage } from './controller.ts';
 
-// large reference data exports (tens of MB) are the motivating use case - see
-// packages/database/src/seed/import-from-blob.ts - but this isn't restricted to one file type.
-const MAX_UPLOAD_BYTES = 250 * 1024 * 1024;
+// large reference data exports (the full combined reference data is over 400MB) are the
+// motivating use case - see packages/database/src/seed/import-from-blob.ts - but this isn't
+// restricted to one file type.
+export const MAX_UPLOAD_BYTES = 1024 * 1024 * 1024;
 
 // disk, not memory storage - a multi-hundred-MB file shouldn't be held in process memory. The
 // temp file is removed by the controller after the blob upload completes, whether it succeeds or

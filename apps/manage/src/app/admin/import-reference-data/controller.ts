@@ -4,6 +4,7 @@ import {
 	importConsulteeAreas
 } from '@pins/identify-consultees-database/src/seed/geojson-import.ts';
 import { downloadBlobToTempFile } from '@pins/identify-consultees-database/src/seed/import-from-blob.ts';
+import { UnknownDatasetError } from '@pins/identify-consultees-database/src/seed/reference-data.ts';
 import type { AsyncRequestHandler } from '@planning-inspectorate/core/util';
 import type { ImportReferenceDataViewModel } from './view-model.ts';
 
@@ -17,10 +18,13 @@ const PAGE_HEADING = 'Import reference data into the database';
 export const CONSULTEE_AREAS_BLOB_NAME = 'combined_reference_data_v1.geojson';
 export const CASE_BOUNDARIES_BLOB_NAME = 'all-project-boundaries.geojson';
 
-// imports replace each table rather than merging into it - see clearExistingRows. The loaders
-// upsert by id and never delete, so a merge would leave the sample data, or rows the new file
-// dropped or re-keyed, behind as stale or duplicate consultees
+// imports replace rather than merge - see clearExistingRows. The loaders upsert by id and never
+// delete, so a merge would leave the sample data, or rows the new file dropped or re-keyed, behind
+// as stale or duplicate consultees
 const REPLACE = { replace: true } as const;
+// consultee areas replace just the categories the file holds, unless asked to replace them all -
+// an export of some datasets leaves the others' rows in place
+const REPLACE_CATEGORIES = { replace: 'categories' } as const;
 
 /**
  * Rows in each table right now. A full import into Azure SQL can outlast Front Door's response
@@ -58,17 +62,22 @@ export function buildRunImportConsulteeAreas(
 
 	return async (req, res) => {
 		const viewModel: ImportReferenceDataViewModel = { pageHeading: PAGE_HEADING };
+		const replaceAll = (req.body as { scope?: unknown } | undefined)?.scope === 'all';
 
 		try {
 			const { filePath, cleanup } = await download(CONSULTEE_AREAS_BLOB_NAME);
 			try {
-				viewModel.consulteeAreasImported = await runImport(db, filePath, REPLACE);
+				viewModel.consulteeAreasImported = await runImport(db, filePath, replaceAll ? REPLACE : REPLACE_CATEGORIES);
+				viewModel.consulteeAreasScope = replaceAll ? 'all' : 'categories';
 			} finally {
 				await cleanup();
 			}
 		} catch (error) {
 			logger.error({ error }, 'Failed to import consultee areas from blob storage');
-			viewModel.error = 'Could not import consultee areas from blob storage.';
+			viewModel.error =
+				error instanceof UnknownDatasetError
+					? `Could not import consultee areas - nothing was changed. ${error.message}.`
+					: 'Could not import consultee areas from blob storage.';
 		}
 
 		return res.render(VIEW, await withLoadedCounts(service, viewModel));

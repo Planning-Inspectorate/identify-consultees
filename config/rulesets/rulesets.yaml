@@ -111,8 +111,9 @@ consulteeTypes:
     categories: [Integrated Transport Authority]
   Docks / Harbours operated by Statutory Harbour Authorities:
     categories: [Dock or Harbour]
+  # Wales's Corporate Joint Committees hold its regional transport planning duties
   Joint Transport Authorities (Wales):
-    categories: [Joint Transport Authority]
+    categories: [Corporate Joint Committee]
   # other
   MoD Safeguarding Areas:
     categories: [MOD Safeguarding Area]
@@ -129,8 +130,6 @@ logic:
   Borders host authority: bordering
 
 categoriesAwaitingData:
-  - Canal
-  - Joint Transport Authority
   - MOD Safeguarding Area
   - MOD Low Flying Area
   - Coal Mining Reporting Area

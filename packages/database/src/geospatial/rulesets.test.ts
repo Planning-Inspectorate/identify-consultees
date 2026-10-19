@@ -387,6 +387,8 @@ describe('rulesets registry', () => {
 		// the consultee_area categories in the reference data today (see kt-docs/data/reference-data.md)
 		const referenceCategories = new Set([
 			'Ambulance Trust',
+			'Canal',
+			'Corporate Joint Committee',
 			'DNO',
 			'Dock or Harbour',
 			'Electricity Generator',

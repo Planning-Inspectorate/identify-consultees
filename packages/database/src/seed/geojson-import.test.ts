@@ -5,6 +5,7 @@ import path from 'node:path';
 import { describe, mock, test } from 'node:test';
 import type { PrismaClient } from '../client/client.ts';
 import {
+	clearCategories,
 	clearExistingRows,
 	deterministicId,
 	importCaseBoundaries,
@@ -85,6 +86,49 @@ describe('toConsulteeArea', () => {
 	});
 });
 
+describe('toConsulteeArea with a dataset code in the id', () => {
+	test("takes the dataset's category, keeping the file's broad group as sourceCategory", () => {
+		const feature = toConsulteeArea({
+			geometry: { type: 'Point', coordinates: [0, 0] },
+			properties: {
+				id: 'health_AMB_EW_00001',
+				consultee: 'East of England Ambulance Service',
+				consultee_category: 'Health',
+				region: 'East of England',
+				metadata: { CODE: 'EE_AMB_SERV' }
+			}
+		});
+
+		assert.equal(feature.properties.consulteeCategory, 'Ambulance Trust');
+		assert.equal(feature.properties.region, 'East of England');
+		assert.deepEqual(feature.properties.metadata, {
+			CODE: 'EE_AMB_SERV',
+			sourceId: 'health_AMB_EW_00001',
+			sourceLastUpdated: undefined,
+			sourceCategory: 'Health'
+		});
+		// the same id as an earlier export's, so a re-import updates the same row
+		assert.equal(feature.id, deterministicId('consultee-area:health_AMB_EW_00001'));
+	});
+
+	test("keeps the file's category for a feature with no id at all", () => {
+		const feature = toConsulteeArea({
+			geometry: { type: 'Point', coordinates: [0, 0] },
+			properties: { consultee_category: 'Railway' }
+		});
+		assert.equal(feature.properties.consulteeCategory, 'Railway');
+	});
+
+	test("records no sourceCategory when the file's category is already the dataset's", () => {
+		const feature = toConsulteeArea({
+			geometry: { type: 'Point', coordinates: [0, 0] },
+			properties: { id: 'health_AMB_EW_00001', consultee_category: 'Ambulance Trust' }
+		});
+		assert.equal(feature.properties.consulteeCategory, 'Ambulance Trust');
+		assert.equal('sourceCategory' in feature.properties.metadata, false);
+	});
+});
+
 describe('toCaseBoundary', () => {
 	test('derives id from caseReference and fileName so revisions are not collapsed', () => {
 		const first = toCaseBoundary({
@@ -160,6 +204,16 @@ async function withFile(contents: string, fn: (filePath: string) => Promise<void
 	}
 }
 
+describe('clearCategories', () => {
+	test("deletes only the named categories' rows, a batch at a time", async () => {
+		const { client, statements, $executeRaw } = deletingClient([500, 7]);
+		assert.equal(await clearCategories(client, ['Ambulance Trust', 'Police']), 507);
+		assert.equal(statements.length, 2);
+		assert.match(statements[0], /DELETE TOP \(\?\) FROM consultee_area WHERE consulteeCategory IN \(\?\)/);
+		assert.match(JSON.stringify($executeRaw.mock.calls[0].arguments), /Ambulance Trust.*Police/);
+	});
+});
+
 describe('importConsulteeAreas with replace', () => {
 	test('refuses to clear the table for a file with no features', async () => {
 		const { client, $executeRaw } = deletingClient([]);
@@ -226,6 +280,122 @@ describe('imports without replace', () => {
 			assert.equal(await importCaseBoundaries(client, filePath), 1);
 		});
 		assert.equal($executeRaw.mock.callCount(), 1);
+	});
+
+	test('importConsulteeAreas loads a chunk of the file at a time, reporting progress across them', async () => {
+		const { client, $executeRaw } = loadingClient();
+		const features = ['a', 'b', 'c'].map((id) => ({
+			geometry: { type: 'Point', coordinates: [0, 0] },
+			properties: { id, consultee: id, consulteeCategory: 'Ambulance Trust' }
+		}));
+		const progress: [number, number][] = [];
+		await withFile(JSON.stringify({ type: 'FeatureCollection', features }), async (filePath) => {
+			const imported = await importConsulteeAreas(client, filePath, {
+				// two features' worth: a, b, then c
+				chunkCharacters: JSON.stringify(features[0]).length * 2 + 2,
+				onProgress: (loaded, total) => progress.push([loaded, total])
+			});
+			assert.equal(imported, 3);
+		});
+		// one MERGE per chunk
+		assert.equal($executeRaw.mock.callCount(), 2);
+		assert.deepEqual(progress, [
+			[2, 3],
+			[3, 3]
+		]);
+	});
+
+	test('a feature larger than a chunk loads on its own', async () => {
+		const { client, $executeRaw } = loadingClient();
+		const features = ['a', 'b'].map((id) => ({
+			geometry: { type: 'Point', coordinates: [0, 0] },
+			properties: { id, consulteeCategory: 'Ambulance Trust' }
+		}));
+		await withFile(JSON.stringify({ type: 'FeatureCollection', features }), async (filePath) => {
+			assert.equal(await importConsulteeAreas(client, filePath, { chunkCharacters: 1 }), 2);
+		});
+		assert.equal($executeRaw.mock.callCount(), 2);
+	});
+
+	test("importConsulteeAreas replacing categories clears only the file's, then loads", async () => {
+		const { client, $executeRaw } = loadingClient();
+		const file = {
+			type: 'FeatureCollection',
+			features: [
+				{
+					geometry: { type: 'Point', coordinates: [0, 0] },
+					properties: { id: 'health_AMB_EW_00001', consultee_category: 'Health' }
+				},
+				{
+					geometry: { type: 'Point', coordinates: [0, 0] },
+					properties: { id: 'health_AMB_EW_00002', consultee_category: 'Health' }
+				},
+				{
+					geometry: { type: 'Point', coordinates: [0, 0] },
+					properties: { id: 'other_ELG_EW_00001', consultee_category: 'Other' }
+				},
+				// no category: nothing of it to clear
+				{ geometry: { type: 'Point', coordinates: [0, 0] }, properties: { id: 'src-1' } }
+			]
+		};
+		await withFile(JSON.stringify(file), async (filePath) => {
+			assert.equal(await importConsulteeAreas(client, filePath, { replace: 'categories' }), 4);
+		});
+		// one category delete that comes back short, then one MERGE batch
+		assert.equal($executeRaw.mock.callCount(), 2);
+		assert.match($executeRaw.mock.calls[0].arguments[0].join('?'), /WHERE consulteeCategory IN/);
+		assert.match(
+			JSON.stringify($executeRaw.mock.calls[0].arguments.slice(1)),
+			/Ambulance Trust.*Electricity Generator/
+		);
+	});
+
+	test('importConsulteeAreas replacing categories clears nothing for a file with none', async () => {
+		const { client, $executeRaw } = loadingClient();
+		const file = {
+			type: 'FeatureCollection',
+			features: [{ geometry: { type: 'Point', coordinates: [0, 0] }, properties: { id: 'src-1' } }]
+		};
+		await withFile(JSON.stringify(file), async (filePath) => {
+			assert.equal(await importConsulteeAreas(client, filePath, { replace: 'categories' }), 1);
+		});
+		// just the MERGE batch
+		assert.equal($executeRaw.mock.callCount(), 1);
+		assert.match($executeRaw.mock.calls[0].arguments[0].join('?'), /MERGE/);
+	});
+
+	test("importConsulteeAreas changes nothing for a file holding a dataset the config doesn't list", async () => {
+		const { client, $executeRaw } = loadingClient();
+		const file = {
+			type: 'FeatureCollection',
+			features: [
+				{
+					geometry: { type: 'Point', coordinates: [0, 0] },
+					properties: { id: 'other_HOS_EW_00001', consultee_category: 'Other' }
+				}
+			]
+		};
+		await withFile(JSON.stringify(file), async (filePath) => {
+			await assert.rejects(() => importConsulteeAreas(client, filePath, { replace: 'categories' }), /dataset HOS_EW/);
+		});
+		assert.equal($executeRaw.mock.callCount(), 0);
+	});
+
+	test('importCaseBoundaries replacing categories replaces every case boundary - they have none', async () => {
+		const { client, $executeRaw } = loadingClient();
+		const file = {
+			type: 'FeatureCollection',
+			features: [
+				{
+					geometry: { type: 'Point', coordinates: [0, 0] },
+					properties: { caseReference: 'EN010099', projectName: 'Example' }
+				}
+			]
+		};
+		await withFile(JSON.stringify(file), async (filePath) => {
+			assert.equal(await importCaseBoundaries(client, filePath, { replace: 'categories' }), 1);
+		});
+		assert.match($executeRaw.mock.calls[0].arguments[0].join('?'), /FROM case_boundary/);
 	});
 
 	test('importConsulteeAreas with replace clears the table once the file has parsed', async () => {

@@ -3,6 +3,7 @@
 {% from "govuk/components/button/macro.njk" import govukButton %}
 {% from "govuk/components/error-message/macro.njk" import govukErrorMessage %}
 {% from "govuk/components/notification-banner/macro.njk" import govukNotificationBanner %}
+{% from "govuk/components/radios/macro.njk" import govukRadios %}
 {% from "govuk/components/warning-text/macro.njk" import govukWarningText %}
 {% from "govuk/components/summary-list/macro.njk" import govukSummaryList %}
 
@@ -20,7 +21,7 @@
     </p>
 
     {{ govukWarningText({
-        text: "Each import deletes every existing row in its table first, then loads the file. The table is only cleared once the file has downloaded and been read.",
+        text: "Each import deletes existing rows first, then loads the file: the consultee areas of the file's categories, or every row in the table. Nothing is deleted until the file has downloaded and been read.",
         iconFallbackText: "Warning"
     }) }}
 
@@ -47,7 +48,7 @@
         {{ govukNotificationBanner({
             type: "success",
             titleText: "Success",
-            text: "Replaced consultee areas: imported " ~ consulteeAreasImported ~ "."
+            text: ("Replaced every consultee area" if consulteeAreasScope == "all" else "Replaced the consultee areas of the file's categories") ~ ": imported " ~ consulteeAreasImported ~ "."
         }) }}
     {% endif %}
 
@@ -60,9 +61,30 @@
     {% endif %}
 
     <h2 class="govuk-heading-m">Consultee areas</h2>
-    <p class="govuk-body">Replaces all consultee areas with <code>combined_reference_data_v1.geojson</code> from blob storage.</p>
+    <p class="govuk-body">
+        Loads <code>combined_reference_data_v1.geojson</code> from blob storage. Each feature takes its
+        dataset's consultee category (<code>config/reference-data.yaml</code>), and a file holding a
+        dataset that isn't listed there isn't imported.
+    </p>
     <form method="post" action="/admin/import-reference-data/run-consultee-areas" novalidate>
         <input type="hidden" name="_csrf" value="{{ _csrf }}">
+        {{ govukRadios({
+            name: "scope",
+            fieldset: { legend: { text: "Which consultee areas to replace", classes: "govuk-fieldset__legend--s" } },
+            items: [
+                {
+                    value: "categories",
+                    text: "Only the file's categories",
+                    hint: { text: "Keeps every other category - for an export of some datasets, such as one without parishes." },
+                    checked: true
+                },
+                {
+                    value: "all",
+                    text: "Every consultee area",
+                    hint: { text: "Deletes the categories the file doesn't hold, too." }
+                }
+            ]
+        }) }}
         {{ govukButton({ text: "Replace consultee areas", classes: "govuk-button--warning" }) }}
     </form>
 
