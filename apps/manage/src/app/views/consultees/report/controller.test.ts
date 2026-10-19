@@ -37,11 +37,6 @@ function parishMatchRow() {
 		consulteeCategory: 'Parish Council',
 		consultee: 'Little Snoring Parish Council',
 		region: 'East of England',
-		caseReference: null,
-		documentId: null,
-		consulteeId: null,
-		organisationId: null,
-		currentVersion: 1,
 		metadata: '{}',
 		geometryWkt: 'MULTILINESTRING((-1.5 52.5, -1.4 52.6))',
 		distanceMetres: 123.456
@@ -72,14 +67,11 @@ function dbReturning(rows: unknown[][]) {
 				where.id.in.map((id) => ({
 					id,
 					geometryType: 'Point',
+					sourceId: null,
 					consulteeCategory: 'Parish Council',
+					consulteeGroup: null,
 					consultee: `Parish ${id}`,
 					region: 'East',
-					caseReference: null,
-					documentId: null,
-					consulteeId: null,
-					organisationId: null,
-					currentVersion: 1,
 					metadata: '{}',
 					lastUpdated: new Date('2026-10-01T09:00:00Z')
 				}))

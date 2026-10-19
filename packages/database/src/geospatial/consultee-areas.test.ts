@@ -174,14 +174,11 @@ describe('consultee areas (requires a local SQL Server - see docker-compose.yml)
 						type: 'Feature',
 						geometry: { type: 'Point', coordinates: [0, 0] },
 						properties: {
+							sourceId: 'railway_RAIL_EW_00001',
 							consulteeCategory: 'Railway',
+							consulteeGroup: 'Railway',
 							consultee: 'Network Rail',
 							region: 'South',
-							caseReference: 'EN010001',
-							documentId: '33333333-3333-3333-3333-333333333333',
-							consulteeId: '44444444-4444-4444-4444-444444444444',
-							organisationId: '55555555-5555-5555-5555-555555555555',
-							currentVersion: 3,
 							metadata: { source: 'test' }
 						}
 					},
@@ -209,15 +206,19 @@ describe('consultee areas (requires a local SQL Server - see docker-compose.yml)
 
 			const stored = await getConsulteeAreaById(dbClient, testAreaId);
 			assert.ok(stored);
-			assert.equal(stored.properties.caseReference, 'EN010001');
-			assert.equal(stored.properties.currentVersion, 3);
-			assert.equal(stored.properties.documentId?.toLowerCase(), '33333333-3333-3333-3333-333333333333');
-			assert.equal(stored.properties.consulteeId?.toLowerCase(), '44444444-4444-4444-4444-444444444444');
-			assert.equal(stored.properties.organisationId?.toLowerCase(), '55555555-5555-5555-5555-555555555555');
+			assert.deepEqual(stored.properties, {
+				sourceId: 'railway_RAIL_EW_00001',
+				consulteeCategory: 'Railway',
+				consulteeGroup: 'Railway',
+				consultee: 'Network Rail',
+				region: 'South',
+				metadata: { source: 'test' }
+			});
 
 			const minimal = await getConsulteeAreaById(dbClient, secondAreaId);
 			assert.equal(minimal?.properties.consulteeCategory, null);
-			assert.equal(minimal?.properties.currentVersion, 1);
+			assert.equal(minimal?.properties.sourceId, null);
+			assert.equal(minimal?.properties.consulteeGroup, null);
 		} finally {
 			await cleanup();
 		}

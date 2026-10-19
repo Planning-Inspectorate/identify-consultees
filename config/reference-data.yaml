@@ -7,7 +7,7 @@
 # of England and Wales. The file's own consultee_category is a broad group (Health, Transport,
 # Other...), so the import gives each feature its dataset's category instead - the names the
 # rulesets (rulesets/rulesets.yaml), the report (report.yaml) and the maps (nearby-consultees.yaml)
-# use. The group is kept in the row's metadata, as sourceCategory.
+# use. The group is kept too, in consultee_area.consulteeGroup.
 #
 #   datasets - each dataset code (the id's capitals and area: AMB_EW) and its consultee category.
 #              A file holding a dataset not listed here isn't imported - nothing is changed - and

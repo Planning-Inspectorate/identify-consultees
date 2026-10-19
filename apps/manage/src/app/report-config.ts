@@ -16,11 +16,11 @@ export const REPORT_COLUMNS = {
 	region: 'Region',
 	whyIdentified: 'Why identified',
 	source: 'Source',
-	version: 'Version',
+	group: 'Group',
 	distanceKm: 'Distance from site (km)',
 	consulteeAreaId: 'Consultee area id',
+	sourceId: 'Source id',
 	geometryType: 'Geometry type',
-	caseReference: 'Case reference',
 	lastUpdated: 'Last updated'
 } as const;
 

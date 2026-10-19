@@ -8,14 +8,11 @@ import { toRunRulesetResult } from '../ruleset-runner.ts';
 /** A consultee_area row as the tests' fixtures describe one - the shape the Python function reads. */
 export interface ConsulteeAreaMatchRow {
 	id: string;
+	sourceId?: string | null;
 	consulteeCategory: string | null;
+	consulteeGroup?: string | null;
 	consultee: string | null;
 	region: string | null;
-	caseReference?: string | null;
-	documentId?: string | null;
-	consulteeId?: string | null;
-	organisationId?: string | null;
-	currentVersion?: number;
 	metadata?: string;
 	/** Absent for a consultee only the nearby search found - the function sends those without it. */
 	geometryWkt?: string;
@@ -30,14 +27,11 @@ function feature(row: ConsulteeAreaMatchRow) {
 	return {
 		id: row.id,
 		properties: {
+			sourceId: row.sourceId ?? null,
 			consulteeCategory: row.consulteeCategory,
+			consulteeGroup: row.consulteeGroup ?? null,
 			consultee: row.consultee,
 			region: row.region,
-			caseReference: row.caseReference ?? null,
-			documentId: row.documentId ?? null,
-			consulteeId: row.consulteeId ?? null,
-			organisationId: row.organisationId ?? null,
-			currentVersion: row.currentVersion ?? 1,
 			metadata: JSON.parse(row.metadata ?? '{}')
 		},
 		...(row.geometryWkt ? { geometryWkt: row.geometryWkt } : {})
@@ -80,8 +74,8 @@ export function buildDatabaseRulesetRunner(getDb: () => PrismaClient): RulesetRu
 		const rules = ruleset.rules.filter((rule) => rule.logicType === 'intersection' && rule.categories.length > 0);
 		const searchMetres = Math.max(nearbyRadiusMetres, ...rules.map((rule) => rule.bufferMetres ?? 0));
 		const rows = await db.$queryRaw<(ConsulteeAreaMatchRow & { metadata: string })[]>`
-			SELECT id, consulteeCategory, consultee, region, caseReference, documentId, consulteeId, organisationId,
-				currentVersion, metadata, geometry.STAsText() AS geometryWkt,
+			SELECT id, sourceId, consulteeCategory, consulteeGroup, consultee, region, metadata,
+				geometry.STAsText() AS geometryWkt,
 				geometrySimplified.STDistance(geography::STGeomFromText(${wkt}, 4326)) AS distanceMetres
 			FROM consultee_area
 			WHERE geometrySimplified.STDistance(geography::STGeomFromText(${wkt}, 4326)) <= ${searchMetres}

@@ -31,19 +31,21 @@ Two spatial datasets drive the service: **consultee areas** (what each potential
 
 Defined in `packages/database/src/schema.prisma`; spatial indexes, `CHECK` constraints and backfills are hand-written into the migrations (Prisma can't express them). Schema at `20261007090000_add_consultee_area_simplified_geometry`. There's no foreign key between the tables: screening relates them spatially.
 
-**`consultee_area`**: one row per area a consultee covers, or a point for site-based consultees such as hospitals.
+**`consultee_area`**: one row per area a consultee covers, or a point for site-based consultees such as hospitals. Its columns follow the reference data export's own fields (`20261019170000_consultee_area_follows_export`).
 
-| Column                                                                           | Notes                                                                                                            |
-| -------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
-| `id`                                                                             | `UNIQUEIDENTIFIER`, derived from the source row's id                                                             |
-| `geometry`                                                                       | `geography`, the original shape                                                                                  |
-| `geometrySimplified`                                                             | `geometry.Reduce(10).MakeValid()`: every screening query runs on it, and the map draws a further-simplified copy |
-| `geometryType`                                                                   | `CHECK`: Point, MultiPoint, LineString, MultiLineString, Polygon, MultiPolygon, GeometryCollection               |
-| `consulteeCategory`                                                              | Indexed. What conditions match on, e.g. `Parish Council`. See [Reference data](./reference-data.md)              |
-| `consultee`                                                                      | Display name                                                                                                     |
-| `region`                                                                         | Being reworked separately                                                                                        |
-| `metadata`, `lastUpdated`                                                        | Source attributes as JSON; refreshed on each import                                                              |
-| `caseReference`, `documentId`, `consulteeId`, `organisationId`, `currentVersion` | Not populated today (`currentVersion` is always 1)                                                               |
+| Column               | Notes                                                                                                                                                            |
+| -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `id`                 | `UNIQUEIDENTIFIER`, derived from the export's id                                                                                                                 |
+| `sourceId`           | The export's own id, such as `health_AMB_EW_00001`                                                                                                               |
+| `geometry`           | `geography`, the original shape                                                                                                                                  |
+| `geometrySimplified` | `geometry.Reduce(10).MakeValid()`: every screening query runs on it, and the map draws a further-simplified copy                                                 |
+| `geometryType`       | `CHECK`: Point, MultiPoint, LineString, MultiLineString, Polygon, MultiPolygon, GeometryCollection                                                               |
+| `consulteeCategory`  | Indexed. What conditions match on, e.g. `Parish Council`: the export's dataset mapped by `config/reference-data.yaml`. See [Reference data](./reference-data.md) |
+| `consulteeGroup`     | The export's own `consultee_category`, a broad group: Health, Local Authorities, Transport...                                                                    |
+| `consultee`          | Display name                                                                                                                                                     |
+| `region`             | The export's region                                                                                                                                              |
+| `metadata`           | The export's metadata as JSON, as given: each source dataset's own attributes                                                                                    |
+| `lastUpdated`        | When the row was loaded                                                                                                                                          |
 
 **`case_boundary`**: one row per boundary **submission**. A case can have several, so `caseReference` isn't unique.
 
@@ -66,27 +68,29 @@ Spatial indexes (`GEOGRAPHY_AUTO_GRID`): `consultee_area_geometry_simplified_sid
 
 ## Loading
 
-| Route            | For                                        | How                                                                                                                                                                  |
-| ---------------- | ------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Admin pages      | An Azure environment                       | `/admin/upload-to-blob` (up to 1GB), then `/admin/import-reference-data`. **Replaces** the file's consultee categories, or the whole table. Shows current row counts |
-| DB Seed pipeline | An Azure environment                       | `loadFullReferenceData=false` loads the sample; `true` imports the two blobs (not Prod). Add `replaceExistingData=true` to replace                                   |
-| CLI              | Local, or any database you can reach       | `npm run db-import -- --type=consultee-areas --file=<path>` (or `case-boundaries`; `--batch-size=<n>`)                                                               |
-| From CBOS        | Case boundaries, any connected environment | `/admin/import-from-cbos`. Merges; see below                                                                                                                         |
+| Route            | For                                        | How                                                                                                                                                                                        |
+| ---------------- | ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Admin pages      | An Azure environment                       | `/admin/upload-to-blob` (up to 1GB), then `/admin/import-reference-data`. **Replaces** the table. Shows current row counts                                                                 |
+| DB Seed pipeline | An Azure environment                       | `loadFullReferenceData=false` loads the sample; `true` imports the two blobs (not Prod). Consultee areas always replace; add `replaceExistingData=true` to replace the case boundaries too |
+| CLI              | Local, or any database you can reach       | `npm run db-import -- --type=consultee-areas --file=<path>` (or `case-boundaries`; `--batch-size=<n>`)                                                                                     |
+| From CBOS        | Case boundaries, any connected environment | `/admin/import-from-cbos`. Merges; see below                                                                                                                                               |
 
 **Permissions:** the DB Seed pipeline's identity has no data-plane role on the container, so its full-data import fails with 403. Terraform can't grant one (an ABAC condition on the pipeline identity refuses it). Until the platform team grants Storage Blob Data Reader, use the admin pages.
 
 An import (`loadConsulteeAreas`, `loadCaseBoundaries` in `packages/database/src/geospatial/`):
 
 1. Reads the GeoJSON (camelCase sample or snake_case export properties).
-2. Gives each consultee area its category. Since October 2026 the export's `consultee_category` is a broad group (Health, Transport, Other...), and each id names its dataset (`health_AMB_EW_00001` is from `AMB_EW`). [`config/reference-data.yaml`](../../config/reference-data.yaml) maps each dataset to the category the rulesets use (Ambulance Trust), and the group is kept in `metadata.sourceCategory`. An id with no dataset code (`parish_council_E04000001`) keeps the file's category. A file holding a dataset the config doesn't list isn't imported at all, and the page names it.
+2. Gives each consultee area its category. The export's `consultee_category` is a broad group (Health, Local Authorities, Transport...), and each id names its dataset (`health_AMB_EW_00001` is from `AMB_EW`). [`config/reference-data.yaml`](../../config/reference-data.yaml) maps each dataset to the category the rulesets use (Ambulance Trust), and the group goes in `consulteeGroup`. An id with no dataset code (the small sample's) keeps the file's category. A file holding a dataset the config doesn't list isn't imported at all, and the page names it.
 3. Derives a stable id per row, so re-importing updates in place.
 4. Converts to WKT, fixing winding.
 5. Upserts 200 rows per round trip: one `MERGE` per batch, rows as JSON through `OPENJSON`. Seconds instead of tens of minutes.
 6. Runs `MakeValid()` and, for consultee areas, builds `geometrySimplified`.
 
-**Merge or replace.** A merge never deletes, so a source whose ids changed or that dropped areas leaves stale or duplicate consultees. Replace clears rows in batches of 500 first, but only once its file has downloaded and parsed with at least one feature, so a missing or bad file leaves the data as it was. The admin page replaces just the consultee categories the file holds by default, so an export of some datasets (one without parishes, say) leaves the others' rows in place; it can replace the whole table instead. The DB Seed pipeline and CLI replace the whole table.
+**Consultee areas are always replaced.** Every import, from the admin page, the DB Seed pipeline or the CLI, clears the whole table and loads the file, so the table holds exactly the latest export and nothing from an earlier one. It clears in batches of 500, but only once the file has been read through and holds at least one feature, so a missing or bad file leaves the data as it was. Clear and load aren't one transaction: if the load fails partway, re-run it. A full import can outlast Front Door's timeout: the browser shows an error while the import carries on, so reload the admin page and check the counts rather than submitting again. Case boundaries merge by id unless replaced.
 
-**Import the full export, not the `_simplified` one.** The simplified file is about 55m coarser (up to 137m for interconnectors), and screening's margins assume the 10m `geometrySimplified` the import builds from the full shapes. Clear and load aren't one transaction: if the load fails partway, re-run it. A full import can outlast Front Door's timeout: the browser shows an error while the import carries on, so reload the admin page and check the counts rather than submitting again.
+The import reads the file a feature at a time and loads about 32MB of it at once, so a 500MB export imports within a 1GB heap.
+
+**Import the full export, not the `_simplified` one.** The simplified file is about 55m coarser (up to 137m for interconnectors), and screening's margins assume the 10m `geometrySimplified` the import builds from the full shapes.
 
 ## Case boundaries from CBOS
 

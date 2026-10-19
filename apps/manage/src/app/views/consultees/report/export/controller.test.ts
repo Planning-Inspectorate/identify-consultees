@@ -81,11 +81,6 @@ function serviceWith(
 						consulteeCategory: 'Parish Council',
 						consultee: `Parish ${id}`,
 						region: 'East',
-						caseReference: null,
-						documentId: null,
-						consulteeId: null,
-						organisationId: null,
-						currentVersion: 1,
 						metadata: '{}',
 						lastUpdated: new Date('2026-10-01T09:00:00Z')
 					}))

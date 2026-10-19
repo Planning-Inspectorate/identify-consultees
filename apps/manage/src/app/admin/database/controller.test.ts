@@ -197,8 +197,8 @@ describe('admin database pages', () => {
 	test('shows one row whole - every column, and its metadata indented', async () => {
 		const row = {
 			...area(),
-			caseReference: null,
-			currentVersion: 1,
+			sourceId: 'local_authorities_PAR_EW_00001',
+			consulteeGroup: 'Local Authorities',
 			metadata: '{"FID":612,"LAT":52.06}'
 		};
 		const res = response();
@@ -212,8 +212,8 @@ describe('admin database pages', () => {
 		assert.equal(model.backLinkUrl, '/admin/database/consultee-areas');
 		assert.deepEqual(model.columns.slice(-3), [
 			{ name: 'lastUpdated', value: '13 Oct 2026, 14:39' },
-			{ name: 'caseReference', value: '' },
-			{ name: 'currentVersion', value: '1' }
+			{ name: 'sourceId', value: 'local_authorities_PAR_EW_00001' },
+			{ name: 'consulteeGroup', value: 'Local Authorities' }
 		]);
 		assert.equal(model.metadata, '{\n  "FID": 612,\n  "LAT": 52.06\n}');
 

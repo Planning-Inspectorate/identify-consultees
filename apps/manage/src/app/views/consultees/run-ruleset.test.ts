@@ -43,14 +43,11 @@ describe('runRulesetSafely', () => {
 			feature: {
 				id: MATCH.id,
 				properties: {
+					sourceId: null,
 					consulteeCategory: 'Parish Council',
+					consulteeGroup: null,
 					consultee: 'Abbey Parish Council',
-					region: 'East',
-					caseReference: null,
-					documentId: null,
-					consulteeId: null,
-					organisationId: null,
-					currentVersion: 1
+					region: 'East'
 				}
 			}
 		});

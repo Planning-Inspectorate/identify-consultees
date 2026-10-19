@@ -54,14 +54,11 @@ function record(id: string, overrides: Partial<ConsulteeAreaRecord> = {}): Consu
 	return {
 		id,
 		geometryType: 'Polygon',
+		sourceId: null,
 		consulteeCategory: 'Parish Council',
+		consulteeGroup: null,
 		consultee: 'Stored name',
 		region: 'East',
-		caseReference: null,
-		documentId: null,
-		consulteeId: null,
-		organisationId: null,
-		currentVersion: 1,
 		metadata: '{"FID":1}',
 		lastUpdated: new Date('2026-10-01T09:00:00Z'),
 		...overrides
@@ -132,14 +129,13 @@ describe('report workbook', () => {
 			})
 		);
 		const admin = sheets.find((sheet) => sheet.sheet === 'Administrative boundaries')!;
-		// who, why, where from and which version - then the source data's own attributes
+		// who, why and where from - then the source data's own attributes
 		assert.deepStrictEqual(rowValues(admin.data[0]), [
 			'Consultee',
 			'Category',
 			'Region',
 			'Why identified',
 			'Source',
-			'Version',
 			'FID'
 		]);
 		assert.deepStrictEqual(admin.data.slice(1).map(rowValues), [
@@ -150,22 +146,21 @@ describe('report workbook', () => {
 				'Stored region',
 				'"B" host Parish Councils: intersects the site',
 				'Ruleset',
-				1,
 				1
 			],
 			// added by hand, with the default reason
-			['Added Parish', 'Parish Council', null, 'Manually added', 'Manually added', null, null],
-			// no stored row (deleted mid-request) - the run's values, and no version or metadata
+			['Added Parish', 'Parish Council', null, 'Manually added', 'Manually added', null],
+			// no stored row (deleted mid-request) - the run's values, and no metadata
 			[
 				'Zeal Parish Council',
 				'Parish Council',
 				'Feature region',
 				'"B" host Parish Councils: intersects the site',
 				'Ruleset',
-				null,
 				null
 			]
 		]);
+		// a number in the metadata stays a number
 		assert.deepStrictEqual(admin.data[1][5], { type: Number, value: 1 });
 
 		const publicBodies = sheets.find((sheet) => sheet.sheet === 'Public bodies')!;
@@ -193,9 +188,9 @@ describe('report workbook', () => {
 			})
 		);
 		const admin = sheets.find((sheet) => sheet.sheet === 'Administrative boundaries')!;
-		assert.deepStrictEqual(rowValues(admin.data[0]).slice(6), ['PARNCP', 'FID', 'open', 'area', 'note', 'Metadata']);
+		assert.deepStrictEqual(rowValues(admin.data[0]).slice(5), ['PARNCP', 'FID', 'open', 'area', 'note', 'Metadata']);
 		assert.deepStrictEqual(
-			admin.data.slice(1).map((row) => rowValues(row).slice(6)),
+			admin.data.slice(1).map((row) => rowValues(row).slice(5)),
 			[
 				['Abbey', 7, true, '{"ha":12}', null, null],
 				[null, 8, null, null, null, null],
@@ -204,18 +199,18 @@ describe('report workbook', () => {
 			]
 		);
 		// numbers and true/false keep their types
-		assert.deepStrictEqual(admin.data[1][7], { type: Number, value: 7 });
-		assert.deepStrictEqual(admin.data[1][8], { type: Boolean, value: true });
+		assert.deepStrictEqual(admin.data[1][6], { type: Number, value: 7 });
+		assert.deepStrictEqual(admin.data[1][7], { type: Boolean, value: true });
 		// a column per attribute, sized to its name
 		assert.deepStrictEqual(
-			admin.columns.slice(6).map((column) => column.width),
+			admin.columns.slice(5).map((column) => column.width),
 			[12, 12, 12, 12, 12, 12]
 		);
 
 		// another tab has its own data's attributes
 		const publicBodies = sheets.find((sheet) => sheet.sheet === 'Public bodies')!;
-		assert.deepStrictEqual(rowValues(publicBodies.data[0]).slice(6), ['ODS']);
-		assert.deepStrictEqual(rowValues(publicBodies.data[1]).slice(6), ['RX1']);
+		assert.deepStrictEqual(rowValues(publicBodies.data[0]).slice(5), ['ODS']);
+		assert.deepStrictEqual(rowValues(publicBodies.data[1]).slice(5), ['RX1']);
 	});
 
 	it('summarises the report, counting each tab, and lists removals with their reasons', () => {
@@ -253,10 +248,10 @@ describe('report workbook', () => {
 		assert.ok(!summary.some((cells) => cells[0] === 'Removed consultees'));
 	});
 
-	it('gives a consultee added by hand its stored region, version and metadata', () => {
+	it('gives a consultee added by hand its stored region and metadata', () => {
 		const admin = buildReportSheets(
 			report({
-				records: new Map([['p', record('p', { region: 'Stored region', currentVersion: 3 })]]),
+				records: new Map([['p', record('p', { region: 'Stored region' })]]),
 				added: [{ id: 'p', category: 'Parish Council', name: 'Picked Parish', reason: 'Borders the site' }]
 			})
 		).find((sheet) => sheet.sheet === 'Administrative boundaries')!;
@@ -266,7 +261,6 @@ describe('report workbook', () => {
 			'Stored region',
 			'Borders the site',
 			'Manually added',
-			3,
 			1
 		]);
 	});
@@ -285,8 +279,7 @@ describe('report workbook', () => {
 			null,
 			null,
 			'"B" host Parish Councils: intersects the site',
-			'Ruleset',
-			null
+			'Ruleset'
 		]);
 	});
 
@@ -304,14 +297,23 @@ describe('report workbook', () => {
 		const config = parseReportConfig(
 			[
 				'version: 1',
-				'columns: [lastUpdated, consultee, distanceKm, consulteeAreaId, geometryType, caseReference, version, source]',
+				'columns: [lastUpdated, consultee, distanceKm, consulteeAreaId, geometryType, sourceId, group, source]',
 				'defaults: { mapKm: 10, metadata: none }'
 			].join('\n')
 		);
 		const admin = buildReportSheets(
 			report({
 				identified: [match('a', 'Parish Council', 'Abbey', 'b_host_parish', 2500)],
-				records: new Map([['a', record('a', { consultee: 'Abbey', caseReference: 'EN010001', currentVersion: 2 })]]),
+				records: new Map([
+					[
+						'a',
+						record('a', {
+							consultee: 'Abbey',
+							sourceId: 'local_authorities_PAR_EW_00001',
+							consulteeGroup: 'Local Authorities'
+						})
+					]
+				]),
 				// one the run found, with its distance; one added by name alone
 				added: [
 					{ id: 'p', category: 'Parish Council', name: 'Picked', reason: 'r', distanceMetres: 1000 },
@@ -326,18 +328,27 @@ describe('report workbook', () => {
 			'Distance from site (km)',
 			'Consultee area id',
 			'Geometry type',
-			'Case reference',
-			'Version',
+			'Source id',
+			'Group',
 			'Source'
 		]);
 		assert.deepStrictEqual(admin.data.slice(1).map(rowValues), [
-			[new Date('2026-10-01T09:00:00Z'), 'Abbey', 2.5, 'a', 'Polygon', 'EN010001', 2, 'Ruleset'],
+			[
+				new Date('2026-10-01T09:00:00Z'),
+				'Abbey',
+				2.5,
+				'a',
+				'Polygon',
+				'local_authorities_PAR_EW_00001',
+				'Local Authorities',
+				'Ruleset'
+			],
 			[null, 'Picked', 1, 'p', null, null, null, 'Manually added'],
 			[null, 'Typed', null, null, null, null, null, 'Manually added']
 		]);
 		assert.deepStrictEqual(
 			admin.columns.map((column) => column.width),
-			[18, 36, 12, 38, 16, 14, 10, 16]
+			[18, 36, 12, 38, 16, 30, 22, 16]
 		);
 	});
 
