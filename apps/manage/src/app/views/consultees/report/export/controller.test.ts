@@ -5,7 +5,9 @@ import { after, before, describe, it, mock } from 'node:test';
 import { ONE_PIXEL_PNG, pdfTextLines } from '../../../../testing/pdf-text.ts';
 import type { ConsulteeAreaMatchRow } from '../../../../testing/ruleset-runner-stub.ts';
 import { failingRulesetRunner, rulesetRunnerReturning } from '../../../../testing/ruleset-runner-stub.ts';
+import { consulteeSelection, reportDownloadUrl } from '../urls.ts';
 import { buildReportDownload } from './controller.ts';
+import { rememberReportZip } from './report-zip.ts';
 
 const realProjectId = '44444444-4444-4444-4444-444444444444';
 const ruleset = 'england-wales-post-20240430';
@@ -227,6 +229,25 @@ describe('report download', () => {
 			(res.set.mock.calls[0].arguments as unknown as [Record<string, string>])[0]['Content-Disposition'],
 			/England Wales post 30 April 2024/
 		);
+	});
+
+	it('serves the report the created page remembered, without running the ruleset again', async () => {
+		const query = { ruleset, add: JSON.stringify({ c: 'Landowner', n: 'Kept Report Landowner', r: '' }) };
+		const downloadUrl = reportDownloadUrl(realProjectId, ruleset, consulteeSelection(query));
+		rememberReportZip(downloadUrl, { fileName: 'kept.zip', contents: Buffer.from('the kept report') });
+
+		const runner = rulesetRunnerReturning([]);
+		const service = serviceWith(runner);
+		const res = response();
+		await buildReportDownload(service as never)({ params: { caseId: realProjectId }, query } as never, res as never);
+
+		assert.equal(runner.mock.callCount(), 0);
+		assert.equal(service.db.consulteeArea.findMany.mock.callCount(), 0);
+		assert.match(
+			(res.set.mock.calls[0].arguments as unknown as [Record<string, string>])[0]['Content-Disposition'],
+			/filename="kept\.zip"/
+		);
+		assert.deepStrictEqual(res.send.mock.calls[0].arguments[0], Buffer.from('the kept report'));
 	});
 
 	it('goes back to the Report created page, keeping the selection, when the ruleset cannot be run', async () => {

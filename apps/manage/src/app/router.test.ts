@@ -415,12 +415,27 @@ describe('manage router wiring', () => {
 	});
 
 	test('GET /consultees/:id/report/created renders the report created page', async () => {
-		const response = await request(authDisabledApp).get(
-			`/consultees/${homePageTestCaseId}/report/created?ruleset=england-wales-post-20240430`
-		);
-		assert.equal(response.status, 200);
-		assert.match(response.text, /Report created/);
-		assert.match(response.text, /Download Router Test Fixture Wind Farm consultee report/);
+		// the page builds the report's map PDFs - never the real tile server from a test
+		const originalFetch = globalThis.fetch;
+		globalThis.fetch = async () =>
+			new Response(
+				Buffer.from(
+					'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
+					'base64'
+				),
+				{ status: 200, headers: { 'content-type': 'image/png' } }
+			);
+
+		try {
+			const response = await request(authDisabledApp).get(
+				`/consultees/${homePageTestCaseId}/report/created?ruleset=england-wales-post-20240430`
+			);
+			assert.equal(response.status, 200);
+			assert.match(response.text, /Report created/);
+			assert.match(response.text, /Download Router Test Fixture Wind Farm Consultee List report \(ZIP/);
+		} finally {
+			globalThis.fetch = originalFetch;
+		}
 	});
 
 	test('GET /consultees/:id/results runs the ruleset and renders the results page', async () => {
