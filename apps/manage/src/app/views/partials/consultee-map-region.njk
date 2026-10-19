@@ -5,12 +5,19 @@
 {# the InteractiveMap constructor JSON.parses every data-* attribute on its container -
    the fallback details travel in the JSON config block instead, and the container is
    discovered by class, not data-* #}
+{# shown from first paint until the interactive map reaches first idle -
+   hidden without JavaScript, adopted by the map-loading plugin when it runs #}
+<noscript><style>.app-js-only { display: none; }</style></noscript>
 <div
 	id="{{ mapId }}"
 	class="app-case-map app-consultee-map"
 	role="region"
 	aria-label="{{ mapRegionLabel }}"
 >
+	<div class="app-map-loading app-js-only" role="status">
+		<span class="app-map-loading__spinner" aria-hidden="true"></span>
+		<span class="app-map-loading__text">Loading map</span>
+	</div>
 	<noscript>
 		<img
 			class="app-case-map-static"
