@@ -22,14 +22,11 @@ type GroupTab = (typeof GROUP_TABS)[number];
 export interface ConsulteeAreaRecord {
 	id: string;
 	geometryType: string;
+	sourceId: string | null;
 	consulteeCategory: string | null;
+	consulteeGroup: string | null;
 	consultee: string | null;
 	region: string | null;
-	caseReference: string | null;
-	documentId: string | null;
-	consulteeId: string | null;
-	organisationId: string | null;
-	currentVersion: number;
 	metadata: string;
 	lastUpdated: Date;
 }
@@ -165,11 +162,11 @@ const COLUMN_CELLS: Record<ReportColumn, (row: RowSource) => Cell> = {
 	region: (row) => text(row.region),
 	whyIdentified: (row) => ({ value: row.whyIdentified, wrap: true }),
 	source: (row) => ({ value: row.source }),
-	version: (row) => (row.record ? { type: Number, value: row.record.currentVersion } : null),
+	group: (row) => text(row.record?.consulteeGroup),
 	distanceKm: (row) => kilometres(row.distanceMetres),
 	consulteeAreaId: (row) => text(row.id),
+	sourceId: (row) => text(row.record?.sourceId),
 	geometryType: (row) => text(row.record?.geometryType),
-	caseReference: (row) => text(row.record?.caseReference),
 	lastUpdated: (row) => (row.record ? { type: Date, value: row.record.lastUpdated, format: 'yyyy-mm-dd hh:mm' } : null)
 };
 
@@ -179,11 +176,11 @@ export const COLUMN_WIDTHS: Record<ReportColumn, number> = {
 	region: 22,
 	whyIdentified: 60,
 	source: 16,
-	version: 10,
+	group: 22,
 	distanceKm: 12,
 	consulteeAreaId: 38,
+	sourceId: 30,
 	geometryType: 16,
-	caseReference: 14,
 	lastUpdated: 18
 };
 

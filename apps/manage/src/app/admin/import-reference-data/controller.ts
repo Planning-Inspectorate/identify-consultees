@@ -18,13 +18,10 @@ const PAGE_HEADING = 'Import reference data into the database';
 export const CONSULTEE_AREAS_BLOB_NAME = 'combined_reference_data_v1.geojson';
 export const CASE_BOUNDARIES_BLOB_NAME = 'all-project-boundaries.geojson';
 
-// imports replace rather than merge - see clearExistingRows. The loaders upsert by id and never
-// delete, so a merge would leave the sample data, or rows the new file dropped or re-keyed, behind
-// as stale or duplicate consultees
+// imports replace the table rather than merge into it - see clearExistingRows. Consultee areas
+// always do (importConsulteeAreas); case boundaries are asked to. A merge would leave the sample
+// data, or rows the new file dropped or re-keyed, behind as stale or duplicate rows
 const REPLACE = { replace: true } as const;
-// consultee areas replace just the categories the file holds, unless asked to replace them all -
-// an export of some datasets leaves the others' rows in place
-const REPLACE_CATEGORIES = { replace: 'categories' } as const;
 
 /**
  * Rows in each table right now. A full import into Azure SQL can outlast Front Door's response
@@ -62,13 +59,11 @@ export function buildRunImportConsulteeAreas(
 
 	return async (req, res) => {
 		const viewModel: ImportReferenceDataViewModel = { pageHeading: PAGE_HEADING };
-		const replaceAll = (req.body as { scope?: unknown } | undefined)?.scope === 'all';
 
 		try {
 			const { filePath, cleanup } = await download(CONSULTEE_AREAS_BLOB_NAME);
 			try {
-				viewModel.consulteeAreasImported = await runImport(db, filePath, replaceAll ? REPLACE : REPLACE_CATEGORIES);
-				viewModel.consulteeAreasScope = replaceAll ? 'all' : 'categories';
+				viewModel.consulteeAreasImported = await runImport(db, filePath);
 			} finally {
 				await cleanup();
 			}

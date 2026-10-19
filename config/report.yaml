@@ -10,11 +10,12 @@
 #                  whyIdentified    Why identified      the ruleset conditions it met, or the reason
 #                                                       it was added by hand
 #                  source           Source              Ruleset, or Manually added
-#                  version          Version             the reference data row's version
+#                  group            Group               the reference data's broad group: Health,
+#                                                       Local Authorities, Transport...
 #                  distanceKm       Distance from site (km)
 #                  consulteeAreaId  Consultee area id
+#                  sourceId         Source id           the reference data's own id
 #                  geometryType     Geometry type
-#                  caseReference    Case reference
 #                  lastUpdated      Last updated
 #                Then come the metadata columns each category exports (below).
 #
@@ -51,7 +52,6 @@ columns:
   - region
   - whyIdentified
   - source
-  - version
 
 defaults:
   mapKm: 10

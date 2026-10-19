@@ -9,9 +9,9 @@
  *   npm run db-import-from-blob -- --type=consultee-areas --blob=combined_reference_data_v1.geojson
  *   npm run db-import-from-blob -- --type=case-boundaries --blob=all-project-boundaries.geojson
  *
- * Add `--replace` to delete every existing row of that type first (once the file has downloaded
- * and parsed with features), so the table ends up holding exactly the file's contents - see
- * clearExistingRows.
+ * Consultee areas always replace the table: it ends up holding exactly the file's contents, cleared
+ * once the file has downloaded and been read (see clearExistingRows). For case boundaries, add
+ * `--replace` to do the same; without it they merge by id.
  *
  * Requires BLOB_STORE_HOST and BLOB_STORE_CONTAINER (the same env var names the running app
  * already uses - see infrastructure/app-web.tf) and an ambient Azure identity DefaultAzureCredential
@@ -40,7 +40,7 @@ export interface ParsedArgs {
 	type: ImportType;
 	blob: string;
 	batchSize?: number;
-	/** Delete the table's existing rows before importing, rather than merging into them. */
+	/** Case boundaries: delete the table's existing rows before importing, rather than merging. */
 	replace: boolean;
 }
 

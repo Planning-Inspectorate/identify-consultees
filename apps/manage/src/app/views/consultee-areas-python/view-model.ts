@@ -1,11 +1,11 @@
 export interface ConsulteeAreaRow {
 	id: string;
 	geometryType: string;
+	sourceId: string | null;
 	consulteeCategory: string | null;
+	consulteeGroup: string | null;
 	consultee: string | null;
 	region: string | null;
-	caseReference: string | null;
-	currentVersion: number;
 	metadata: string;
 	lastUpdated: string | null;
 	geometryWkt: string;
