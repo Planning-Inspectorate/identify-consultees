@@ -152,6 +152,10 @@ describe('add a consultee page', () => {
 		assert.match(html, /<input[^>]*name="name"/);
 		assert.match(html, /<textarea[^>]*name="reason"/);
 		assert.match(html, /Add consultee/);
+		// the reviewed layout: a two-thirds column, a large (not extra-large) heading, bold labels
+		assert.match(html, /govuk-grid-column-two-thirds/);
+		assert.match(html, /govuk-heading-l/);
+		assert.match(html, /govuk-label--m/);
 	});
 
 	it("suggests the category's nearby consultees as the name is typed, nearest first, once per name", async () => {
