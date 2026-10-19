@@ -13,11 +13,6 @@ describe('consultee areas direct', () => {
 		consulteeCategory: 'Statutory',
 		consultee: 'Environment Agency',
 		region: 'South West',
-		caseReference: null,
-		documentId: null,
-		consulteeId: null,
-		organisationId: null,
-		currentVersion: 1,
 		metadata: '{}',
 		geometryWkt: 'POINT(-2.5 51.5)'
 	});

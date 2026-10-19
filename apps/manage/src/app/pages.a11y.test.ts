@@ -658,11 +658,11 @@ describe('manage page accessibility smoke', () => {
 				{
 					id: '1',
 					geometryType: 'Polygon',
+					sourceId: 'health_AMB_EW_00001',
 					consulteeCategory: 'Statutory',
+					consulteeGroup: 'Health',
 					consultee: 'Example Trust',
 					region: 'South West',
-					caseReference: 'EN01',
-					currentVersion: 1,
 					metadata: '{}',
 					lastUpdated: '2026-01-01',
 					geometryWkt: 'POLYGON((0 0,1 0,1 1,0 1,0 0))'

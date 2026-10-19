@@ -172,8 +172,8 @@ def areas(connection_params):
                 cursor.execute(
                     """
                     INSERT INTO consultee_area (id, geometryType, geometry, geometrySimplified, consulteeCategory,
-                        consultee, currentVersion, metadata)
-                    SELECT %s, %s, g.geometry, g.geometry.Reduce(10).MakeValid(), %s, %s, 1, '{}'
+                        consultee, metadata)
+                    SELECT %s, %s, g.geometry, g.geometry.Reduce(10).MakeValid(), %s, %s, '{}'
                     FROM (SELECT geography::STGeomFromText(%s, 4326).MakeValid() AS geometry) AS g
                     """,
                     (area_id, wkt.split("(", 1)[0].title(), category, consultee, wkt),

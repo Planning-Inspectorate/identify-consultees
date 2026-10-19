@@ -35,22 +35,19 @@ model ConsulteeArea {
   // simplified copy of `geometry` that ruleset distance checks run against - see the migration
   geometrySimplified Unsupported("geography")
   geometryType       String                   @db.NVarChar(50)
+  // the reference data export's own id - `id` is derived from it, so a re-import keeps each row's id
+  sourceId           String?                  @db.NVarChar(200)
+  // the category the rulesets match (config/reference-data.yaml maps each dataset to one)
   consulteeCategory  String?                  @db.NVarChar(200)
+  // the export's own consultee_category: a broad group (Health, Local Authorities, Transport...)
+  consulteeGroup     String?                  @db.NVarChar(100)
   consultee          String?                  @db.NVarChar(200)
   region             String?                  @db.NVarChar(100)
-  // loose link by value, not an enforced foreign key - an area can relate to several case parts
-  // sharing one reference, so this isn't unique and can't be an FK target
-  caseReference      String?                  @db.NVarChar(50)
-  documentId         String?                  @db.UniqueIdentifier
-  consulteeId        String?                  @db.UniqueIdentifier
-  organisationId     String?                  @db.UniqueIdentifier
-  currentVersion     Int                      @default(1)
-  // JSON catch-all for anything not promoted to a named column above - SQL Server has no native
-  // JSON column type; query it with JSON_VALUE()/OPENJSON().
+  // the export's metadata as it gives it: each source dataset's own attributes. SQL Server has no
+  // native JSON column type; query it with JSON_VALUE()/OPENJSON().
   metadata           String                   @default("{}") @db.NVarChar(Max)
   lastUpdated        DateTime                 @default(now())
 
-  @@index([caseReference])
   @@index([consulteeCategory])
   @@map("consultee_area")
 }

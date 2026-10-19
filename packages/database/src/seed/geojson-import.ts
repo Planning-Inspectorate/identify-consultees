@@ -1,4 +1,4 @@
-import { Prisma, type PrismaClient } from '@pins/identify-consultees-database/src/client/client.ts';
+import type { PrismaClient } from '@pins/identify-consultees-database/src/client/client.ts';
 import { createHash } from 'node:crypto';
 import type { CaseBoundaryFeature } from '../geospatial/case-boundaries.ts';
 import { loadCaseBoundaries } from '../geospatial/case-boundaries.ts';
@@ -6,7 +6,12 @@ import type { ConsulteeAreaFeature, LoadOptions } from '../geospatial/consultee-
 import { loadConsulteeAreas } from '../geospatial/consultee-areas.ts';
 import type { Geometry } from '../geospatial/wkt.ts';
 import { streamFeatures } from './feature-stream.ts';
-import { consulteeCategoryFor, REFERENCE_DATA_CONFIG, type ReferenceDataConfig } from './reference-data.ts';
+import {
+	consulteeCategoryFor,
+	datasetCode,
+	REFERENCE_DATA_CONFIG,
+	type ReferenceDataConfig
+} from './reference-data.ts';
 
 /**
  * Shared logic for importing the two GeoJSON sources this project loads: reference/consultee
@@ -36,15 +41,14 @@ export function toConsulteeArea(
 ): ConsulteeAreaFeature {
 	const props = feature.properties;
 
-	// two source shapes seen so far: the original small ArcGIS-style sample (consulteeCategory,
-	// camelCase, metadata as a real JSON object) and the real "combined reference data" export
-	// (consultee_category, snake_case, metadata as a Python dict repr string in earlier exports -
-	// not valid JSON, so it's kept as-is under rawMetadata rather than risking corruption from a
-	// fragile parser). The export's category is a broad group (Health, Transport...) since October
-	// 2026, so a feature whose id names its dataset takes that dataset's category instead - see
-	// config/reference-data.yaml - and keeps the group as sourceCategory
+	// two source shapes: the small camelCase sample (consulteeCategory, metadata an object) and the
+	// reference data export (consultee_category, snake_case). The export's category is a broad
+	// group (Health, Transport...), so a feature whose id names its dataset takes that dataset's
+	// category - see config/reference-data.yaml - and keeps the group as consulteeGroup. Earlier
+	// exports gave metadata as a Python dict repr string, not valid JSON: it's kept as-is under
+	// rawMetadata rather than risking corruption from a fragile parser
+	const id = String(props.id ?? '');
 	const fileCategory = (props.consulteeCategory ?? props.consultee_category) as string | undefined;
-	const consulteeCategory = consulteeCategoryFor(String(props.id ?? ''), fileCategory, config);
 	const rawMetadata = props.metadata;
 	let metadata: Record<string, unknown> = {};
 	if (rawMetadata && typeof rawMetadata === 'object') {
@@ -58,22 +62,12 @@ export function toConsulteeArea(
 		type: 'Feature',
 		geometry: feature.geometry,
 		properties: {
+			sourceId: id || null,
+			consulteeCategory: consulteeCategoryFor(id, fileCategory, config) ?? null,
+			consulteeGroup: datasetCode(id) === undefined ? null : (fileCategory ?? null),
 			consultee: (props.consultee as string) ?? null,
 			region: (props.region as string) ?? null,
-			consulteeCategory: consulteeCategory ?? null,
-			caseReference: (props.caseId as string) ?? null,
-			documentId: (props.documentId as string) ?? null,
-			consulteeId: (props.consulteeId as string) ?? null,
-			organisationId: (props.organisationId as string) ?? null,
-			currentVersion: (props.currentVersion as number) ?? 1,
-			// keep the source data's own id/lastUpdated alongside its metadata, rather than dropping
-			// them - our schema only has a dedicated column for currentVersion
-			metadata: {
-				...metadata,
-				sourceId: props.id,
-				sourceLastUpdated: props.last_updated,
-				...(fileCategory && fileCategory !== consulteeCategory ? { sourceCategory: fileCategory } : {})
-			}
+			metadata
 		}
 	};
 }
@@ -126,32 +120,15 @@ export async function clearExistingRows(dbClient: PrismaClient, type: ImportType
 	}
 }
 
-/**
- * Delete the consultee areas of `categories`, a batch at a time - so an import of some datasets
- * replaces those and leaves the rest. A category the file doesn't hold keeps its rows.
- */
-export async function clearCategories(dbClient: PrismaClient, categories: string[]): Promise<number> {
-	let total = 0;
-	for (;;) {
-		const deleted = await dbClient.$executeRaw`
-			DELETE TOP (${CLEAR_BATCH_SIZE}) FROM consultee_area WHERE consulteeCategory IN (${Prisma.join(categories)})
-		`;
-		total += deleted;
-		if (deleted < CLEAR_BATCH_SIZE) {
-			return total;
-		}
-	}
-}
-
 export interface ImportOptions {
 	batchSize?: number;
 	onProgress?: (loaded: number, total: number) => void;
 	/**
-	 * Clear the table before loading (see clearExistingRows) - only once the file has parsed and
-	 * holds at least one feature, so a bad or empty file can't leave the table empty. For consultee
-	 * areas, `'categories'` clears only the categories the file holds (see clearCategories).
+	 * Case boundaries: clear the table before loading (see clearExistingRows) - only once the file
+	 * has parsed and holds at least one feature, so a bad or empty file can't leave the table empty.
+	 * Consultee areas are always replaced.
 	 */
-	replace?: boolean | 'categories';
+	replace?: boolean;
 	/** How much source GeoJSON, in characters, to load at a time (see CHUNK_CHARACTERS). */
 	chunkCharacters?: number;
 }
@@ -160,20 +137,13 @@ async function clearIfReplacing(
 	dbClient: PrismaClient,
 	type: ImportType,
 	featureCount: number,
-	categories: Set<string>,
-	options: ImportOptions
+	replace: boolean
 ): Promise<void> {
-	if (!options.replace) {
+	if (!replace) {
 		return;
 	}
 	if (featureCount === 0) {
 		throw new Error(`Refusing to replace ${type} with a file holding no features`);
-	}
-	if (options.replace === 'categories' && type === 'consultee-areas') {
-		const named = [...categories].sort();
-		const deleted = named.length > 0 ? await clearCategories(dbClient, named) : 0;
-		console.log(`Cleared ${deleted} existing ${type} rows of ${named.join(', ')}`);
-		return;
 	}
 	const deleted = await clearExistingRows(dbClient, type);
 	console.log(`Cleared ${deleted} existing ${type} rows`);
@@ -186,8 +156,8 @@ const CHUNK_CHARACTERS = 32 * 1024 * 1024;
 
 /**
  * Import a GeoJSON file into `type`'s table, a chunk at a time: read it once to check every
- * feature maps (a feature that doesn't throws before anything is deleted), count them and gather
- * their categories, clear what `replace` asks for, then read it again and load each chunk.
+ * feature maps (a feature that doesn't throws before anything is deleted) and count them, clear
+ * the table if `replace`, then read it again and load each chunk.
  */
 async function importFile<F extends ConsulteeAreaFeature | CaseBoundaryFeature>(
 	dbClient: PrismaClient,
@@ -199,18 +169,14 @@ async function importFile<F extends ConsulteeAreaFeature | CaseBoundaryFeature>(
 		featureCollection: { type: 'FeatureCollection'; features: F[] },
 		options: LoadOptions
 	) => Promise<number>,
-	options: ImportOptions
+	options: ImportOptions & { replace: boolean }
 ): Promise<number> {
 	let total = 0;
-	const categories = new Set<string>();
 	for await (const { feature } of streamFeatures<RawFeature>(filePath)) {
-		const row = toRow(feature);
+		toRow(feature);
 		total++;
-		if ('consulteeCategory' in row.properties && row.properties.consulteeCategory) {
-			categories.add(row.properties.consulteeCategory);
-		}
 	}
-	await clearIfReplacing(dbClient, type, total, categories, options);
+	await clearIfReplacing(dbClient, type, total, options.replace);
 
 	let loaded = 0;
 	let chunk: F[] = [];
@@ -239,34 +205,33 @@ async function importFile<F extends ConsulteeAreaFeature | CaseBoundaryFeature>(
 }
 
 /**
- * Read a reference-data GeoJSON file (same shape as
- * apps/function-python/setup_database/sample_data/reference_data.geojson, just potentially many
- * more/larger features) and load it into consultee_area.
+ * Replace consultee_area with a reference-data GeoJSON file (the reference data export, or the
+ * small sample in apps/function-python/setup_database/sample_data/reference_data.geojson). Always
+ * a replace: the table holds exactly the file, never an older export's rows alongside it.
  */
 export async function importConsulteeAreas(
 	dbClient: PrismaClient,
 	filePath: string,
-	options: ImportOptions = {}
+	options: Omit<ImportOptions, 'replace'> = {}
 ): Promise<number> {
-	return importFile(
-		dbClient,
-		filePath,
-		'consultee-areas',
-		(feature) => toConsulteeArea(feature),
-		loadConsulteeAreas,
-		options
-	);
+	return importFile(dbClient, filePath, 'consultee-areas', (feature) => toConsulteeArea(feature), loadConsulteeAreas, {
+		...options,
+		replace: true
+	});
 }
 
 /**
  * Read a project/case-boundary GeoJSON file (same shape as
  * apps/function-python/setup_database/sample_data/sample_application_boundaries.geojson) and load
- * it into case_boundary. Case boundaries have no category, so `'categories'` replaces them all.
+ * it into case_boundary - replacing the table with `replace`, else merging into it by id.
  */
 export async function importCaseBoundaries(
 	dbClient: PrismaClient,
 	filePath: string,
 	options: ImportOptions = {}
 ): Promise<number> {
-	return importFile(dbClient, filePath, 'case-boundaries', toCaseBoundary, loadCaseBoundaries, options);
+	return importFile(dbClient, filePath, 'case-boundaries', toCaseBoundary, loadCaseBoundaries, {
+		...options,
+		replace: Boolean(options.replace)
+	});
 }

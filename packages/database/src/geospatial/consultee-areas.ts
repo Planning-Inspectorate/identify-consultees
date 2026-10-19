@@ -13,16 +13,16 @@ import { geometryToWkt, wktToGeometry } from './wkt.ts';
  */
 export const SIMPLIFY_TOLERANCE_METRES = 10;
 
+/** A consultee area's fields, as the reference data export gives them - see schema.prisma. */
 export interface ConsulteeAreaProperties {
+	/** The export's own id. */
+	sourceId?: string | null;
+	/** The category the rulesets match. */
 	consulteeCategory?: string | null;
+	/** The export's broad group: Health, Local Authorities, Transport... */
+	consulteeGroup?: string | null;
 	consultee?: string | null;
 	region?: string | null;
-	// loose value-link to a case, not an FK - see schema.prisma
-	caseReference?: string | null;
-	documentId?: string | null;
-	consulteeId?: string | null;
-	organisationId?: string | null;
-	currentVersion?: number;
 	metadata?: Record<string, unknown>;
 }
 
@@ -52,14 +52,11 @@ export interface ConsulteeAreaSummary {
 interface ConsulteeAreaSummaryRow {
 	id: string;
 	geometryType: string;
+	sourceId: string | null;
 	consulteeCategory: string | null;
+	consulteeGroup: string | null;
 	consultee: string | null;
 	region: string | null;
-	caseReference: string | null;
-	documentId: string | null;
-	consulteeId: string | null;
-	organisationId: string | null;
-	currentVersion: number;
 	metadata: string;
 }
 
@@ -71,14 +68,11 @@ function rowToSummary(row: ConsulteeAreaSummaryRow): ConsulteeAreaSummary {
 	return {
 		id: row.id,
 		properties: {
+			sourceId: row.sourceId,
 			consulteeCategory: row.consulteeCategory,
+			consulteeGroup: row.consulteeGroup,
 			consultee: row.consultee,
 			region: row.region,
-			caseReference: row.caseReference,
-			documentId: row.documentId,
-			consulteeId: row.consulteeId,
-			organisationId: row.organisationId,
-			currentVersion: row.currentVersion,
 			metadata: JSON.parse(row.metadata)
 		}
 	};
@@ -128,11 +122,8 @@ export async function loadConsulteeAreas(
 				consulteeCategory: feature.properties.consulteeCategory ?? null,
 				consultee: feature.properties.consultee ?? null,
 				region: feature.properties.region ?? null,
-				caseReference: feature.properties.caseReference ?? null,
-				documentId: feature.properties.documentId ?? null,
-				consulteeId: feature.properties.consulteeId ?? null,
-				organisationId: feature.properties.organisationId ?? null,
-				currentVersion: feature.properties.currentVersion ?? 1,
+				sourceId: feature.properties.sourceId ?? null,
+				consulteeGroup: feature.properties.consulteeGroup ?? null,
 				// pre-stringified rather than nested JSON - OPENJSON's WITH clause extracts a
 				// declared NVARCHAR column as a scalar string, not a nested object
 				metadata: JSON.stringify(feature.properties.metadata ?? {})
@@ -153,11 +144,8 @@ export async function loadConsulteeAreas(
 						consulteeCategory,
 						consultee,
 						region,
-						caseReference,
-						documentId,
-						consulteeId,
-						organisationId,
-						currentVersion,
+						sourceId,
+						consulteeGroup,
 						metadata
 					FROM OPENJSON(${batchJson})
 					WITH (
@@ -169,11 +157,8 @@ export async function loadConsulteeAreas(
 						consulteeCategory NVARCHAR(200) '$.consulteeCategory',
 						consultee NVARCHAR(200) '$.consultee',
 						region NVARCHAR(100) '$.region',
-						caseReference NVARCHAR(50) '$.caseReference',
-						documentId UNIQUEIDENTIFIER '$.documentId',
-						consulteeId UNIQUEIDENTIFIER '$.consulteeId',
-						organisationId UNIQUEIDENTIFIER '$.organisationId',
-						currentVersion INT '$.currentVersion',
+						sourceId NVARCHAR(200) '$.sourceId',
+						consulteeGroup NVARCHAR(100) '$.consulteeGroup',
 						metadata NVARCHAR(MAX) '$.metadata'
 					)
 				) AS parsed
@@ -186,20 +171,16 @@ export async function loadConsulteeAreas(
 				consulteeCategory = source.consulteeCategory,
 				consultee = source.consultee,
 				region = source.region,
-				caseReference = source.caseReference,
-				documentId = source.documentId,
-				consulteeId = source.consulteeId,
-				organisationId = source.organisationId,
-				currentVersion = source.currentVersion,
+				sourceId = source.sourceId,
+				consulteeGroup = source.consulteeGroup,
 				metadata = source.metadata,
 				lastUpdated = SYSUTCDATETIME()
 			WHEN NOT MATCHED THEN INSERT (
-				id, geometryType, geometry, geometrySimplified, consulteeCategory, consultee, region, caseReference,
-				documentId, consulteeId, organisationId, currentVersion, metadata
+				id, geometryType, geometry, geometrySimplified, sourceId, consulteeCategory, consulteeGroup, consultee,
+				region, metadata
 			) VALUES (
-				source.id, source.geometryType, source.geometry, source.geometrySimplified, source.consulteeCategory,
-				source.consultee, source.region, source.caseReference, source.documentId,
-				source.consulteeId, source.organisationId, source.currentVersion, source.metadata
+				source.id, source.geometryType, source.geometry, source.geometrySimplified, source.sourceId,
+				source.consulteeCategory, source.consulteeGroup, source.consultee, source.region, source.metadata
 			);
 		`;
 
@@ -211,8 +192,7 @@ export async function loadConsulteeAreas(
 // a plain, developer-controlled (never user input) column list - safe to inline as raw SQL via
 // Prisma.raw() below, which is Prisma's documented escape hatch for trusted, non-parameter SQL text
 const summaryColumnList = `
-	id, geometryType, consulteeCategory, consultee, region, caseReference, documentId,
-	consulteeId, organisationId, currentVersion, metadata
+	id, geometryType, sourceId, consulteeCategory, consulteeGroup, consultee, region, metadata
 `;
 const selectColumns = Prisma.raw(`${summaryColumnList}, geometry.STAsText() AS geometryWkt`);
 

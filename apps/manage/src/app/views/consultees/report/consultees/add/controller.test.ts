@@ -35,11 +35,6 @@ function parishMatchRow(id = matchId, consultee = 'Little Snoring Parish Council
 		consulteeCategory: 'Parish Council',
 		consultee,
 		region: 'East of England',
-		caseReference: null,
-		documentId: null,
-		consulteeId: null,
-		organisationId: null,
-		currentVersion: 1,
 		metadata: '{}',
 		geometryWkt: 'MULTILINESTRING((-1.5 52.5, -1.4 52.6))',
 		distanceMetres

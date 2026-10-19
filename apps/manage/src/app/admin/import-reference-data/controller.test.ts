@@ -34,8 +34,8 @@ describe('admin import reference data', () => {
 		assert.strictEqual(viewModel.loadedCaseBoundaries, 283);
 		const html = res.render.mock.calls[0].result;
 		assert.match(html, /Currently loaded/);
-		assert.match(html, /deletes existing rows first/);
-		assert.match(html, /Only the file&#39;s categories/);
+		assert.match(html, /deletes every row in its table/);
+		assert.match(html, /Replace consultee areas/);
 		assert.match(html, /Replace consultee areas/);
 	});
 
@@ -65,43 +65,14 @@ describe('admin import reference data', () => {
 
 			assert.strictEqual(download.mock.calls[0].arguments[0], CONSULTEE_AREAS_BLOB_NAME);
 			assert.strictEqual(runImport.mock.calls[0].arguments[1], '/tmp/consultee-areas.geojson');
-			// replaces the file's categories rather than merging into them
-			assert.deepStrictEqual(runImport.mock.calls[0].arguments[2], { replace: 'categories' });
+			// importConsulteeAreas always replaces the table - nothing to ask it
+			assert.strictEqual(runImport.mock.calls[0].arguments.length, 2);
 
 			const { error, consulteeAreasImported, loadedConsulteeAreas } = res.render.mock.calls[0].arguments[1];
 			assert.strictEqual(error, undefined);
 			assert.strictEqual(consulteeAreasImported, 18258);
 			assert.strictEqual(loadedConsulteeAreas, 18_258);
-			assert.match(
-				res.render.mock.calls[0].result,
-				/Replaced the consultee areas of the file&#39;s categories: imported 18258/
-			);
-		});
-
-		it('replaces every consultee area when asked to', async () => {
-			const res = newRes();
-			const runImport = mock.fn(async () => 3539);
-			const run = buildRunImportConsulteeAreas({ db: countingDb(), logger: mockLogger() }, newDownload(), runImport);
-			await run({ body: { scope: 'all' } }, res);
-
-			assert.deepStrictEqual(runImport.mock.calls[0].arguments[2], { replace: true });
-			assert.strictEqual(res.render.mock.calls[0].arguments[1].consulteeAreasScope, 'all');
-			assert.match(res.render.mock.calls[0].result, /Replaced every consultee area: imported 3539/);
-		});
-
-		it('renders an error when the download fails, without throwing', async () => {
-			const res = newRes();
-			const download = mock.fn(async () => {
-				throw new Error('AuthorizationPermissionMismatch');
-			});
-			const runImport = mock.fn(async () => 0);
-			const run = buildRunImportConsulteeAreas({ db: {}, logger: mockLogger() }, download, runImport);
-			await run({}, res);
-
-			assert.strictEqual(runImport.mock.callCount(), 0);
-			const { error, consulteeAreasImported } = res.render.mock.calls[0].arguments[1];
-			assert.match(error, /Could not import consultee areas/);
-			assert.strictEqual(consulteeAreasImported, undefined);
+			assert.match(res.render.mock.calls[0].result, /Replaced consultee areas: imported 18258/);
 		});
 
 		it("names a dataset the config doesn't list, saying nothing changed", async () => {

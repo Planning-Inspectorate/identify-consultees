@@ -7,6 +7,8 @@
  *   npm run db-import -- --type=consultee-areas --file=/path/to/reference_data.geojson
  *   npm run db-import -- --type=case-boundaries --file=/path/to/application_boundaries.geojson
  *
+ * Consultee areas replace the whole table with the file; case boundaries merge into theirs by id.
+ *
  * Optional: --batch-size=<n> to override the default rows-per-round-trip (tune down for
  * unusually large/complex geometries, up for small simple ones).
  */

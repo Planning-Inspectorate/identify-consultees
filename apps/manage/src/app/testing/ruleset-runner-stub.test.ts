@@ -15,14 +15,11 @@ describe('rulesetRunnerReturning', () => {
 		const { consultees } = await rulesetRunnerReturning([row('a', 'Hospital', 5)])(site, emptyRuleset, 1);
 
 		assert.deepEqual(consultees[0].feature.properties, {
+			sourceId: null,
 			consulteeCategory: 'Hospital',
+			consulteeGroup: null,
 			consultee: 'a',
 			region: null,
-			caseReference: null,
-			documentId: null,
-			consulteeId: null,
-			organisationId: null,
-			currentVersion: 1,
 			metadata: {}
 		});
 		assert.deepEqual(consultees[0].reasons, [{ type: 'condition', conditionId: 'test-condition' }]);
