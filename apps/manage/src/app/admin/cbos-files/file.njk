@@ -1,0 +1,105 @@
+{% extends "admin/layout.njk" %}
+
+{% from "govuk/components/error-message/macro.njk" import govukErrorMessage %}
+{% from "govuk/components/inset-text/macro.njk" import govukInsetText %}
+{% from "govuk/components/summary-list/macro.njk" import govukSummaryList %}
+{% from "govuk/components/table/macro.njk" import govukTable %}
+{% from "govuk/components/tag/macro.njk" import govukTag %}
+{% from "govuk/components/warning-text/macro.njk" import govukWarningText %}
+
+{% block pageTitle %}
+	{{ pageHeading }} - CBOS files - Admin - {{ config.headerTitle }}
+{% endblock %}
+
+{% block adminContent %}
+	<h1 class="govuk-heading-l pins-admin-files__heading"><span class="govuk-caption-l">CBOS file</span>{{ pageHeading }}</h1>
+
+	{% if error %}
+		{{ govukErrorMessage({ text: error }) }}
+	{% endif %}
+
+	{% if details %}
+		{% if readByImport %}
+			{{ govukInsetText({ text: "The import reads this version." }) }}
+		{% else %}
+			{{ govukInsetText({ text: "The import doesn't read this version: it reads only each document's newest GeoJSON version in a GIS Shapefiles folder." }) }}
+		{% endif %}
+
+		{% set detailRows = [] %}
+		{% for detail in details %}
+			{% set detailRows = (detailRows.push({ key: { text: detail.key }, value: { text: detail.value } }), detailRows) %}
+		{% endfor %}
+		{{ govukSummaryList({ classes: "pins-admin-files", rows: detailRows }) }}
+	{% endif %}
+
+	{% if versions | length > 1 %}
+		<h2 class="govuk-heading-m">Versions of this document</h2>
+		{% set versionRows = [] %}
+		{% for version in versions %}
+			{% set versionRows = (versionRows.push([
+				{ html: (version.version | escape) if version.current else '<a class="govuk-link" href="' ~ version.href ~ '">' ~ (version.version | escape) ~ '</a>' },
+				{ text: version.type },
+				{ text: version.status },
+				{ text: version.created },
+				{ html: govukTag({ text: "Read", classes: "govuk-tag--green" }) if version.readByImport else "" }
+			]), versionRows) %}
+		{% endfor %}
+		{{ govukTable({
+			caption: "Versions of this document",
+			captionClasses: "govuk-visually-hidden",
+			head: [{ text: "Version" }, { text: "Type" }, { text: "Status" }, { text: "Created" }, { text: "Import" }],
+			rows: versionRows
+		}) }}
+	{% endif %}
+
+	{% if problem %}
+		{{ govukWarningText({ text: "Couldn't read the file: " ~ problem ~ ".", iconFallbackText: "Warning" }) }}
+	{% endif %}
+
+	{% if content %}
+		<h2 class="govuk-heading-m">Content</h2>
+		<p class="govuk-body">{{ content.bytes }}, read as {{ content.kind }}.</p>
+
+		{% if content.problem %}
+			{{ govukWarningText({ text: "It " ~ content.problem ~ ".", iconFallbackText: "Warning" }) }}
+		{% endif %}
+
+		{% if content.missingParts | length %}
+			{{ govukWarningText({
+				text: "It has no " ~ content.missingParts | join(", ") ~ " file. CBOS can't convert a shapefile without its .shp, .shx and .dbf, and only reprojects it to longitude and latitude when it has a .prj.",
+				iconFallbackText: "Warning"
+			}) }}
+		{% endif %}
+
+		{% if content.entries %}
+			{% set entryRows = [] %}
+			{% for entry in content.entries %}
+				{% set entryRows = (entryRows.push([{ text: entry.name }, { text: entry.size, format: "numeric" }]), entryRows) %}
+			{% endfor %}
+			{{ govukTable({
+				caption: "Files in the ZIP",
+				captionClasses: "govuk-table__caption--s",
+				head: [{ text: "Name" }, { text: "Size", format: "numeric" }],
+				rows: entryRows
+			}) }}
+		{% endif %}
+
+		{% if content.geojson %}
+			{% set geojsonRows = [] %}
+			{% for row in content.geojson %}
+				{% set geojsonRows = (geojsonRows.push({ key: { text: row.key }, value: { text: row.value } }), geojsonRows) %}
+			{% endfor %}
+			{{ govukSummaryList({ rows: geojsonRows }) }}
+		{% endif %}
+
+		{% if content.firstFeatureProperties %}
+			<h3 class="govuk-heading-s">First feature's properties</h3>
+			<pre class="pins-admin-json" tabindex="0">{{ content.firstFeatureProperties }}</pre>
+		{% endif %}
+
+		{% if content.preview %}
+			<h3 class="govuk-heading-s">Start of the file</h3>
+			<pre class="pins-admin-json" tabindex="0">{{ content.preview }}</pre>
+		{% endif %}
+	{% endif %}
+{% endblock %}

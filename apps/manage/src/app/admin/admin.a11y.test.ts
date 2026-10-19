@@ -2,6 +2,8 @@ import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
 import { configureNunjucks } from '../nunjucks.ts';
 import { assertNoSeriousA11yViolations, pageLocals } from '../testing/a11y.ts';
+import { buildCbosFilePage, buildCbosFilesPage } from './cbos-files/controller.ts';
+import { gisFile } from './cbos-files/testing.ts';
 import { adminNavigation } from './navigation.ts';
 
 // what admin/index.ts puts on every admin page: the header link and the menu
@@ -78,6 +80,70 @@ describe('admin page accessibility smoke', () => {
 			error: 'Could not reach the Python function.'
 		});
 		await assertNoSeriousA11yViolations(html);
+	});
+
+	// the CBOS files pages' view models, as their controllers build them from the function's responses
+	const renderedBy = async (handler: (req: never, res: never) => Promise<unknown>, req: object) => {
+		let html = '';
+		const res = {
+			status: () => res,
+			render: (view: string, data: object) => {
+				html = nunjucks.render(view, { ...adminLocals, ...navFor('/admin/cbos-files'), ...data });
+			}
+		};
+		await handler(req as never, res as never);
+		return html;
+	};
+	const zip = gisFile({ version: 1, latestVersion: 2 });
+	const geojson = gisFile({ version: 2, latestVersion: 2, mime: 'application/geo+json', originalFileName: null });
+	const service = { logger: { error: () => undefined } } as never;
+
+	test('admin CBOS files page has no serious a11y violations', async () => {
+		const page = buildCbosFilesPage(service, {
+			listFiles: async () => ({
+				casesWithReference: 3,
+				casesWithGisFolder: 2,
+				files: [zip, geojson, gisFile({ documentGuid: 'b', publishedStatus: 'invalid', folder: 'Other' })]
+			}),
+			readFile: async () => ({}) as never
+		});
+		await assertNoSeriousA11yViolations(await renderedBy(page, { query: {} }));
+	});
+
+	test('admin CBOS files page with an error has no serious a11y violations', async () => {
+		const page = buildCbosFilesPage(service, {
+			listFiles: async () => {
+				throw new Error('unreachable');
+			},
+			readFile: async () => ({}) as never
+		});
+		await assertNoSeriousA11yViolations(await renderedBy(page, { query: {} }));
+	});
+
+	test('admin CBOS file pages have no serious a11y violations', async () => {
+		const pageFor = (content: object) =>
+			buildCbosFilePage(service, {
+				listFiles: async () => ({}) as never,
+				readFile: async () => ({ file: zip, versions: [zip, geojson], ...content })
+			});
+		const params = { params: { guid: zip.documentGuid, version: '1' } };
+		for (const content of [
+			{ content: { bytes: 4096, kind: 'zip', entries: [{ name: 'site.shp', size: 3000 }] } },
+			{
+				content: {
+					bytes: 500,
+					kind: 'geojson',
+					featureCount: 1,
+					geometryTypes: ['Polygon'],
+					firstPosition: [-1.5, 52.1],
+					firstFeatureProperties: { caseReference: 'EN010001' },
+					preview: '{"type": "FeatureCollection"}'
+				}
+			},
+			{ problem: 'CBOS has no blob path for this version' }
+		]) {
+			await assertNoSeriousA11yViolations(await renderedBy(pageFor(content), params));
+		}
 	});
 
 	test('admin home lists every admin page beside the menu, with no serious a11y violations', async () => {

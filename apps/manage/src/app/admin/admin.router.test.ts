@@ -64,7 +64,8 @@ describe('admin section', () => {
 			'/admin/upload-to-blob',
 			'/admin/import-reference-data',
 			'/admin/cbos-connection',
-			'/admin/import-from-cbos'
+			'/admin/import-from-cbos',
+			'/admin/cbos-files'
 		]) {
 			assert.match(response.text, new RegExp(`<h2[^>]*><a class="govuk-link" href="${page}">`));
 		}

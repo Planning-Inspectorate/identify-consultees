@@ -149,6 +149,33 @@ $font-family: arial, helvetica, sans-serif;
 	}
 }
 
+// the admin CBOS files pages: long file names and blob paths wrap anywhere rather than widening
+// the page - other cells wrap only between words
+.pins-admin-files {
+	@include index.govuk-font($size: 16);
+
+	a,
+	code,
+	dd {
+		overflow-wrap: anywhere;
+	}
+}
+
+.pins-admin-path {
+	font-size: 14px;
+	overflow-wrap: anywhere;
+}
+
+// a wide admin table scrolls sideways on a narrow screen, rather than the whole page
+.pins-admin-scroll {
+	overflow-x: auto;
+}
+
+// a file name is often one long word
+.pins-admin-files__heading {
+	overflow-wrap: anywhere;
+}
+
 // a stored row's metadata on the admin Database pages - long, so it scrolls rather than widening the page
 .pins-admin-json {
 	max-height: 40rem;

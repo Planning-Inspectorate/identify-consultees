@@ -6,9 +6,12 @@ import pytest
 
 from cbos.boundaries import BoundaryFileNotFound
 from cbos.config import CbosNotConfigured
+from cbos.gis_files import GisFileNotFound
 from function_app import (
     cbos_boundary_file,
     cbos_boundary_files,
+    cbos_gis_file,
+    cbos_gis_files,
     cbos_health,
     consultee_areas,
     health,
@@ -364,6 +367,65 @@ def test_cbos_boundary_file_reports_failures(error, status_code):
     env, config, credential, fetch = _cbos_patches(fetch_boundary_geojson={"side_effect": error})
     with env, config, credential, fetch:
         response = cbos_boundary_file(_route_request())
+
+    assert response.status_code == status_code
+    assert "boom" not in response.get_body().decode()
+
+
+def test_cbos_gis_file_routes_require_the_api_key():
+    with patch.dict("os.environ", {"CONSULTEE_AREAS_API_KEY": API_KEY}):
+        assert cbos_gis_files(_request()).status_code == 401
+        assert cbos_gis_file(_request()).status_code == 401
+
+
+def test_cbos_gis_files_returns_the_listing():
+    listing = {"casesWithReference": 3, "casesWithGisFolder": 2, "files": []}
+    env, config, credential, list_patch = _cbos_patches(list_gis_files={"return_value": listing})
+    with env, config, credential, list_patch:
+        response = cbos_gis_files(_request({"x-api-key": API_KEY}))
+
+    assert response.status_code == 200
+    assert json.loads(response.get_body()) == listing
+
+
+@pytest.mark.parametrize("error", [CbosNotConfigured(["IDAS_BACK_OFFICE_DATABASE_SERVER"]), RuntimeError("boom")])
+def test_cbos_gis_files_reports_failures(error):
+    env, config, credential, list_patch = _cbos_patches(list_gis_files={"side_effect": error})
+    with env, config, credential, list_patch:
+        response = cbos_gis_files(_request({"x-api-key": API_KEY}))
+
+    assert response.status_code == 500
+    assert "boom" not in response.get_body().decode()
+
+
+def test_cbos_gis_file_returns_what_the_file_holds():
+    result = {"file": {"documentGuid": "abc"}, "content": {"kind": "zip", "entries": []}}
+    env, config, credential, read = _cbos_patches(read_gis_file={"return_value": result})
+    with env, config, credential, read as read_mock:
+        response = cbos_gis_file(_route_request(guid="0F8FAD5B-D9CB-469F-A165-70867728950E", version="1"))
+
+    assert response.status_code == 200
+    assert json.loads(response.get_body()) == result
+    assert read_mock.call_args.args[2:] == ("0f8fad5b-d9cb-469f-a165-70867728950e", 1)
+
+
+def test_cbos_gis_file_rejects_bad_route_params():
+    with patch.dict("os.environ", {"CONSULTEE_AREAS_API_KEY": API_KEY}):
+        assert cbos_gis_file(_route_request("not-a-guid", "1")).status_code == 400
+
+
+@pytest.mark.parametrize(
+    ("error", "status_code"),
+    [
+        (GisFileNotFound("missing"), 404),
+        (CbosNotConfigured(["IDAS_BACK_OFFICE_DATABASE_SERVER"]), 500),
+        (RuntimeError("boom"), 500),
+    ],
+)
+def test_cbos_gis_file_reports_failures(error, status_code):
+    env, config, credential, read = _cbos_patches(read_gis_file={"side_effect": error})
+    with env, config, credential, read:
+        response = cbos_gis_file(_route_request())
 
     assert response.status_code == status_code
     assert "boom" not in response.get_body().decode()
