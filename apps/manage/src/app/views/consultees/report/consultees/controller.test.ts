@@ -183,19 +183,17 @@ describe('report consultees change page', () => {
 
 	it('should 404 a category only the nearby search found - it is not in the report', async () => {
 		const mockRes = { status: mock.fn(() => mockRes), render: mock.fn() };
-		// no ruleset covers Corporate Joint Committee, so only the nearby search ever finds one
-		const { geometryWkt: _noGeometry, ...committee } = {
+		// the default ruleset (England Wales post 30 April 2024) has no Local Resilience Forum
+		// condition, so only the nearby search finds one
+		const { geometryWkt: _noGeometry, ...forum } = {
 			...parishMatchRow(),
-			consulteeCategory: 'Corporate Joint Committee',
-			consultee: 'South East Wales Corporate Joint Committee',
+			consulteeCategory: 'Local Resilience Forum',
+			consultee: 'Example Local Resilience Forum',
 			distanceMetres: 4_000,
 			reasons: [{ type: 'nearby' as const, radiusMetres: 20_000 }]
 		};
-		const db = dbReturning([[realProjectRow()], [committee]]);
-		await handlerFor(db)(
-			{ params: { caseId: realProjectId }, query: { category: 'Corporate Joint Committee' } },
-			mockRes
-		);
+		const db = dbReturning([[realProjectRow()], [forum]]);
+		await handlerFor(db)({ params: { caseId: realProjectId }, query: { category: 'Local Resilience Forum' } }, mockRes);
 
 		assert.strictEqual(mockRes.status.mock.calls[0].arguments[0], 404);
 	});

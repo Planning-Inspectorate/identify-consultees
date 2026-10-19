@@ -38,7 +38,7 @@ Profiled from `combined_reference_data_v1.geojson` (18,258 consultee areas) and 
 
 "Polygon" includes MultiPolygon; "Line" is LineString or MultiLineString.
 
-Corporate Joint Committee is the only category with no condition in any ruleset. It still appears when the nearby search finds it, with the reason "Within 20km of the site".
+Corporate Joint Committee is the England Wales post 30 April 2024 ruleset's "Joint Transport Authorities (Wales)": Wales's Corporate Joint Committees hold its regional transport planning duties.
 
 **Railway** is merged nationally by line type and status. "Freight And Passenger - Main Line - Active" is one shape covering the GB network: 115,966 parts and 233,820 points. Being near it is true almost everywhere and every query touching it is slow. The rulesets' "Railways within 10km" condition runs against it as it is, so most projects list the national railway features and long schemes screen more slowly; the general nearby search still leaves Railway out. Splitting it by route or region would fix both.
 

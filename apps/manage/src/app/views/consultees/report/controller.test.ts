@@ -78,12 +78,13 @@ describe('consultee report check page', () => {
 			...parishMatchRow('88888888-8888-8888-8888-888888888888', 'Nearby Parish Council'),
 			reasons: [{ type: 'nearby' as const, radiusMetres: 20_000 }]
 		};
-		const nearbyCommittee = {
-			...parishMatchRow('99999999-9999-9999-9999-999999999999', 'South East Wales Corporate Joint Committee'),
-			consulteeCategory: 'Corporate Joint Committee',
+		// the default ruleset (England Wales post 30 April 2024) has no Local Resilience Forum condition
+		const nearbyForum = {
+			...parishMatchRow('99999999-9999-9999-9999-999999999999', 'Example Local Resilience Forum'),
+			consulteeCategory: 'Local Resilience Forum',
 			reasons: [{ type: 'nearby' as const, radiusMetres: 20_000 }]
 		};
-		const db = dbReturning([[realProjectRow()], [parishMatchRow(), nearbyParish, nearbyCommittee]]);
+		const db = dbReturning([[realProjectRow()], [parishMatchRow(), nearbyParish, nearbyForum]]);
 		await handlerFor(db)({ params: { caseId: realProjectId }, query: {} }, mockRes);
 
 		const categories = mockRes.render.mock.calls[0].arguments[1].consultees as { name: string; names: string[] }[];
@@ -91,7 +92,7 @@ describe('consultee report check page', () => {
 			'Little Snoring Parish Council'
 		]);
 		// a category only the nearby search found isn't listed at all
-		assert.ok(!categories.some((category) => category.name === 'Corporate Joint Committee'));
+		assert.ok(!categories.some((category) => category.name === 'Local Resilience Forum'));
 	});
 
 	it('should render the report details and per-category consultee counts', async () => {
