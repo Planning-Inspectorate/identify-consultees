@@ -117,8 +117,12 @@ describe('report consultee remove page', () => {
 		const html = mockRes.render.mock.calls[0].result;
 		assert.match(html, /Remove consultee/);
 		assert.match(html, /Little Snoring Parish Council/);
-		assert.match(html, /Reason for removal/);
+		assert.match(html, /Reason for removing/);
 		assert.match(html, /<textarea[^>]*name="reason"/);
+		// the reviewed layout: a two-thirds column, a large (not extra-large) heading, a bold label
+		assert.match(html, /govuk-grid-column-two-thirds/);
+		assert.match(html, /govuk-heading-l/);
+		assert.match(html, /govuk-label--m/);
 	});
 
 	it('should fall back to the default ruleset when none is given', async () => {

@@ -68,7 +68,7 @@ const pages = [
 		path: `/consultees/${SAMPLE_CASE_ID}/report/consultees/remove?ruleset=${SAMPLE_RULESET_ID}&category=Parish%20Council&add=${Buffer.from('{"c":"Parish Council","n":"A Consultee","r":"borders"}').toString('base64url')}&added=0`,
 		name: 'report consultee remove',
 		heading: /Remove consultee/i,
-		mustSee: [/A Consultee/i, /Reason for removal/i]
+		mustSee: [/A Consultee/i, /Reason for removing/i]
 	},
 	{
 		path: `/consultees/${SAMPLE_CASE_ID}/report/created?ruleset=${SAMPLE_RULESET_ID}`,
