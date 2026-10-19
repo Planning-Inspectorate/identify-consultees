@@ -100,6 +100,8 @@ CBOS (the IDAS back office) is PINS's system of record for cases. A case officer
 
 Nothing else is done to the geometry: screening simplifies the site to 10m when it runs, as for any boundary.
 
+**When a case's boundary isn't imported**, `/admin/cbos-files` shows why. It lists every version of every file in the GIS Shapefiles folders, not just what the import reads: the ZIPs CBOS converted, the ones it marked `invalid`, and the ones never virus checked and so never sent for conversion. It also counts the cases at each step, from those with a reference down to those the import reads. Each file's page shows where it's stored and what's in it, for example a ZIP with no `.prj` or GeoJSON in grid metres. CBOS's historical boundaries migration adds its GeoJSON as version 1 of a new document, so the import reads those too, once it has run in that environment.
+
 1. Edit `schema.prisma`, then run `npx prisma migrate dev --create-only` in `packages/database`.
 2. Hand-add what Prisma can't express: spatial indexes, `CHECK` constraints, backfills. A new column can't be referenced in the batch that adds it, so wrap later statements in `EXEC('...')` (see the simplified-geometry migration).
 3. Deploy runs `prisma migrate deploy`, including any backfill, so time it against the full dataset first (the simplified-geometry backfill took 11s locally for 18,258 rows).

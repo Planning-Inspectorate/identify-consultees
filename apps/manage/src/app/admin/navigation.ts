@@ -32,6 +32,12 @@ export const ADMIN_PAGES: readonly AdminPage[] = [
 		href: '/admin/import-from-cbos',
 		text: 'Import from CBOS',
 		description: 'Import the case boundaries CBOS holds.'
+	},
+	{
+		href: '/admin/cbos-files',
+		text: 'CBOS files',
+		description:
+			"Every file in CBOS's GIS Shapefiles folders, where it's stored and what it holds - to see why a case's boundary isn't imported."
 	}
 ];
 

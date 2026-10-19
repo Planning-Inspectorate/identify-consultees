@@ -3,6 +3,7 @@ import { asyncHandler } from '@planning-inspectorate/core/util';
 import type { IRouter, RequestHandler } from 'express';
 import { Router as createRouter } from 'express';
 import { createRoutes as createCbosConnectionRoutes } from './cbos-connection/index.ts';
+import { createRoutes as createCbosFilesRoutes } from './cbos-files/index.ts';
 import {
 	buildCaseBoundariesPage,
 	buildCaseBoundaryRowPage,
@@ -51,6 +52,7 @@ export function createAdminRoutes(service: ManageService): IRouter {
 	router.use('/import-reference-data', createImportReferenceDataRoutes(service));
 	router.use('/cbos-connection', createCbosConnectionRoutes(service));
 	router.use('/import-from-cbos', createImportFromCbosRoutes(service));
+	router.use('/cbos-files', createCbosFilesRoutes(service));
 
 	return router;
 }
