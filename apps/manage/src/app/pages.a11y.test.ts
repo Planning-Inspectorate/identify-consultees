@@ -347,7 +347,7 @@ describe('manage page accessibility smoke', () => {
 			retryUrl:
 				'/consultees/11111111-1111-1111-1111-111111111111/report/consultees/remove?ruleset=england-wales-post-20240430&category=Parish%20Council&match=55555555-5555-5555-5555-555555555555'
 		});
-		assert.match(html, /Reason for removal/);
+		assert.match(html, /Reason for removing/);
 		await assertNoSeriousA11yViolations(html);
 	});
 

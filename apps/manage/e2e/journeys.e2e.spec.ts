@@ -172,7 +172,7 @@ test.describe('manage journeys', () => {
 			await page.getByRole('button', { name: 'Remove consultee' }).click();
 			await expect(page.getByText('There is a problem')).toBeVisible();
 			await expect(page.getByRole('link', { name: 'Enter a reason for removing this consultee.' })).toBeVisible();
-			await page.getByLabel('Reason for removal').fill('Duplicate of another consultee');
+			await page.getByLabel('Reason for removing').fill('Duplicate of another consultee');
 			await page.getByRole('button', { name: 'Remove consultee' }).click();
 			await expect(page).toHaveURL(/\/report\/consultees\?.*exclude=/);
 			await expect(page.getByRole('link', { name: /Remove/ })).toHaveCount(parishCount - 1);
@@ -261,7 +261,7 @@ test.describe('manage journeys', () => {
 		await page.getByRole('link', { name: 'Remove Second Test Consultee' }).click();
 		await expect(page).toHaveURL(/\/report\/consultees\/remove\?.*added=/);
 		await expect(page.getByRole('rowheader', { name: 'Second Test Consultee' })).toBeVisible();
-		await page.getByLabel('Reason for removal').fill('Added in error');
+		await page.getByLabel('Reason for removing').fill('Added in error');
 		await page.getByRole('button', { name: 'Remove consultee' }).click();
 		const consulteesTable = page.getByRole('table', { name: 'Consultees', exact: true });
 		await expect(consulteesTable.getByRole('rowheader', { name: 'Second Test Consultee' })).toHaveCount(0);

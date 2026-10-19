@@ -8,49 +8,68 @@
 	{% if errorSummary %}Error: {% endif %}{{ pageHeading }} - {{ config.headerTitle }}
 {% endblock %}
 
+{# a one-question form: the heading and everything below it sit in a two-thirds column #}
+{% block pageHeading %}
+	<div class="govuk-grid-row">
+		<div class="govuk-grid-column-two-thirds">
+			<h1 class="govuk-heading-l">
+				{% if pageCaption %}
+					<span class="govuk-caption-l">{{ pageCaption }}</span>
+				{% endif %}
+				{{ pageHeading }}
+			</h1>
+		</div>
+	</div>
+{% endblock %}
+
 {% block pageContent %}
-	{% if rulesetFailed %}
-		{% from "govuk/components/notification-banner/macro.njk" import govukNotificationBanner %}
-		{% set failureHtml %}
-			<h3 class="govuk-notification-banner__heading">The ruleset could not be run</h3>
-			<p class="govuk-body">The consultee cannot be shown because the search did not finish. <a class="govuk-notification-banner__link" href="{{ retryUrl }}">Try again</a>.</p>
-		{% endset %}
-		{{ govukNotificationBanner({ html: failureHtml }) }}
-	{% else %}
-		{# one reason per line - each item is autoescaped #}
-		{% set identifiedHtml %}{% for reason in identified %}{{ reason }}{% if not loop.last %}<br>{% endif %}{% endfor %}{% endset %}
-		{{ govukTable({
-			caption: "Consultee being removed",
-			captionClasses: "govuk-visually-hidden",
-			firstCellIsHeader: true,
-			head: [
-				{ text: "Name" },
-				{ text: "Identified" }
-			],
-			rows: [
-				[
-					{ text: name, classes: "govuk-table__cell--no-wrap" },
-					{ html: identifiedHtml }
-				]
-			]
-		}) }}
+	<div class="govuk-grid-row">
+		<div class="govuk-grid-column-two-thirds">
+			{% if rulesetFailed %}
+				{% from "govuk/components/notification-banner/macro.njk" import govukNotificationBanner %}
+				{% set failureHtml %}
+					<h3 class="govuk-notification-banner__heading">The ruleset could not be run</h3>
+					<p class="govuk-body">The consultee cannot be shown because the search did not finish. <a class="govuk-notification-banner__link" href="{{ retryUrl }}">Try again</a>.</p>
+				{% endset %}
+				{{ govukNotificationBanner({ html: failureHtml }) }}
+			{% else %}
+				{# one reason per line - each item is autoescaped #}
+				{% set identifiedHtml %}{% for reason in identified %}{{ reason }}{% if not loop.last %}<br>{% endif %}{% endfor %}{% endset %}
+				{{ govukTable({
+					caption: "Consultee being removed",
+					captionClasses: "govuk-visually-hidden",
+					firstCellIsHeader: true,
+					head: [
+						{ text: "Name" },
+						{ text: "Identified" }
+					],
+					rows: [
+						[
+							{ text: name, classes: "govuk-table__cell--no-wrap" },
+							{ html: identifiedHtml }
+						]
+					]
+				}) }}
 
-		<form method="post" action="{{ formAction }}" novalidate>
-			<input type="hidden" name="_csrf" value="{{ _csrf }}">
-			{{ govukTextarea({
-				label: {
-					text: "Reason for removal"
-				},
-				id: "removal-reason",
-				name: "reason",
-				value: reasonValue,
-				errorMessage: reasonError,
-				rows: 5
-			}) }}
+				<form method="post" action="{{ formAction }}" novalidate>
+					<input type="hidden" name="_csrf" value="{{ _csrf }}">
+					{{ govukTextarea({
+						label: {
+							text: "Reason for removing",
+							classes: "govuk-label--m"
+						},
+						id: "removal-reason",
+						name: "reason",
+						value: reasonValue,
+						errorMessage: reasonError,
+						rows: 5
+					}) }}
 
-			{{ govukButton({
-				text: "Remove consultee"
-			}) }}
-		</form>
-	{% endif %}
+					{{ govukButton({
+						text: "Remove consultee"
+					}) }}
+				</form>
+			{% endif %}
+		</div>
+	</div>
 {% endblock %}
