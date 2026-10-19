@@ -129,7 +129,14 @@ describe('map-layers-demo client helpers', () => {
 				<script id="demo-2-data" type="application/json">{"center":[0,0],"zoom":8,"height":400,"mapLabel":"Demo","projectGeojson":{"features":[{"type":"Feature"}]},"railwayGeojson":{"features":[{"type":"Feature"}]},"roadGeojson":{"features":[{"type":"Feature"}]},"constraintGeojson":{"features":[{"type":"Feature"}]}}</script>
 			</body></html>`
 		);
-		const InteractiveMap = mock.fn(function InteractiveMap() {});
+		const handlers = new Map();
+		const InteractiveMap = mock.fn(function InteractiveMap() {
+			this.on = mock.fn((event, handler) => {
+				const list = handlers.get(event) ?? [];
+				list.push(handler);
+				handlers.set(event, list);
+			});
+		});
 		const defra = {
 			InteractiveMap,
 			maplibreProvider: mock.fn(() => ({})),
@@ -141,6 +148,14 @@ describe('map-layers-demo client helpers', () => {
 		initMapLayersDemo('demo-2');
 		assert.equal(InteractiveMap.mock.callCount(), 1);
 		assert.ok(InteractiveMap.mock.calls[0].arguments[1].plugins.some((plugin) => plugin.id === 'staticMap'));
+		assert.ok(InteractiveMap.mock.calls[0].arguments[1].plugins.some((plugin) => plugin.id === 'mapLoading'));
+
+		// the loading overlay covers the demo until the map first idles
+		assert.ok(document.querySelector('.app-map-loading'));
+		for (const handler of handlers.get('map:firstidle') ?? []) {
+			handler();
+		}
+		assert.equal(document.querySelector('.app-map-loading'), null);
 
 		installDom(
 			`<!DOCTYPE html><html><body>

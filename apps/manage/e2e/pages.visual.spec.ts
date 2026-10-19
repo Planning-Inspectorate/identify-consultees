@@ -22,8 +22,10 @@ import { SAMPLE_CASE_ID, SAMPLE_CASE_REFERENCE, SAMPLE_RULESET_ID } from './fixt
  */
 
 // every interactive map host class/attribute in the app: the map canvas itself is
-// masked, everything around it (chrome, tables, keys/legends) is still compared
-const MAP_MASK = '.app-case-map, .app-consultee-map, .app-map-layers-demo, .app-interactive-map-example';
+// masked, everything around it (chrome, tables, keys/legends) is still compared.
+// The loading overlay is timing-dependent the same way, so it is masked too
+const MAP_MASK =
+	'.app-case-map, .app-consultee-map, .app-map-layers-demo, .app-interactive-map-example, .app-map-loading';
 
 const pages = [
 	{ path: '/', name: 'home' },
