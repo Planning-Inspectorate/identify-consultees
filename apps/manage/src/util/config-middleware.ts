@@ -7,7 +7,7 @@ import type { Handler } from 'express';
 export function addLocalsConfiguration(options: { devPagesEnabled?: boolean } = {}): Handler {
 	return (req, res, next) => {
 		res.locals.config = {
-			styleFile: 'style-cc66c70c.css',
+			styleFile: 'style-e8c80c1b.css',
 			govukFrontendJs: 'assets/js/govuk-frontend.min-0391e416.js',
 			consulteesMapJs: 'javascripts/consultees-map-5855bb06.js',
 			mapLayersDemoJs: 'javascripts/map-layers-demo-130dc1a5.js',
@@ -27,10 +27,13 @@ export function addLocalsConfiguration(options: { devPagesEnabled?: boolean } = 
 			vendorMapStylesPluginCss: 'vendor/map-styles-plugin/css/index-d8fa9e70.css',
 			interactiveMapExamplesJs: 'javascripts/interactive-map-examples-8b09e791.js',
 			headerTitle: 'Identify consultees',
-			// the support links the site footer lists - generic Planning Inspectorate pages
+			// the support links the site footer lists - generic Planning Inspectorate pages.
+			// `hidden` keeps the page routed but takes its link out of the footer (the list item
+			// gets pins-footer__item--hidden): T&Cs and the accessibility statement are hidden
+			// until their content has had a proper audit
 			footerLinks: [
-				{ text: 'Terms and conditions', link: '/terms-and-conditions' },
-				{ text: 'Accessibility statement', link: '/accessibility-statement' },
+				{ text: 'Terms and conditions', link: '/terms-and-conditions', hidden: true },
+				{ text: 'Accessibility statement', link: '/accessibility-statement', hidden: true },
 				{
 					text: 'Privacy',
 					link: 'https://www.gov.uk/government/publications/planning-inspectorate-privacy-notices/customer-privacy-notice'

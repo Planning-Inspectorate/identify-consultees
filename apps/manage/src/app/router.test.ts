@@ -92,6 +92,15 @@ describe('manage router wiring', () => {
 	test('the footer lists the support links on every page', async () => {
 		const response = await request(authDisabledApp).get('/');
 		assert.equal(response.status, 200);
+		// T&Cs and the accessibility statement stay routed but their links are hidden (CSS)
+		// until their content has had a proper audit
+		for (const href of ['/terms-and-conditions', '/accessibility-statement']) {
+			assert.match(
+				response.text,
+				new RegExp(`govuk-footer__inline-list-item pins-footer__item--hidden">\\s*<a[^>]*href="${escapeRegExp(href)}"`)
+			);
+		}
+		assert.equal(response.text.match(/pins-footer__item--hidden/g)?.length, 2);
 		for (const [text, href] of [
 			['Terms and conditions', '/terms-and-conditions'],
 			['Accessibility statement', '/accessibility-statement'],

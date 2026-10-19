@@ -12,7 +12,7 @@
 							<h2 class="govuk-visually-hidden">Support links</h2>
 							<ul class="govuk-footer__inline-list">
 								{% for footerLink in footerLinks %}
-									<li class="govuk-footer__inline-list-item">
+									<li class="govuk-footer__inline-list-item{% if footerLink.hidden %} pins-footer__item--hidden{% endif %}">
 										<a class="govuk-footer__link" href="{{ footerLink.link }}">{{ footerLink.text }}</a>
 									</li>
 								{% endfor %}
