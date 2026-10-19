@@ -13,53 +13,71 @@
 	<link rel="stylesheet" href="/{{ config.accessibleAutocompleteCss }}">
 {% endblock %}
 
+{# a one-question form: the heading and everything below it sit in a two-thirds column #}
+{% block pageHeading %}
+	<div class="govuk-grid-row">
+		<div class="govuk-grid-column-two-thirds">
+			<h1 class="govuk-heading-l">
+				{% if pageCaption %}
+					<span class="govuk-caption-l">{{ pageCaption }}</span>
+				{% endif %}
+				{{ pageHeading }}
+			</h1>
+		</div>
+	</div>
+{% endblock %}
+
 {% block pageContent %}
-	<form method="post" action="{{ formAction }}" novalidate>
-		<input type="hidden" name="_csrf" value="{{ _csrf }}">
-		{% if nearbySuggestions | length %}
-			{# typed names are matched to the consultees near the site the ruleset didn't identify - the
-			faint ones on the category page's map. The datalist suggests them as the name is typed;
-			consultee-autocomplete.js swaps it for the GOV.UK accessible autocomplete #}
-			{{ govukInput({
-				label: { text: "Name of consultee", classes: "govuk-label--s" },
-				hint: { text: "Start typing to choose a consultee near the site that the ruleset did not identify. They are shown faintly on the map. You can also enter any other " ~ pageCaption ~ " consultee by its name." },
-				id: "consultee-name",
-				name: "name",
-				value: addForm.nameValue,
-				errorMessage: addForm.nameError,
-				autocomplete: "off",
-				spellcheck: false,
-				attributes: { list: "nearby-consultees", "data-consultee-autocomplete": "" }
-			}) }}
-			<datalist id="nearby-consultees">
-				{% for suggestion in nearbySuggestions %}
-					<option value="{{ suggestion.name }}" label="{{ suggestion.hint }}"></option>
-				{% endfor %}
-			</datalist>
-		{% else %}
-			{{ govukInput({
-				label: { text: "Name of consultee", classes: "govuk-label--s" },
-				id: "consultee-name",
-				name: "name",
-				value: addForm.nameValue,
-				errorMessage: addForm.nameError,
-				spellcheck: false
-			}) }}
-		{% endif %}
+	<div class="govuk-grid-row">
+		<div class="govuk-grid-column-two-thirds">
+			<form method="post" action="{{ formAction }}" novalidate>
+				<input type="hidden" name="_csrf" value="{{ _csrf }}">
+				{% if nearbySuggestions | length %}
+					{# typed names are matched to the consultees near the site the ruleset didn't identify - the
+					faint ones on the category page's map. The datalist suggests them as the name is typed;
+					consultee-autocomplete.js swaps it for the GOV.UK accessible autocomplete #}
+					{{ govukInput({
+						label: { text: "Name of consultee", classes: "govuk-label--m" },
+						hint: { text: "Start typing to choose a consultee near the site that the ruleset did not identify. They are shown faintly on the map. You can also enter any other " ~ pageCaption ~ " consultee by its name." },
+						id: "consultee-name",
+						name: "name",
+						value: addForm.nameValue,
+						errorMessage: addForm.nameError,
+						autocomplete: "off",
+						spellcheck: false,
+						attributes: { list: "nearby-consultees", "data-consultee-autocomplete": "" }
+					}) }}
+					<datalist id="nearby-consultees">
+						{% for suggestion in nearbySuggestions %}
+							<option value="{{ suggestion.name }}" label="{{ suggestion.hint }}"></option>
+						{% endfor %}
+					</datalist>
+				{% else %}
+					{{ govukInput({
+						label: { text: "Name of consultee", classes: "govuk-label--m" },
+						id: "consultee-name",
+						name: "name",
+						value: addForm.nameValue,
+						errorMessage: addForm.nameError,
+						spellcheck: false
+					}) }}
+				{% endif %}
 
-		{{ govukTextarea({
-			label: { text: "Reason for adding", classes: "govuk-label--s" },
-			id: "consultee-reason",
-			name: "reason",
-			value: addForm.reasonValue,
-			errorMessage: addForm.reasonError,
-			rows: 3
-		}) }}
+				{{ govukTextarea({
+					label: { text: "Reason for adding", classes: "govuk-label--m" },
+					id: "consultee-reason",
+					name: "reason",
+					value: addForm.reasonValue,
+					errorMessage: addForm.reasonError,
+					rows: 3
+				}) }}
 
-		{{ govukButton({
-			text: "Add consultee"
-		}) }}
-	</form>
+				{{ govukButton({
+					text: "Add consultee"
+				}) }}
+			</form>
+		</div>
+	</div>
 {% endblock %}
 
 {% block bodyEnd %}
