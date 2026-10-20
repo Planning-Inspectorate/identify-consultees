@@ -50,7 +50,7 @@ describe('buildBoundaryMapConfig', () => {
 		assert.match(config.mapLabel, /Test Project \(EN010099\)/);
 	});
 
-	it('should draw each file in its own style, the most recent red', () => {
+	it('should draw the most recent file red and every earlier one in the shared other-geometries style', () => {
 		const config = buildBoundaryMapConfig('Test Project', 'EN010099', [
 			boundaryFile('older', new Date('2025-11-01')),
 			boundaryFile('newest', new Date('2026-04-01')),
@@ -60,8 +60,8 @@ describe('buildBoundaryMapConfig', () => {
 		const [older, newest, undated] = config.shapefileDatasets.map((dataset) => dataset.style);
 		assert.strictEqual(newest.stroke, BOUNDARY_MAP_STYLES.mostRecent.colour);
 		assert.strictEqual(older.stroke, BOUNDARY_MAP_STYLES.earlier[0].colour);
-		assert.strictEqual(undated.stroke, BOUNDARY_MAP_STYLES.earlier[1].colour);
-		assert.strictEqual(new Set([older.stroke, newest.stroke, undated.stroke]).size, 3);
+		assert.strictEqual(undated.stroke, BOUNDARY_MAP_STYLES.earlier[0].colour);
+		assert.notStrictEqual(newest.stroke, older.stroke);
 	});
 
 	it('should round each member of a geometry collection', () => {

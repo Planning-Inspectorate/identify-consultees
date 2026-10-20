@@ -229,7 +229,7 @@ describe('consultees-map client helpers', () => {
 	});
 
 	test('translucent turns a hex colour into an rgba fill', () => {
-		assert.equal(translucent('#C44E52', 0.45), 'rgba(196, 78, 82, 0.45)');
+		assert.equal(translucent('#ff0000', 0.2), 'rgba(255, 0, 0, 0.2)');
 	});
 
 	test('buildDatasets omits empty collections', () => {
@@ -276,7 +276,7 @@ describe('consultees-map client helpers', () => {
 		});
 
 		assert.deepEqual(datasets[0].style, style);
-		assert.equal(datasets[1].style.stroke, '#C44E52');
+		assert.equal(datasets[1].style.stroke, '#ff0000');
 	});
 
 	test('buildSelectableLayers lists each shapefile dataset as selectable', () => {

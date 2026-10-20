@@ -3,50 +3,39 @@
 # change is checked by `npm test` and takes effect on the next deploy.
 #
 # The map draws one layer per boundary file the case holds, under "GIS shapefiles" in the Layers
-# menu, each in its own style. "Most recent" is the file with the latest received date; files with
-# no date count as oldest.
+# menu: the most recent in one style, every earlier file in the other. "Most recent" is the file
+# with the latest received date; files with no date count as oldest.
+#
+# The styles are the geometry selection map's from the GIS Styling default values (AGENTS.md): the
+# selected geometry red, every other geometry blue - solid fill, 0.2 fill opacity, a full-opacity
+# 1.5px border. The most recent file stands in for the selected one: the radios below the map are
+# never pre-selected, so the newest submission is the drawn candidate.
 #
 # Each style:
-#   colour        - a 6-digit hex colour, e.g. '#C44E52'. Quote it: YAML treats # as a comment.
+#   colour        - a 6-digit hex colour, e.g. '#ff0000'. Quote it: YAML treats # as a comment.
 #   fillOpacity   - 0 (no fill) to 1 (solid). The Defra map has no fill-opacity setting, so the app
 #                   turns colour + fillOpacity into an rgba() fill.
 #   strokeWidth   - outline width in pixels.
 #   strokeDash    - optional dash pattern for the outline, as [dash, gap] in line widths, e.g.
-#                   [4, 2]. Leave it out for a solid line. It means files differ by more than
-#                   colour (GDS: don't rely on colour alone).
+#                   [4, 2]. Leave it out for a solid line.
 #   description   - how the style looks, in words, read out by screen readers in the map key.
 #
 # The consultee maps will have their own file: consultee-map.example.yaml, next to this one.
 
 version: 1
 
-# Always the newest submission.
+# Always the newest submission - the drawn candidate for the radio selection below the map.
 mostRecent:
-  colour: '#C44E52'
-  fillOpacity: 0.45
-  strokeWidth: 3
-  description: red, solid outline
+  colour: '#ff0000'
+  fillOpacity: 0.2
+  strokeWidth: 1.5
+  description: red, solid fill
 
-# Earlier files, newest first: the second-newest file gets the first style, and so on. When there
-# are more files than styles, the list repeats.
+# Every earlier file: the sheet's one "other geometries" style. `earlier` stays a list - when more
+# than one style is given the second-newest file gets the first, and so on, repeating - but the
+# sheet defines just the one.
 earlier:
-  - colour: '#1d70b8'
-    fillOpacity: 0.15
-    strokeWidth: 2
-    strokeDash: [4, 2]
-    description: blue, dashed outline
-  - colour: '#f47738'
-    fillOpacity: 0.15
-    strokeWidth: 2
-    strokeDash: [4, 2]
-    description: orange, dashed outline
-  - colour: '#912b88'
-    fillOpacity: 0.15
-    strokeWidth: 2
-    strokeDash: [4, 2]
-    description: purple, dashed outline
-  - colour: '#00703c'
-    fillOpacity: 0.15
-    strokeWidth: 2
-    strokeDash: [4, 2]
-    description: green, dashed outline
+  - colour: '#3c51ab'
+    fillOpacity: 0.2
+    strokeWidth: 1.5
+    description: blue, solid fill
