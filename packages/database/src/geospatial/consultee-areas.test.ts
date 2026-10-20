@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { after, before, describe, test } from 'node:test';
 import type { PrismaClient } from '../client/client.ts';
 import { loadConfig } from '../configuration/config.ts';
+import { acquireDbTestLock, releaseDbTestLock } from '../db-test-lock.ts';
 import { newDatabaseClient } from '../index.ts';
 import type { ConsulteeAreaFeatureCollection } from './consultee-areas.ts';
 import {
@@ -28,12 +29,16 @@ before(async () => {
 		dbClient = newDatabaseClient(config.db);
 		await dbClient.$queryRaw`SELECT 1 AS probe`;
 		dbAvailable = true;
+		// the import suites replace the whole consultee_area table, so the files that write
+		// the real database take turns rather than run at the same time
+		await acquireDbTestLock();
 	} catch {
 		dbAvailable = false;
 	}
 });
 
 after(async () => {
+	releaseDbTestLock();
 	await dbClient?.$disconnect();
 });
 

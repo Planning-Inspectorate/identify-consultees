@@ -7,6 +7,7 @@ import { after, before, describe, test } from 'node:test';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import type { PrismaClient } from '../client/client.ts';
 import { loadConfig } from '../configuration/config.ts';
+import { acquireDbTestLock, releaseDbTestLock } from '../db-test-lock.ts';
 import { newDatabaseClient } from '../index.ts';
 import { deterministicId } from './geojson-import.ts';
 import { parseArgs } from './import-cli.ts';
@@ -75,12 +76,16 @@ before(async () => {
 		dbClient = newDatabaseClient(connectionString);
 		await dbClient.$queryRaw`SELECT 1 AS probe`;
 		dbAvailable = true;
+		// the CLI replaces the whole tables it imports, so the files that write the real
+		// database take turns rather than run at the same time
+		await acquireDbTestLock();
 	} catch {
 		dbAvailable = false;
 	}
 });
 
 after(async () => {
+	releaseDbTestLock();
 	await dbClient?.$disconnect();
 });
 
