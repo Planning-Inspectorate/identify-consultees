@@ -12,7 +12,7 @@
  * image is only requested on that failure path; a working map never downloads it.
  */
 
-import { injectLayersKeyTab } from './layers-key-slot.mjs';
+import { createLayersKeyPlugin } from './layers-key-plugin.mjs';
 import { createStaticMapPlugin } from './static-map-plugin.mjs';
 
 /**
@@ -45,7 +45,16 @@ export function buildPlugins(defra, config) {
 	let draw;
 
 	if (config.datasets?.length && defra.datasetsPlugin) {
-		plugins.push(defra.datasetsPlugin({ datasets: config.datasets }));
+		plugins.push(
+			defra.datasetsPlugin({
+				datasets: config.datasets,
+				// the local combined Layers+Key panel replaces the built-in menus
+				...(config.layersKey ? { hasMenu: false } : {})
+			})
+		);
+	}
+	if (config.layersKey && config.datasets?.length) {
+		plugins.push(createLayersKeyPlugin({ datasets: config.datasets }));
 	}
 	if (config.interact && defra.interactPlugin) {
 		interact = defra.interactPlugin(config.interact);
@@ -62,11 +71,7 @@ export function buildPlugins(defra, config) {
 		plugins.push(defra.mapKeyPlugin());
 	}
 
-	// the Key tab in the Layers panel borrows the map-key component without
-	// registering its plugin (its own button and panel are unwanted)
-	const layersKeyTab = config.layersKey && config.datasets?.length ? defra.mapKeyPlugin?.() : undefined;
-
-	return { plugins, interact, draw, layersKeyTab };
+	return { plugins, interact, draw };
 }
 
 /**
@@ -98,13 +103,8 @@ function escapeHtml(value) {
  * @param {object} config
  * @param {object | undefined} interactPlugin
  * @param {object | undefined} drawPlugin
- * @param {object | undefined} layersKeyTab - map-key descriptor for the injected Key tab
  */
-function wireExampleBehaviour(map, config, interactPlugin, drawPlugin, layersKeyTab) {
-	if (layersKeyTab) {
-		map.on('map:ready', () => injectLayersKeyTab(map, layersKeyTab));
-	}
-
+function wireExampleBehaviour(map, config, interactPlugin, drawPlugin) {
 	// the core attaches plugin api methods (enable etc.) onto the plugin object
 	// when the plugin mounts — at map:ready it exists, at wiring time it doesn't
 	if (interactPlugin) {
@@ -218,7 +218,7 @@ export function initInteractiveMapExample(mapId) {
 	container.classList.add('app-case-map-interactive');
 
 	try {
-		const { plugins, interact: interactPlugin, draw: drawPlugin, layersKeyTab } = buildPlugins(defra, config);
+		const { plugins, interact: interactPlugin, draw: drawPlugin } = buildPlugins(defra, config);
 		plugins.push(staticMapPlugin);
 
 		const mapStyle = config.mapStyles?.length ? config.mapStyles[0] : config.mapStyle;
@@ -247,7 +247,7 @@ export function initInteractiveMapExample(mapId) {
 				: {})
 		});
 
-		wireExampleBehaviour(map, config, interactPlugin, drawPlugin, layersKeyTab);
+		wireExampleBehaviour(map, config, interactPlugin, drawPlugin);
 	} catch {
 		staticMapPlugin.showFallback();
 	}

@@ -331,8 +331,10 @@ describe('consultees-map client helpers', () => {
 
 		initConsulteeMap('map-2');
 		assert.equal(InteractiveMap.mock.callCount(), 1);
-		// the map-key bundle is loaded so the Key tab can borrow its component
-		assert.equal(defra.mapKeyPlugin.mock.callCount(), 1);
+		// the built-in menu stays hidden - the layers-key plugin draws the toggles
+		// itself, so the map-key bundle is never needed
+		assert.equal(defra.datasetsPlugin.mock.calls[0].arguments[0].hasMenu, false);
+		assert.equal(defra.mapKeyPlugin.mock.callCount(), 0);
 		// the page's zoom 8 is on 256px raster tiles - MapLibre's 512px levels count one fewer
 		assert.equal(InteractiveMap.mock.calls[0].arguments[1].zoom, 7);
 
@@ -342,6 +344,7 @@ describe('consultees-map client helpers', () => {
 		const staticMap = plugins.find((plugin) => plugin.id === 'staticMap');
 		assert.ok(staticMap);
 		assert.equal(typeof staticMap.load, 'function');
+		assert.ok(plugins.some((plugin) => plugin.id === 'layersKey'));
 	});
 
 	test('buildSelectableLayers lists the MapLibre layers of each consultee sublayer and the project site', () => {

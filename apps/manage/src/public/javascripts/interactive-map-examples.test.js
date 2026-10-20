@@ -117,48 +117,24 @@ describe('interactive-map-examples client helpers', () => {
 		assert.ok(interact);
 	});
 
-	test('buildPlugins keeps the built-in menu and prepares the Key tab descriptor for layersKey', () => {
+	test('buildPlugins wires the local layers-key plugin and hides the datasets menu', () => {
 		const { defra } = mockDefra();
-		const { plugins, layersKeyTab } = buildPlugins(defra, {
+		const { plugins } = buildPlugins(defra, {
 			datasets: [{ id: 'a' }],
 			layersKey: true
 		});
 
-		assert.equal(plugins.length, 1);
+		assert.equal(plugins.length, 2);
 		assert.deepEqual(defra.datasetsPlugin.mock.calls[0].arguments[0], {
-			datasets: [{ id: 'a' }]
+			datasets: [{ id: 'a' }],
+			hasMenu: false
 		});
-		// the map-key bundle is loaded but its plugin is not registered - the
-		// descriptor only provides load() so the Key tab can borrow its component
-		assert.equal(defra.mapKeyPlugin.mock.callCount(), 1);
-		assert.ok(layersKeyTab);
-		assert.ok(!plugins.includes(layersKeyTab));
+		assert.equal(plugins[1].id, 'layersKey');
+		assert.equal(defra.mapKeyPlugin.mock.callCount(), 0);
 
 		// layersKey without datasets adds nothing
-		const { plugins: none, layersKeyTab: noTab } = buildPlugins(defra, { layersKey: true });
+		const { plugins: none } = buildPlugins(defra, { layersKey: true });
 		assert.equal(none.length, 0);
-		assert.equal(noTab, undefined);
-	});
-
-	test('layersKey injects the Key tab control into the Layers panel once the map is ready', async () => {
-		installDom(pageHtml({ kind: 'layers-key', datasets: [{ id: 'x' }], layersKey: true }));
-		const manifest = { panels: [{ id: 'mapKey', render: function MapKey() {} }] };
-		const mapKeyInstance = { load: mock.fn(async () => manifest) };
-		const { defra, InteractiveMap, fire } = mockDefra({ mapKeyPlugin: mock.fn(() => mapKeyInstance) });
-		globalThis.defra = defra;
-		globalThis.window.defra = defra;
-		globalThis.preactCompat = { createElement: mock.fn(() => ({})) };
-
-		initInteractiveMapExample('demo-map');
-		const map = InteractiveMap.mock.calls[0].this;
-		fire('map:ready');
-		await new Promise((resolve) => setImmediate(resolve));
-
-		// datasets is still a normal plugin; the Key rides in as a panel control
-		assert.equal(defra.mapKeyPlugin.mock.callCount(), 1);
-		const [controlId, control] = map.addControl.mock.calls[0].arguments;
-		assert.equal(controlId, 'layersKey');
-		assert.deepEqual(control.desktop, { slot: 'datasets-layers-panel', tab: 'Key' });
 	});
 
 	test('draw-tools instantiates the draw plugin and adds the polygon button at map:ready', () => {
@@ -418,9 +394,12 @@ describe('interactive-map-examples client helpers', () => {
 
 		initInteractiveMapExample('demo-map');
 		const options = defra.InteractiveMap.mock.calls[0].arguments[1];
-		// only the static-map fallback plugin survives when no factories exist
-		assert.equal(options.plugins.length, 1);
-		assert.equal(options.plugins[0].id, 'staticMap');
+		// the local layers-key plugin needs no defra factory, so it still lands
+		// alongside the static-map fallback when no factories exist
+		assert.deepEqual(
+			options.plugins.map((plugin) => plugin.id),
+			['layersKey', 'staticMap']
+		);
 		// mapStyles wins over mapStyle when both are present (style-switcher convention)
 		assert.equal(options.mapStyle.id, 's');
 

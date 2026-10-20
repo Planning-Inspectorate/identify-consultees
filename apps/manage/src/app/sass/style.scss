@@ -42,6 +42,32 @@ $font-family: arial, helvetica, sans-serif;
 	margin-top: 15px;
 }
 
+// Combined Layers/Key panel (javascripts/layers-key-plugin.mjs): the label is a flex row
+// so the key symbol sits between the drawn checkbox box and the layer name; the symbol is
+// inside the label, so hovering and clicking it toggles the layer like the rest of the row
+/* stylelint-disable-next-line selector-class-pattern */
+.app-layers-key__label {
+	display: inline-flex;
+	gap: 8px;
+	align-items: center;
+	min-width: 0;
+	cursor: pointer;
+
+	/* stylelint-disable-next-line selector-class-pattern */
+	.app-layers-key__swatch {
+		flex: 0 0 auto;
+	}
+
+	// break long unspaced names (e.g. `arrowvalleysolar_scoping_cablecorridor.geojson`)
+	// anywhere they need to - a min-width-0 flex item is what lets the row shrink
+	/* stylelint-disable-next-line selector-class-pattern */
+	.app-layers-key__text {
+		flex: 1 1 auto;
+		min-width: 0;
+		overflow-wrap: anywhere;
+	}
+}
+
 // set font-family for any autocomplete menu items
 /* stylelint-disable-next-line selector-class-pattern */
 .autocomplete__menu {
