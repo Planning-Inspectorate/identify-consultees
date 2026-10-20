@@ -120,7 +120,7 @@ describe('report consultees change page', () => {
 		);
 		assert.strictEqual(viewModel.removedRows.length, 0);
 		assert.strictEqual(viewModel.removedOpen, false);
-		// the Add consultee link opens the add page, keeping the current selection
+		// the Add a consultee link opens the add page, keeping the current selection
 		assert.strictEqual(
 			viewModel.addConsulteeUrl,
 			`/consultees/${realProjectId}/report/consultees/add?ruleset=england-wales-post-20240430&category=Parish%20Council`
@@ -129,7 +129,7 @@ describe('report consultees change page', () => {
 
 		const html = mockRes.render.mock.calls[0].result;
 		assert.match(html, /Remove/);
-		assert.match(html, /href="[^"]*\/report\/consultees\/add\?[^"]*"[^>]*>\s*Add consultee/);
+		assert.match(html, /href="[^"]*\/report\/consultees\/add\?[^"]*"[^>]*>\s*Add a consultee/);
 		// the add form lives on its own page now - no name input or datalist here
 		assert.doesNotMatch(html, /<datalist|data-consultee-autocomplete|name="name"/);
 		assert.match(html, /Save and return/);
