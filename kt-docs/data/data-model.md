@@ -33,19 +33,20 @@ Defined in `packages/database/src/schema.prisma`; spatial indexes, `CHECK` const
 
 **`consultee_area`**: one row per area a consultee covers, or a point for site-based consultees such as hospitals. Its columns follow the reference data export's own fields (`20261019170000_consultee_area_follows_export`).
 
-| Column               | Notes                                                                                                                                                            |
-| -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `id`                 | `UNIQUEIDENTIFIER`, derived from the export's id                                                                                                                 |
-| `sourceId`           | The export's own id, such as `health_AMB_EW_00001`                                                                                                               |
-| `geometry`           | `geography`, the original shape                                                                                                                                  |
-| `geometrySimplified` | `geometry.Reduce(10).MakeValid()`: every screening query runs on it, and the map draws a further-simplified copy                                                 |
-| `geometryType`       | `CHECK`: Point, MultiPoint, LineString, MultiLineString, Polygon, MultiPolygon, GeometryCollection                                                               |
-| `consulteeCategory`  | Indexed. What conditions match on, e.g. `Parish Council`: the export's dataset mapped by `config/reference-data.yaml`. See [Reference data](./reference-data.md) |
-| `consulteeGroup`     | The export's own `consultee_category`, a broad group: Health, Local Authorities, Transport...                                                                    |
-| `consultee`          | Display name                                                                                                                                                     |
-| `region`             | The export's region                                                                                                                                              |
-| `metadata`           | The export's metadata as JSON, as given: each source dataset's own attributes                                                                                    |
-| `lastUpdated`        | When the row was loaded                                                                                                                                          |
+| Column                                                    | Notes                                                                                                                                                                                                |
+| --------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `id`                                                      | `UNIQUEIDENTIFIER`, derived from the export's id                                                                                                                                                     |
+| `sourceId`                                                | The export's own id, such as `health_AMB_EW_00001`                                                                                                                                                   |
+| `geometry`                                                | `geography`, the original shape                                                                                                                                                                      |
+| `geometrySimplified`                                      | `geometry.Reduce(10).MakeValid()`: every screening query runs on it, and the map draws a further-simplified copy                                                                                     |
+| `geometryType`                                            | `CHECK`: Point, MultiPoint, LineString, MultiLineString, Polygon, MultiPolygon, GeometryCollection                                                                                                   |
+| `consulteeCategory`                                       | Indexed. What conditions match on, e.g. `Parish Council`: the export's dataset mapped by `config/reference-data.yaml`. See [Reference data](./reference-data.md)                                     |
+| `consulteeGroup`                                          | The export's own `consultee_category`, a broad group: Health, Local Authorities, Transport...                                                                                                        |
+| `consulteeSubcategory`, `consulteeSubcategoryDescription` | The export's `consultee_subcategory` and what it means: a port's ownership (Municipal, Defunct...), a railway's Active or Inactive, an interconnector's data quality. Null where the export has none |
+| `consultee`                                               | Display name                                                                                                                                                                                         |
+| `region`                                                  | The export's region                                                                                                                                                                                  |
+| `metadata`                                                | The export's metadata as JSON, as given: each source dataset's own attributes, starting with `CODE` and `NAME`. A `CHECK` (`ISJSON`) refuses anything else                                           |
+| `lastUpdated`                                             | When the row was loaded                                                                                                                                                                              |
 
 **`case_boundary`**: one row per boundary **submission**. A case can have several, so `caseReference` isn't unique.
 

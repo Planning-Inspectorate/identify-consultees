@@ -29,7 +29,10 @@ def _as_text(column: str) -> str:
 
 ID = _as_text("id")
 
-AREA_COLUMNS = f"{ID} AS id, sourceId, consulteeCategory, consulteeGroup, consultee, region, metadata"
+AREA_COLUMNS = f"""
+    {ID} AS id, sourceId, consulteeCategory, consulteeGroup, consulteeSubcategory,
+    consulteeSubcategoryDescription, consultee, region, metadata
+"""
 AREA_COLUMNS_WITH_GEOMETRY = f"{AREA_COLUMNS}, geometry.STAsText() AS geometryWkt"
 
 # Forces the spatial index. Found when this ran in Node: with Prisma's parameterised SQL and a
@@ -54,6 +57,8 @@ def _area_from_row(row: dict) -> ConsulteeArea:
             "sourceId": row["sourceId"],
             "consulteeCategory": row["consulteeCategory"],
             "consulteeGroup": row["consulteeGroup"],
+            "consulteeSubcategory": row["consulteeSubcategory"],
+            "consulteeSubcategoryDescription": row["consulteeSubcategoryDescription"],
             "consultee": row["consultee"],
             "region": row["region"],
             "metadata": json.loads(row["metadata"]),

@@ -46,6 +46,8 @@ describe('runRulesetSafely', () => {
 					sourceId: null,
 					consulteeCategory: 'Parish Council',
 					consulteeGroup: null,
+					consulteeSubcategory: null,
+					consulteeSubcategoryDescription: null,
 					consultee: 'Abbey Parish Council',
 					region: 'East'
 				}

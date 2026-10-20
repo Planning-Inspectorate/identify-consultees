@@ -57,6 +57,8 @@ function record(id: string, overrides: Partial<ConsulteeAreaRecord> = {}): Consu
 		sourceId: null,
 		consulteeCategory: 'Parish Council',
 		consulteeGroup: null,
+		consulteeSubcategory: null,
+		consulteeSubcategoryDescription: null,
 		consultee: 'Stored name',
 		region: 'East',
 		metadata: '{"FID":1}',
@@ -297,7 +299,7 @@ describe('report workbook', () => {
 		const config = parseReportConfig(
 			[
 				'version: 1',
-				'columns: [lastUpdated, consultee, distanceKm, consulteeAreaId, geometryType, sourceId, group, source]',
+				'columns: [lastUpdated, consultee, distanceKm, consulteeAreaId, geometryType, sourceId, group, subcategory, subcategoryDescription, source]',
 				'defaults: { mapKm: 10, metadata: none }'
 			].join('\n')
 		);
@@ -310,7 +312,9 @@ describe('report workbook', () => {
 						record('a', {
 							consultee: 'Abbey',
 							sourceId: 'local_authorities_PAR_EW_00001',
-							consulteeGroup: 'Local Authorities'
+							consulteeGroup: 'Local Authorities',
+							consulteeSubcategory: 'Active',
+							consulteeSubcategoryDescription: 'Railway line in use'
 						})
 					]
 				]),
@@ -330,6 +334,8 @@ describe('report workbook', () => {
 			'Geometry type',
 			'Source id',
 			'Group',
+			'Subcategory',
+			'Subcategory description',
 			'Source'
 		]);
 		assert.deepStrictEqual(admin.data.slice(1).map(rowValues), [
@@ -341,14 +347,16 @@ describe('report workbook', () => {
 				'Polygon',
 				'local_authorities_PAR_EW_00001',
 				'Local Authorities',
+				'Active',
+				'Railway line in use',
 				'Ruleset'
 			],
-			[null, 'Picked', 1, 'p', null, null, null, 'Manually added'],
-			[null, 'Typed', null, null, null, null, null, 'Manually added']
+			[null, 'Picked', 1, 'p', null, null, null, null, null, 'Manually added'],
+			[null, 'Typed', null, null, null, null, null, null, null, 'Manually added']
 		]);
 		assert.deepStrictEqual(
 			admin.columns.map((column) => column.width),
-			[18, 36, 12, 38, 16, 30, 22, 16]
+			[18, 36, 12, 38, 16, 30, 22, 22, 40, 16]
 		);
 	});
 

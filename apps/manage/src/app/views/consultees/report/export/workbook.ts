@@ -25,6 +25,8 @@ export interface ConsulteeAreaRecord {
 	sourceId: string | null;
 	consulteeCategory: string | null;
 	consulteeGroup: string | null;
+	consulteeSubcategory: string | null;
+	consulteeSubcategoryDescription: string | null;
 	consultee: string | null;
 	region: string | null;
 	metadata: string;
@@ -163,6 +165,11 @@ const COLUMN_CELLS: Record<ReportColumn, (row: RowSource) => Cell> = {
 	whyIdentified: (row) => ({ value: row.whyIdentified, wrap: true }),
 	source: (row) => ({ value: row.source }),
 	group: (row) => text(row.record?.consulteeGroup),
+	subcategory: (row) => text(row.record?.consulteeSubcategory),
+	subcategoryDescription: (row) =>
+		row.record?.consulteeSubcategoryDescription
+			? { value: row.record.consulteeSubcategoryDescription, wrap: true }
+			: null,
 	distanceKm: (row) => kilometres(row.distanceMetres),
 	consulteeAreaId: (row) => text(row.id),
 	sourceId: (row) => text(row.record?.sourceId),
@@ -177,6 +184,8 @@ export const COLUMN_WIDTHS: Record<ReportColumn, number> = {
 	whyIdentified: 60,
 	source: 16,
 	group: 22,
+	subcategory: 22,
+	subcategoryDescription: 40,
 	distanceKm: 12,
 	consulteeAreaId: 38,
 	sourceId: 30,

@@ -12,6 +12,12 @@
 #                  source           Source              Ruleset, or Manually added
 #                  group            Group               the reference data's broad group: Health,
 #                                                       Local Authorities, Transport...
+#                  subcategory      Subcategory         what kind of consultee within its category:
+#                                                       a port's ownership, a railway's Active or
+#                                                       Inactive, an interconnector's data quality
+#                  subcategoryDescription
+#                                   Subcategory description
+#                                                       what the subcategory means
 #                  distanceKm       Distance from site (km)
 #                  consulteeAreaId  Consultee area id
 #                  sourceId         Source id           the reference data's own id

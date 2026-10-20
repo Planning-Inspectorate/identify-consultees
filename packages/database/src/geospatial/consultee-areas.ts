@@ -21,6 +21,10 @@ export interface ConsulteeAreaProperties {
 	consulteeCategory?: string | null;
 	/** The export's broad group: Health, Local Authorities, Transport... */
 	consulteeGroup?: string | null;
+	/** What kind of consultee within its category: a port's ownership, a railway's Active/Inactive... */
+	consulteeSubcategory?: string | null;
+	/** What consulteeSubcategory means. */
+	consulteeSubcategoryDescription?: string | null;
 	consultee?: string | null;
 	region?: string | null;
 	metadata?: Record<string, unknown>;
@@ -55,6 +59,8 @@ interface ConsulteeAreaSummaryRow {
 	sourceId: string | null;
 	consulteeCategory: string | null;
 	consulteeGroup: string | null;
+	consulteeSubcategory: string | null;
+	consulteeSubcategoryDescription: string | null;
 	consultee: string | null;
 	region: string | null;
 	metadata: string;
@@ -71,6 +77,8 @@ function rowToSummary(row: ConsulteeAreaSummaryRow): ConsulteeAreaSummary {
 			sourceId: row.sourceId,
 			consulteeCategory: row.consulteeCategory,
 			consulteeGroup: row.consulteeGroup,
+			consulteeSubcategory: row.consulteeSubcategory,
+			consulteeSubcategoryDescription: row.consulteeSubcategoryDescription,
 			consultee: row.consultee,
 			region: row.region,
 			metadata: JSON.parse(row.metadata)
@@ -124,6 +132,8 @@ export async function loadConsulteeAreas(
 				region: feature.properties.region ?? null,
 				sourceId: feature.properties.sourceId ?? null,
 				consulteeGroup: feature.properties.consulteeGroup ?? null,
+				consulteeSubcategory: feature.properties.consulteeSubcategory ?? null,
+				consulteeSubcategoryDescription: feature.properties.consulteeSubcategoryDescription ?? null,
 				// pre-stringified rather than nested JSON - OPENJSON's WITH clause extracts a
 				// declared NVARCHAR column as a scalar string, not a nested object
 				metadata: JSON.stringify(feature.properties.metadata ?? {})
@@ -146,6 +156,8 @@ export async function loadConsulteeAreas(
 						region,
 						sourceId,
 						consulteeGroup,
+						consulteeSubcategory,
+						consulteeSubcategoryDescription,
 						metadata
 					FROM OPENJSON(${batchJson})
 					WITH (
@@ -159,6 +171,8 @@ export async function loadConsulteeAreas(
 						region NVARCHAR(100) '$.region',
 						sourceId NVARCHAR(200) '$.sourceId',
 						consulteeGroup NVARCHAR(100) '$.consulteeGroup',
+						consulteeSubcategory NVARCHAR(200) '$.consulteeSubcategory',
+						consulteeSubcategoryDescription NVARCHAR(500) '$.consulteeSubcategoryDescription',
 						metadata NVARCHAR(MAX) '$.metadata'
 					)
 				) AS parsed
@@ -173,14 +187,17 @@ export async function loadConsulteeAreas(
 				region = source.region,
 				sourceId = source.sourceId,
 				consulteeGroup = source.consulteeGroup,
+				consulteeSubcategory = source.consulteeSubcategory,
+				consulteeSubcategoryDescription = source.consulteeSubcategoryDescription,
 				metadata = source.metadata,
 				lastUpdated = SYSUTCDATETIME()
 			WHEN NOT MATCHED THEN INSERT (
-				id, geometryType, geometry, geometrySimplified, sourceId, consulteeCategory, consulteeGroup, consultee,
-				region, metadata
+				id, geometryType, geometry, geometrySimplified, sourceId, consulteeCategory, consulteeGroup,
+				consulteeSubcategory, consulteeSubcategoryDescription, consultee, region, metadata
 			) VALUES (
 				source.id, source.geometryType, source.geometry, source.geometrySimplified, source.sourceId,
-				source.consulteeCategory, source.consulteeGroup, source.consultee, source.region, source.metadata
+				source.consulteeCategory, source.consulteeGroup, source.consulteeSubcategory,
+				source.consulteeSubcategoryDescription, source.consultee, source.region, source.metadata
 			);
 		`;
 
@@ -192,7 +209,8 @@ export async function loadConsulteeAreas(
 // a plain, developer-controlled (never user input) column list - safe to inline as raw SQL via
 // Prisma.raw() below, which is Prisma's documented escape hatch for trusted, non-parameter SQL text
 const summaryColumnList = `
-	id, geometryType, sourceId, consulteeCategory, consulteeGroup, consultee, region, metadata
+	id, geometryType, sourceId, consulteeCategory, consulteeGroup, consulteeSubcategory,
+	consulteeSubcategoryDescription, consultee, region, metadata
 `;
 const selectColumns = Prisma.raw(`${summaryColumnList}, geometry.STAsText() AS geometryWkt`);
 

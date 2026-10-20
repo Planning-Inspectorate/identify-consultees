@@ -106,6 +106,11 @@ function withGeoJson(contents: object, fn: (filePath: string) => void) {
 describe('running as a script (requires a local SQL Server - see docker-compose.yml)', () => {
 	test('imports a consultee-areas GeoJSON file', async (t) => {
 		if (!dbAvailable) return t.skip('SQL Server database not available');
+		// a consultee-areas import replaces the whole table - so only against CI's throwaway
+		// database, never a developer's loaded reference data
+		if (!process.env.CI && !process.env.TF_BUILD) {
+			return t.skip('replaces every consultee area - runs in CI only');
+		}
 
 		await dbClient.$executeRaw`DELETE FROM consultee_area WHERE id = ${cliAreaId}`;
 		try {

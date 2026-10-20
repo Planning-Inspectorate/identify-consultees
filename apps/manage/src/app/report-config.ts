@@ -17,6 +17,8 @@ export const REPORT_COLUMNS = {
 	whyIdentified: 'Why identified',
 	source: 'Source',
 	group: 'Group',
+	subcategory: 'Subcategory',
+	subcategoryDescription: 'Subcategory description',
 	distanceKm: 'Distance from site (km)',
 	consulteeAreaId: 'Consultee area id',
 	sourceId: 'Source id',

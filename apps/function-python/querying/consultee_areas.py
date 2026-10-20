@@ -9,8 +9,9 @@ from setup_database.db import ConnectionParams, connect
 # WKT text with STAsText(), the same pattern the Node data-access layer uses
 # (see packages/database/src/geospatial)
 _SELECT_COLUMNS = """
-    id, geometryType, sourceId, consulteeCategory, consulteeGroup, consultee, region,
-    metadata, lastUpdated, geometry.STAsText() AS geometryWkt
+    id, geometryType, sourceId, consulteeCategory, consulteeGroup, consulteeSubcategory,
+    consulteeSubcategoryDescription, consultee, region, metadata, lastUpdated,
+    geometry.STAsText() AS geometryWkt
 """
 
 

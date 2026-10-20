@@ -18,6 +18,8 @@ describe('rulesetRunnerReturning', () => {
 			sourceId: null,
 			consulteeCategory: 'Hospital',
 			consulteeGroup: null,
+			consulteeSubcategory: null,
+			consulteeSubcategoryDescription: null,
 			consultee: 'a',
 			region: null,
 			metadata: {}

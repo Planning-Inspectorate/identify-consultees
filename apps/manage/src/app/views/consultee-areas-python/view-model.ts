@@ -4,6 +4,8 @@ export interface ConsulteeAreaRow {
 	sourceId: string | null;
 	consulteeCategory: string | null;
 	consulteeGroup: string | null;
+	consulteeSubcategory: string | null;
+	consulteeSubcategoryDescription: string | null;
 	consultee: string | null;
 	region: string | null;
 	metadata: string;
