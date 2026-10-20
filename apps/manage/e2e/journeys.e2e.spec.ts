@@ -180,13 +180,14 @@ test.describe('manage journeys', () => {
 			removed = 1;
 		}
 
-		// "Add consultee" opens its own page: a name - matched to the category's consultees only the
+		// "Add a consultee" opens its own page: a name - matched to the category's consultees only the
 		// nearby search found (the faint ones on its map) as it's typed - and a reason, both required.
 		// A blank submit fails on both and stays on the page; a blank name then fails with the reason kept
-		await page.getByRole('button', { name: 'Add consultee' }).click();
+		await page.getByRole('button', { name: 'Add a consultee' }).click();
 		await expect(page).toHaveURL(/\/report\/consultees\/add\?.*category=Parish/);
 		await expect(page.getByRole('heading', { level: 1 })).toContainText('Add a consultee');
 		const nameInput = page.getByLabel('Name of consultee');
+		// the add page's own submit button - "Add consultee" - not the category page's "Add a consultee" link
 		const addButton = page.getByRole('button', { name: 'Add consultee' });
 		await addButton.click();
 		await expect(page.getByText('There is a problem')).toBeVisible();
@@ -218,7 +219,7 @@ test.describe('manage journeys', () => {
 		// offers them as a name is typed - picking one adds it by name, and the map draws it as
 		// identified. The seeded data decides whether there are any
 		let picked = 0;
-		await page.getByRole('button', { name: 'Add consultee' }).click();
+		await page.getByRole('button', { name: 'Add a consultee' }).click();
 		await expect(page).toHaveURL(/\/report\/consultees\/add\?.*category=Parish.*add=/);
 		if ((await page.locator('.autocomplete__wrapper').count()) > 0) {
 			const suggestions = page.locator('.autocomplete__option');
@@ -247,7 +248,7 @@ test.describe('manage journeys', () => {
 
 		// a successful add landed back on the category page - open the add page again for the next one
 		if (picked === 1) {
-			await page.getByRole('button', { name: 'Add consultee' }).click();
+			await page.getByRole('button', { name: 'Add a consultee' }).click();
 		}
 		await nameInput.fill('Second Test Consultee');
 		await page.getByLabel('Reason for adding').fill('Borders the site');

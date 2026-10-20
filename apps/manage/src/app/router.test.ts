@@ -261,7 +261,7 @@ describe('manage router wiring', () => {
 			`/consultees/${homePageTestCaseId}/report/consultees?ruleset=england-wales-post-20240430&category=Parish%20Council`
 		);
 		assert.equal(response.status, 200);
-		assert.match(response.text, /href="[^"]*\/report\/consultees\/add\?[^"]*"[^>]*>\s*Add consultee/);
+		assert.match(response.text, /href="[^"]*\/report\/consultees\/add\?[^"]*"[^>]*>\s*Add a consultee/);
 	});
 
 	test('GET /consultees/:id/report/consultees/add renders the add form, with the autocomplete', async () => {
