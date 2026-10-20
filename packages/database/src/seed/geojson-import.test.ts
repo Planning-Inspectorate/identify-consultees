@@ -91,12 +91,12 @@ describe('toConsulteeArea', () => {
 			properties: {
 				id: 'transport_DKH_WE_00001',
 				consultee_category: 'Transport',
-				consultee_subcategory: ' Municipal ',
-				consultee_subcategory_description: 'Port or harbour run by a local authority'
+				consultee_subcategory: ' Statutory ',
+				consultee_subcategory_description: 'Statutory harbour authority'
 			}
 		});
-		assert.equal(feature.properties.consulteeSubcategory, 'Municipal');
-		assert.equal(feature.properties.consulteeSubcategoryDescription, 'Port or harbour run by a local authority');
+		assert.equal(feature.properties.consulteeSubcategory, 'Statutory');
+		assert.equal(feature.properties.consulteeSubcategoryDescription, 'Statutory harbour authority');
 
 		const blank = toConsulteeArea({
 			geometry: { type: 'Point', coordinates: [0, 0] },
