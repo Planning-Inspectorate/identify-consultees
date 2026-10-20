@@ -21,7 +21,7 @@ export interface ConsulteeAreaProperties {
 	consulteeCategory?: string | null;
 	/** The export's broad group: Health, Local Authorities, Transport... */
 	consulteeGroup?: string | null;
-	/** What kind of consultee within its category: a port's ownership, a railway's Active/Inactive... */
+	/** What kind of consultee within its category: a port's Statutory/NonStatutory, a railway's Active/Inactive... */
 	consulteeSubcategory?: string | null;
 	/** What consulteeSubcategory means. */
 	consulteeSubcategoryDescription?: string | null;

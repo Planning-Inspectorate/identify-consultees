@@ -13,8 +13,9 @@
 #                  group            Group               the reference data's broad group: Health,
 #                                                       Local Authorities, Transport...
 #                  subcategory      Subcategory         what kind of consultee within its category:
-#                                                       a port's ownership, a railway's Active or
-#                                                       Inactive, an interconnector's data quality
+#                                                       a port's Statutory or NonStatutory, a
+#                                                       railway's Active or Inactive, an
+#                                                       interconnector's build status
 #                  subcategoryDescription
 #                                   Subcategory description
 #                                                       what the subcategory means
