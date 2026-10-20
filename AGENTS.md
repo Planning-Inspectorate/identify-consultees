@@ -339,9 +339,35 @@ For Astun GIS shapefile packaging, upload, attribute population, and prescribed-
 
 Keep that procedural detail out of this file; link here when an agent needs the operational context.
 
-### GIS Tool Styling (map overlays — required)
+### GIS Styling — default values (map overlays — required)
 
-Source: **GIS Tool Styling** (last updated 12/09/2024, Jo Gerulaitis). Agents and contributors **must** use these styles whenever implementing or changing map overlays (interactive layers, legends/keys, and static-map drawings of the same features). Do not invent new colours or fill patterns for these layer types.
+Source: **GIS Styling (default values)** (last updated 19/10/2026, Jo Gerulaitis), superseding the earlier **GIS Tool Styling** sheet (12/09/2024) wherever the two disagree — the MOD area fills moved to `0.2` opacity and the safeguarding purple to `#cd2380`. Agents and contributors **must** use these styles whenever implementing or changing map overlays (interactive layers, legends/keys, and static-map drawings of the same features). Do not invent new colours or fill patterns for these layer types.
+
+#### Geometry selection map
+
+Solid fill; fill opacity `0.2`; border opacity `1.0`; border width `1.5px`.
+
+| Layer             | Colour    | Description |
+| ----------------- | --------- | ----------- |
+| Selected geometry | `#ff0000` | Solid fill  |
+| Other geometries  | `#3c51ab` | Solid fill  |
+
+#### Consultee layers
+
+Solid fill; fill opacity `0.2`; border opacity `1.0`; border width `1.5px`. The five group layers key the same groups as the generated report's workbook tabs (`GROUP_TABS` in `apps/manage/src/app/views/consultees/report/export/workbook.ts`).
+
+| Layer                     | Colour    | Differentiation hints (design suggestions, not mandated)                         |
+| ------------------------- | --------- | -------------------------------------------------------------------------------- |
+| Latest project geometries | `#ff0000` |                                                                                  |
+| Administrative boundaries | `#007a7a` | Ranges of opacities or overlaid hatch patterns (`\`, `/`, `=`, `\|`)             |
+| Public bodies             | `#2a72b2` | `+` markers in `#2a72b2` for hospitals                                           |
+| Energy                    | `#330165` |                                                                                  |
+| Transport                 | `#444444` | Dashed lines; `.`, `+`, `*` port-type markers in `#330165`, `#2a72b2`, `#cd2380` |
+| Other                     | `#cd2380` | See the MOD layers below                                                         |
+
+The sheet's mock-up legend also sketches per-group fill patterns (administrative boundaries a diagonal hatch, public bodies horizontal lines, energy a diagonal hatch, transport a dashed line, other constraints a cross-dot). The mock-up is marked approximate and AI-generated — the tables above are the source of truth for colours and opacities; treat the patterns as a differentiation aid where one colour per group is not enough on its own.
+
+Consultee areas on the maps should ultimately follow these group colours — the per-category palette in `apps/manage/src/app/maps/category-colours.ts` is an interim placeholder until group colouring lands.
 
 #### All layers — labels and buffers
 
@@ -401,7 +427,7 @@ Diagonal hatch (`Hatched /`); fill opacity `1`; border opacity `1`.
 
 #### MOD low flying areas
 
-Cross hatch (`Hatched X`); fill opacity `1`; border opacity `1`.
+Cross hatch (`Hatched X`); fill opacity `0.2`; border/hatch opacity `1.0`.
 
 | Layer | Colour    | Description |
 | ----- | --------- | ----------- |
@@ -412,11 +438,11 @@ Cross hatch (`Hatched X`); fill opacity `1`; border opacity `1`.
 
 #### MOD safeguarding areas
 
-Cross hatch (`Hatched X`); fill opacity `1`; border opacity `1`.
+Cross hatch (`Hatched X`); fill opacity `0.2`; border/hatch opacity `1.0`.
 
 | Layer  | Colour    | Description |
 | ------ | --------- | ----------- |
-| Purple | `#782e98` | Hatched X   |
+| Purple | `#cd2380` | Hatched X   |
 
 #### Agent rules for overlay styling
 
