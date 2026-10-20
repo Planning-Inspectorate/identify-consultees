@@ -11,13 +11,17 @@ function kilometres(metres: number): string {
 /**
  * One reason a consultee was identified, as the report pages show it: the ruleset condition it met
  * ("Hospitals: within 10km of the site", "\"B\" host District Councils: intersects the site", or a
- * bordering condition's own description), or the general search ("Within 20km of the site"). A
- * condition the ruleset no longer has - it can't happen within one request, but the text shouldn't
- * vanish if it did - falls back to its id.
+ * bordering condition's own description), the general search ("Within 20km of the site"), or for a
+ * Nearby NSIP, its distance ("Another NSIP within 10km of the site"). A condition the ruleset no
+ * longer has - it can't happen within one request, but the text shouldn't vanish if it did - falls
+ * back to its id.
  */
 export function describeReason(reason: ConsulteeReason, ruleset: Ruleset): string {
 	if (reason.type === 'nearby') {
 		return `Within ${kilometres(reason.radiusMetres)} of the site`;
+	}
+	if (reason.type === 'nearbyNsip') {
+		return `Another NSIP within ${kilometres(reason.radiusMetres)} of the site`;
 	}
 	const rule = ruleset.rules.find((candidate) => candidate.id === reason.conditionId);
 	if (!rule) {

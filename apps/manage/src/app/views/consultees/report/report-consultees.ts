@@ -1,5 +1,5 @@
 import type { ConsulteeMatch, Ruleset } from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
-import { isIdentifiedByCondition } from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
+import { isIdentified } from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
 import { describeReasons } from '../reasons.ts';
 import { reportCategories } from './categories.ts';
 import type { AddedConsultee, ConsulteeSelection } from './urls.ts';
@@ -45,7 +45,7 @@ export function reportByCategory(
 	consultees: ConsulteeMatch[],
 	selection: ConsulteeSelection
 ): ReportCategory[] {
-	const identified = consultees.filter(isIdentifiedByCondition);
+	const identified = consultees.filter(isIdentified);
 	const categories = reportCategories(ruleset, identified);
 	for (const add of selection.adds) {
 		if (!categories.includes(add.category)) {

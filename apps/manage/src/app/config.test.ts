@@ -106,6 +106,7 @@ describe('manage loadConfig', () => {
 		const shipped = loadNearbyConsultees();
 		assert.strictEqual(config.nearbyConsulteeRadiusMetres, shipped.defaultRadiusMetres);
 		assert.deepStrictEqual(config.nearbyRadiusMetresByCategory, shipped.radiusMetresByCategory);
+		assert.strictEqual(config.nearbyNsipRadiusMetres, shipped.nsipRadiusMetres);
 	});
 
 	test('allows AUTH_DISABLED outside production', () => {

@@ -16,7 +16,7 @@ import { buildReportZip, rememberedReportZip } from './report-zip.ts';
  * says so.
  */
 export function buildReportDownload(service: ManageService): AsyncRequestHandler {
-	const { db, logger, nearbyConsulteeRadiusMetres, rulesetRunner } = service;
+	const { db, logger } = service;
 
 	return async (req, res) => {
 		const caseId = String(req.params.caseId ?? '');
@@ -42,14 +42,7 @@ export function buildReportDownload(service: ManageService): AsyncRequestHandler
 			return;
 		}
 
-		const { consultees, failed } = await runRulesetSafely(
-			rulesetRunner,
-			project,
-			ruleset,
-			nearbyConsulteeRadiusMetres,
-			logger,
-			req.session
-		);
+		const { consultees, failed } = await runRulesetSafely(service, project, ruleset, req.session);
 		if (failed) {
 			res.redirect(reportCreatedUrl(project.id, ruleset.id, selection));
 			return;

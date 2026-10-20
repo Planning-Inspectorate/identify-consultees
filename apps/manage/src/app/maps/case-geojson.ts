@@ -6,7 +6,7 @@
 
 import type { CaseBoundaryFeature } from '@pins/identify-consultees-database/src/geospatial/case-boundaries.ts';
 import type { ConsulteeMatch } from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
-import { isIdentifiedByCondition } from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
+import { isIdentified } from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
 import type { Geometry } from '@pins/identify-consultees-database/src/geospatial/wkt.ts';
 import { REPORT_CONFIG } from '../report-config.ts';
 import { assignCategoryColours, colourFor, UNCATEGORISED } from './category-colours.ts';
@@ -77,7 +77,7 @@ export function markAddedByHand(matches: ConsulteeMatch[], ids: ReadonlySet<stri
 
 /** True when the map draws the match as identified: a condition found it, or a user added it. */
 function isDrawnAsIdentified(match: MapMatch): boolean {
-	return match.addedByHand === true || isIdentifiedByCondition(match);
+	return match.addedByHand === true || isIdentified(match);
 }
 
 type DrawableMatch = MapMatch & { feature: { geometry: Geometry } };

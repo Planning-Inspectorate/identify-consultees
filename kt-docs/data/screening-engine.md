@@ -42,14 +42,15 @@ Python decides which queries to run and combines the results; the geometry maths
 
 The report pages turn reasons into **Why identified** text (`apps/manage/src/app/views/consultees/reasons.ts`), one per line:
 
-| Reason                   | Shown as                                                                                         |
-| ------------------------ | ------------------------------------------------------------------------------------------------ |
-| Intersection, buffer 0   | `"B" host District Councils: intersects the site`                                                |
-| Intersection, buffer > 0 | `Hospitals: within 10km of the site`                                                             |
-| Bordering                | The condition's description, e.g. `"A" Community Councils bordering "B" host Community Councils` |
-| Nearby                   | `Within 20km of the site` (the `/results` page only - see below)                                 |
+| Reason                   | Shown as                                                                                           |
+| ------------------------ | -------------------------------------------------------------------------------------------------- |
+| Intersection, buffer 0   | `"B" host District Councils: intersects the site`                                                  |
+| Intersection, buffer > 0 | `Hospitals: within 10km of the site`                                                               |
+| Bordering                | The condition's description, e.g. `"A" Community Councils bordering "B" host Community Councils`   |
+| Nearby                   | `Within 20km of the site` (the `/results` page only - see below)                                   |
+| Nearby NSIP              | `Another NSIP within 10km of the site` - another case near the site (see [Web app](../web-app.md)) |
 
-**The report is what the conditions identified.** The check page, category pages and remove page list, and the report itself contains, only consultees that met at least one condition (`isIdentifiedByCondition`), and leave the nearby reason out of **Why identified**. Consultees only the nearby search found are context, not report content: the category maps draw them fainter (see [Maps](../maps.md#layers)), and the unlinked `/results` page still lists everything.
+**The report is what the conditions identified.** The check page, category pages and remove page list, and the report itself contains, only consultees that met at least one condition, and Nearby NSIPs (`isIdentified`), and leave the nearby reason out of **Why identified**. Consultees only the nearby search found are context, not report content: the category maps draw them fainter (see [Maps](../maps.md#layers)), and the unlinked `/results` page still lists everything.
 
 ## Tolerances
 

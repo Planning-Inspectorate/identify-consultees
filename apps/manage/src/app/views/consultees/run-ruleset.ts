@@ -1,5 +1,6 @@
 import type { ManageService } from '#service';
 import type { CaseBoundaryFeature } from '@pins/identify-consultees-database/src/geospatial/case-boundaries.ts';
+import { getCaseBoundaryDisplayGeometries } from '@pins/identify-consultees-database/src/geospatial/case-boundaries.ts';
 import {
 	bufferGeometryForDisplay,
 	getConsulteeAreaDisplayGeometries
@@ -10,7 +11,7 @@ import type {
 	RunRulesetResult
 } from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
 import type { SearchAreaDisplay } from '../../maps/case-geojson.ts';
-import type { RulesetRunner } from '../../ruleset-runner.ts';
+import { findNearbyNsips, isNearbyNsip } from './nearby-nsips.ts';
 
 /**
  * Shared plumbing for the consultee pages that run a ruleset (the project map page and the
@@ -75,8 +76,14 @@ function storedRun(
 	return undefined;
 }
 
+/** What a ruleset run needs from the service. No Nearby NSIPs distance means none are looked for. */
+export type RulesetRunService = Pick<ManageService, 'db' | 'logger' | 'rulesetRunner' | 'nearbyConsulteeRadiusMetres'> &
+	Partial<Pick<ManageService, 'nearbyNsipRadiusMetres'>>;
+
 /**
- * Run the ruleset in the Python function (see ruleset-runner.ts). If it's down, slow or errors, the
+ * Run the ruleset in the Python function (see ruleset-runner.ts), and add the Nearby NSIPs - other
+ * cases near the site, from case_boundary (see nearby-nsips.ts) - so every page treats them as
+ * another consultee category. If either fails - the function is down, slow or errors, say - the
  * page says the ruleset couldn't be run - there's no in-app fallback, so there's one implementation
  * of the intersection logic rather than two that could quietly disagree.
  *
@@ -86,11 +93,9 @@ function storedRun(
  * display geometry alone (as it does whenever the search area can be built).
  */
 export async function runRulesetSafely(
-	runRuleset: RulesetRunner,
+	service: RulesetRunService,
 	project: CaseBoundaryFeature,
 	ruleset: Ruleset,
-	nearbyRadiusMetres: number,
-	logger: ManageService['logger'],
 	store?: RulesetRunStore
 ): Promise<RulesetRun> {
 	const stored = storedRun(store, project, ruleset);
@@ -98,7 +103,11 @@ export async function runRulesetSafely(
 		return { consultees: stored.consultees, failed: false };
 	}
 	try {
-		const { consultees } = await runRuleset(project.geometry, ruleset, nearbyRadiusMetres);
+		const [run, nearbyNsips] = await Promise.all([
+			service.rulesetRunner(project.geometry, ruleset, service.nearbyConsulteeRadiusMetres),
+			findNearbyNsips(service.db, project, service.nearbyNsipRadiusMetres ?? 0)
+		]);
+		const consultees = [...run.consultees, ...nearbyNsips];
 		if (store) {
 			const run: StoredRulesetRun = {
 				caseId: project.id,
@@ -110,15 +119,15 @@ export async function runRulesetSafely(
 		}
 		return { consultees, failed: false };
 	} catch (error) {
-		logger.error({ error, caseId: project.id, rulesetId: ruleset.id }, 'Failed to run ruleset');
+		service.logger.error({ error, caseId: project.id, rulesetId: ruleset.id }, 'Failed to run ruleset');
 		return { consultees: [], failed: true };
 	}
 }
 
 /**
  * The interactive map's search area - the site grown by the nearby radius - and the display
- * geometry of every consultee touching it. The map is an extra: if this fails, the page still lists every consultee
- * in its tables.
+ * geometry of every consultee touching it: consultee areas', and Nearby NSIPs' boundaries. The map
+ * is an extra: if this fails, the page still lists every consultee in its tables.
  */
 export async function buildSearchAreaSafely(
 	db: ManageService['db'],
@@ -132,8 +141,14 @@ export async function buildSearchAreaSafely(
 	}
 	try {
 		const area = await bufferGeometryForDisplay(db, project.geometry, nearbyRadiusMetres);
-		const ids = [...new Set(matches.map((match) => match.feature.id))];
-		return { area, geometries: await getConsulteeAreaDisplayGeometries(db, ids, area) };
+		const ids = (nearbyNsips: boolean) => [
+			...new Set(matches.filter((match) => isNearbyNsip(match) === nearbyNsips).map((match) => match.feature.id))
+		];
+		const [consulteeAreas, caseBoundaries] = await Promise.all([
+			getConsulteeAreaDisplayGeometries(db, ids(false), area),
+			getCaseBoundaryDisplayGeometries(db, ids(true), area)
+		]);
+		return { area, geometries: new Map([...consulteeAreas, ...caseBoundaries]) };
 	} catch (error) {
 		logger.error({ error, caseId: project.id }, 'Failed to build the map search area');
 		return undefined;

@@ -51,13 +51,14 @@ Defined in `packages/database/src/schema.prisma`; spatial indexes, `CHECK` const
 
 **`case_boundary`**: one row per boundary **submission**. A case can have several, so `caseReference` isn't unique.
 
-| Column                                  | Notes                                                               |
-| --------------------------------------- | ------------------------------------------------------------------- |
-| `id`                                    | `UNIQUEIDENTIFIER`, deterministic from case reference and file name |
-| `geometry`, `geometryType`              | As above                                                            |
-| `caseReference`, `caseName`             | e.g. `EN010102`, project name                                       |
-| `fileName`, `receivedDate`              | Which submission                                                    |
-| `acceptance`, `metadata`, `lastUpdated` | `acceptance` not populated                                          |
+| Column                                  | Notes                                                                            |
+| --------------------------------------- | -------------------------------------------------------------------------------- |
+| `id`                                    | `UNIQUEIDENTIFIER`, deterministic from case reference and file name              |
+| `geometry`, `geometryType`              | As above                                                                         |
+| `geometrySimplified`                    | `geometry.Reduce(10).MakeValid()`: Nearby NSIPs are measured, and drawn, from it |
+| `caseReference`, `caseName`             | e.g. `EN010102`, project name                                                    |
+| `fileName`, `receivedDate`              | Which submission                                                                 |
+| `acceptance`, `metadata`, `lastUpdated` | `acceptance` not populated                                                       |
 
 Spatial indexes (`GEOGRAPHY_AUTO_GRID`): `consultee_area_geometry_simplified_sidx` (every screening query, forced by hint), `consultee_area_geometry_sidx`, `case_boundary_geometry_sidx`. B-tree indexes on `consulteeCategory` and `caseReference`.
 
@@ -86,7 +87,7 @@ An import (`loadConsulteeAreas`, `loadCaseBoundaries` in `packages/database/src/
 3. Derives a stable id per row, so re-importing updates in place.
 4. Converts to WKT, fixing winding.
 5. Upserts 200 rows per round trip: one `MERGE` per batch, rows as JSON through `OPENJSON`. Seconds instead of tens of minutes.
-6. Runs `MakeValid()` and, for consultee areas, builds `geometrySimplified`.
+6. Runs `MakeValid()` and builds `geometrySimplified`.
 
 **Consultee areas are always replaced.** Every import, from the admin page, the DB Seed pipeline or the CLI, clears the whole table and loads the file, so the table holds exactly the latest export and nothing from an earlier one. It clears in batches of 500, but only once the file has been read through and holds at least one feature, so a missing or bad file leaves the data as it was. Clear and load aren't one transaction: if the load fails partway, re-run it. A full import can outlast Front Door's timeout: the browser shows an error while the import carries on, so reload the admin page and check the counts rather than submitting again. Case boundaries merge by id unless replaced.
 

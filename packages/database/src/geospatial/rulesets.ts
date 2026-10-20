@@ -474,9 +474,13 @@ export function getRuleset(id: string): Ruleset | undefined {
 
 /**
  * Why an area is a consultee: a ruleset condition it met (by the condition's id - see
- * RuleCondition), or the general search for every consultee within the nearby radius.
+ * RuleCondition), the general search for every consultee within the nearby radius, or - for
+ * another case, a Nearby NSIP - being within the Nearby NSIPs distance of the site.
  */
-export type ConsulteeReason = { type: 'condition'; conditionId: string } | { type: 'nearby'; radiusMetres: number };
+export type ConsulteeReason =
+	| { type: 'condition'; conditionId: string }
+	| { type: 'nearby'; radiusMetres: number }
+	| { type: 'nearbyNsip'; radiusMetres: number };
 
 /** One consultee a ruleset run found, with every reason it qualified. */
 export interface ConsulteeMatch {
@@ -487,11 +491,12 @@ export interface ConsulteeMatch {
 }
 
 /**
- * True when a ruleset condition identified the consultee - false when only the general nearby
- * search found it. The report lists only the first kind; maps show both, the second fainter.
+ * True when the consultee is report content: a ruleset condition identified it, or it's a Nearby
+ * NSIP - false when only the general nearby search found it. The report lists only the first kind;
+ * maps show both, the second fainter.
  */
-export function isIdentifiedByCondition(match: Pick<ConsulteeMatch, 'reasons'>): boolean {
-	return match.reasons.some((reason) => reason.type === 'condition');
+export function isIdentified(match: Pick<ConsulteeMatch, 'reasons'>): boolean {
+	return match.reasons.some((reason) => reason.type !== 'nearby');
 }
 
 export interface RunRulesetResult {

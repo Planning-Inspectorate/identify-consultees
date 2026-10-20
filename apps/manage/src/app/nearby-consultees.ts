@@ -6,13 +6,19 @@ import path from 'node:path';
 /**
  * How far around a site the maps show consultees the ruleset didn't identify, from
  * config/nearby-consultees.yaml: a default, and a distance per category. Sent with every ruleset
- * run, so the Python function counts each area as nearby within its own category's distance.
+ * run, so the Python function counts each area as nearby within its own category's distance. The
+ * file also sets how far away another case is a Nearby NSIP (see views/consultees/nearby-nsips.ts).
  */
 export interface NearbyConsultees {
 	defaultRadiusMetres: number;
 	/** A category's own distance; 0 means it's never shown as nearby. */
 	radiusMetresByCategory: Record<string, number>;
+	/** How far from the site another case is a Nearby NSIP; 0 means none are looked for. */
+	nsipRadiusMetres: number;
 }
+
+/** The Nearby NSIPs distance when the file doesn't set one. */
+export const DEFAULT_NSIP_RADIUS_KM = 10;
 
 export const NEARBY_CONSULTEES_FILE = path.join(CONFIG_DIR, 'nearby-consultees.yaml');
 
@@ -50,7 +56,8 @@ export function parseNearbyConsultees(text: string): NearbyConsultees {
 		defaultRadiusMetres: radiusMetres(document.defaultRadiusKm, 'defaultRadiusKm', false),
 		radiusMetresByCategory: Object.fromEntries(
 			Object.entries(categories).map(([category, km]) => [category, radiusMetres(km, `categories.${category}`, true)])
-		)
+		),
+		nsipRadiusMetres: radiusMetres(document.nsipRadiusKm ?? DEFAULT_NSIP_RADIUS_KM, 'nsipRadiusKm', true)
 	};
 }
 
@@ -60,8 +67,8 @@ export function loadNearbyConsultees(file: string = NEARBY_CONSULTEES_FILE): Nea
 
 /**
  * How far the search, and the map's search area, reach: the largest distance configured, so every
- * category's nearby consultees are found and drawn.
+ * category's nearby consultees, and every Nearby NSIP, are found and drawn.
  */
 export function searchRadiusMetres(nearby: NearbyConsultees): number {
-	return Math.max(nearby.defaultRadiusMetres, ...Object.values(nearby.radiusMetresByCategory));
+	return Math.max(nearby.defaultRadiusMetres, nearby.nsipRadiusMetres, ...Object.values(nearby.radiusMetresByCategory));
 }

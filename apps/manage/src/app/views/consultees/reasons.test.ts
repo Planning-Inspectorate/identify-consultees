@@ -39,6 +39,13 @@ describe('describeReason', () => {
 	it('describes the general nearby search', () => {
 		assert.equal(describeReason({ type: 'nearby', radiusMetres: 20_000 }, ruleset), 'Within 20km of the site');
 	});
+
+	it('describes a Nearby NSIP by the distance it was looked for within', () => {
+		assert.equal(
+			describeReason({ type: 'nearbyNsip', radiusMetres: 10_000 }, ruleset),
+			'Another NSIP within 10km of the site'
+		);
+	});
 });
 
 describe('describeReasons', () => {

@@ -2,19 +2,27 @@ import type { ConsulteeMatch, Ruleset } from '@pins/identify-consultees-database
 import type { SheetData } from 'write-excel-file/node';
 import type { MetadataSelection, ReportColumn, ReportConfig } from '../../../../report-config.ts';
 import { categorySettings, REPORT_COLUMNS, REPORT_CONFIG } from '../../../../report-config.ts';
+import { NEARBY_NSIPS } from '../../nearby-nsips.ts';
 import { describeReasons } from '../../reasons.ts';
 import type { AddedConsultee, RemovedConsultee } from '../urls.ts';
 
 /**
  * The exported consultee report: a Summary tab, then one tab per high-level group of the rulesets
- * workbook. Each consultee goes on the tab of the condition that identified it (a hand-added one,
- * its category's), with the columns config/report.yaml sets - its fixed columns, then the metadata
- * each category exports, a column per heading.
+ * workbook, then Nearby NSIPs. Each consultee goes on the tab of the condition that identified it
+ * (a hand-added one, its category's), and each nearby case on Nearby NSIPs, with the columns
+ * config/report.yaml sets - its fixed columns, then the metadata each category exports, a column
+ * per heading.
  */
 
-/** The tabs after Summary, in order. "Other Cases" is a placeholder - nothing fills it yet. */
-export const GROUP_TABS = ['Administrative boundaries', 'Public bodies', 'Energy', 'Transport', 'Other'] as const;
-export const OTHER_CASES_TAB = 'Other Cases';
+/** The tabs after Summary, in order. */
+export const GROUP_TABS = [
+	'Administrative boundaries',
+	'Public bodies',
+	'Energy',
+	'Transport',
+	'Other',
+	NEARBY_NSIPS
+] as const;
 
 type GroupTab = (typeof GROUP_TABS)[number];
 
@@ -43,8 +51,9 @@ export interface ReportExport {
 	/** The consultees the ruleset's conditions identified, less any removed. */
 	identified: ConsulteeMatch[];
 	/**
-	 * Each identified consultee's full row, and each picked nearby one's, by id - missing only if it
-	 * was deleted mid-request.
+	 * Each identified consultee's full row, and each picked nearby one's, by id - a Nearby NSIP's
+	 * built from its case_boundary row (see report-zip.ts). Missing only if it was deleted
+	 * mid-request.
 	 */
 	records: Map<string, ConsulteeAreaRecord>;
 	/** Consultees added by hand - one the run found with its distance from the site. */
@@ -58,9 +67,15 @@ function tabForGroup(group: string | undefined): GroupTab {
 	return GROUP_TABS.find((tab) => tab.toLowerCase() === normalised) ?? 'Other';
 }
 
-/** The tab a ruleset match goes on: the group of the first condition that identified it. */
+/**
+ * The tab a ruleset match goes on: the group of the first condition that identified it - Nearby
+ * NSIPs for a nearby case.
+ */
 export function tabForMatch(match: ConsulteeMatch, ruleset: Ruleset): GroupTab {
 	for (const reason of match.reasons) {
+		if (reason.type === 'nearbyNsip') {
+			return NEARBY_NSIPS;
+		}
 		if (reason.type === 'condition') {
 			const rule = ruleset.rules.find((candidate) => candidate.id === reason.conditionId);
 			if (rule) {
@@ -71,8 +86,14 @@ export function tabForMatch(match: ConsulteeMatch, ruleset: Ruleset): GroupTab {
 	return 'Other';
 }
 
-/** The tab a hand-added consultee goes on: the group of the first condition naming its category. */
+/**
+ * The tab a hand-added consultee goes on: the group of the first condition naming its category -
+ * Nearby NSIPs for one added there.
+ */
 export function tabForCategory(category: string, ruleset: Ruleset): GroupTab {
+	if (category === NEARBY_NSIPS) {
+		return NEARBY_NSIPS;
+	}
 	return tabForGroup(ruleset.rules.find((rule) => rule.categories.includes(category))?.group);
 }
 
@@ -387,7 +408,7 @@ function summarySheet(report: ReportExport, tabs: Map<GroupTab, GroupTabContent>
 	return sheet;
 }
 
-/** The workbook's sheets, ready for write-excel-file: Summary, the five group tabs, then Other Cases. */
+/** The workbook's sheets, ready for write-excel-file: Summary, the five group tabs, then Nearby NSIPs. */
 export function buildReportSheets(report: ReportExport, config: ReportConfig = REPORT_CONFIG) {
 	const tabs = groupTabs(report, config);
 	return [
@@ -400,12 +421,7 @@ export function buildReportSheets(report: ReportExport, config: ReportConfig = R
 				columns: widths.map((width) => ({ width })),
 				stickyRowsCount: 1
 			};
-		}),
-		{
-			sheet: OTHER_CASES_TAB,
-			data: [[bold('Other cases')], [{ value: 'Not filled yet.' }]] as SheetData,
-			columns: [{ width: 40 }]
-		}
+		})
 	];
 }
 

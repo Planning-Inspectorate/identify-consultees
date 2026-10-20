@@ -1,12 +1,15 @@
 import assert from 'node:assert/strict';
 import { after, before, describe, test } from 'node:test';
 import type { PrismaClient } from '../client/client.ts';
+import { Prisma } from '../client/client.ts';
 import { loadConfig } from '../configuration/config.ts';
 import { acquireDbTestLock, releaseDbTestLock } from '../db-test-lock.ts';
 import { newDatabaseClient } from '../index.ts';
 import type { CaseBoundaryFeatureCollection } from './case-boundaries.ts';
 import {
+	findNearbyCases,
 	getCaseBoundaryById,
+	getCaseBoundaryDisplayGeometries,
 	getCaseBoundarySummaryById,
 	listCaseBoundaries,
 	listCaseBoundaryFiles,
@@ -415,6 +418,100 @@ describe('case boundaries (requires a local SQL Server - see docker-compose.yml)
 			assert.ok(outOfRange.total >= 1, 'expected the real match count even with no rows on the page');
 		} finally {
 			await cleanup();
+		}
+	});
+	test('findNearbyCases lists other cases near a site, each once as its newest shapefile', async (t) => {
+		if (!dbAvailable) return t.skip('SQL Server database not available');
+
+		// mid-Atlantic, well away from any real case
+		const ids = {
+			site: testBoundaryId,
+			siteOlder: '22222222-2222-2222-2222-222222222230',
+			near: '22222222-2222-2222-2222-222222222231',
+			nearOlder: '22222222-2222-2222-2222-222222222232',
+			touching: '22222222-2222-2222-2222-222222222233',
+			far: '22222222-2222-2222-2222-222222222234'
+		};
+		const cleanupCases = async () => {
+			await dbClient.$executeRaw`DELETE FROM case_boundary WHERE id IN (${Prisma.join(Object.values(ids))})`;
+		};
+		const square = (west: number, south: number) => ({
+			type: 'Polygon' as const,
+			coordinates: [
+				[
+					[west, south],
+					[west + 0.01, south],
+					[west + 0.01, south + 0.01],
+					[west, south + 0.01],
+					[west, south]
+				]
+			]
+		});
+		const submission = (
+			id: string,
+			caseReference: string,
+			geometry: ReturnType<typeof square>,
+			receivedDate: Date,
+			fileName: string
+		) => ({
+			id,
+			type: 'Feature' as const,
+			geometry,
+			properties: { caseReference, caseName: `${caseReference} project`, fileName, receivedDate }
+		});
+
+		await cleanupCases();
+		try {
+			await loadCaseBoundaries(dbClient, {
+				type: 'FeatureCollection',
+				features: [
+					submission(ids.site, 'NN000001', square(-35, 45), new Date('2026-01-01T00:00:00Z'), 'site.geojson'),
+					// the site's own older shapefile overlaps it - still not a nearby case
+					submission(ids.siteOlder, 'NN000001', square(-35, 45), new Date('2025-01-01T00:00:00Z'), 'old.geojson'),
+					// about 2km east: newest shapefile wins, whichever is nearer
+					submission(ids.near, 'NN000002', square(-34.962, 45), new Date('2026-02-01T00:00:00Z'), 'new.geojson'),
+					submission(ids.nearOlder, 'NN000002', square(-34.99, 45), new Date('2025-02-01T00:00:00Z'), 'old.geojson'),
+					submission(ids.touching, 'NN000003', square(-34.99, 45.005), new Date('2026-03-01T00:00:00Z'), 'a.geojson'),
+					// about 40km away
+					submission(ids.far, 'NN000004', square(-34.5, 45), new Date('2026-04-01T00:00:00Z'), 'far.geojson')
+				]
+			});
+
+			const nearby = await findNearbyCases(dbClient, ids.site, 10_000);
+			assert.deepEqual(
+				nearby.map((nearbyCase) => [nearbyCase.id, nearbyCase.caseReference, nearbyCase.fileName]),
+				[
+					[ids.touching, 'NN000003', 'a.geojson'],
+					[ids.near, 'NN000002', 'new.geojson']
+				]
+			);
+			assert.equal(nearby[0].distanceMetres, 0);
+			assert.ok(nearby[1].distanceMetres > 1000 && nearby[1].distanceMetres < 3000, `${nearby[1].distanceMetres}`);
+			assert.equal(nearby[1].caseName, 'NN000002 project');
+			assert.deepEqual(nearby[1].receivedDate, new Date('2026-02-01T00:00:00Z'));
+
+			// from the site's older shapefile, the same case is still left out
+			assert.deepEqual(
+				(await findNearbyCases(dbClient, ids.siteOlder, 100_000)).map((nearbyCase) => nearbyCase.id),
+				[ids.touching, ids.near, ids.far]
+			);
+			assert.deepEqual(await findNearbyCases(dbClient, '22222222-2222-2222-2222-22222222ffff', 100_000), []);
+
+			// drawn from their simplified geometry, for those touching the map's window
+			const window = square(-35.1, 44.9);
+			window.coordinates[0] = [
+				[-35.1, 44.9],
+				[-34.9, 44.9],
+				[-34.9, 45.1],
+				[-35.1, 45.1],
+				[-35.1, 44.9]
+			];
+			const geometries = await getCaseBoundaryDisplayGeometries(dbClient, [ids.near, ids.far.toUpperCase()], window);
+			assert.deepEqual([...geometries.keys()], [ids.near]);
+			assert.equal(geometries.get(ids.near)?.type, 'Polygon');
+			assert.deepEqual(await getCaseBoundaryDisplayGeometries(dbClient, [], window), new Map());
+		} finally {
+			await cleanupCases();
 		}
 	});
 });

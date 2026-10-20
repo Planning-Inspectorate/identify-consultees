@@ -31,7 +31,7 @@ function toMatchRow(match: ConsulteeMatch, ruleset: Ruleset): ConsulteeMatchRow 
  * every consultee it found listed with the reasons it was identified.
  */
 export function buildConsulteesResultsPage(service: ManageService): AsyncRequestHandler {
-	const { db, logger, nearbyConsulteeRadiusMetres, rulesetRunner } = service;
+	const { db, logger } = service;
 
 	return async (req, res) => {
 		const caseId = String(req.params.caseId ?? '');
@@ -52,14 +52,7 @@ export function buildConsulteesResultsPage(service: ManageService): AsyncRequest
 			'consultees results page'
 		);
 
-		const { consultees, failed } = await runRulesetSafely(
-			rulesetRunner,
-			project,
-			ruleset,
-			nearbyConsulteeRadiusMetres,
-			logger,
-			req.session
-		);
+		const { consultees, failed } = await runRulesetSafely(service, project, ruleset, req.session);
 		const searchArea = await buildSearchAreaSafely(db, project, consultees, service.nearbySearchRadiusMetres, logger);
 		const staticMapSrc = `/consultees/${encodeURIComponent(project.id)}/results/static-map?ruleset=${encodeURIComponent(ruleset.id)}`;
 		const staticMapAlt = `Static map showing ${ruleset.name} for ${project.properties.caseName}`;
@@ -88,7 +81,7 @@ export function buildConsulteesResultsPage(service: ManageService): AsyncRequest
 			matchCount: map.matchCount,
 			mapIsSampled: map.isSampled,
 			mapSampleSize: MAX_SAMPLED_MAP_MATCHES,
-			nearbyRadiusKm: nearbyConsulteeRadiusMetres / 1000
+			nearbyRadiusKm: service.nearbyConsulteeRadiusMetres / 1000
 		};
 
 		return res.render('views/consultees/results/view.njk', viewModel);
@@ -96,7 +89,7 @@ export function buildConsulteesResultsPage(service: ManageService): AsyncRequest
 }
 
 export function buildResultsStaticMap(service: ManageService, forceSvg = false): AsyncRequestHandler {
-	const { db, logger, nearbyConsulteeRadiusMetres, rulesetRunner } = service;
+	const { db, logger } = service;
 
 	return async (req, res) => {
 		const caseId = String(req.params.caseId ?? '');
@@ -108,14 +101,7 @@ export function buildResultsStaticMap(service: ManageService, forceSvg = false):
 			return;
 		}
 
-		const { consultees, failed } = await runRulesetSafely(
-			rulesetRunner,
-			project,
-			ruleset,
-			nearbyConsulteeRadiusMetres,
-			logger,
-			req.session
-		);
+		const { consultees, failed } = await runRulesetSafely(service, project, ruleset, req.session);
 		if (failed) {
 			// not an empty map: that would be cached (see Cache-Control below) as if it were a real
 			// "no matches" result

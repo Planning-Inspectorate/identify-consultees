@@ -1,5 +1,10 @@
 import type { PrismaClient } from '../client/client.ts';
 import { Prisma } from '../client/client.ts';
+import {
+	DISPLAY_SIMPLIFY_TOLERANCE_METRES,
+	DISPLAY_SIMPLIFY_WIDTH_RATIO,
+	SIMPLIFY_TOLERANCE_METRES
+} from './consultee-areas.ts';
 import { withDeadlockRetry } from './db-retry.ts';
 import type { Geometry } from './wkt.ts';
 import { geometryToWkt, wktToGeometry } from './wkt.ts';
@@ -100,6 +105,8 @@ export async function loadCaseBoundaries(
 		await dbClient.$executeRaw`
 			MERGE INTO case_boundary AS target
 			USING (
+				SELECT parsed.*, parsed.geometry.Reduce(${SIMPLIFY_TOLERANCE_METRES}).MakeValid() AS geometrySimplified
+				FROM (
 				SELECT
 					id,
 					geometryType,
@@ -126,11 +133,13 @@ export async function loadCaseBoundaries(
 					acceptance NVARCHAR(50) '$.acceptance',
 					metadata NVARCHAR(MAX) '$.metadata'
 				)
+				) AS parsed
 			) AS source
 			ON target.id = source.id
 			WHEN MATCHED THEN UPDATE SET
 				geometryType = source.geometryType,
 				geometry = source.geometry,
+				geometrySimplified = source.geometrySimplified,
 				caseReference = source.caseReference,
 				caseName = source.caseName,
 				fileName = source.fileName,
@@ -139,12 +148,12 @@ export async function loadCaseBoundaries(
 				metadata = source.metadata,
 				lastUpdated = SYSUTCDATETIME()
 			WHEN NOT MATCHED THEN INSERT (
-				id, geometryType, geometry, caseReference, caseName, fileName, receivedDate,
-				acceptance, metadata
+				id, geometryType, geometry, geometrySimplified, caseReference, caseName, fileName,
+				receivedDate, acceptance, metadata
 			) VALUES (
-				source.id, source.geometryType, source.geometry, source.caseReference,
-				source.caseName, source.fileName, source.receivedDate, source.acceptance,
-				source.metadata
+				source.id, source.geometryType, source.geometry, source.geometrySimplified,
+				source.caseReference, source.caseName, source.fileName, source.receivedDate,
+				source.acceptance, source.metadata
 			);
 		`;
 
@@ -359,4 +368,121 @@ export async function searchCaseBoundaries(dbClient: PrismaClient, options: Sear
 		features: rows.map(rowToSummary),
 		total
 	};
+}
+
+/**
+ * Another case near a site - its newest shapefile - for the report's Nearby NSIPs: the other
+ * Nationally Significant Infrastructure Projects a case's consultees may need to know about.
+ */
+export interface NearbyCase {
+	/** The newest shapefile's case_boundary id, lowercase - as the maps give ids. */
+	id: string;
+	caseReference: string;
+	caseName: string;
+	fileName: string | null;
+	receivedDate: Date | null;
+	/** From the site's boundary to this case's - 0 where they touch or overlap. */
+	distanceMetres: number;
+}
+
+// a bounding circle's radius in metres, from its angle - by the equatorial radius, the earth's
+// largest, so the filter below errs towards measuring a case rather than dropping one in reach
+const METRES_PER_DEGREE = (6_378_137 * Math.PI) / 180;
+
+/**
+ * The other cases within `radiusMetres` of case boundary `caseId`, nearest first: one per case -
+ * its newest shapefile (as searchCaseBoundaries picks), so a case resubmitted several times is
+ * listed, measured and drawn once - and never the site's own case, whichever of its shapefiles
+ * `caseId` is. Empty when `caseId` matches no row.
+ *
+ * Measured between simplified boundaries (geometrySimplified - within 10m of the originals): some
+ * boundaries hold over 100,000 points, and measuring between the originals takes minutes. Cases
+ * whose bounding circles are further apart than the radius are left out before any measuring,
+ * which keeps the largest site's search under a second.
+ */
+export async function findNearbyCases(
+	dbClient: PrismaClient,
+	caseId: string,
+	radiusMetres: number
+): Promise<NearbyCase[]> {
+	const rows = await withDeadlockRetry(
+		() => dbClient.$queryRaw<
+			{
+				id: string;
+				caseReference: string;
+				caseName: string;
+				fileName: string | null;
+				receivedDate: Date | null;
+				distanceMetres: number;
+			}[]
+		>`
+			WITH site AS (
+				SELECT caseReference, geometrySimplified AS geometry,
+					geometrySimplified.EnvelopeCenter() AS centre,
+					geometrySimplified.EnvelopeAngle() * ${METRES_PER_DEGREE} AS reach
+				FROM case_boundary WHERE id = CAST(${caseId} AS UNIQUEIDENTIFIER)
+			),
+			newest AS (
+				SELECT id, caseReference, caseName, fileName, receivedDate, geometrySimplified AS geometry,
+					ROW_NUMBER() OVER (PARTITION BY caseReference ORDER BY receivedDate DESC, id) AS rank
+				FROM case_boundary
+			)
+			SELECT newest.id, newest.caseReference, newest.caseName, newest.fileName, newest.receivedDate,
+				distance.metres AS distanceMetres
+			FROM newest
+			CROSS JOIN site
+			CROSS APPLY (SELECT newest.geometry.STDistance(site.geometry) AS metres) AS distance
+			WHERE newest.rank = 1
+				AND newest.caseReference <> site.caseReference
+				AND newest.geometry.EnvelopeCenter().STDistance(site.centre)
+					- newest.geometry.EnvelopeAngle() * ${METRES_PER_DEGREE} - site.reach <= ${radiusMetres}
+				AND distance.metres <= ${radiusMetres}
+			ORDER BY distance.metres, newest.caseReference
+		`
+	);
+	return rows.map((row) => ({
+		id: row.id.toLowerCase(),
+		caseReference: row.caseReference,
+		caseName: row.caseName,
+		fileName: row.fileName,
+		receivedDate: row.receivedDate,
+		distanceMetres: row.distanceMetres
+	}));
+}
+
+/**
+ * Whole geometry of specific case boundaries, for drawing them as Nearby NSIPs around a site -
+ * for those that touch `window`, simplified more the larger they are, as
+ * getConsulteeAreaDisplayGeometries simplifies consultee areas. Display only - never measure
+ * distances on these. Ids with no matching row, or not touching `window`, are absent; ids come
+ * back lowercase, as the maps give them.
+ */
+export async function getCaseBoundaryDisplayGeometries(
+	dbClient: PrismaClient,
+	ids: string[],
+	window: Geometry
+): Promise<Map<string, Geometry>> {
+	const geometries = new Map<string, Geometry>();
+	if (ids.length === 0) {
+		return geometries;
+	}
+	const rows = await withDeadlockRetry(
+		() => dbClient.$queryRaw<{ id: string; geometryWkt: string }[]>`
+			SELECT id, geometrySimplified.Reduce(tolerance.metres).STAsText() AS geometryWkt
+			FROM case_boundary
+			CROSS APPLY (
+				SELECT CASE
+					WHEN SQRT(geometrySimplified.STArea()) / ${DISPLAY_SIMPLIFY_WIDTH_RATIO} > ${DISPLAY_SIMPLIFY_TOLERANCE_METRES}
+						THEN SQRT(geometrySimplified.STArea()) / ${DISPLAY_SIMPLIFY_WIDTH_RATIO}
+					ELSE ${DISPLAY_SIMPLIFY_TOLERANCE_METRES}
+				END AS metres
+			) AS tolerance
+			WHERE id IN (${Prisma.join(ids)})
+				AND geometrySimplified.STIntersects(geography::STGeomFromText(${geometryToWkt(window)}, 4326)) = 1
+		`
+	);
+	for (const row of rows) {
+		geometries.set(row.id.toLowerCase(), wktToGeometry(row.geometryWkt));
+	}
+	return geometries;
 }
