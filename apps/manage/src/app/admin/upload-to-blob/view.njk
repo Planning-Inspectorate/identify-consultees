@@ -28,7 +28,12 @@
         }) }}
     {% endif %}
 
-    <form method="post" action="/admin/upload-to-blob/run" enctype="multipart/form-data" novalidate>
+    {# blob-upload.js sends the file a part at a time (data-chunk-bytes each) rather than in one
+       request, which a large file can't finish within Front Door's timeout; without it the form
+       posts the whole file #}
+    <form method="post" action="/admin/upload-to-blob/run" enctype="multipart/form-data" novalidate
+        data-chunked-upload data-chunk-bytes="{{ chunkBytes }}" data-max-upload-bytes="{{ maxUploadBytes }}"
+        data-csrf-token="{{ _csrf }}">
         {% if error %}
             {{ govukErrorMessage({ text: error }) }}
         {% endif %}
@@ -37,9 +42,15 @@
             id: "file",
             name: "file",
             label: { text: "Upload a file" },
-            hint: { text: "Up to 1GB." }
+            hint: { text: "Up to 1GB. The file is saved under its own name - to import consultee areas, name it combined_reference_data_v1.geojson." }
         }) }}
+
+        <p class="govuk-body" role="status" aria-live="polite" data-upload-status></p>
 
         {{ govukButton({ text: "Upload" }) }}
     </form>
+{% endblock %}
+
+{% block bodyEnd %}
+    <script type="module" src="/{{ config.blobUploadJs }}"></script>
 {% endblock %}

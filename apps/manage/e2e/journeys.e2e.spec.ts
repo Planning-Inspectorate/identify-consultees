@@ -350,6 +350,33 @@ test.describe('manage journeys', () => {
 		await expect(page.locator('.app-map-layers-demo')).toBeVisible();
 	});
 
+	test('the admin upload page sends a file in parts, with the CSRF token, and says why it failed', async ({ page }) => {
+		// the e2e server has no blob storage, so the first part is refused with that reason - after
+		// the script has sliced the file and sent it, past the CSRF check, to the parts route
+		const tokens: string[] = [];
+		page.on('request', (request) => {
+			if (request.url().includes('/admin/upload-to-blob/blocks?name=e2e-upload.geojson&block=0')) {
+				tokens.push(request.headers()['x-csrf-token'] ?? '');
+			}
+		});
+		await page.goto('/admin/upload-to-blob');
+		await page.setInputFiles('#file', {
+			name: 'e2e-upload.geojson',
+			mimeType: 'application/geo+json',
+			buffer: Buffer.from('{"type":"FeatureCollection","features":[]}')
+		});
+		await page.getByRole('button', { name: 'Upload', exact: true }).click();
+
+		await expect(page.locator('[data-upload-status]')).toHaveText(
+			'Could not upload the file: Blob storage is not configured for this environment.',
+			// a part the server can't take is tried three times, a second or two apart
+			{ timeout: 15_000 }
+		);
+		expect(tokens.length).toBeGreaterThan(0);
+		expect(tokens[0]).not.toBe('');
+		await expect(page).toHaveURL(/\/admin\/upload-to-blob$/);
+	});
+
 	test('signed-out page offers sign in again', async ({ page }) => {
 		await page.goto('/signed-out');
 		await expect(page.getByText('You have signed out').first()).toBeVisible();

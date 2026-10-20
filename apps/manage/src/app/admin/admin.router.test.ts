@@ -130,6 +130,33 @@ describe('admin section', () => {
 		assert.match(response.text, /aria-current="page">Upload to blob storage<\/a>/);
 	});
 
+	test("POST /admin/upload-to-blob/blocks and /commit take a file's parts with the page's CSRF token", async () => {
+		// the routes the page's script (blob-upload.js) sends a file through, a part at a time: the
+		// raw parser reads the part, and the token travels in a header since the body is the file's
+		const agent = request.agent(app);
+		const page = await agent.get('/admin/upload-to-blob');
+		const token = /data-csrf-token="([^"]+)"/.exec(page.text)?.[1];
+		assert.ok(token);
+		const sendPart = (headers: Record<string, string>) =>
+			agent
+				.post('/admin/upload-to-blob/blocks?name=test.geojson&block=0')
+				.set({ 'content-type': 'application/octet-stream', ...headers })
+				.send(Buffer.from('{"type":"FeatureCollection"}'));
+
+		// without the token, lusca refuses it - the app's error handler answers its error page
+		assert.ok((await sendPart({})).status >= 400);
+		// past the CSRF check and the parser, to the test service's missing blob storage
+		const part = await sendPart({ 'x-csrf-token': token });
+		assert.equal(part.status, 503);
+		assert.match(part.body.error, /not configured/);
+		const commit = await agent
+			.post('/admin/upload-to-blob/commit')
+			.set('x-csrf-token', token)
+			.send({ name: 'test.geojson', blocks: 1 });
+		assert.equal(commit.status, 503);
+		assert.match(page.text, /src="\/javascripts\/blob-upload-[0-9a-f]{8}\.js"/);
+	});
+
 	test('POST /admin/upload-to-blob/run accepts a multipart file and reports blob storage is not configured', async () => {
 		// proves multer (applied in upload-to-blob/index.ts) actually parses a real multipart body
 		// end-to-end - ADMIN_MULTIPART_ROUTES lets it past the CSRF check first. The test service has

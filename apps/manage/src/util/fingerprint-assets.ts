@@ -168,6 +168,7 @@ export async function applyAssetManifestToLocalsFile(localsFile: string, manifes
 		{ logical: 'javascripts/consultees-map.js', property: 'consulteesMapJs' },
 		{ logical: 'javascripts/map-layers-demo.js', property: 'mapLayersDemoJs' },
 		{ logical: 'javascripts/consultee-autocomplete.js', property: 'consulteeAutocompleteJs' },
+		{ logical: 'javascripts/blob-upload.js', property: 'blobUploadJs' },
 		{ logical: 'assets/js/accessible-autocomplete.min.js', property: 'accessibleAutocompleteJs' },
 		{ logical: 'assets/css/accessible-autocomplete.min.css', property: 'accessibleAutocompleteCss' },
 		{ logical: 'vendor/interactive-map/js/index.js', property: 'vendorInteractiveMapJs' },

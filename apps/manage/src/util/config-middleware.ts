@@ -12,6 +12,7 @@ export function addLocalsConfiguration(options: { devPagesEnabled?: boolean } = 
 			consulteesMapJs: 'javascripts/consultees-map-00c638e3.js',
 			mapLayersDemoJs: 'javascripts/map-layers-demo-82b46375.js',
 			consulteeAutocompleteJs: 'javascripts/consultee-autocomplete-8efbbdc4.js',
+			blobUploadJs: 'javascripts/blob-upload-18a4f5fc.js',
 			accessibleAutocompleteJs: 'assets/js/accessible-autocomplete.min-876870ee.js',
 			accessibleAutocompleteCss: 'assets/css/accessible-autocomplete.min-4b7a52dc.css',
 			vendorInteractiveMapJs: 'vendor/interactive-map/js/index-66cff150.js',
