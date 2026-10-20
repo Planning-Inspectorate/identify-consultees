@@ -35,6 +35,11 @@ export function deterministicId(seed: string): string {
 	return `${hash.slice(0, 8)}-${hash.slice(8, 12)}-${hash.slice(12, 16)}-${hash.slice(16, 20)}-${hash.slice(20, 32)}`;
 }
 
+/** A property as text, or null when it's absent or blank. */
+function text(value: unknown): string | null {
+	return value === null || value === undefined || String(value).trim() === '' ? null : String(value).trim();
+}
+
 export function toConsulteeArea(
 	feature: RawFeature,
 	config: ReferenceDataConfig = REFERENCE_DATA_CONFIG
@@ -65,6 +70,10 @@ export function toConsulteeArea(
 			sourceId: id || null,
 			consulteeCategory: consulteeCategoryFor(id, fileCategory, config) ?? null,
 			consulteeGroup: datasetCode(id) === undefined ? null : (fileCategory ?? null),
+			consulteeSubcategory: text(props.consultee_subcategory ?? props.consulteeSubcategory),
+			consulteeSubcategoryDescription: text(
+				props.consultee_subcategory_description ?? props.consulteeSubcategoryDescription
+			),
 			consultee: (props.consultee as string) ?? null,
 			region: (props.region as string) ?? null,
 			metadata

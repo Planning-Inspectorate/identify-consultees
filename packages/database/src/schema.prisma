@@ -30,23 +30,29 @@ datasource db {
 /// Consultee catchment/consultation-area geometries. CaseBoundary geometries are screened against
 /// these to work out which consultees are relevant to a case.
 model ConsulteeArea {
-  id                 String                   @id @default(dbgenerated("newid()")) @db.UniqueIdentifier
-  geometry           Unsupported("geography")
+  id                              String                   @id @default(dbgenerated("newid()")) @db.UniqueIdentifier
+  geometry                        Unsupported("geography")
   // simplified copy of `geometry` that ruleset distance checks run against - see the migration
-  geometrySimplified Unsupported("geography")
-  geometryType       String                   @db.NVarChar(50)
+  geometrySimplified              Unsupported("geography")
+  geometryType                    String                   @db.NVarChar(50)
   // the reference data export's own id - `id` is derived from it, so a re-import keeps each row's id
-  sourceId           String?                  @db.NVarChar(200)
+  sourceId                        String?                  @db.NVarChar(200)
   // the category the rulesets match (config/reference-data.yaml maps each dataset to one)
-  consulteeCategory  String?                  @db.NVarChar(200)
+  consulteeCategory               String?                  @db.NVarChar(200)
   // the export's own consultee_category: a broad group (Health, Local Authorities, Transport...)
-  consulteeGroup     String?                  @db.NVarChar(100)
-  consultee          String?                  @db.NVarChar(200)
-  region             String?                  @db.NVarChar(100)
+  consulteeGroup                  String?                  @db.NVarChar(100)
+  // what kind of consultee within its category - a port's ownership, a railway's Active/Inactive,
+  // an interconnector's data quality - and what that means: the export's consultee_subcategory
+  // and consultee_subcategory_description
+  consulteeSubcategory            String?                  @db.NVarChar(200)
+  consulteeSubcategoryDescription String?                  @db.NVarChar(500)
+  consultee                       String?                  @db.NVarChar(200)
+  region                          String?                  @db.NVarChar(100)
   // the export's metadata as it gives it: each source dataset's own attributes. SQL Server has no
-  // native JSON column type; query it with JSON_VALUE()/OPENJSON().
-  metadata           String                   @default("{}") @db.NVarChar(Max)
-  lastUpdated        DateTime                 @default(now())
+  // native JSON column type (and Prisma no SQL Server Json); query it with JSON_VALUE()/OPENJSON().
+  // A CHECK constraint (ISJSON) in the migrations refuses anything that isn't JSON
+  metadata                        String                   @default("{}") @db.NVarChar(Max)
+  lastUpdated                     DateTime                 @default(now())
 
   @@index([consulteeCategory])
   @@map("consultee_area")

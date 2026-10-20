@@ -44,6 +44,8 @@ describe('toConsulteeArea', () => {
 			sourceId: 'health_AMB_EW_00001',
 			consulteeCategory: 'Ambulance Trust',
 			consulteeGroup: 'Health',
+			consulteeSubcategory: null,
+			consulteeSubcategoryDescription: null,
 			consultee: 'East of England Ambulance Service',
 			region: 'East of England',
 			metadata: { CODE: 'EE_AMB_SERV', NAME: 'East of England Ambulance Service' }
@@ -69,10 +71,33 @@ describe('toConsulteeArea', () => {
 			sourceId: 'E23000001',
 			consulteeCategory: 'Ambulance Trust',
 			consulteeGroup: null,
+			consulteeSubcategory: null,
+			consulteeSubcategoryDescription: null,
 			consultee: 'Example Trust',
 			region: null,
 			metadata: { layer: 'ambulance' }
 		});
+	});
+
+	test("takes the export's subcategory and its description, a blank one as none", () => {
+		const feature = toConsulteeArea({
+			geometry: { type: 'Point', coordinates: [0, 0] },
+			properties: {
+				id: 'transport_DKH_WE_00001',
+				consultee_category: 'Transport',
+				consultee_subcategory: ' Municipal ',
+				consultee_subcategory_description: 'Port or harbour run by a local authority'
+			}
+		});
+		assert.equal(feature.properties.consulteeSubcategory, 'Municipal');
+		assert.equal(feature.properties.consulteeSubcategoryDescription, 'Port or harbour run by a local authority');
+
+		const blank = toConsulteeArea({
+			geometry: { type: 'Point', coordinates: [0, 0] },
+			properties: { id: 'src-1', consulteeSubcategory: '  ', consulteeSubcategoryDescription: 'Sample' }
+		});
+		assert.equal(blank.properties.consulteeSubcategory, null);
+		assert.equal(blank.properties.consulteeSubcategoryDescription, 'Sample');
 	});
 
 	test('keeps metadata that is not a JSON object whole, as rawMetadata', () => {
@@ -93,6 +118,8 @@ describe('toConsulteeArea', () => {
 			sourceId: null,
 			consulteeCategory: null,
 			consulteeGroup: null,
+			consulteeSubcategory: null,
+			consulteeSubcategoryDescription: null,
 			consultee: null,
 			region: null,
 			metadata: {}

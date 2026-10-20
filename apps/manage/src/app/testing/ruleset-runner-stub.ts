@@ -11,6 +11,8 @@ export interface ConsulteeAreaMatchRow {
 	sourceId?: string | null;
 	consulteeCategory: string | null;
 	consulteeGroup?: string | null;
+	consulteeSubcategory?: string | null;
+	consulteeSubcategoryDescription?: string | null;
 	consultee: string | null;
 	region: string | null;
 	metadata?: string;
@@ -30,6 +32,8 @@ function feature(row: ConsulteeAreaMatchRow) {
 			sourceId: row.sourceId ?? null,
 			consulteeCategory: row.consulteeCategory,
 			consulteeGroup: row.consulteeGroup ?? null,
+			consulteeSubcategory: row.consulteeSubcategory ?? null,
+			consulteeSubcategoryDescription: row.consulteeSubcategoryDescription ?? null,
 			consultee: row.consultee,
 			region: row.region,
 			metadata: JSON.parse(row.metadata ?? '{}')
@@ -74,7 +78,8 @@ export function buildDatabaseRulesetRunner(getDb: () => PrismaClient): RulesetRu
 		const rules = ruleset.rules.filter((rule) => rule.logicType === 'intersection' && rule.categories.length > 0);
 		const searchMetres = Math.max(nearbyRadiusMetres, ...rules.map((rule) => rule.bufferMetres ?? 0));
 		const rows = await db.$queryRaw<(ConsulteeAreaMatchRow & { metadata: string })[]>`
-			SELECT id, sourceId, consulteeCategory, consulteeGroup, consultee, region, metadata,
+			SELECT id, sourceId, consulteeCategory, consulteeGroup, consulteeSubcategory, consulteeSubcategoryDescription,
+				consultee, region, metadata,
 				geometry.STAsText() AS geometryWkt,
 				geometrySimplified.STDistance(geography::STGeomFromText(${wkt}, 4326)) AS distanceMetres
 			FROM consultee_area

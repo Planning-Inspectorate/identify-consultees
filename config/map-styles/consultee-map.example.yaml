@@ -17,9 +17,10 @@
 # Point categories (Hospital, Dock or Harbour, Electricity Generator, ONR Site) are drawn as small
 # dots in `colour`; the outline and dash settings don't apply to them.
 #
-# Sub-categories key on the consultee sub-category column the data redevelopment is adding to
-# consultee_area. Until it lands, the sub-category values below are illustrative - taken from
-# attributes in today's source files - and will be replaced with the column's real values.
+# Sub-categories key on consultee_area.consulteeSubcategory, the reference data export's
+# consultee_subcategory - a port's ownership, a railway's Active/Inactive, an interconnector's data
+# quality. Some values below are illustrative, taken from attributes in earlier source files, and
+# are to be replaced with the column's real values.
 
 version: 1
 
