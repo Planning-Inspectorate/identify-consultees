@@ -1,6 +1,7 @@
 {% extends "views/layouts/main.njk" %}
 
 {% from "govuk/components/button/macro.njk" import govukButton %}
+{% from "govuk/components/details/macro.njk" import govukDetails %}
 {% from "govuk/components/summary-list/macro.njk" import govukSummaryList %}
 
 {% block pageTitle %}
@@ -23,6 +24,7 @@
 			{
 				key: { text: "Project" },
 				value: { text: caseName },
+				classes: "govuk-summary-list__row--no-border",
 				actions: {
 					items: [
 						{ href: caseChangeUrl, text: "Change", visuallyHiddenText: "project" }
@@ -56,33 +58,51 @@
 
 	{% if not rulesetFailed %}
 		<h2 class="govuk-heading-m">Identified consultees</h2>
-		{% set consulteeRows = [] %}
-		{% for consultee in consultees %}
-			{% set valueHtml %}
-				{% if consultee.total == 0 %}
-					0
-				{% else %}
-					{% if consultee.total > consultee.names.length %}
-						<p class="govuk-body">Showing {{ consultee.names.length }} of {{ consultee.total }} consultees</p>
+		{# the exported workbook's tab groupings (see the controller's tabForCategory) #}
+		{% for group in groups %}
+			<h3 class="govuk-heading-s">{{ group.name }}</h3>
+			{% set consulteeRows = [] %}
+			{% for consultee in group.consultees %}
+				{% set valueHtml %}
+					{% if consultee.names.length == 0 %}
+						No consultees
+					{% elif consultee.names.length == 1 %}
+						{{ consultee.names | first }}
+					{% else %}
+						{# more than five names and the rest sit behind "Show more" #}
+						<ul class="govuk-list govuk-list--bullet">
+							{% for name in consultee.names %}
+								{% if loop.index <= 5 %}
+									<li>{{ name }}</li>
+								{% endif %}
+							{% endfor %}
+						</ul>
+						{% if consultee.names.length > 5 %}
+							{% set moreHtml %}
+								<ul class="govuk-list govuk-list--bullet">
+									{% for name in consultee.names %}
+										{% if loop.index > 5 %}
+											<li>{{ name }}</li>
+										{% endif %}
+									{% endfor %}
+								</ul>
+							{% endset %}
+							{{ govukDetails({ summaryText: "Show more", html: moreHtml }) }}
+						{% endif %}
 					{% endif %}
-					<ul class="govuk-list govuk-list--bullet">
-						{% for name in consultee.names %}
-							<li>{{ name }}</li>
-						{% endfor %}
-					</ul>
-				{% endif %}
-			{% endset %}
-			{% set consulteeRows = (consulteeRows.push({
-				key: { text: consultee.name },
-				value: { html: valueHtml },
-				actions: {
-					items: [
-						{ href: consultee.changeUrl, text: "Change", visuallyHiddenText: consultee.name }
-					]
-				}
-			}), consulteeRows) %}
+				{% endset %}
+				{% set consulteeRows = (consulteeRows.push({
+					key: { text: consultee.name },
+					value: { html: valueHtml },
+					actions: {
+						items: [
+							{ href: consultee.changeUrl, text: "Change", visuallyHiddenText: consultee.name }
+						]
+					}
+				}), consulteeRows) %}
+			{% endfor %}
+			{{ govukSummaryList({ rows: consulteeRows }) }}
 		{% endfor %}
-		{{ govukSummaryList({ rows: consulteeRows }) }}
 	{% endif %}
 
 	{{ govukButton({

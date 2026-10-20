@@ -172,20 +172,36 @@ describe('manage page accessibility smoke', () => {
 			shapefileChangeUrl: '/consultees/11111111-1111-1111-1111-111111111111',
 			rulesetName: 'England Wales post 30 April 2024',
 			rulesetChangeUrl: '/consultees/11111111-1111-1111-1111-111111111111/ruleset?ruleset=england-wales-post-20240430',
-			consultees: [
+			groups: [
 				{
-					name: 'Parish Council',
-					names: ['Little Snoring Parish Council', 'Great Snoring Parish Council', 'Barmer Parish Council'],
-					total: 3,
-					changeUrl: '#'
+					name: 'Administrative boundaries',
+					consultees: [
+						{
+							name: 'Parish Council',
+							names: [
+								'Little Snoring Parish Council',
+								'Great Snoring Parish Council',
+								'Barmer Parish Council',
+								'Fulmodeston Parish Council',
+								'Brinton Parish Council',
+								'Bale Parish Council',
+								'Briston Parish Council'
+							],
+							changeUrl: '#'
+						}
+					]
 				},
 				{
-					name: 'Police and Crime Commission',
-					names: ['Norfolk Police and Crime Commissioner'],
-					total: 1,
-					changeUrl: '#'
-				},
-				{ name: 'Railway', names: [], total: 0, changeUrl: '#' }
+					name: 'Public bodies',
+					consultees: [
+						{
+							name: 'Police and Crime Commission',
+							names: ['Norfolk Police and Crime Commissioner'],
+							changeUrl: '#'
+						},
+						{ name: 'Railway', names: [], changeUrl: '#' }
+					]
+				}
 			],
 			generateReportUrl:
 				'/consultees/11111111-1111-1111-1111-111111111111/report/created?ruleset=england-wales-post-20240430',
@@ -207,7 +223,7 @@ describe('manage page accessibility smoke', () => {
 			shapefileChangeUrl: '/consultees/11111111-1111-1111-1111-111111111111',
 			rulesetName: 'England Wales post 30 April 2024',
 			rulesetChangeUrl: '/consultees/11111111-1111-1111-1111-111111111111/ruleset?ruleset=england-wales-post-20240430',
-			consultees: [],
+			groups: [],
 			generateReportUrl:
 				'/consultees/11111111-1111-1111-1111-111111111111/report/created?ruleset=england-wales-post-20240430',
 			rulesetFailed: true,

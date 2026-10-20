@@ -1,11 +1,19 @@
 export interface IdentifiedConsultee {
 	/** The consultee category (e.g. "Parish Council") the row is for. */
 	name: string;
-	/** The category's consultee names, capped at the first few (see total for the real count). */
+	/** Every consultee name in the category - the page shows the first few, then "Show more". */
 	names: string[];
-	/** How many consultees the category has in total - may exceed names.length. */
-	total: number;
 	changeUrl: string;
+}
+
+/**
+ * The check page's broad groupings, following the prototype: the same groups the exported
+ * workbook's tabs use (see export/workbook.ts's GROUP_TABS), so the page reads like the report.
+ */
+export interface ConsulteeGroup {
+	/** The group's heading - an export tab's name. */
+	name: string;
+	consultees: IdentifiedConsultee[];
 }
 
 export interface ReportCheckViewModel {
@@ -19,8 +27,8 @@ export interface ReportCheckViewModel {
 	shapefileChangeUrl: string;
 	rulesetName: string;
 	rulesetChangeUrl: string;
-	/** One row per category the ruleset covers, in the ruleset's own order - zeros included. */
-	consultees: IdentifiedConsultee[];
+	/** The ruleset's categories under the export's group tabs - empty categories included. */
+	groups: ConsulteeGroup[];
 	/** The "Create report" link - the report created confirmation page. */
 	generateReportUrl: string;
 	/** True when the ruleset couldn't be run at all - the counts would be misleading zeros. */
