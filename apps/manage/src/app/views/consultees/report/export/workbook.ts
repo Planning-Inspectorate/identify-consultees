@@ -90,9 +90,62 @@ function kilometres(metres: number | null | undefined): Cell {
 
 type Metadata = Record<string, unknown>;
 
+/** A JSON object held as text - as some earlier exports nested their attributes - else undefined. */
+function jsonObjectIn(value: unknown): Metadata | undefined {
+	if (typeof value !== 'string' || !value.trimStart().startsWith('{')) {
+		return undefined;
+	}
+	try {
+		// text starting with { that parses is always an object
+		return JSON.parse(value) as Metadata;
+	} catch {
+		return undefined;
+	}
+}
+
+function isObject(value: unknown): value is Metadata {
+	return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+/** A list as one readable value: its items' text, comma-separated - an object item as "key: value" pairs. */
+function listText(items: unknown[]): string {
+	return items
+		.filter((item) => item !== null && item !== undefined && item !== '')
+		.map((item) =>
+			isObject(item)
+				? Object.entries(flattenMetadata(item))
+						.map(([key, value]) => `${key}: ${String(value)}`)
+						.join('; ')
+				: String(item)
+		)
+		.join(', ');
+}
+
 /**
- * A stored row's metadata as an object: the source data's own attributes, which differ from one
- * source dataset to another. Anything that isn't a JSON object is kept whole, under "Metadata".
+ * Metadata as one level of readable values: a nested object's attributes under dotted names
+ * (area.ha), a list as text, and a JSON object held as text opened up the same way - so no cell
+ * of the report shows JSON.
+ */
+function flattenMetadata(metadata: Metadata, prefix = ''): Metadata {
+	const flat: Metadata = {};
+	for (const [key, value] of Object.entries(metadata)) {
+		const name = prefix ? `${prefix}.${key}` : key;
+		const nested = isObject(value) ? value : jsonObjectIn(value);
+		if (nested) {
+			Object.assign(flat, flattenMetadata(nested, name));
+		} else if (Array.isArray(value)) {
+			flat[name] = listText(value);
+		} else {
+			flat[name] = value;
+		}
+	}
+	return flat;
+}
+
+/**
+ * A stored row's metadata as readable values, by attribute: the source data's own attributes,
+ * which differ from one source dataset to another, flattened (see flattenMetadata). A list is kept
+ * as text under "Metadata", and anything that isn't JSON whole.
  */
 export function parseMetadata(raw: string | undefined): Metadata {
 	if (!raw) {
@@ -100,15 +153,16 @@ export function parseMetadata(raw: string | undefined): Metadata {
 	}
 	try {
 		const parsed: unknown = JSON.parse(raw);
-		return parsed !== null && typeof parsed === 'object' && !Array.isArray(parsed)
-			? (parsed as Metadata)
-			: { Metadata: raw };
+		if (isObject(parsed)) {
+			return flattenMetadata(parsed);
+		}
+		return { Metadata: Array.isArray(parsed) ? listText(parsed) : raw };
 	} catch {
 		return { Metadata: raw };
 	}
 }
 
-/** A metadata value as a cell: numbers and true/false as such, objects and lists as JSON. */
+/** A metadata value as a cell: numbers and true/false as such, anything else as text. */
 function metadataCell(value: unknown): Cell {
 	if (value === null || value === undefined || value === '') {
 		return null;
@@ -119,7 +173,7 @@ function metadataCell(value: unknown): Cell {
 	if (typeof value === 'boolean') {
 		return { type: Boolean, value };
 	}
-	return { value: typeof value === 'string' ? value : JSON.stringify(value) };
+	return { value: String(value) };
 }
 
 /**

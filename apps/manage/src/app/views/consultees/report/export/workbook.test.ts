@@ -7,6 +7,7 @@ import {
 	buildReportSheets,
 	exportedMetadata,
 	GROUP_TABS,
+	parseMetadata,
 	reportFileName,
 	tabForCategory,
 	tabForMatch
@@ -124,17 +125,29 @@ describe('report workbook', () => {
 					match('h', 'Hospital', 'General Hospital', 'hospitals_10km')
 				],
 				records: new Map([
-					['a', record('a', { consultee: 'Abbey Parish Council', region: 'Stored region' })],
+					[
+						'a',
+						record('a', {
+							consultee: 'Abbey Parish Council',
+							region: 'Stored region',
+							consulteeGroup: 'Local Authorities',
+							consulteeSubcategory: 'Town Council',
+							consulteeSubcategoryDescription: 'A parish with a town council'
+						})
+					],
 					['h', record('h', { consulteeCategory: 'Hospital', consultee: 'General Hospital' })]
 				]),
 				added: [{ category: 'Parish Council', name: 'Added Parish', reason: '' }]
 			})
 		);
 		const admin = sheets.find((sheet) => sheet.sheet === 'Administrative boundaries')!;
-		// who, why and where from - then the source data's own attributes
+		// who and what kind, where, why and where from - then the source data's own attributes
 		assert.deepStrictEqual(rowValues(admin.data[0]), [
 			'Consultee',
 			'Category',
+			'Group',
+			'Subcategory',
+			'Subcategory description',
 			'Region',
 			'Why identified',
 			'Source',
@@ -145,17 +158,23 @@ describe('report workbook', () => {
 			[
 				'Abbey Parish Council',
 				'Parish Council',
+				'Local Authorities',
+				'Town Council',
+				'A parish with a town council',
 				'Stored region',
 				'"B" host Parish Councils: intersects the site',
 				'Ruleset',
 				1
 			],
 			// added by hand, with the default reason
-			['Added Parish', 'Parish Council', null, 'Manually added', 'Manually added', null],
+			['Added Parish', 'Parish Council', null, null, null, null, 'Manually added', 'Manually added', null],
 			// no stored row (deleted mid-request) - the run's values, and no metadata
 			[
 				'Zeal Parish Council',
 				'Parish Council',
+				null,
+				null,
+				null,
 				'Feature region',
 				'"B" host Parish Councils: intersects the site',
 				'Ruleset',
@@ -163,7 +182,7 @@ describe('report workbook', () => {
 			]
 		]);
 		// a number in the metadata stays a number
-		assert.deepStrictEqual(admin.data[1][5], { type: Number, value: 1 });
+		assert.deepStrictEqual(admin.data[1][8], { type: Number, value: 1 });
 
 		const publicBodies = sheets.find((sheet) => sheet.sheet === 'Public bodies')!;
 		assert.equal(publicBodies.data.length, 2);
@@ -182,7 +201,7 @@ describe('report workbook', () => {
 				records: new Map([
 					['a', record('a', { metadata: '{"PARNCP":"Abbey","FID":7,"open":true,"area":{"ha":12}}' })],
 					['b', record('b', { metadata: '{"FID":8,"PARNCP":null,"note":""}' })],
-					// not a JSON object, or not JSON at all - kept whole
+					// a list of values as text, and not JSON at all kept whole
 					['c', record('c', { metadata: '[1,2]' })],
 					['d', record('d', { metadata: 'not json' })],
 					['h', record('h', { consulteeCategory: 'Hospital', metadata: '{"ODS":"RX1"}' })]
@@ -190,29 +209,61 @@ describe('report workbook', () => {
 			})
 		);
 		const admin = sheets.find((sheet) => sheet.sheet === 'Administrative boundaries')!;
-		assert.deepStrictEqual(rowValues(admin.data[0]).slice(5), ['PARNCP', 'FID', 'open', 'area', 'note', 'Metadata']);
+		// after the 8 fixed columns, a column per attribute - a nested one under its dotted name
+		assert.deepStrictEqual(rowValues(admin.data[0]).slice(8), ['PARNCP', 'FID', 'open', 'area.ha', 'note', 'Metadata']);
 		assert.deepStrictEqual(
-			admin.data.slice(1).map((row) => rowValues(row).slice(5)),
+			admin.data.slice(1).map((row) => rowValues(row).slice(8)),
 			[
-				['Abbey', 7, true, '{"ha":12}', null, null],
+				['Abbey', 7, true, 12, null, null],
 				[null, 8, null, null, null, null],
-				[null, null, null, null, null, '[1,2]'],
+				[null, null, null, null, null, '1, 2'],
 				[null, null, null, null, null, 'not json']
 			]
 		);
 		// numbers and true/false keep their types
-		assert.deepStrictEqual(admin.data[1][6], { type: Number, value: 7 });
-		assert.deepStrictEqual(admin.data[1][7], { type: Boolean, value: true });
+		assert.deepStrictEqual(admin.data[1][9], { type: Number, value: 7 });
+		assert.deepStrictEqual(admin.data[1][10], { type: Boolean, value: true });
 		// a column per attribute, sized to its name
 		assert.deepStrictEqual(
-			admin.columns.slice(5).map((column) => column.width),
+			admin.columns.slice(8).map((column) => column.width),
 			[12, 12, 12, 12, 12, 12]
 		);
 
 		// another tab has its own data's attributes
 		const publicBodies = sheets.find((sheet) => sheet.sheet === 'Public bodies')!;
-		assert.deepStrictEqual(rowValues(publicBodies.data[0]).slice(5), ['ODS']);
-		assert.deepStrictEqual(rowValues(publicBodies.data[1]).slice(5), ['RX1']);
+		assert.deepStrictEqual(rowValues(publicBodies.data[0]).slice(8), ['ODS']);
+		assert.deepStrictEqual(rowValues(publicBodies.data[1]).slice(8), ['RX1']);
+	});
+
+	it('reads metadata as plain values - nested, held as text, or listed - never as JSON', () => {
+		assert.deepStrictEqual(
+			parseMetadata(
+				JSON.stringify({
+					CODE: 'NEW_FOREST_E_NAT_PARK',
+					area: { ha: 12, survey: { year: 2024 } },
+					// an earlier export's attributes, nested as text
+					meta_json: '{"NAME":"New Forest"}',
+					tags: ['a', null, '', 'b'],
+					parts: [{ n: 1 }, { n: 2, kind: { name: 'cable' } }],
+					note: '{not json',
+					empty: []
+				})
+			),
+			{
+				CODE: 'NEW_FOREST_E_NAT_PARK',
+				'area.ha': 12,
+				'area.survey.year': 2024,
+				'meta_json.NAME': 'New Forest',
+				tags: 'a, b',
+				parts: 'n: 1, n: 2; kind.name: cable',
+				note: '{not json',
+				empty: ''
+			}
+		);
+		// a JSON value that isn't an object, a list of them, and nothing at all
+		assert.deepStrictEqual(parseMetadata('"text"'), { Metadata: '"text"' });
+		assert.deepStrictEqual(parseMetadata('[{"a":1}]'), { Metadata: 'a: 1' });
+		assert.deepStrictEqual(parseMetadata(undefined), {});
 	});
 
 	it('summarises the report, counting each tab, and lists removals with their reasons', () => {
@@ -260,6 +311,9 @@ describe('report workbook', () => {
 		assert.deepStrictEqual(rowValues(admin.data[1]), [
 			'Picked Parish',
 			'Parish Council',
+			null,
+			null,
+			null,
 			'Stored region',
 			'Borders the site',
 			'Manually added',
@@ -277,6 +331,9 @@ describe('report workbook', () => {
 			(sheet) => sheet.sheet === 'Administrative boundaries'
 		)!;
 		assert.deepStrictEqual(rowValues(admin.data[1]), [
+			null,
+			null,
+			null,
 			null,
 			null,
 			null,

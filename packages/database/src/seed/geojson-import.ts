@@ -40,6 +40,24 @@ function text(value: unknown): string | null {
 	return value === null || value === undefined || String(value).trim() === '' ? null : String(value).trim();
 }
 
+/** A positive whole version number, 1 when there's none. */
+function version(value: unknown): number {
+	const number = Number(value);
+	return Number.isInteger(number) && number >= 1 ? number : 1;
+}
+
+/** A date as YYYY-MM-DD, null when there's none - a value that isn't one throws, naming the feature. */
+function isoDate(value: unknown, property: string, id: string): string | null {
+	if (value === null || value === undefined || String(value).trim() === '') {
+		return null;
+	}
+	const date = /^(\d{4}-\d{2}-\d{2})(T.*)?$/.exec(String(value).trim());
+	if (!date || Number.isNaN(Date.parse(date[1]))) {
+		throw new Error(`Feature ${id} has ${property} "${String(value)}", which isn't a date`);
+	}
+	return date[1];
+}
+
 export function toConsulteeArea(
 	feature: RawFeature,
 	config: ReferenceDataConfig = REFERENCE_DATA_CONFIG
@@ -74,6 +92,9 @@ export function toConsulteeArea(
 			consulteeSubcategoryDescription: text(
 				props.consultee_subcategory_description ?? props.consulteeSubcategoryDescription
 			),
+			currentVersion: version(props.current_version ?? props.currentVersion),
+			validFrom: isoDate(props.valid_from ?? props.validFrom, 'valid_from', id),
+			validTo: isoDate(props.valid_to ?? props.validTo, 'valid_to', id),
 			consultee: (props.consultee as string) ?? null,
 			region: (props.region as string) ?? null,
 			metadata

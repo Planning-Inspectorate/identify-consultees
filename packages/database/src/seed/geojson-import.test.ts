@@ -46,6 +46,9 @@ describe('toConsulteeArea', () => {
 			consulteeGroup: 'Health',
 			consulteeSubcategory: null,
 			consulteeSubcategoryDescription: null,
+			currentVersion: 1,
+			validFrom: null,
+			validTo: null,
 			consultee: 'East of England Ambulance Service',
 			region: 'East of England',
 			metadata: { CODE: 'EE_AMB_SERV', NAME: 'East of England Ambulance Service' }
@@ -73,6 +76,9 @@ describe('toConsulteeArea', () => {
 			consulteeGroup: null,
 			consulteeSubcategory: null,
 			consulteeSubcategoryDescription: null,
+			currentVersion: 2,
+			validFrom: null,
+			validTo: null,
 			consultee: 'Example Trust',
 			region: null,
 			metadata: { layer: 'ambulance' }
@@ -97,7 +103,53 @@ describe('toConsulteeArea', () => {
 			properties: { id: 'src-1', consulteeSubcategory: '  ', consulteeSubcategoryDescription: 'Sample' }
 		});
 		assert.equal(blank.properties.consulteeSubcategory, null);
+		// a dataset's feature with no group of its own
+		const ungrouped = toConsulteeArea({
+			geometry: { type: 'Point', coordinates: [0, 0] },
+			properties: { id: 'health_AMB_EW_00002' }
+		});
+		assert.equal(ungrouped.properties.consulteeGroup, null);
+		assert.equal(ungrouped.properties.consulteeCategory, 'Ambulance Trust');
 		assert.equal(blank.properties.consulteeSubcategoryDescription, 'Sample');
+	});
+
+	test("takes the export's version and the dates it applies from and until", () => {
+		const feature = toConsulteeArea({
+			geometry: { type: 'Point', coordinates: [0, 0] },
+			properties: {
+				id: 'health_AMB_EW_00001',
+				consultee_category: 'Health',
+				current_version: 3,
+				valid_from: '2026-10-19',
+				valid_to: '2027-03-31T00:00:00Z'
+			}
+		});
+		assert.equal(feature.properties.currentVersion, 3);
+		assert.equal(feature.properties.validFrom, '2026-10-19');
+		assert.equal(feature.properties.validTo, '2027-03-31');
+
+		// no version, or not a whole number from 1, is version 1; a blank date is none
+		for (const currentVersion of [undefined, 0, 2.5, 'three']) {
+			const sample = toConsulteeArea({
+				geometry: { type: 'Point', coordinates: [0, 0] },
+				properties: { id: 'src-1', currentVersion, validFrom: ' ' }
+			});
+			assert.equal(sample.properties.currentVersion, 1);
+			assert.equal(sample.properties.validFrom, null);
+		}
+	});
+
+	test('refuses a date that is not one, naming the feature', () => {
+		for (const valid_from of ['19/10/2026', '2026-13-45', 'soon']) {
+			assert.throws(
+				() =>
+					toConsulteeArea({
+						geometry: { type: 'Point', coordinates: [0, 0] },
+						properties: { id: 'health_AMB_EW_00001', consultee_category: 'Health', valid_from }
+					}),
+				/Feature health_AMB_EW_00001 has valid_from ".*", which isn't a date/
+			);
+		}
 	});
 
 	test('keeps metadata that is not a JSON object whole, as rawMetadata', () => {
@@ -120,6 +172,9 @@ describe('toConsulteeArea', () => {
 			consulteeGroup: null,
 			consulteeSubcategory: null,
 			consulteeSubcategoryDescription: null,
+			currentVersion: 1,
+			validFrom: null,
+			validTo: null,
 			consultee: null,
 			region: null,
 			metadata: {}
@@ -219,10 +274,13 @@ describe('importConsulteeAreas', () => {
 		const { client, $executeRaw } = loadingClient();
 		const file = {
 			type: 'FeatureCollection',
-			features: [point({ id: 'health_AMB_EW_00001', consultee_category: 'Health' })]
+			features: [
+				point({ id: 'health_AMB_EW_00001', consultee_category: 'Health' }),
+				point({ id: 'health_AMB_EW_00002', consultee_category: 'Health' })
+			]
 		};
 		await withFile(JSON.stringify(file), async (filePath) => {
-			assert.equal(await importConsulteeAreas(client, filePath), 1);
+			assert.equal(await importConsulteeAreas(client, filePath), 2);
 		});
 		// one batch delete of every row that comes back short, then one MERGE batch
 		assert.equal($executeRaw.mock.callCount(), 2);

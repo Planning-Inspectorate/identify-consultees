@@ -23,7 +23,9 @@
 #                  sourceId         Source id           the reference data's own id
 #                  geometryType     Geometry type
 #                  lastUpdated      Last updated
-#                Then come the metadata columns each category exports (below).
+#                Then come the metadata columns each category exports (below): one per attribute,
+#                as readable values - a nested attribute under a dotted name (area.ha), a list as
+#                comma-separated text - never JSON.
 #
 #   defaults   - for every category not listed under categories (and anything one leaves out):
 #     mapKm      the least distance, in km, its map shows around the site on every side - the
@@ -55,6 +57,9 @@ version: 1
 columns:
   - consultee
   - category
+  - group
+  - subcategory
+  - subcategoryDescription
   - region
   - whyIdentified
   - source

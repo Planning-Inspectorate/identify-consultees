@@ -52,6 +52,12 @@ model ConsulteeArea {
   // native JSON column type (and Prisma no SQL Server Json); query it with JSON_VALUE()/OPENJSON().
   // A CHECK constraint (ISJSON) in the migrations refuses anything that isn't JSON
   metadata                        String                   @default("{}") @db.NVarChar(Max)
+  // which version of the area this is, and the dates it applies from and until (null while
+  // current): the export's current_version, valid_from and valid_to
+  currentVersion                  Int                      @default(1)
+  validFrom                       DateTime?                @db.Date
+  validTo                         DateTime?                @db.Date
+  // when the row was loaded
   lastUpdated                     DateTime                 @default(now())
 
   @@index([consulteeCategory])
