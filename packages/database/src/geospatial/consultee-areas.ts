@@ -25,6 +25,11 @@ export interface ConsulteeAreaProperties {
 	consulteeSubcategory?: string | null;
 	/** What consulteeSubcategory means. */
 	consulteeSubcategoryDescription?: string | null;
+	/** Which version of the area this is - 1 if the export doesn't say. */
+	currentVersion?: number;
+	/** The dates, YYYY-MM-DD, it applies from and until (null while current). */
+	validFrom?: string | null;
+	validTo?: string | null;
 	consultee?: string | null;
 	region?: string | null;
 	metadata?: Record<string, unknown>;
@@ -134,6 +139,9 @@ export async function loadConsulteeAreas(
 				consulteeGroup: feature.properties.consulteeGroup ?? null,
 				consulteeSubcategory: feature.properties.consulteeSubcategory ?? null,
 				consulteeSubcategoryDescription: feature.properties.consulteeSubcategoryDescription ?? null,
+				currentVersion: feature.properties.currentVersion ?? 1,
+				validFrom: feature.properties.validFrom ?? null,
+				validTo: feature.properties.validTo ?? null,
 				// pre-stringified rather than nested JSON - OPENJSON's WITH clause extracts a
 				// declared NVARCHAR column as a scalar string, not a nested object
 				metadata: JSON.stringify(feature.properties.metadata ?? {})
@@ -158,6 +166,9 @@ export async function loadConsulteeAreas(
 						consulteeGroup,
 						consulteeSubcategory,
 						consulteeSubcategoryDescription,
+						currentVersion,
+						validFrom,
+						validTo,
 						metadata
 					FROM OPENJSON(${batchJson})
 					WITH (
@@ -173,6 +184,9 @@ export async function loadConsulteeAreas(
 						consulteeGroup NVARCHAR(100) '$.consulteeGroup',
 						consulteeSubcategory NVARCHAR(200) '$.consulteeSubcategory',
 						consulteeSubcategoryDescription NVARCHAR(500) '$.consulteeSubcategoryDescription',
+						currentVersion INT '$.currentVersion',
+						validFrom DATE '$.validFrom',
+						validTo DATE '$.validTo',
 						metadata NVARCHAR(MAX) '$.metadata'
 					)
 				) AS parsed
@@ -189,15 +203,20 @@ export async function loadConsulteeAreas(
 				consulteeGroup = source.consulteeGroup,
 				consulteeSubcategory = source.consulteeSubcategory,
 				consulteeSubcategoryDescription = source.consulteeSubcategoryDescription,
+				currentVersion = source.currentVersion,
+				validFrom = source.validFrom,
+				validTo = source.validTo,
 				metadata = source.metadata,
 				lastUpdated = SYSUTCDATETIME()
 			WHEN NOT MATCHED THEN INSERT (
 				id, geometryType, geometry, geometrySimplified, sourceId, consulteeCategory, consulteeGroup,
-				consulteeSubcategory, consulteeSubcategoryDescription, consultee, region, metadata
+				consulteeSubcategory, consulteeSubcategoryDescription, currentVersion, validFrom, validTo, consultee,
+				region, metadata
 			) VALUES (
 				source.id, source.geometryType, source.geometry, source.geometrySimplified, source.sourceId,
 				source.consulteeCategory, source.consulteeGroup, source.consulteeSubcategory,
-				source.consulteeSubcategoryDescription, source.consultee, source.region, source.metadata
+				source.consulteeSubcategoryDescription, source.currentVersion, source.validFrom, source.validTo,
+				source.consultee, source.region, source.metadata
 			);
 		`;
 

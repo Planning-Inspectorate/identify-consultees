@@ -188,6 +188,9 @@ describe('consultee areas (requires a local SQL Server - see docker-compose.yml)
 							consulteeGroup: 'Railway',
 							consulteeSubcategory: 'Active',
 							consulteeSubcategoryDescription: 'Railway line in use',
+							currentVersion: 2,
+							validFrom: '2026-10-19',
+							validTo: '2027-03-31',
 							consultee: 'Network Rail',
 							region: 'South',
 							metadata: { source: 'test' }
@@ -227,6 +230,14 @@ describe('consultee areas (requires a local SQL Server - see docker-compose.yml)
 				region: 'South',
 				metadata: { source: 'test' }
 			});
+
+			// stored, though nothing reads them back - they're not shown in the report
+			const [versioned] = await dbClient.$queryRaw<{ currentVersion: number; validFrom: string; validTo: string }[]>`
+				SELECT currentVersion, CONVERT(VARCHAR(10), validFrom, 23) AS validFrom,
+					CONVERT(VARCHAR(10), validTo, 23) AS validTo
+				FROM consultee_area WHERE id = ${testAreaId}
+			`;
+			assert.deepEqual({ ...versioned }, { currentVersion: 2, validFrom: '2026-10-19', validTo: '2027-03-31' });
 
 			const minimal = await getConsulteeAreaById(dbClient, secondAreaId);
 			assert.equal(minimal?.properties.consulteeCategory, null);
