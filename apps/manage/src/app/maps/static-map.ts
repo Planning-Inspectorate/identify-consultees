@@ -49,11 +49,11 @@ const OSM_TILE_FETCH_TIMEOUT_MS = 10_000;
 type FeatureColours = { stroke: string; fill: string; fillOpacity: number; googleFill: string; googleStroke: string };
 
 const PROJECT_COLOUR: FeatureColours = {
-	stroke: '#C44E52',
-	fill: '#C44E52',
-	fillOpacity: 0.45,
-	googleFill: '0xC44E5266',
-	googleStroke: '0xC44E52FF'
+	stroke: '#ff0000',
+	fill: '#ff0000',
+	fillOpacity: 0.2,
+	googleFill: '0xFF000033',
+	googleStroke: '0xFF0000FF'
 };
 const CONSULTEE_COLOUR: FeatureColours = {
 	stroke: '#55A868',
@@ -462,7 +462,8 @@ function pathForFeature(
 		return '';
 	}
 	const fillAttributes = filled ? `fill="${colours.fill}" fill-opacity="${colours.fillOpacity}"` : 'fill="none"';
-	return `<path d="${subpaths.join(' ')}" ${fillAttributes} stroke="${colours.stroke}" stroke-width="2"/>`;
+	// the GIS Styling default values give the overlays a 1.5px border (AGENTS.md)
+	return `<path d="${subpaths.join(' ')}" ${fillAttributes} stroke="${colours.stroke}" stroke-width="1.5"/>`;
 }
 
 /**

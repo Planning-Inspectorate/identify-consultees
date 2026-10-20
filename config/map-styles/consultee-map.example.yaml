@@ -25,9 +25,9 @@ version: 1
 
 # The project site, drawn on top of the consultee areas.
 projectSite:
-  colour: '#C44E52' # red - no category should use it
-  fillOpacity: 0.45
-  strokeWidth: 2
+  colour: '#ff0000' # the sheet's "latest project geometries" red - no category should use it
+  fillOpacity: 0.2
+  strokeWidth: 1.5
 
 # How a consultee is drawn depends on why it was identified:
 #   identified - it met at least one ruleset condition (the intersection logic)

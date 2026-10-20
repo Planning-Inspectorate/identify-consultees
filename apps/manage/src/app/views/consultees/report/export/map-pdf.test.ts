@@ -13,7 +13,7 @@ function input(overrides: Partial<MapPdfInput> = {}): MapPdfInput {
 		generatedAt: new Date('2026-10-13T14:00:00Z'),
 		category: 'Parish Council',
 		image: ONE_PIXEL_PNG,
-		colours: { consultee: '#4c72b0', site: '#C44E52', siteFillOpacity: 0.45 },
+		colours: { consultee: '#4c72b0', site: '#ff0000', siteFillOpacity: 0.2 },
 		consultees: [
 			{ name: 'Abbey Parish Council', identified: ['"B" host Parish Councils: intersects the site'], mapped: true },
 			{ name: 'Added Parish', identified: ['Asked to be consulted'], mapped: false }

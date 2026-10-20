@@ -47,10 +47,10 @@ export function buildDatasets(config) {
 			showInKey: true,
 			showInMenu: true,
 			style: {
-				stroke: '#C44E52',
-				strokeWidth: 2,
-				fill: '#C44E52',
-				fillOpacity: 0.45
+				stroke: '#ff0000',
+				strokeWidth: 1.5,
+				fill: '#ff0000',
+				fillOpacity: 0.2
 			}
 		});
 	}

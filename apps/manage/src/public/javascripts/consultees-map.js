@@ -135,7 +135,7 @@ export function buildDatasets(config) {
 
 	// the boundary page's shapefiles: one dataset each, grouped under the same Layers-menu
 	// heading, every one visible to start with - any can be unticked. Each carries its own style,
-	// by how recent it is (config/map-styles/boundary-map.yaml); red if it doesn't
+	// by how recent it is (config/map-styles/boundary-map.yaml); the selected-geometry red if it doesn't
 	for (const file of config.shapefileDatasets ?? []) {
 		if (file.geojson?.features?.length > 0) {
 			datasets.push({
@@ -150,9 +150,9 @@ export function buildDatasets(config) {
 				showInKey: true,
 				showInMenu: true,
 				style: file.style ?? {
-					stroke: '#C44E52',
-					strokeWidth: 2,
-					fill: translucent('#C44E52', 0.45)
+					stroke: '#ff0000',
+					strokeWidth: 1.5,
+					fill: translucent('#ff0000', 0.2)
 				}
 			});
 		}
@@ -189,8 +189,9 @@ export function buildDatasets(config) {
 			showInKey: true,
 			showInMenu: true,
 			style: {
-				stroke: '#C44E52',
-				fill: translucent('#C44E52', 0.45)
+				stroke: '#ff0000',
+				strokeWidth: 1.5,
+				fill: translucent('#ff0000', 0.2)
 			}
 		});
 	}
