@@ -237,6 +237,11 @@ describe('manage router wiring', () => {
 		assert.match(response.text, /Check consultees before creating the report/);
 		assert.match(response.text, /Report details/);
 		assert.match(response.text, /Identified consultees/);
+		// the identified consultees sit under the export workbook's group tabs
+		assert.match(response.text, /Administrative boundaries/);
+		assert.match(response.text, /Public bodies/);
+		// a category with no matches says so rather than show a number
+		assert.match(response.text, /No consultees/);
 		assert.match(response.text, /Create report/);
 	});
 

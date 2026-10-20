@@ -10,6 +10,7 @@ import { resolveCase } from '../resolve-case.ts';
 import { firstQueryValue, runRulesetSafely } from '../run-ruleset.ts';
 import { reportCategories } from './categories.ts';
 import { buildReportZip, formatFileSize, rememberedReportZip, rememberReportZip } from './export/report-zip.ts';
+import { GROUP_TABS, tabForCategory } from './export/workbook.ts';
 import { consulteeName } from './report-consultees.ts';
 import type { ConsulteeSelection } from './urls.ts';
 import {
@@ -21,27 +22,28 @@ import {
 	reportUrl,
 	rulesetUrl
 } from './urls.ts';
-import type { IdentifiedConsultee, ReportCheckViewModel, ReportCreatedViewModel } from './view-model.ts';
-
-// the check page lists consultee names per category, capped - seeing or removing the rest is
-// what each category's Change page is for
-const MAX_LISTED_CONSULTEES = 10;
+import type {
+	ConsulteeGroup,
+	IdentifiedConsultee,
+	ReportCheckViewModel,
+	ReportCreatedViewModel
+} from './view-model.ts';
 
 /**
  * Every category the ruleset covers, in the order its rules name them, then any other category its
- * conditions identified consultees in (see reportCategories), with each one's visible consultee names.
- * Consultees only the nearby search found aren't counted: they're map context, not report content - including covered
- * categories that matched nothing, so the list reads as the ruleset's full coverage. Excluded
- * consultees (removed on a category's Change page) don't appear and hand-added ones do - the
- * total here is the number of rows that page lists. Categories bigger than MAX_LISTED_CONSULTEES
- * name only the first few, with the total alongside.
+ * conditions identified consultees in (see reportCategories), bucketed into the export workbook's
+ * group tabs (export/workbook.ts's tabForCategory) so the page's sections match the report.
+ * Consultees only the nearby search found aren't counted: they're map context, not report
+ * content - including covered categories that matched nothing, so the list reads as the
+ * ruleset's full coverage. Excluded consultees (removed on a category's Change page) don't
+ * appear and hand-added ones do. Groups with no categories at all are left out.
  */
-function identifiedConsultees(
+export function groupedConsultees(
 	ruleset: Ruleset,
 	caseId: string,
 	matches: ConsulteeMatch[],
 	selection: ConsulteeSelection
-): IdentifiedConsultee[] {
+): ConsulteeGroup[] {
 	const names = new Map<string, string[]>();
 	const excluded = excludedMatchIds(selection.removed);
 	const identified = matches.filter(isIdentifiedByCondition);
@@ -54,15 +56,19 @@ function identifiedConsultees(
 	for (const add of selection.adds) {
 		names.set(add.category, [...(names.get(add.category) ?? []), add.name]);
 	}
-	return reportCategories(ruleset, identified).map((name) => {
-		const categoryNames = names.get(name) ?? [];
-		return {
-			name,
-			names: categoryNames.slice(0, MAX_LISTED_CONSULTEES),
-			total: categoryNames.length,
-			changeUrl: consulteesUrl(caseId, ruleset.id, name, selection)
-		};
+	const row = (category: string): IdentifiedConsultee => ({
+		name: category,
+		names: names.get(category) ?? [],
+		changeUrl: consulteesUrl(caseId, ruleset.id, category, selection)
 	});
+	const byGroup = new Map<string, IdentifiedConsultee[]>();
+	for (const category of reportCategories(ruleset, identified)) {
+		const group = tabForCategory(category, ruleset);
+		byGroup.set(group, [...(byGroup.get(group) ?? []), row(category)]);
+	}
+	return GROUP_TABS.map((tab) => ({ name: tab, consultees: byGroup.get(tab) ?? [] })).filter(
+		(group) => group.consultees.length > 0
+	);
 }
 
 /**
@@ -116,7 +122,7 @@ export function buildReportCheckPage(service: ManageService): AsyncRequestHandle
 			shapefileChangeUrl: `/consultees/${encodeURIComponent(project.id)}`,
 			rulesetName: ruleset.name,
 			rulesetChangeUrl: rulesetUrl(project.id, ruleset.id, selection),
-			consultees: identifiedConsultees(ruleset, project.id, consultees, selection),
+			groups: groupedConsultees(ruleset, project.id, consultees, selection),
 			generateReportUrl: reportCreatedUrl(project.id, ruleset.id, selection),
 			rulesetFailed: failed,
 			retryUrl: reportUrl(project.id, ruleset.id, selection)

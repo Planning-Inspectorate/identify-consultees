@@ -1,3 +1,4 @@
+import type { Ruleset } from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
 import { mockLogger } from '@planning-inspectorate/core/testing';
 import { unzipSync } from 'fflate';
 import assert from 'node:assert';
@@ -6,7 +7,7 @@ import { configureNunjucks } from '../../../nunjucks.ts';
 import { ONE_PIXEL_PNG } from '../../../testing/pdf-text.ts';
 import type { ConsulteeAreaMatchRow } from '../../../testing/ruleset-runner-stub.ts';
 import { failingRulesetRunner, rulesetRunnerReturning } from '../../../testing/ruleset-runner-stub.ts';
-import { buildReportCheckPage, buildReportCreatedPage } from './controller.ts';
+import { buildReportCheckPage, buildReportCreatedPage, groupedConsultees } from './controller.ts';
 import { rememberedReportZip } from './export/report-zip.ts';
 
 // a selection entry as the app's URLs carry it - base64url-encoded JSON (see urls.ts's ENCODED_JSON)
@@ -100,6 +101,12 @@ function handlerFor(db: unknown) {
 	});
 }
 
+// every category row the page lists, whichever group it sits under
+const allRows = (viewModel: { groups: { consultees: { name: string }[] }[] }) =>
+	viewModel.groups.flatMap((group) => group.consultees);
+const rowNamed = (viewModel: { groups: { consultees: { name: string }[] }[] }, name: string) =>
+	allRows(viewModel).find((row) => row.name === name);
+
 describe('consultee report check page', () => {
 	it('should count only consultees a condition identified, not ones only the nearby search found', async () => {
 		const mockRes = { status: mock.fn(() => mockRes), render: mock.fn() };
@@ -116,12 +123,10 @@ describe('consultee report check page', () => {
 		const db = dbReturning([[realProjectRow()], [parishMatchRow(), nearbyParish, nearbyForum]]);
 		await handlerFor(db)({ params: { caseId: realProjectId }, query: {} }, mockRes);
 
-		const categories = mockRes.render.mock.calls[0].arguments[1].consultees as { name: string; names: string[] }[];
-		assert.deepStrictEqual(categories.find((category) => category.name === 'Parish Council')?.names, [
-			'Little Snoring Parish Council'
-		]);
+		const viewModel = mockRes.render.mock.calls[0].arguments[1];
+		assert.deepStrictEqual(rowNamed(viewModel, 'Parish Council')?.names, ['Little Snoring Parish Council']);
 		// a category only the nearby search found isn't listed at all
-		assert.ok(!categories.some((category) => category.name === 'Local Resilience Forum'));
+		assert.ok(!allRows(viewModel).some((category) => category.name === 'Local Resilience Forum'));
 	});
 
 	it('should render the report details and per-category consultee counts', async () => {
@@ -159,15 +164,14 @@ describe('consultee report check page', () => {
 			`/consultees/${realProjectId}/report/created?ruleset=england-wales-post-20240430`
 		);
 
-		// one row per ruleset category, in ruleset order - matched ones carry their consultee names
-		const parishRow = viewModel.consultees.find((row: { name: string }) => row.name === 'Parish Council');
-		assert.strictEqual(parishRow.total, 1);
+		// one row per ruleset category, grouped under the export's tabs, in ruleset order
+		const parishRow = rowNamed(viewModel, 'Parish Council');
 		assert.deepStrictEqual(parishRow.names, ['Little Snoring Parish Council']);
-		assert.ok(viewModel.consultees.every((row: { names: string[] }) => Array.isArray(row.names)));
-		assert.ok(viewModel.consultees.length > 1);
+		assert.ok(allRows(viewModel).every((row: { names: string[] }) => Array.isArray(row.names)));
+		assert.ok(allRows(viewModel).length > 1);
 		// every category's Change link opens its shared consultees page for the same ruleset
 		assert.ok(
-			viewModel.consultees.every((row: { changeUrl: string }) =>
+			allRows(viewModel).every((row: { changeUrl: string }) =>
 				row.changeUrl.startsWith(
 					`/consultees/${realProjectId}/report/consultees?ruleset=england-wales-post-20240430&category=`
 				)
@@ -175,9 +179,18 @@ describe('consultee report check page', () => {
 		);
 		assert.match(parishRow.changeUrl, /category=Parish%20Council/);
 
+		// a group's rows are the categories the export's tab of the same name lists
+		const administrative = viewModel.groups.find(
+			(group: { name: string }) => group.name === 'Administrative boundaries'
+		);
+		assert.ok(administrative.consultees.some((row: { name: string }) => row.name === 'Parish Council'));
+		const publicBodies = viewModel.groups.find((group: { name: string }) => group.name === 'Public bodies');
+		assert.ok(publicBodies.consultees.some((row: { name: string }) => row.name === 'Hospital'));
+
 		const html = mockRes.render.mock.calls[0].result;
 		assert.match(html, /Report details/);
 		assert.match(html, /Identified consultees/);
+		assert.match(html, /Administrative boundaries/);
 		assert.match(html, /Little Snoring Parish Council/);
 		assert.match(html, /Create report/);
 	});
@@ -192,9 +205,8 @@ describe('consultee report check page', () => {
 		);
 
 		const viewModel = mockRes.render.mock.calls[0].arguments[1];
-		// the only match was excluded - the total is the number of rows its Change page would list
-		const parishRow = viewModel.consultees.find((row: { name: string }) => row.name === 'Parish Council');
-		assert.strictEqual(parishRow.total, 0);
+		// the only match was excluded - the category row lists no names
+		const parishRow = rowNamed(viewModel, 'Parish Council');
 		assert.deepStrictEqual(parishRow.names, []);
 		assert.ok(parishRow.changeUrl.includes(`&exclude=${excludedId}`));
 		assert.ok(viewModel.generateReportUrl.includes(`&exclude=${excludedId}`));
@@ -214,12 +226,10 @@ describe('consultee report check page', () => {
 		);
 
 		const viewModel = mockRes.render.mock.calls[0].arguments[1];
-		const parishRow = viewModel.consultees.find((row: { name: string }) => row.name === 'Parish Council');
-		const hospitalRow = viewModel.consultees.find((row: { name: string }) => row.name === 'Hospital');
+		const parishRow = rowNamed(viewModel, 'Parish Council');
+		const hospitalRow = rowNamed(viewModel, 'Hospital');
 		// one ruleset match + one hand-added row
-		assert.strictEqual(parishRow.total, 2);
 		assert.deepStrictEqual(parishRow.names, ['Little Snoring Parish Council', 'Test Consultee']);
-		assert.strictEqual(hospitalRow.total, 1);
 		assert.deepStrictEqual(hospitalRow.names, ['Other Test Consultee']);
 		// the adds reach the Change pages and the report-created link unchanged
 		assert.ok(parishRow.changeUrl.includes(`add=${urlParam(parishAdd)}`));
@@ -227,7 +237,7 @@ describe('consultee report check page', () => {
 		assert.ok(viewModel.generateReportUrl.includes(`add=${urlParam(parishAdd)}`));
 	});
 
-	it('should cap the listed names at 10 and say how many the category really has', async () => {
+	it('should list the first five names and put the rest behind "Show more"', async () => {
 		const nunjucks = configureNunjucks();
 		const mockRes = {
 			status: mock.fn(() => mockRes),
@@ -245,13 +255,35 @@ describe('consultee report check page', () => {
 		);
 
 		const viewModel = mockRes.render.mock.calls[0].arguments[1];
-		const parishRow = viewModel.consultees.find((row: { name: string }) => row.name === 'Parish Council');
-		assert.strictEqual(parishRow.total, 12);
-		assert.strictEqual(parishRow.names.length, 10);
-		assert.strictEqual(parishRow.names[0], 'Parish Council 1');
+		const parishRow = rowNamed(viewModel, 'Parish Council');
+		assert.strictEqual(parishRow.names.length, 12);
 
+		// all twelve names are in the row - the first five listed, the rest inside the details
 		const html = mockRes.render.mock.calls[0].result;
-		assert.match(html, /Showing 10 of 12 consultees/);
+		assert.match(html, /Show more/);
+		assert.strictEqual(html.match(/<li>Parish Council \d+<\/li>/g)?.length, 12);
+		const shown = html.slice(0, html.indexOf('Show more'));
+		assert.match(shown, /<li>Parish Council 5<\/li>/);
+		assert.doesNotMatch(shown, /Parish Council 6/);
+		const details = html.slice(html.indexOf('Show more'), html.indexOf('</details>'));
+		assert.match(details, /<li>Parish Council 12<\/li>/);
+	});
+
+	it('should leave out a group the ruleset covers no categories in', () => {
+		// the shipped rulesets all span the five tabs, but a ruleset isn't required to
+		const ruleset = {
+			id: 'test-ruleset',
+			name: 'Test',
+			rules: [
+				{ id: 'a', name: 'a', group: 'Administative boundaries', categories: ['Parish Council'] },
+				{ id: 'b', name: 'b', group: 'Public bodies', categories: ['Hospital'] }
+			]
+		} as unknown as Ruleset;
+		const groups = groupedConsultees(ruleset, realProjectId, [], { removed: [], adds: [] });
+		assert.deepStrictEqual(
+			groups.map((group) => group.name),
+			['Administrative boundaries', 'Public bodies']
+		);
 	});
 
 	it('should run the default (first) ruleset when none is selected', async () => {

@@ -142,8 +142,8 @@ test.describe('manage journeys', () => {
 		await page.getByRole('radio', { name: SAMPLE_RULESET_NAME }).check();
 		await page.getByRole('button', { name: 'Identify consultees' }).click();
 
-		// the check page lists each category's consultee names (capped at 10 per category, with
-		// "Showing 10 of N" when it's bigger) - its Change page lists them all
+		// the check page lists each category's consultee names (the first five, the rest behind a
+		// closed "Show more" - still in the DOM) - its Change page lists them all
 		await expect(page).toHaveURL(new RegExp(`/consultees/${SAMPLE_CASE_ID}/report\\?ruleset=${SAMPLE_RULESET_ID}`));
 		await expect(page.getByRole('heading', { level: 1 })).toContainText('Check consultees before creating the report');
 
@@ -151,8 +151,10 @@ test.describe('manage journeys', () => {
 		const parishValue = page
 			.locator('.govuk-summary-list__row', { has: parishChange })
 			.locator('.govuk-summary-list__value');
-		const showingMatch = (await parishValue.innerText()).match(/Showing \d+ of (\d+) consultees/);
-		const parishCount = showingMatch ? Number(showingMatch[1]) : await parishValue.locator('li').count();
+		const parishListed = await parishValue.locator('li').count();
+		// one name renders as text, not a list; "No consultees" as neither
+		const parishCount =
+			parishListed > 0 ? parishListed : (await parishValue.innerText()).trim() === 'No consultees' ? 0 : 1;
 		await parishChange.click();
 
 		await expect(page).toHaveURL(/\/report\/consultees\?.*category=Parish/);
@@ -272,8 +274,8 @@ test.describe('manage journeys', () => {
 		await expect(removedTable.getByRole('row', { name: /Added in error/ })).toBeVisible();
 		await expect(page.getByRole('link', { name: /Remove/ })).toHaveCount(parishCount - removed + picked + 1);
 
-		// "Save and return" lands back on the check page - the row's list/total matching the rows
-		// just listed (a hand-added consultee shows by name when the list isn't capped)
+		// "Save and return" lands back on the check page - the row's names matching the rows just
+		// listed (past the fifth the names sit behind a closed "Show more" - still in the DOM)
 		await page.getByRole('button', { name: 'Save and return' }).click();
 		await expect(page).toHaveURL(new RegExp(`/consultees/${SAMPLE_CASE_ID}/report\\?ruleset=${SAMPLE_RULESET_ID}`));
 		await expect(page.getByRole('heading', { level: 1 })).toContainText('Check consultees before creating the report');
@@ -282,11 +284,14 @@ test.describe('manage journeys', () => {
 			.locator('.govuk-summary-list__value')
 			.first();
 		const expectedTotal = parishCount - removed + picked + 1;
-		if (expectedTotal > 10) {
-			await expect(returnedValue).toContainText(`Showing 10 of ${expectedTotal} consultees`);
-		} else {
-			await expect(returnedValue.locator('li')).toHaveCount(expectedTotal);
-			await expect(returnedValue).toContainText('First Test Consultee');
+		// one name renders as text, not a list item; "No consultees" as neither
+		const listedNames = await returnedValue.locator('li').allInnerTexts();
+		const count = listedNames.length || ((await returnedValue.innerText()).trim() === 'No consultees' ? 0 : 1);
+		expect(count).toBe(expectedTotal);
+		expect((await returnedValue.innerHTML()).includes('First Test Consultee')).toBe(true);
+		// past the fifth name the rest sit behind a closed "Show more" (still in the DOM)
+		if (expectedTotal > 5) {
+			await expect(returnedValue.getByText('Show more')).toBeVisible();
 		}
 
 		// "Create report" leads to the confirmation page with the download link, naming the built ZIP's size
