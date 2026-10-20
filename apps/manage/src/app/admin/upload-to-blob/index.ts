@@ -1,16 +1,20 @@
 import type { ManageService } from '#service';
 import { asyncHandler } from '@planning-inspectorate/core/util';
 import type { IRouter } from 'express';
-import { Router as createRouter } from 'express';
+import express, { Router as createRouter } from 'express';
 import multer from 'multer';
 import { tmpdir } from 'node:os';
-import type { BlobUploader } from './controller.ts';
-import { buildRunUploadToBlob, buildUploadToBlobPage } from './controller.ts';
+import type { BlobStoreConfig, BlobUploader, BlockUploads } from './controller.ts';
+import {
+	buildCommitBlocks,
+	buildRunUploadToBlob,
+	buildStageBlock,
+	buildUploadToBlobPage,
+	CHUNK_BYTES,
+	MAX_UPLOAD_BYTES
+} from './controller.ts';
 
-// large reference data exports (the full combined reference data is over 400MB) are the
-// motivating use case - see packages/database/src/seed/import-from-blob.ts - but this isn't
-// restricted to one file type.
-export const MAX_UPLOAD_BYTES = 1024 * 1024 * 1024;
+export { MAX_UPLOAD_BYTES };
 
 // disk, not memory storage - a multi-hundred-MB file shouldn't be held in process memory. The
 // temp file is removed by the controller after the blob upload completes, whether it succeeds or
@@ -21,13 +25,24 @@ const upload = multer({
 	limits: { fileSize: MAX_UPLOAD_BYTES }
 });
 
-export function createRoutes(service: ManageService, uploadFile?: BlobUploader): IRouter {
+// a part's bytes, as they came - a little over a part's size, for any slack
+const part = express.raw({ type: 'application/octet-stream', limit: CHUNK_BYTES + 1024 });
+
+export function createRoutes(
+	service: ManageService,
+	uploadFile?: BlobUploader,
+	uploadsFor?: (blobStoreConfig: BlobStoreConfig) => BlockUploads
+): IRouter {
 	const router = createRouter({ mergeParams: true });
 	const uploadToBlobPage = buildUploadToBlobPage();
 	const runUploadToBlob = buildRunUploadToBlob(service, uploadFile);
 
 	router.get('/', asyncHandler(uploadToBlobPage));
+	// without JavaScript: the whole file in one request - fine for a small one
 	router.post('/run', upload.single('file'), asyncHandler(runUploadToBlob));
+	// with it (public/javascripts/blob-upload.js): the file a part at a time, then committed
+	router.post('/blocks', part, asyncHandler(buildStageBlock(service, uploadsFor)));
+	router.post('/commit', asyncHandler(buildCommitBlocks(service, uploadsFor)));
 
 	return router;
 }
