@@ -130,13 +130,13 @@ The main journey is **database-backed**: there are no fixtures. Locally the data
 - Screening in the Python function: `intersection` and `bordering` conditions, plus a general nearby search
 - Every consultee carries its reasons, shown as **Why identified**
 - Report journey: check counts per category, remove or add consultees (typed names matched to the reference data, the nearby ones suggested), generate, see the report's consultees and download them as an Excel workbook with a PDF of each category's map
+- **Nearby NSIPs**: other cases near the site (each by its newest shapefile, within [`config/nearby-consultees.yaml`](../config/nearby-consultees.yaml)'s `nsipRadiusKm`), treated as another consultee category - listed, changed, mapped and on their own report tab
 - Interactive Defra map with a server-rendered static fallback
 - Admin upload and import that replaces each reference-data table
 - Entra sign-in, Front Door, Key Vault, Redis sessions, Application Insights
 
 ## Not built yet
 
-- The report workbook's **Other Cases** tab
 - Uploading a project's shapefile: the journey uses case boundaries already in the database
 - The remaining rulesets: three of the expected eight exist (see [Screening engine](./data/screening-engine.md#rulesets))
 - Redeveloped data processing (new ingest, ids and schema), being built separately

@@ -2,16 +2,13 @@ import type { ManageService } from '#service';
 import { stringifyForInlineScript } from '#util/inline-json.ts';
 import type { CaseBoundaryFeature } from '@pins/identify-consultees-database/src/geospatial/case-boundaries.ts';
 import type { ConsulteeMatch, Ruleset } from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
-import {
-	getRuleset,
-	isIdentifiedByCondition,
-	RULESETS
-} from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
+import { getRuleset, isIdentified, RULESETS } from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
 import type { AsyncRequestHandler } from '@planning-inspectorate/core/util';
 import type { Request, Response } from 'express';
 import { buildCaseMapConfig, markAddedByHand, MAX_SAMPLED_MAP_MATCHES } from '../../../../maps/case-geojson.ts';
 import { MAP_VIEWPORT } from '../../../../maps/sample-geojson.ts';
 import { categorySettings } from '../../../../report-config.ts';
+import { NEARBY_NSIPS } from '../../nearby-nsips.ts';
 import { describeReasons } from '../../reasons.ts';
 import { resolveCase } from '../../resolve-case.ts';
 import { buildSearchAreaSafely, firstQueryValue, runRulesetSafely } from '../../run-ruleset.ts';
@@ -46,7 +43,7 @@ export interface CategoryContext {
  * The case/ruleset/category a category page request targets, with the ruleset's run (kept in the
  * session - see runRulesetSafely). A case that isn't found, a ruleset that isn't known, or a
  * category the ruleset neither covers nor identified consultees in 404s - anything else has
- * nothing to change. A failed run can't tell, so it shows its error rather than a 404.
+ * nothing to change. Nearby NSIPs, while they're looked for, has a page whether or not any were found. A failed run can't tell, so it shows its error rather than a 404.
  * `undefined` means a response has already been sent.
  */
 export async function categoryContext(
@@ -64,18 +61,12 @@ export async function categoryContext(
 	}
 
 	const category = firstQueryValue(req.query.category);
-	const { consultees, failed } = await runRulesetSafely(
-		service.rulesetRunner,
-		project,
-		ruleset,
-		service.nearbyConsulteeRadiusMetres,
-		service.logger,
-		req.session
-	);
+	const { consultees, failed } = await runRulesetSafely(service, project, ruleset, req.session);
 	const found = consultees.some(
-		(consultee) => consultee.feature.properties.consulteeCategory === category && isIdentifiedByCondition(consultee)
+		(consultee) => consultee.feature.properties.consulteeCategory === category && isIdentified(consultee)
 	);
-	if (!failed && !found && !rulesetCategories(ruleset).includes(category)) {
+	const nearbyNsips = category === NEARBY_NSIPS && service.nearbyNsipRadiusMetres > 0;
+	if (!failed && !found && !nearbyNsips && !rulesetCategories(ruleset).includes(category)) {
 		res.status(404).render('views/errors/404.njk', { pageHeading: 'Page not found' });
 		return undefined;
 	}
@@ -90,9 +81,7 @@ export function nearbyCandidates({ consultees, category, selection }: CategoryCo
 	const added = addedMatchIds(selection.adds);
 	return consultees.filter(
 		(match) =>
-			match.feature.properties.consulteeCategory === category &&
-			!isIdentifiedByCondition(match) &&
-			!added.has(match.feature.id)
+			match.feature.properties.consulteeCategory === category && !isIdentified(match) && !added.has(match.feature.id)
 	);
 }
 
@@ -121,7 +110,7 @@ async function renderCategoryPage(
 	const visible = consultees.filter(
 		(match) => match.feature.properties.consulteeCategory === category && !excluded.has(match.feature.id)
 	);
-	const identified = visible.filter(isIdentifiedByCondition);
+	const identified = visible.filter(isIdentified);
 	const searchArea = await buildSearchAreaSafely(
 		service.db,
 		project,

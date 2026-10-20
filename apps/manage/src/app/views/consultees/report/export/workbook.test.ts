@@ -2,6 +2,7 @@ import type { ConsulteeMatch, Ruleset } from '@pins/identify-consultees-database
 import assert from 'node:assert';
 import { describe, it } from 'node:test';
 import { parseReportConfig } from '../../../../report-config.ts';
+import { NEARBY_NSIPS } from '../../nearby-nsips.ts';
 import type { ConsulteeAreaRecord, ReportExport } from './workbook.ts';
 import {
 	buildReportSheets,
@@ -107,13 +108,59 @@ describe('report workbook', () => {
 		assert.equal(tabForCategory('Landowner', ruleset), 'Other');
 	});
 
-	it('writes a Summary tab, the five group tabs and an Other Cases placeholder', () => {
+	it('puts Nearby NSIPs on their own tab, found or added by hand', () => {
+		const nearbyNsip = {
+			...match('n', NEARBY_NSIPS, 'Neighbouring Solar Farm (EN010200)', 'odd'),
+			reasons: [{ type: 'nearbyNsip' as const, radiusMetres: 10_000 }]
+		};
+		assert.equal(tabForMatch(nearbyNsip, ruleset), NEARBY_NSIPS);
+		assert.equal(tabForCategory(NEARBY_NSIPS, ruleset), NEARBY_NSIPS);
+	});
+
+	it('writes a Summary tab, the five group tabs, then Nearby NSIPs', () => {
 		const sheets = buildReportSheets(report());
 		assert.deepStrictEqual(
 			sheets.map((sheet) => sheet.sheet),
-			['Summary', ...GROUP_TABS, 'Other Cases']
+			['Summary', 'Administrative boundaries', 'Public bodies', 'Energy', 'Transport', 'Other', NEARBY_NSIPS]
 		);
-		assert.deepStrictEqual(rowValues(sheets[6].data[1]), ['Not filled yet.']);
+		assert.deepStrictEqual(GROUP_TABS.at(-1), NEARBY_NSIPS);
+	});
+
+	it("lists each Nearby NSIP with its case's details from its record, and counts them in the Summary", () => {
+		const nearbyNsip = {
+			...match('n', NEARBY_NSIPS, 'Neighbouring Solar Farm (EN010200)', 'odd', 2_345),
+			reasons: [{ type: 'nearbyNsip' as const, radiusMetres: 10_000 }]
+		};
+		const sheets = buildReportSheets(
+			report({
+				identified: [nearbyNsip],
+				records: new Map([
+					[
+						'n',
+						record('n', {
+							consulteeCategory: NEARBY_NSIPS,
+							consulteeGroup: NEARBY_NSIPS,
+							consultee: 'Neighbouring Solar Farm (EN010200)',
+							region: null,
+							metadata: JSON.stringify({ 'Case reference': 'EN010200', 'Distance (km)': 2.35 })
+						})
+					]
+				])
+			})
+		);
+		const tab = sheets.find((sheet) => sheet.sheet === NEARBY_NSIPS)!;
+		const header = rowValues(tab.data[0]);
+		const row = rowValues(tab.data[1]);
+		assert.equal(row[header.indexOf('Consultee')], 'Neighbouring Solar Farm (EN010200)');
+		assert.equal(row[header.indexOf('Category')], NEARBY_NSIPS);
+		assert.equal(row[header.indexOf('Why identified')], 'Another NSIP within 10km of the site');
+		assert.equal(row[header.indexOf('Case reference')], 'EN010200');
+		assert.equal(row[header.indexOf('Distance (km)')], 2.35);
+		const summary = sheets[0].data.map(rowValues);
+		assert.deepStrictEqual(
+			summary.find((cells) => cells[0] === NEARBY_NSIPS),
+			[NEARBY_NSIPS, 1]
+		);
 	});
 
 	it('lists each consultee with its stored columns, sorted by category then name', () => {

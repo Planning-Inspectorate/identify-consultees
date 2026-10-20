@@ -26,6 +26,9 @@ export interface Config extends BaseConfig {
 	// distance per category - from config/nearby-consultees.yaml (see nearby-consultees.ts)
 	nearbyConsulteeRadiusMetres: number;
 	nearbyRadiusMetresByCategory?: Record<string, number>;
+	// how far from the site another case is a Nearby NSIP - the same file's nsipRadiusKm; unset or 0
+	// looks for none
+	nearbyNsipRadiusMetres?: number;
 	// whether the prototype/debug pages are mounted (/items, /map-layers-demo, /components,
 	// /consultee-areas-python, /consultee-areas-direct). On by default outside production; set
 	// ENABLE_DEV_PAGES=true to enable them on a deployed environment running NODE_ENV=production
@@ -146,6 +149,7 @@ export function loadConfig(): Config {
 			BLOB_STORE_HOST && BLOB_STORE_CONTAINER ? { host: BLOB_STORE_HOST, container: BLOB_STORE_CONTAINER } : undefined,
 		nearbyConsulteeRadiusMetres: nearbyConsultees.defaultRadiusMetres,
 		nearbyRadiusMetresByCategory: nearbyConsultees.radiusMetresByCategory,
+		nearbyNsipRadiusMetres: nearbyConsultees.nsipRadiusMetres,
 		devPagesEnabled: !isProduction || ENABLE_DEV_PAGES === 'true',
 		auth: {
 			authority: `https://login.microsoftonline.com/${AUTH_TENANT_ID}`,

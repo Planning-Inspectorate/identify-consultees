@@ -67,16 +67,18 @@ model ConsulteeArea {
 /// Case/application site-boundary geometries - the subject geometries screened against
 /// ConsulteeArea.
 model CaseBoundary {
-  id            String                   @id @default(dbgenerated("newid()")) @db.UniqueIdentifier
-  geometry      Unsupported("geography")
-  geometryType  String                   @db.NVarChar(50)
-  caseReference String                   @db.NVarChar(50)
-  caseName      String                   @db.NVarChar(500)
-  fileName      String?                  @db.NVarChar(500)
-  receivedDate  DateTime?
-  acceptance    String?                  @db.NVarChar(50)
-  metadata      String                   @default("{}") @db.NVarChar(Max)
-  lastUpdated   DateTime                 @default(now())
+  id                 String                   @id @default(dbgenerated("newid()")) @db.UniqueIdentifier
+  geometry           Unsupported("geography")
+  // simplified copy of `geometry` that the report's Nearby NSIPs distances run against - see the migration
+  geometrySimplified Unsupported("geography")
+  geometryType       String                   @db.NVarChar(50)
+  caseReference      String                   @db.NVarChar(50)
+  caseName           String                   @db.NVarChar(500)
+  fileName           String?                  @db.NVarChar(500)
+  receivedDate       DateTime?
+  acceptance         String?                  @db.NVarChar(50)
+  metadata           String                   @default("{}") @db.NVarChar(Max)
+  lastUpdated        DateTime                 @default(now())
 
   @@index([caseReference])
   @@map("case_boundary")

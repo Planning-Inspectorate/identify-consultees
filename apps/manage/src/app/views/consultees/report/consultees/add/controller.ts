@@ -1,6 +1,6 @@
 import type { ManageService } from '#service';
 import { findConsulteeAreaByName } from '@pins/identify-consultees-database/src/geospatial/consultee-areas.ts';
-import { isIdentifiedByCondition } from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
+import { isIdentified } from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
 import type { AsyncRequestHandler, AsyncRequestHandlerWithBody } from '@planning-inspectorate/core/util';
 import type { Response } from 'express';
 import { consulteeName } from '../../report-consultees.ts';
@@ -96,7 +96,7 @@ export function buildReportConsulteeAddSubmit(
 				.filter(
 					(match) =>
 						match.feature.properties.consulteeCategory === category &&
-						isIdentifiedByCondition(match) &&
+						isIdentified(match) &&
 						!excluded.has(match.feature.id)
 				)
 				.map(consulteeName),

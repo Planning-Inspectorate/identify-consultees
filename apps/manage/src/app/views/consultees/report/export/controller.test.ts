@@ -176,6 +176,91 @@ describe('report download', () => {
 		assert.ok(landowner.includes('Manually added - not on the map'));
 	});
 
+	it("puts Nearby NSIPs in the report like any category - their own tab, with their case's details, and a map", async () => {
+		const nearbyNsip = 'bbbbbbbb-0000-0000-0000-000000000001';
+		const undatedNsip = 'bbbbbbbb-0000-0000-0000-000000000002';
+		const base = serviceWith(rulesetRunnerReturning([matchRow(identifiedParish, identifiedReason)]));
+		const parishQueries = base.db.$queryRaw;
+		const nearbyCase = (id: string, caseReference: string, caseName: string, distanceMetres: number) => ({
+			id: id.toUpperCase(),
+			caseReference,
+			caseName,
+			fileName: `${caseReference}.geojson`,
+			receivedDate: new Date('2026-09-01T09:00:00Z'),
+			distanceMetres
+		});
+		const service = {
+			...base,
+			nearbyNsipRadiusMetres: 10_000,
+			db: {
+				...base.db,
+				$queryRaw: mock.fn(async (sql: TemplateStringsArray, ...values: unknown[]) => {
+					const text = sql.join('');
+					// the cases near the site, and their boundaries for the map
+					if (text.includes('PARTITION BY caseReference')) {
+						return [
+							nearbyCase(nearbyNsip, 'EN010200', 'Neighbouring Solar Farm', 2_345),
+							nearbyCase(undatedNsip, 'EN010201', 'Undated Wind Farm', 0)
+						];
+					}
+					if (text.includes('FROM case_boundary') && text.includes('AS tolerance')) {
+						return [{ id: nearbyNsip.toUpperCase(), geometryWkt: 'POINT(-1.45 52.5)' }];
+					}
+					return parishQueries(sql, ...(values as []));
+				}),
+				caseBoundary: {
+					findMany: mock.fn(async ({ where }: { where: { id: { in: string[] } } }) =>
+						where.id.in.map((id) => ({
+							id: id.toUpperCase(),
+							geometryType: 'Polygon',
+							caseReference: id === nearbyNsip ? 'EN010200' : 'EN010201',
+							caseName: id === nearbyNsip ? 'Neighbouring Solar Farm' : 'Undated Wind Farm',
+							fileName: id === nearbyNsip ? 'neighbour.geojson' : null,
+							receivedDate: id === nearbyNsip ? new Date('2026-09-01T09:00:00Z') : null,
+							lastUpdated: new Date('2026-10-01T09:00:00Z')
+						}))
+					)
+				}
+			}
+		};
+		const res = response();
+		await buildReportDownload(service as never)(
+			{ params: { caseId: realProjectId }, query: { ruleset } } as never,
+			res as never
+		);
+
+		// their rows come from case_boundary, not consultee_area
+		assert.deepStrictEqual(service.db.consulteeArea.findMany.mock.calls[0].arguments[0].where.id.in, [
+			identifiedParish
+		]);
+		assert.deepStrictEqual(service.db.caseBoundary.findMany.mock.calls[0].arguments[0].where.id.in, [
+			nearbyNsip,
+			undatedNsip
+		]);
+		const files = zipOf(res);
+		const names = Object.keys(files);
+		assert.deepStrictEqual(names.slice(1), ['maps/01 Parish Council.pdf', 'maps/02 Nearby NSIPs.pdf']);
+		const workbook = unzipSync(files[names[0]]);
+		const xml = Object.entries(workbook)
+			.filter(([name]) => name.startsWith('xl/'))
+			.map(([, data]) => strFromU8(data))
+			.join('');
+		for (const text of [
+			'name="Nearby NSIPs"',
+			'Neighbouring Solar Farm (EN010200)',
+			'Another NSIP within 10km of the site',
+			'neighbour.geojson',
+			'1 September 2026',
+			'Distance (km)'
+		]) {
+			assert.ok(xml.includes(text), text);
+		}
+		const nsips = pdfTextLines(Buffer.from(files['maps/02 Nearby NSIPs.pdf']));
+		assert.ok(nsips.includes('Nearby NSIPs: 2 in the report'));
+		assert.ok(nsips.includes('Neighbouring Solar Farm (EN010200)'));
+		assert.ok(nsips.includes('Undated Wind Farm (EN010201)'));
+	});
+
 	it('uses the run the session keeps, and notes a map that then has no areas to draw', async () => {
 		const runner = rulesetRunnerReturning([matchRow(identifiedParish, identifiedReason)]);
 		// the search area fails, and a kept run has no geometry - nothing to draw the parish from

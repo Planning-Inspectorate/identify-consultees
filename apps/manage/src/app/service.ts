@@ -62,11 +62,20 @@ export class ManageService extends BaseService<PrismaClient> {
 		return this.#config.nearbyConsulteeRadiusMetres;
 	}
 
-	/** How far the maps' search area reaches: the largest nearby distance, default or per category. */
+	/** How far from the site another case is a Nearby NSIP - 0 when none are looked for. */
+	get nearbyNsipRadiusMetres(): number {
+		return this.#config.nearbyNsipRadiusMetres ?? 0;
+	}
+
+	/**
+	 * How far the maps' search area reaches: the largest nearby distance, default or per category,
+	 * or the Nearby NSIPs distance if that's further.
+	 */
 	get nearbySearchRadiusMetres(): number {
 		return searchRadiusMetres({
 			defaultRadiusMetres: this.#config.nearbyConsulteeRadiusMetres,
-			radiusMetresByCategory: this.#config.nearbyRadiusMetresByCategory ?? {}
+			radiusMetresByCategory: this.#config.nearbyRadiusMetresByCategory ?? {},
+			nsipRadiusMetres: this.nearbyNsipRadiusMetres
 		});
 	}
 

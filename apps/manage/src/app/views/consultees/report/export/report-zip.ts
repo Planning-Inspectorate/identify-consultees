@@ -1,7 +1,7 @@
 import type { ManageService } from '#service';
 import type { CaseBoundaryFeature } from '@pins/identify-consultees-database/src/geospatial/case-boundaries.ts';
 import type { ConsulteeMatch, Ruleset } from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
-import { isIdentifiedByCondition } from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
+import { isIdentified } from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
 import { MapCache } from '@planning-inspectorate/core/util';
 import { strToU8, zipSync } from 'fflate';
 import writeExcelFile from 'write-excel-file/node';
@@ -9,14 +9,15 @@ import { buildCaseMapConfig, markAddedByHand } from '../../../../maps/case-geojs
 import { buildConsulteeStaticMapResponse } from '../../../../maps/serve-static-map.ts';
 import { consulteeColours, projectColours } from '../../../../maps/static-map.ts';
 import { categorySettings } from '../../../../report-config.ts';
-import { RULESET_RUN_MAX_AGE_MS, buildSearchAreaSafely } from '../../run-ruleset.ts';
+import { isNearbyNsip, NEARBY_NSIPS } from '../../nearby-nsips.ts';
+import { buildSearchAreaSafely, RULESET_RUN_MAX_AGE_MS } from '../../run-ruleset.ts';
 import { reportByCategory } from '../report-consultees.ts';
 import type { ConsulteeSelection } from '../urls.ts';
 import { addedMatchIds, excludedMatchIds } from '../urls.ts';
 import type { MapPdfInput } from './map-pdf.ts';
 import { buildMapPdf } from './map-pdf.ts';
 import type { ConsulteeAreaRecord } from './workbook.ts';
-import { buildReportSheets, reportFileName, safeFileName } from './workbook.ts';
+import { buildReportSheets, formatDate, reportFileName, safeFileName } from './workbook.ts';
 
 // SQL Server takes at most 2,100 parameters per query
 const RECORD_BATCH_SIZE = 1000;
@@ -29,6 +30,45 @@ async function consulteeAreaRecords(db: ManageService['db'], ids: string[]): Pro
 		for (const row of rows) {
 			records.set(row.id.toLowerCase(), row);
 		}
+	}
+	return records;
+}
+
+/**
+ * Each Nearby NSIP's row for the report, by id, as a consultee's would be: built from its
+ * case_boundary row, with the case's details - and how far it is from the site - as its metadata.
+ */
+async function nearbyNsipRecords(
+	db: ManageService['db'],
+	matches: ConsulteeMatch[]
+): Promise<Map<string, ConsulteeAreaRecord>> {
+	const records = new Map<string, ConsulteeAreaRecord>();
+	if (matches.length === 0) {
+		return records;
+	}
+	const distances = new Map(matches.map((match) => [match.feature.id, match.distanceMetres]));
+	const rows = await db.caseBoundary.findMany({ where: { id: { in: [...distances.keys()] } } });
+	for (const row of rows) {
+		const id = row.id.toLowerCase();
+		records.set(id, {
+			id,
+			geometryType: row.geometryType,
+			sourceId: row.caseReference,
+			consulteeCategory: NEARBY_NSIPS,
+			consulteeGroup: NEARBY_NSIPS,
+			consulteeSubcategory: null,
+			consulteeSubcategoryDescription: null,
+			consultee: `${row.caseName} (${row.caseReference})`,
+			region: null,
+			metadata: JSON.stringify({
+				'Case reference': row.caseReference,
+				'Project name': row.caseName,
+				Shapefile: row.fileName,
+				Received: row.receivedDate ? formatDate(row.receivedDate) : null,
+				'Distance (km)': Math.round(distances.get(id)! / 10) / 100
+			}),
+			lastUpdated: row.lastUpdated
+		});
 	}
 	return records;
 }
@@ -120,7 +160,7 @@ export async function buildReportZip({
 }: ReportZipContext): Promise<ReportZip> {
 	const { db, logger } = service;
 	const excluded = excludedMatchIds(selection.removed);
-	const identified = consultees.filter((match) => isIdentifiedByCondition(match) && !excluded.has(match.feature.id));
+	const identified = consultees.filter((match) => isIdentified(match) && !excluded.has(match.feature.id));
 	const report = {
 		caseName: project.properties.caseName,
 		caseReference: project.properties.caseReference,
@@ -129,9 +169,12 @@ export async function buildReportZip({
 		ruleset,
 		generatedAt: new Date(),
 		identified,
-		records: await consulteeAreaRecords(db, [
-			...identified.map((match) => match.feature.id),
-			...addedMatchIds(selection.adds)
+		records: new Map([
+			...(await consulteeAreaRecords(db, [
+				...identified.filter((match) => !isNearbyNsip(match)).map((match) => match.feature.id),
+				...addedMatchIds(selection.adds)
+			])),
+			...(await nearbyNsipRecords(db, identified.filter(isNearbyNsip)))
 		]),
 		// a hand-added consultee the run found has its distance - for the distanceKm column
 		added: selection.adds.map((add) => {

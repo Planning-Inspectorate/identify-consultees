@@ -9,6 +9,10 @@
 #   categories       - a distance in km for each consultee category. 0 means never show that
 #                      category as nearby. Names must match consultee_area.consulteeCategory exactly
 #                      (see kt-docs/data/reference-data.md).
+#   nsipRadiusKm     - how far from the site another case's boundary can be for it to be a Nearby
+#                      NSIP - in the report, like a consultee a ruleset identified. Each case counts
+#                      once, by its most recently received shapefile. 0 means none are looked for;
+#                      10 if not set.
 #
 # Railway is never searched as nearby, whatever is set here: its data is one national shape per
 # line type, which is near almost every site and slows the search (see kt-docs/data/screening-issues.md).
@@ -19,6 +23,8 @@
 version: 1
 
 defaultRadiusKm: 20
+
+nsipRadiusKm: 10
 
 categories:
   # local government

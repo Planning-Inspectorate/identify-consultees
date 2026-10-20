@@ -278,6 +278,41 @@ describe('consultee report check page', () => {
 		);
 	});
 
+	it('should list Nearby NSIPs last, under their own heading, while they are looked for - found or not', () => {
+		const ruleset = {
+			id: 'test-ruleset',
+			name: 'Test',
+			rules: [{ id: 'a', name: 'a', group: 'Administative boundaries', categories: ['Parish Council'] }]
+		} as unknown as Ruleset;
+		const none = { removed: [], adds: [] };
+		assert.deepStrictEqual(
+			groupedConsultees(ruleset, realProjectId, [], none, true).map((group) => [
+				group.name,
+				group.consultees.map((row) => [row.name, row.names])
+			]),
+			[
+				['Administrative boundaries', [['Parish Council', []]]],
+				['Nearby NSIPs', [['Nearby NSIPs', []]]]
+			]
+		);
+		const nearbyNsip = {
+			feature: { id: 'n', properties: { consulteeCategory: 'Nearby NSIPs', consultee: 'Neighbour (EN010200)' } },
+			distanceMetres: 2_000,
+			reasons: [{ type: 'nearbyNsip' as const, radiusMetres: 10_000 }]
+		};
+		const found = groupedConsultees(ruleset, realProjectId, [nearbyNsip], none, true);
+		assert.deepStrictEqual(found.at(-1)?.consultees, [
+			{
+				name: 'Nearby NSIPs',
+				names: ['Neighbour (EN010200)'],
+				changeUrl:
+					'/consultees/44444444-4444-4444-4444-444444444444/report/consultees?ruleset=test-ruleset&category=Nearby%20NSIPs'
+			}
+		]);
+		// not looked for, there's no row for them
+		assert.ok(!groupedConsultees(ruleset, realProjectId, [], none).some((group) => group.name === 'Nearby NSIPs'));
+	});
+
 	it('should run the default (first) ruleset when none is selected', async () => {
 		const mockRes = { status: mock.fn(() => mockRes), render: mock.fn() };
 		const db = dbReturning([[realProjectRow()], []]);

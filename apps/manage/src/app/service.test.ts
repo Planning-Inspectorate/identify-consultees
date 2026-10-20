@@ -14,6 +14,7 @@ describe('ManageService', () => {
 			assert.equal(service.pythonFunctionApiKey, config.pythonFunctionApiKey);
 			assert.equal(service.blobStoreConfig, config.blobStore);
 			assert.equal(service.nearbyConsulteeRadiusMetres, config.nearbyConsulteeRadiusMetres);
+			assert.equal(service.nearbyNsipRadiusMetres, config.nearbyNsipRadiusMetres);
 			// with no per-category distances, the search reaches the default
 			assert.equal(service.nearbySearchRadiusMetres, config.nearbyConsulteeRadiusMetres);
 			assert.equal(service.assetsStaticDir, config.staticDir);
@@ -33,6 +34,18 @@ describe('ManageService', () => {
 			assert.equal(service.nearbySearchRadiusMetres, 35_000);
 		} finally {
 			await service.db.$disconnect().catch(() => undefined);
+		}
+	});
+
+	test('looks for no Nearby NSIPs unless a distance is set, and searches out to it', async () => {
+		const service = new ManageService({ ...buildManageTestConfig(true), nearbyNsipRadiusMetres: undefined });
+		const further = new ManageService({ ...buildManageTestConfig(true), nearbyNsipRadiusMetres: 45_000 });
+		try {
+			assert.equal(service.nearbyNsipRadiusMetres, 0);
+			assert.equal(further.nearbySearchRadiusMetres, 45_000);
+		} finally {
+			await service.db.$disconnect().catch(() => undefined);
+			await further.db.$disconnect().catch(() => undefined);
 		}
 	});
 });

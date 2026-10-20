@@ -1,11 +1,8 @@
 import type { ManageService } from '#service';
 import type { ConsulteeMatch, Ruleset } from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
-import {
-	getRuleset,
-	isIdentifiedByCondition,
-	RULESETS
-} from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
+import { getRuleset, isIdentified, RULESETS } from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
 import type { AsyncRequestHandler } from '@planning-inspectorate/core/util';
+import { NEARBY_NSIPS } from '../nearby-nsips.ts';
 import { resolveCase } from '../resolve-case.ts';
 import { firstQueryValue, runRulesetSafely } from '../run-ruleset.ts';
 import { reportCategories } from './categories.ts';
@@ -31,7 +28,8 @@ import type {
 
 /**
  * Every category the ruleset covers, in the order its rules name them, then any other category its
- * conditions identified consultees in (see reportCategories), bucketed into the export workbook's
+ * conditions identified consultees in (see reportCategories), then Nearby NSIPs when they're looked
+ * for (`nearbyNsips`) - found or not, as a covered category is - bucketed into the export workbook's
  * group tabs (export/workbook.ts's tabForCategory) so the page's sections match the report.
  * Consultees only the nearby search found aren't counted: they're map context, not report
  * content - including covered categories that matched nothing, so the list reads as the
@@ -42,11 +40,12 @@ export function groupedConsultees(
 	ruleset: Ruleset,
 	caseId: string,
 	matches: ConsulteeMatch[],
-	selection: ConsulteeSelection
+	selection: ConsulteeSelection,
+	nearbyNsips = false
 ): ConsulteeGroup[] {
 	const names = new Map<string, string[]>();
 	const excluded = excludedMatchIds(selection.removed);
-	const identified = matches.filter(isIdentifiedByCondition);
+	const identified = matches.filter(isIdentified);
 	for (const match of identified) {
 		const category = match.feature.properties.consulteeCategory;
 		if (category && !excluded.has(match.feature.id)) {
@@ -62,7 +61,11 @@ export function groupedConsultees(
 		changeUrl: consulteesUrl(caseId, ruleset.id, category, selection)
 	});
 	const byGroup = new Map<string, IdentifiedConsultee[]>();
-	for (const category of reportCategories(ruleset, identified)) {
+	const categories = reportCategories(ruleset, identified);
+	if (nearbyNsips && !categories.includes(NEARBY_NSIPS)) {
+		categories.push(NEARBY_NSIPS);
+	}
+	for (const category of categories) {
 		const group = tabForCategory(category, ruleset);
 		byGroup.set(group, [...(byGroup.get(group) ?? []), row(category)]);
 	}
@@ -77,7 +80,7 @@ export function groupedConsultees(
  * and the per-category match counts. "Generate report" leads to the Report created page.
  */
 export function buildReportCheckPage(service: ManageService): AsyncRequestHandler {
-	const { db, logger, nearbyConsulteeRadiusMetres, rulesetRunner } = service;
+	const { db, logger } = service;
 
 	return async (req, res) => {
 		const caseId = String(req.params.caseId ?? '');
@@ -100,14 +103,7 @@ export function buildReportCheckPage(service: ManageService): AsyncRequestHandle
 			'consultee report check page'
 		);
 
-		const { consultees, failed } = await runRulesetSafely(
-			rulesetRunner,
-			project,
-			ruleset,
-			nearbyConsulteeRadiusMetres,
-			logger,
-			req.session
-		);
+		const { consultees, failed } = await runRulesetSafely(service, project, ruleset, req.session);
 		const selection: ConsulteeSelection = consulteeSelection(req.query);
 
 		const viewModel: ReportCheckViewModel = {
@@ -122,7 +118,7 @@ export function buildReportCheckPage(service: ManageService): AsyncRequestHandle
 			shapefileChangeUrl: `/consultees/${encodeURIComponent(project.id)}`,
 			rulesetName: ruleset.name,
 			rulesetChangeUrl: rulesetUrl(project.id, ruleset.id, selection),
-			groups: groupedConsultees(ruleset, project.id, consultees, selection),
+			groups: groupedConsultees(ruleset, project.id, consultees, selection, service.nearbyNsipRadiusMetres > 0),
 			generateReportUrl: reportCreatedUrl(project.id, ruleset.id, selection),
 			rulesetFailed: failed,
 			retryUrl: reportUrl(project.id, ruleset.id, selection)
@@ -139,7 +135,7 @@ export function buildReportCheckPage(service: ManageService): AsyncRequestHandle
  * built the page still renders, the link just says "(ZIP)" and the download builds it when clicked.
  */
 export function buildReportCreatedPage(service: ManageService): AsyncRequestHandler {
-	const { db, logger, nearbyConsulteeRadiusMetres, rulesetRunner } = service;
+	const { db, logger } = service;
 
 	return async (req, res) => {
 		const caseId = String(req.params.caseId ?? '');
@@ -159,14 +155,7 @@ export function buildReportCreatedPage(service: ManageService): AsyncRequestHand
 
 		const selection: ConsulteeSelection = consulteeSelection(req.query);
 		const downloadUrl = reportDownloadUrl(project.id, ruleset.id, selection);
-		const { consultees, failed } = await runRulesetSafely(
-			rulesetRunner,
-			project,
-			ruleset,
-			nearbyConsulteeRadiusMetres,
-			logger,
-			req.session
-		);
+		const { consultees, failed } = await runRulesetSafely(service, project, ruleset, req.session);
 
 		let downloadSize = '';
 		if (!failed) {

@@ -401,6 +401,28 @@ describe('report consultees change page', () => {
 		assert.strictEqual((viewModel.saveAndReturnUrl.match(/add=/g) ?? []).length, 1);
 	});
 
+	it('should show Nearby NSIPs while they are looked for, even with none found - and 404 it otherwise', async () => {
+		const nearbyNsips = { params: { caseId: realProjectId }, query: { category: 'Nearby NSIPs' } };
+		const lookedFor = { status: mock.fn(() => lookedFor), render: mock.fn() };
+		// the project, then no nearby cases
+		const db = dbReturning([[realProjectRow()], []]);
+		await buildReportConsulteesPage({
+			db,
+			logger: mockLogger(),
+			nearbyConsulteeRadiusMetres: 20_000,
+			nearbyNsipRadiusMetres: 10_000,
+			rulesetRunner: rulesetRunnerReturning([])
+		} as never)(nearbyNsips as never, lookedFor as never);
+		assert.strictEqual(lookedFor.status.mock.callCount(), 0);
+		const [view, viewModel] = lookedFor.render.mock.calls[0].arguments as unknown as [string, { pageHeading: string }];
+		assert.strictEqual(view, 'views/consultees/report/consultees/view.njk');
+		assert.strictEqual(viewModel.pageHeading, 'Nearby NSIPs');
+
+		const notLookedFor = { status: mock.fn(() => notLookedFor), render: mock.fn() };
+		await handlerFor(dbReturning([[realProjectRow()]]))(nearbyNsips, notLookedFor);
+		assert.strictEqual(notLookedFor.status.mock.calls[0].arguments[0], 404);
+	});
+
 	it('should 404 for a category neither the ruleset covers nor the run found', async () => {
 		const mockRes = { status: mock.fn(() => mockRes), render: mock.fn() };
 		const db = dbReturning([[realProjectRow()]]);

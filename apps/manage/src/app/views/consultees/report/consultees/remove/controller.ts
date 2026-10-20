@@ -1,10 +1,6 @@
 import type { ManageService } from '#service';
 import type { Ruleset } from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
-import {
-	getRuleset,
-	isIdentifiedByCondition,
-	RULESETS
-} from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
+import { getRuleset, isIdentified, RULESETS } from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
 import type { AsyncRequestHandler, AsyncRequestHandlerWithBody } from '@planning-inspectorate/core/util';
 import type { Response } from 'express';
 import { describeReasons } from '../../../reasons.ts';
@@ -62,14 +58,7 @@ async function removeConsulteeContext(
 			res.status(404).render('views/errors/404.njk', { pageHeading: 'Page not found' });
 			return undefined;
 		}
-		const { consultees, failed } = await runRulesetSafely(
-			service.rulesetRunner,
-			project,
-			ruleset,
-			service.nearbyConsulteeRadiusMetres,
-			service.logger,
-			store
-		);
+		const { consultees, failed } = await runRulesetSafely(service, project, ruleset, store);
 		if (failed) {
 			return {
 				caseId: project.id,
@@ -88,7 +77,7 @@ async function removeConsulteeContext(
 		// condition (nearby-only consultees aren't in the report) and not already removed
 		if (
 			!match ||
-			!isIdentifiedByCondition(match) ||
+			!isIdentified(match) ||
 			match.feature.properties.consulteeCategory !== category ||
 			excludedMatchIds(selection.removed).has(matchId)
 		) {

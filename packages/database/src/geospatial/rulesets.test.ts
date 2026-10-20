@@ -7,7 +7,7 @@ import {
 	buildRulesetFromCsv,
 	CATEGORIES_AWAITING_DATA,
 	getRuleset,
-	isIdentifiedByCondition,
+	isIdentified,
 	loadRulesets,
 	parseCsv,
 	parseRulesetCsv,
@@ -355,10 +355,10 @@ describe('loadRulesets', () => {
 	});
 });
 
-describe('isIdentifiedByCondition', () => {
+describe('isIdentified', () => {
 	test('is true when any condition matched, false when only the nearby search found it', () => {
 		assert.equal(
-			isIdentifiedByCondition({
+			isIdentified({
 				reasons: [
 					{ type: 'nearby', radiusMetres: 20000 },
 					{ type: 'condition', conditionId: 'railways_10km' }
@@ -366,7 +366,11 @@ describe('isIdentifiedByCondition', () => {
 			}),
 			true
 		);
-		assert.equal(isIdentifiedByCondition({ reasons: [{ type: 'nearby', radiusMetres: 20000 }] }), false);
+		assert.equal(isIdentified({ reasons: [{ type: 'nearby', radiusMetres: 20000 }] }), false);
+	});
+
+	test('is true for a Nearby NSIP - another case near the site is report content', () => {
+		assert.equal(isIdentified({ reasons: [{ type: 'nearbyNsip', radiusMetres: 10000 }] }), true);
 	});
 });
 

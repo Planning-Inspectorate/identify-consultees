@@ -28,6 +28,7 @@ export function buildManageTestConfig(authDisabled = true, overrides: Partial<Co
 		pythonFunctionApiKey: 'test-function-api-key',
 		blobStore: undefined,
 		nearbyConsulteeRadiusMetres: 20_000,
+		nearbyNsipRadiusMetres: 10_000,
 		devPagesEnabled: true,
 		auth: {
 			authority: 'https://login.microsoftonline.com/tenant-id',
