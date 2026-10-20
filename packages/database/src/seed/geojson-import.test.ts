@@ -85,6 +85,19 @@ describe('toConsulteeArea', () => {
 		});
 	});
 
+	test('loads offshore wind export cables as their own category, by their subcategory', () => {
+		const offshoreWind = (id: string, subcategory: string) =>
+			toConsulteeArea({
+				geometry: { type: 'Point', coordinates: [0, 0] },
+				properties: { id, consultee_category: 'Energy', consultee_subcategory: subcategory }
+			}).properties;
+		const cable = offshoreWind('energy_OWF_EW_00073', 'Offshore Wind Export Cables');
+		assert.equal(cable.consulteeCategory, 'Offshore Wind Export Cable');
+		assert.equal(cable.consulteeSubcategory, 'Offshore Wind Export Cables');
+		assert.equal(cable.consulteeGroup, 'Energy');
+		assert.equal(offshoreWind('energy_OWF_EW_00001', 'Offshore Wind Sites').consulteeCategory, 'Offshore Wind Site');
+	});
+
 	test("takes the export's subcategory and its description, a blank one as none", () => {
 		const feature = toConsulteeArea({
 			geometry: { type: 'Point', coordinates: [0, 0] },

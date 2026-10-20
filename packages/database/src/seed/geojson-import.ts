@@ -80,15 +80,16 @@ export function toConsulteeArea(
 		metadata = { rawMetadata };
 	}
 
+	const subcategory = text(props.consultee_subcategory ?? props.consulteeSubcategory);
 	return {
 		id: deterministicId(`consultee-area:${props.id}`),
 		type: 'Feature',
 		geometry: feature.geometry,
 		properties: {
 			sourceId: id || null,
-			consulteeCategory: consulteeCategoryFor(id, fileCategory, config) ?? null,
+			consulteeCategory: consulteeCategoryFor(id, fileCategory, subcategory, config) ?? null,
 			consulteeGroup: datasetCode(id) === undefined ? null : (fileCategory ?? null),
-			consulteeSubcategory: text(props.consultee_subcategory ?? props.consulteeSubcategory),
+			consulteeSubcategory: subcategory,
 			consulteeSubcategoryDescription: text(
 				props.consultee_subcategory_description ?? props.consulteeSubcategoryDescription
 			),
