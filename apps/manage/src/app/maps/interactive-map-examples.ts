@@ -53,7 +53,7 @@ export interface InteractiveMapExampleConfig {
 	interact?: Record<string, unknown>;
 	draw?: Record<string, unknown>;
 	mapKey?: boolean;
-	/** Inject a "Key" tab into the datasets plugin's built-in Layers panel (layers-key-slot.mjs). */
+	/** Use the local layers-key plugin: one panel combining the Layers toggles and key symbols. */
 	layersKey?: boolean;
 	mapStyles?: Record<string, unknown>[];
 	marker?: Record<string, unknown>;
@@ -291,11 +291,11 @@ export const INTERACTIVE_MAP_EXAMPLES: readonly InteractiveMapExample[] = [
 		id: 'layers-key',
 		title: 'Combined layers and key',
 		summary:
-			"The component's slot system folds the separate Layers and Key panels into one: a control " +
-			"injected into the Layers panel's own slot gives it a 'Key' tab alongside the checkbox " +
-			"menu, rendered by the map-key plugin's own component — no local plugin needed.",
-		interaction: 'Open the Layers panel — the toggles are on the Layers tab, the symbols on the Key tab.',
-		plugins: ['datasets', 'map-key'],
+			'The local layers-key plugin replaces the separate Layers and Key panels with a single Layers ' +
+			"panel: every toggle row leads with the layer's key symbol ahead of its checkbox and label. " +
+			'The datasets plugin still renders the layers — only its built-in menu is hidden (`hasMenu: false`).',
+		interaction: 'Open the Layers panel — each row shows its symbol beside the checkbox that toggles it.',
+		plugins: ['datasets'],
 		clientConfig: {
 			kind: 'layers-key',
 			behaviour: 'inline',
