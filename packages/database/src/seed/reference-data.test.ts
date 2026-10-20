@@ -15,6 +15,15 @@ datasets:
   IDB_WA: " Internal Drainage District "
 `;
 
+const WITH_SUBCATEGORIES = `
+version: 1
+datasets:
+  OWF_EW:
+    category: Offshore Wind Site
+    subcategories:
+      Offshore  Wind Export Cables: " Offshore Wind Export Cable "
+`;
+
 describe('reference data config', () => {
 	test('reads each dataset code and its category', () => {
 		assert.deepEqual(
@@ -26,9 +35,25 @@ describe('reference data config', () => {
 		);
 	});
 
+	test("reads a dataset's category and the subcategories that load as another", () => {
+		const config = parseReferenceDataConfig(WITH_SUBCATEGORIES);
+		assert.equal(config.datasets.get('OWF_EW'), 'Offshore Wind Site');
+		assert.deepEqual(
+			[...config.subcategories.get('OWF_EW')!],
+			[['offshore wind export cables', 'Offshore Wind Export Cable']]
+		);
+		assert.equal(parseReferenceDataConfig(VALID).subcategories.size, 0);
+	});
+
 	test('reads config/reference-data.yaml', () => {
 		assert.equal(REFERENCE_DATA_CONFIG.datasets.get('AMB_EW'), 'Ambulance Trust');
 		assert.equal(REFERENCE_DATA_CONFIG.datasets.get('CJC_EW'), 'Corporate Joint Committee');
+		// the offshore wind dataset holds sites and their export cables, which the rulesets treat apart
+		assert.equal(REFERENCE_DATA_CONFIG.datasets.get('OWF_EW'), 'Offshore Wind Site');
+		assert.equal(
+			REFERENCE_DATA_CONFIG.subcategories.get('OWF_EW')?.get('offshore wind export cables'),
+			'Offshore Wind Export Cable'
+		);
 	});
 
 	for (const [title, text, message] of [
@@ -44,6 +69,26 @@ describe('reference data config', () => {
 			'a category that is not text',
 			VALID.replace('Ambulance Trust', '5'),
 			/datasets.AMB_EW must be a consultee category/
+		],
+		[
+			'an unknown dataset setting',
+			WITH_SUBCATEGORIES.replace('subcategories:', 'subcategory:'),
+			/datasets.OWF_EW has "subcategory" - it can only have category, subcategories/
+		],
+		[
+			'subcategories without a category',
+			WITH_SUBCATEGORIES.replace('category: Offshore Wind Site', 'category: ""'),
+			/datasets.OWF_EW.category must be a consultee category/
+		],
+		[
+			'no subcategories',
+			'version: 1\ndatasets:\n  OWF_EW:\n    category: Offshore Wind Site',
+			/datasets.OWF_EW.subcategories must map/
+		],
+		[
+			"a subcategory's blank category",
+			WITH_SUBCATEGORIES.replace('" Offshore Wind Export Cable "', '""'),
+			/datasets.OWF_EW.subcategories.Offshore {2}Wind Export Cables must be a consultee category/
 		]
 	] as const) {
 		test(`refuses ${title}, naming the setting`, () => {
@@ -77,17 +122,17 @@ describe('consulteeCategoryFor', () => {
 	const config = parseReferenceDataConfig(VALID);
 
 	test("gives a feature its dataset's category, over the file's broad group", () => {
-		assert.equal(consulteeCategoryFor('health_AMB_EW_00001', 'Health', config), 'Ambulance Trust');
+		assert.equal(consulteeCategoryFor('health_AMB_EW_00001', 'Health', null, config), 'Ambulance Trust');
 	});
 
 	test("keeps the file's category for an id with no dataset code", () => {
-		assert.equal(consulteeCategoryFor('parish_council_E04000001', 'Parish Council', config), 'Parish Council');
-		assert.equal(consulteeCategoryFor('src-1', undefined, config), undefined);
+		assert.equal(consulteeCategoryFor('parish_council_E04000001', 'Parish Council', null, config), 'Parish Council');
+		assert.equal(consulteeCategoryFor('src-1', undefined, undefined, config), undefined);
 	});
 
 	test("refuses a dataset the config doesn't list, naming it", () => {
 		assert.throws(
-			() => consulteeCategoryFor('other_HOS_EW_00001', 'Other', config),
+			() => consulteeCategoryFor('other_HOS_EW_00001', 'Other', null, config),
 			(error: Error) =>
 				error instanceof UnknownDatasetError &&
 				/Feature other_HOS_EW_00001 is from dataset HOS_EW, which config\/reference-data.yaml doesn't list/.test(
@@ -96,7 +141,23 @@ describe('consulteeCategoryFor', () => {
 		);
 	});
 
+	test("gives a subcategory the config names its own category - any other, its dataset's", () => {
+		const owf = parseReferenceDataConfig(WITH_SUBCATEGORIES);
+		const cable = 'energy_OWF_EW_00073';
+		assert.equal(
+			consulteeCategoryFor(cable, 'Energy', 'offshore wind  export cables', owf),
+			'Offshore Wind Export Cable'
+		);
+		assert.equal(consulteeCategoryFor(cable, 'Energy', 'Offshore Wind Sites', owf), 'Offshore Wind Site');
+		assert.equal(consulteeCategoryFor(cable, 'Energy', null, owf), 'Offshore Wind Site');
+		// a dataset with no subcategories set keeps its category, whatever its subcategory
+		assert.equal(
+			consulteeCategoryFor('health_AMB_EW_00001', 'Health', 'Ambulance Trusts', parseReferenceDataConfig(VALID)),
+			'Ambulance Trust'
+		);
+	});
+
 	test("uses the app's own config by default", () => {
-		assert.equal(consulteeCategoryFor('transport_CJC_EW_00001', 'Transport'), 'Corporate Joint Committee');
+		assert.equal(consulteeCategoryFor('transport_CJC_EW_00001', 'Transport', null), 'Corporate Joint Committee');
 	});
 });

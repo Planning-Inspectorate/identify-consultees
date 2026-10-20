@@ -12,6 +12,10 @@
 #   datasets - each dataset code (the id's capitals and area: AMB_EW) and its consultee category.
 #              A file holding a dataset not listed here isn't imported - nothing is changed - and
 #              the import names it, so a new dataset can't load as a category nothing matches.
+#              A dataset holding more than one kind of consultee can instead give its category
+#              under `category`, and under `subcategories` the category each of its
+#              consultee_subcategory values loads as instead - compared ignoring case and repeated
+#              spaces. A subcategory not listed loads as the dataset's category.
 #
 # A feature whose id has no dataset code (parish_council_E04000001, railway_RAILWAY_0001) keeps
 # the category the file gives it.
@@ -53,7 +57,11 @@ datasets:
   ELG_EW: Electricity Generator
   DNO_EW: DNO
   ICN_EW: Interconnector
-  OWF_EW: Offshore Wind Site
+  # sites and their export cables, which the rulesets treat separately
+  OWF_EW:
+    category: Offshore Wind Site
+    subcategories:
+      Offshore Wind Export Cables: Offshore Wind Export Cable
   ONR_EW: ONR Site
   # earlier exports' codes for the same datasets
   OWS_NA: Offshore Wind Site
