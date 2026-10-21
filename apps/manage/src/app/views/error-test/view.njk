@@ -1,0 +1,77 @@
+{% extends "views/layouts/main.njk" %}
+
+{% from "govuk/components/button/macro.njk" import govukButton %}
+
+{% block pageTitle %}
+	{{ pageHeading }} - {{ config.headerTitle }}
+{% endblock %}
+
+{% block pageContent %}
+	{% if csrfAccepted %}
+		<div class="govuk-notification-banner govuk-notification-banner--success" role="alert" aria-labelledby="govuk-notification-banner-title" data-module="govuk-notification-banner">
+			<div class="govuk-notification-banner__header">
+				<h2 class="govuk-notification-banner__title" id="govuk-notification-banner-title">Success</h2>
+			</div>
+			<div class="govuk-notification-banner__content">
+				<p class="govuk-notification-banner__heading">The CSRF token was accepted - the request reached the route.</p>
+			</div>
+		</div>
+	{% endif %}
+	<p class="govuk-body">
+		A dev-only page for exercising every error state the service can show. Each link or
+		button reproduces the real behaviour; none of this is mounted when the dev pages are off.
+	</p>
+
+	<h2 class="govuk-heading-m">Rendered error pages</h2>
+	<ul class="govuk-list govuk-list--bullet">
+		{% for page in statusPages %}
+			<li><a class="govuk-link" href="{{ page.href }}">{{ page.label }}</a> - {{ page.description }}</li>
+		{% endfor %}
+	</ul>
+
+	<h2 class="govuk-heading-m">Real error routes</h2>
+	<ul class="govuk-list govuk-list--bullet">
+		{% for page in livePages %}
+			<li><a class="govuk-link" href="{{ page.href }}">{{ page.label }}</a> - {{ page.description }}</li>
+		{% endfor %}
+		<li>
+			<a class="govuk-link" href="{{ rateLimitedHref }}">429 rate limit</a> - refresh more than 3
+			times in a minute to see the plain-text "Too many requests" response
+		</li>
+	</ul>
+
+	<h2 class="govuk-heading-m">CSRF check</h2>
+	<p class="govuk-body">
+		Posting without the <code>_csrf</code> token is rejected by the CSRF middleware and shows the
+		"CSRF token missing" error page; posting with it returns here with a confirmation.
+	</p>
+	<div class="govuk-button-group">
+		<form method="post" action="{{ csrfCheckAction }}">
+			{{ govukButton({ text: "Submit without a token", classes: "govuk-button--secondary" }) }}
+		</form>
+		<form method="post" action="{{ csrfCheckAction }}">
+			<input type="hidden" name="_csrf" value="{{ _csrf }}">
+			{{ govukButton({ text: "Submit with a token" }) }}
+		</form>
+	</div>
+
+	<h2 class="govuk-heading-m">Needs the environment</h2>
+	<ul class="govuk-list govuk-list--bullet">
+		<li>
+			<strong>Real group 403</strong> - sign in on an auth-enabled environment with an Entra account
+			outside <code>AUTH_GROUP_APPLICATION_ACCESS</code>
+		</li>
+		<li>
+			<strong>Session store down</strong> - point <code>MANAGED_REDIS_URL</code> at an unreachable
+			Redis; pages show "The service is not ready. Please try again in a moment."
+		</li>
+		<li>
+			<strong>Database down</strong> - stop the SQL container; <code>/</code> degrades to an empty
+			list and database-backed pages show a wrapped connection error
+		</li>
+		<li>
+			<strong>Front Door WAF</strong> - on a deployed environment, a request its managed rules block
+			is redirected to <a class="govuk-link" href="/error/firewall-error">/error/firewall-error</a>
+		</li>
+	</ul>
+{% endblock %}

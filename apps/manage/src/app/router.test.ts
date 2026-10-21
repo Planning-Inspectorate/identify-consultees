@@ -655,6 +655,10 @@ describe('manage router wiring', () => {
 		try {
 			for (const path of [
 				'/items',
+				'/error-test',
+				'/error-test/500',
+				'/error-test/403',
+				'/error-test/rate-limited',
 				'/map-layers-demo',
 				'/components',
 				'/components/interactive-map/basic',
@@ -746,6 +750,88 @@ describe('manage router wiring', () => {
 		const response = await request(authDisabledApp).get('/error/firewall-error');
 		assert.equal(response.status, 200);
 		assert.match(response.text, /Sorry, there is a problem with the service/);
+	});
+
+	test('GET /error-test renders the error scenario index', async () => {
+		const response = await request(authDisabledApp).get('/error-test');
+		assert.equal(response.status, 200);
+		assert.match(response.text, /Error scenarios/);
+		assert.match(response.text, /href="\/error-test\/401"/);
+		assert.match(response.text, /href="\/error-test\/403"/);
+		assert.match(response.text, /href="\/error-test\/404"/);
+		assert.match(response.text, /href="\/error-test\/500"/);
+		assert.match(response.text, /href="\/unauthenticated"/);
+		assert.match(response.text, /href="\/error\/firewall-error"/);
+		assert.match(response.text, /href="\/error-test\/not-a-page"/);
+		assert.match(response.text, /href="\/error-test\/rate-limited"/);
+		// the CSRF demo posts two forms to the check endpoint; only one carries a token
+		assert.match(response.text, /action="\/error-test\/csrf-check"/);
+		assert.match(response.text, /Submit without a token/);
+		assert.match(response.text, /Submit with a token/);
+		assert.match(response.text, /name="_csrf" value="[^"]+"/);
+	});
+
+	test('GET /error-test/:status renders the real error template with that status', async () => {
+		const unauthorised = await request(authDisabledApp).get('/error-test/401');
+		assert.equal(unauthorised.status, 401);
+		assert.match(unauthorised.text, /Sorry, there is a problem with your login/);
+
+		const forbidden = await request(authDisabledApp).get('/error-test/403');
+		assert.equal(forbidden.status, 403);
+		assert.match(forbidden.text, /You are not permitted to access this URL/);
+
+		const notFound = await request(authDisabledApp).get('/error-test/404');
+		assert.equal(notFound.status, 404);
+		assert.match(notFound.text, /Page not found/);
+	});
+
+	test('GET /error-test/500 fails deliberately and renders the sanitised 500 page', async () => {
+		const response = await request(authDisabledApp).get('/error-test/500');
+		assert.equal(response.status, 500);
+		assert.match(response.text, /Sorry, there is a problem with the service/);
+		// the thrown error's detail stays in the logs, off the page
+		assert.doesNotMatch(response.text, /deliberate test error/);
+	});
+
+	test('GET /error-test/not-a-page exercises the catch-all not-found handler', async () => {
+		const response = await request(authDisabledApp).get('/error-test/not-a-page');
+		assert.equal(response.status, 404);
+		assert.match(response.text, /Page not found/);
+	});
+
+	test('POST /error-test/csrf-check without a token shows the CSRF failure page', async () => {
+		const response = await request(authDisabledApp).post('/error-test/csrf-check').type('form').send({});
+		assert.equal(response.status, 500);
+		assert.match(response.text, /CSRF token missing/);
+	});
+
+	test('POST /error-test/csrf-check with a token confirms the check passed', async () => {
+		const agent = request.agent(authDisabledApp);
+		const page = await agent.get('/error-test');
+		const csrf = /name="_csrf" value="([^"]+)"/.exec(page.text)?.[1];
+		assert.ok(csrf, 'expected the CSRF demo form to carry a token');
+
+		const response = await agent.post('/error-test/csrf-check').type('form').send({ _csrf: csrf });
+		assert.equal(response.status, 200);
+		assert.match(response.text, /The CSRF token was accepted/);
+	});
+
+	test('GET /error-test/rate-limited returns the plain-text 429 past the limit', async () => {
+		// a dedicated app so the shared one never trips the demo limiter
+		const service = createManageTestService(true);
+		const app = createManageTestApp(service);
+		try {
+			for (let i = 0; i < 3; i++) {
+				const response = await request(app).get('/error-test/rate-limited');
+				assert.equal(response.status, 200);
+				assert.match(response.text, /Not rate limited yet/);
+			}
+			const response = await request(app).get('/error-test/rate-limited');
+			assert.equal(response.status, 429);
+			assert.match(response.text, /Too many requests/);
+		} finally {
+			await service.db.$disconnect().catch(() => undefined);
+		}
 	});
 
 	test('GET /auth is rate limited when auth is enabled', async () => {

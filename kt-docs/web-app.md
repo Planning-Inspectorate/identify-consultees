@@ -49,12 +49,13 @@ A request goes: `server.ts` → `createApp` → `buildRouter` (monitoring, `/ven
 
 Dev pages mount only when `devPagesEnabled` is on (not production, or `ENABLE_DEV_PAGES=true`):
 
-| Path                                                 | What it is                                                                     |
-| ---------------------------------------------------- | ------------------------------------------------------------------------------ |
-| `/components`, `/components/interactive-map`         | GOV.UK component showcase and worked Defra map examples. Remove before go-live |
-| `/map-layers-demo`                                   | Layer toggle experiment                                                        |
-| `/consultee-areas-python`, `/consultee-areas-direct` | Nearby-area query through the Python function, or straight from Node           |
-| `/items`                                             | Database connectivity check                                                    |
+| Path                                                 | What it is                                                                                                             |
+| ---------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `/components`, `/components/interactive-map`         | GOV.UK component showcase and worked Defra map examples. Remove before go-live                                         |
+| `/map-layers-demo`                                   | Layer toggle experiment                                                                                                |
+| `/error-test`                                        | Error-scenario index for QA: renders each error page, throws for the sanitised 500, demos CSRF and rate-limit failures |
+| `/consultee-areas-python`, `/consultee-areas-direct` | Nearby-area query through the Python function, or straight from Node                                                   |
+| `/items`                                             | Database connectivity check                                                                                            |
 
 ## The journey
 

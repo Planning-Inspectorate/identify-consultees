@@ -45,6 +45,23 @@ describe('manage page accessibility smoke', () => {
 		await assertNoSeriousA11yViolations(html);
 	});
 
+	test('error scenarios index page has no serious a11y violations', async () => {
+		const html = nunjucks.render('views/error-test/view.njk', {
+			...pageLocals,
+			pageHeading: 'Error scenarios',
+			statusPages: [
+				{ href: '/error-test/401', label: '401', description: 'the login problem page' },
+				{ href: '/error-test/500', label: '500', description: 'deliberately throws' }
+			],
+			livePages: [{ href: '/unauthenticated', label: 'Login problem', description: 'the real 401 route' }],
+			csrfCheckAction: '/error-test/csrf-check',
+			rateLimitedHref: '/error-test/rate-limited',
+			// render the success banner too so both states are covered
+			csrfAccepted: true
+		});
+		await assertNoSeriousA11yViolations(html);
+	});
+
 	test('items list page has no serious a11y violations', async () => {
 		const html = nunjucks.render('views/items/list/view.njk', {
 			...pageLocals,

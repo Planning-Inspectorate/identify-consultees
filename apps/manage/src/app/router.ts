@@ -12,6 +12,7 @@ import { createRoutes as createComponentRoutes } from './views/components/index.
 import { createRoutes as createConsulteeAreasDirectRoutes } from './views/consultee-areas-direct/index.ts';
 import { createRoutes as createConsulteeAreasPythonRoutes } from './views/consultee-areas-python/index.ts';
 import { createRoutes as createConsulteeRoutes } from './views/consultees/index.ts';
+import { createRoutes as createErrorTestRoutes } from './views/error-test/index.ts';
 import { createFooterRoutes } from './views/footer/index.ts';
 import { createRoutes as createHomeRoutes } from './views/home/index.ts';
 import { createRoutes as createItemRoutes } from './views/items/index.ts';
@@ -52,6 +53,7 @@ export function buildRouter(service: ManageService, options: BuildRouterOptions 
 	const homeRoutes = createHomeRoutes(service);
 	const consulteeRoutes = createConsulteeRoutes(service);
 	const mapLayersDemoRoutes = createMapLayersDemoRoutes();
+	const errorTestRoutes = createErrorTestRoutes(service);
 	const componentRoutes = createComponentRoutes();
 	const itemsRoutes = createItemRoutes(service);
 	const consulteeAreasPythonRoutes = createConsulteeAreasPythonRoutes(service);
@@ -116,6 +118,7 @@ export function buildRouter(service: ManageService, options: BuildRouterOptions 
 	// (dev builds by default, deployed envs via ENABLE_DEV_PAGES - see config.ts)
 	if (service.devPagesEnabled) {
 		router.use('/map-layers-demo', mapLayersDemoRoutes);
+		router.use('/error-test', errorTestRoutes);
 		router.use('/components', componentRoutes);
 		router.use('/items', itemsRoutes);
 		router.use('/consultee-areas-python', consulteeAreasPythonRoutes);
