@@ -10,6 +10,7 @@ How the service works and how to work on it. Plain Markdown, so it can move to C
 | Work on the maps | [Maps](./maps.md) |
 | Work on the screening (which consultees a project needs) | [Screening service](./screening-service.md) → [Screening engine](./data/screening-engine.md) |
 | Add or fix tests | [Testing](./testing.md) |
+| Check the error pages by hand | [Error pages](./error-pages.md) |
 | Ship to an environment, or load data there | [Deployment](./deployment.md) → [Data model and loading](./data/data-model.md) |
 | Work on the data | [Data model and loading](./data/data-model.md) → [Reference data](./data/reference-data.md) → [Screening issues](./data/screening-issues.md) |
 | Change a ruleset, map colours or the nearby distances | [`config/README.md`](../config/README.md) |

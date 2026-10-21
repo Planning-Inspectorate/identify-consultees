@@ -48,3 +48,7 @@ npm run test:visual:update    # after a deliberate UI change
 3. Add the page to `pages.a11y.test.ts` with a representative view model
 4. Add it to the Playwright specs in `apps/manage/e2e/`
 5. Run the coverage gate before opening the PR
+
+## Checking error pages by hand
+
+The URLs, `curl` recipes and environment steps for triggering every error state the service can show live in [Error pages](./error-pages.md).
