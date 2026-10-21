@@ -1,7 +1,15 @@
 import { JSDOM } from 'jsdom';
 import assert from 'node:assert/strict';
 import { describe, mock, test } from 'node:test';
-import { ATTEMPTS, enhanceUploadForm, initBlobUpload, PARALLEL_PARTS, uploadInParts } from './blob-upload.js';
+import {
+	ATTEMPTS,
+	compactDate,
+	dateFromFileName,
+	enhanceUploadForm,
+	initBlobUpload,
+	PARALLEL_PARTS,
+	uploadInParts
+} from './blob-upload.js';
 
 const FORM = `
 	<form method="post" action="/admin/upload-to-blob/run" data-chunked-upload data-chunk-bytes="4"
@@ -10,6 +18,12 @@ const FORM = `
 		<p role="status" data-upload-status></p>
 		<button>Upload</button>
 	</form>`;
+
+const GROUP_FORM = FORM.replace('data-chunked-upload', 'data-chunked-upload data-blob-group="energy"').replace(
+	'<p role="status"',
+	`<input name="date-day"><input name="date-month"><input name="date-year">
+		<p role="status"`
+);
 
 function documentWith(body = FORM) {
 	return new JSDOM(`<!DOCTYPE html><html><body>${body}</body></html>`).window.document;
@@ -203,6 +217,7 @@ describe('the upload form', () => {
 		const fetch = fakeFetch(() => undefined);
 		const location = { assign: mock.fn() };
 		assert.equal(enhanceUploadForm(document.querySelector('form'), { fetch, location }), true);
+		assert.equal(document.querySelector('form').dataset.uploadEnhanced, '');
 		choose(document, fileOf('0123456789'));
 
 		const event = submit(document);
@@ -273,11 +288,14 @@ describe('the upload form', () => {
 		assert.equal(enhanceUploadForm(documentWith().querySelector('form'), { fetch: 'not a function' }), false);
 	});
 
-	test('enhances the page form, if there is one', (t) => {
+	test("enhances each of the page's upload forms", (t) => {
 		t.mock.method(globalThis, 'fetch', async () => new Response(null, { status: 204 }));
-		assert.equal(initBlobUpload(documentWith()), true);
-		assert.equal(initBlobUpload(documentWith('<p>No form here</p>')), false);
-		assert.equal(initBlobUpload(undefined), false);
+		assert.equal(initBlobUpload(documentWith()), 1);
+		assert.equal(initBlobUpload(documentWith(`${GROUP_FORM}${FORM}`)), 2);
+		// a form missing a part it needs isn't counted
+		assert.equal(initBlobUpload(documentWith(FORM.replace('data-upload-status', ''))), 0);
+		assert.equal(initBlobUpload(documentWith('<p>No form here</p>')), 0);
+		assert.equal(initBlobUpload(undefined), 0);
 	});
 
 	test('posts to the page without a CSRF token if the page has none', async () => {
@@ -288,5 +306,91 @@ describe('the upload form', () => {
 		submit(document);
 		await settle();
 		assert.equal(partsOf(fetch)[0].arguments[1].headers['x-csrf-token'], '');
+	});
+
+	describe("a group's form", () => {
+		const fields = (document) =>
+			['day', 'month', 'year'].map((part) => document.querySelector(`input[name="date-${part}"]`));
+		const fieldValues = (document) => fields(document).map((field) => field.value);
+		const change = (document) =>
+			document.getElementById('file').dispatchEvent(new document.defaultView.Event('change'));
+
+		test("fills the date in from the chosen file's name, and saves it as the group's file for that date", async () => {
+			const document = documentWith(GROUP_FORM);
+			const fetch = fakeFetch(() => undefined);
+			const location = { assign: mock.fn() };
+			enhanceUploadForm(document.querySelector('form'), { fetch, location });
+			choose(document, fileOf('abc', '20261020_combined_energy.geojson'));
+			change(document);
+			assert.deepEqual(fieldValues(document), ['20', '10', '2026']);
+
+			submit(document);
+			await settle();
+			assert.equal(partsOf(fetch)[0].arguments[0], '/admin/upload-to-blob/blocks?name=20261020_energy.geojson&block=0');
+			assert.deepEqual(location.assign.mock.calls[0].arguments, [
+				'/admin/upload-to-blob?uploaded=20261020_energy.geojson'
+			]);
+		});
+
+		test('uses the date as typed, and leaves it be for a file whose name has none', async () => {
+			const document = documentWith(GROUP_FORM);
+			const fetch = fakeFetch(() => undefined);
+			enhanceUploadForm(document.querySelector('form'), { fetch, location: { assign: mock.fn() } });
+			const [day, month, year] = fields(document);
+			day.value = '1';
+			month.value = '2';
+			year.value = '2026';
+			choose(document, fileOf('abc', 'energy.geojson'));
+			change(document);
+			assert.deepEqual(fieldValues(document), ['1', '2', '2026']);
+			submit(document);
+			await settle();
+			assert.equal(partsOf(fetch)[0].arguments[0], '/admin/upload-to-blob/blocks?name=20260201_energy.geojson&block=0');
+		});
+
+		test("refuses a date that isn't one, or a form without one, before sending anything", () => {
+			for (const body of [GROUP_FORM, GROUP_FORM.replace(/<input name="date-[a-z]+">/g, '')]) {
+				const document = documentWith(body);
+				const fetch = fakeFetch();
+				enhanceUploadForm(document.querySelector('form'), { fetch });
+				choose(document, fileOf('abc', 'energy.geojson'));
+				change(document);
+				const event = submit(document);
+				assert.equal(event.defaultPrevented, true);
+				assert.equal(fetch.mock.callCount(), 0);
+				const status = document.querySelector('[data-upload-status]');
+				assert.equal(status.textContent, 'Enter the date the data is from, as a real date.');
+				assert.ok(status.classList.contains('govuk-error-message'));
+			}
+		});
+
+		test('leaves the date alone when the choice is cleared', () => {
+			const document = documentWith(GROUP_FORM);
+			enhanceUploadForm(document.querySelector('form'), { fetch: fakeFetch() });
+			choose(document, undefined);
+			change(document);
+			assert.deepEqual(fieldValues(document), ['', '', '']);
+		});
+	});
+});
+
+describe('dates', () => {
+	test('a day, month and year as YYYYMMDD, if they are a real date', () => {
+		assert.equal(compactDate('20', '10', '2026'), '20261020');
+		assert.equal(compactDate(' 1', '2', '2026'), '20260201');
+		for (const [day, month, year] of [
+			['31', '2', '2026'],
+			['', '', ''],
+			['1', '1', '26'],
+			['x', '1', '2026']
+		]) {
+			assert.equal(compactDate(day, month, year), undefined, `${day}/${month}/${year}`);
+		}
+	});
+
+	test("the date a file's name starts with, as the pipeline names them", () => {
+		assert.deepEqual(dateFromFileName('20260105_transport.geojson'), { day: '5', month: '1', year: '2026' });
+		assert.equal(dateFromFileName('20261340_transport.geojson'), undefined);
+		assert.equal(dateFromFileName('transport.geojson'), undefined);
 	});
 });

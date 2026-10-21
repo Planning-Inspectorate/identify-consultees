@@ -5,6 +5,7 @@
 {% from "govuk/components/notification-banner/macro.njk" import govukNotificationBanner %}
 {% from "govuk/components/warning-text/macro.njk" import govukWarningText %}
 {% from "govuk/components/summary-list/macro.njk" import govukSummaryList %}
+{% from "govuk/components/table/macro.njk" import govukTable %}
 
 {% block pageTitle %}
     {{ pageHeading }} - {{ config.headerTitle }}
@@ -14,40 +15,29 @@
     <h1 class="govuk-heading-l">{{ pageHeading }}</h1>
 
     <p class="govuk-body">
-        Internal tool - downloads a file already uploaded to blob storage
-        (<a class="govuk-link" href="/admin/upload-to-blob">/admin/upload-to-blob</a>) and replaces
-        the matching table with its contents, using the app's own managed identity.
+        Internal tool - loads files already uploaded to blob storage
+        (<a class="govuk-link" href="/admin/upload-to-blob">/admin/upload-to-blob</a>) into the
+        database, using the app's own managed identity.
     </p>
-
-    {{ govukWarningText({
-        text: "Each import deletes every row in its table, then loads the file - nothing from an earlier file is kept. Nothing is deleted until the file has downloaded and been read.",
-        iconFallbackText: "Warning"
-    }) }}
 
     <p class="govuk-body">
-        A full import can take several minutes. If the page times out, the import carries on - wait a
-        few minutes, then reload this page and check the counts below rather than submitting again.
+        A load can take several minutes. If the page times out, the load carries on - wait a few
+        minutes, then reload this page and check the counts rather than submitting again.
     </p>
-
-    {% if loadedConsulteeAreas != undefined %}
-        <h2 class="govuk-heading-m">Currently loaded</h2>
-        {{ govukSummaryList({
-            rows: [
-                { key: { text: "Consultee areas" }, value: { text: loadedConsulteeAreas } },
-                { key: { text: "Case boundaries" }, value: { text: loadedCaseBoundaries } }
-            ]
-        }) }}
-    {% endif %}
 
     {% if error %}
         {{ govukErrorMessage({ text: error }) }}
     {% endif %}
 
-    {% if consulteeAreasImported != undefined %}
+    {% if groupLoaded %}
+        {{ govukNotificationBanner({ type: "success", titleText: "Success", text: groupLoaded }) }}
+    {% endif %}
+
+    {% if consulteeAreasCleared != undefined %}
         {{ govukNotificationBanner({
             type: "success",
             titleText: "Success",
-            text: "Replaced consultee areas: imported " ~ consulteeAreasImported ~ "."
+            text: "Cleared the consultee areas: deleted " ~ consulteeAreasCleared ~ "."
         }) }}
     {% endif %}
 
@@ -59,16 +49,84 @@
         }) }}
     {% endif %}
 
-    <h2 class="govuk-heading-m">Consultee areas</h2>
+    {% if loadedConsulteeAreas != undefined %}
+        <h2 class="govuk-heading-m">Currently loaded</h2>
+        {{ govukSummaryList({
+            rows: [
+                { key: { text: "Consultee areas" }, value: { text: loadedConsulteeAreas } },
+                { key: { text: "Case boundaries" }, value: { text: loadedCaseBoundaries } }
+            ]
+        }) }}
+    {% endif %}
+
+    <h2 class="govuk-heading-m">Consultee areas, by group</h2>
     <p class="govuk-body">
-        Replaces every consultee area with <code>combined_reference_data_v1.geojson</code> from blob
-        storage. Each feature takes its dataset's consultee category
-        (<code>config/reference-data.yaml</code>), and a file holding a dataset that isn't listed there
-        isn't imported.
+        The reference data is loaded a group at a time - the report's tabs, as
+        <code>config/reference-data.yaml</code> sets them. Loading a group takes its newest file in
+        blob storage (<code>YYYYMMDD_&lt;group&gt;.geojson</code>, named for the date its data is
+        from) and replaces that group's consultee areas. If the file is from a later quarter than
+        the group's loaded data, the loaded data is moved to the archive first. A file holding a
+        category from another group, or from an earlier quarter, isn't loaded.
     </p>
-    <form method="post" action="/admin/import-reference-data/run-consultee-areas" novalidate>
+
+    {% if blobStorageRead === false %}
+        {{ govukWarningText({ text: "Blob storage couldn't be read, so no group's file is shown.", iconFallbackText: "Warning" }) }}
+    {% endif %}
+
+    {% set groupRows = [] %}
+    {% for group in groups %}
+        {% set fileHtml %}
+            {% if group.file %}
+                {{ group.file.name }}<br>
+                <span class="govuk-hint">Data from {{ group.file.dataDate }} ({{ group.file.quarter }}), {{ group.file.size }}</span>
+            {% else %}
+                No file uploaded
+            {% endif %}
+        {% endset %}
+        {% set loadedHtml %}
+            {% if group.rows != undefined %}{{ group.rows }} consultee areas{% endif %}
+            {% if group.load %}
+                <br><span class="govuk-hint">{{ group.load.quarter }}, from {{ group.load.blobName }}, loaded {{ group.load.loadedAt }}</span>
+            {% elif group.rows %}
+                <br><span class="govuk-hint">Quarter not known - loaded before loads were logged</span>
+            {% endif %}
+        {% endset %}
+        {% set actionHtml %}
+            {% if group.file %}
+                <form method="post" action="/admin/import-reference-data/run-consultee-area-group" novalidate>
+                    <input type="hidden" name="_csrf" value="{{ _csrf }}">
+                    <input type="hidden" name="group" value="{{ group.slug }}">
+                    {{ govukButton({ text: "Load", classes: "govuk-!-margin-bottom-0", attributes: { "aria-label": "Load " ~ group.name } }) }}
+                </form>
+            {% endif %}
+        {% endset %}
+        {% set groupRows = (groupRows.push([
+            { html: "<strong>" ~ (group.name | escape) ~ "</strong><br><span class=\"govuk-hint\">" ~ (group.categories | escape) ~ "</span>" },
+            { html: fileHtml },
+            { html: loadedHtml },
+            { html: actionHtml }
+        ]), groupRows) %}
+    {% endfor %}
+    {{ govukTable({
+        caption: "Consultee area groups",
+        captionClasses: "govuk-visually-hidden",
+        head: [
+            { text: "Group" },
+            { text: "In blob storage" },
+            { text: "Loaded" },
+            { html: "<span class=\"govuk-visually-hidden\">Action</span>" }
+        ],
+        rows: groupRows
+    }) }}
+
+    <h2 class="govuk-heading-m">Clear consultee areas</h2>
+    {{ govukWarningText({
+        text: "Deletes every consultee area, in every group. The table itself, the files in blob storage and the archive are left as they are - load each group again afterwards.",
+        iconFallbackText: "Warning"
+    }) }}
+    <form method="post" action="/admin/import-reference-data/clear-consultee-areas" novalidate>
         <input type="hidden" name="_csrf" value="{{ _csrf }}">
-        {{ govukButton({ text: "Replace consultee areas", classes: "govuk-button--warning" }) }}
+        {{ govukButton({ text: "Clear consultee areas", classes: "govuk-button--warning" }) }}
     </form>
 
     <h2 class="govuk-heading-m">Case boundaries</h2>

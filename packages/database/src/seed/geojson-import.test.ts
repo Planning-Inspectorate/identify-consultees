@@ -295,10 +295,12 @@ describe('importConsulteeAreas', () => {
 		await withFile(JSON.stringify(file), async (filePath) => {
 			assert.equal(await importConsulteeAreas(client, filePath), 2);
 		});
-		// one batch delete of every row that comes back short, then one MERGE batch
-		assert.equal($executeRaw.mock.callCount(), 2);
+		// one batch delete of every row that comes back short, the group load log emptied - every
+		// group was replaced - then one MERGE batch
+		assert.equal($executeRaw.mock.callCount(), 3);
 		assert.match(sql($executeRaw.mock.calls[0]), /^DELETE TOP \(\?\) FROM consultee_area$/);
-		assert.match(sql($executeRaw.mock.calls[1]), /MERGE INTO consultee_area/);
+		assert.match(sql($executeRaw.mock.calls[1]), /^DELETE FROM reference_data_load$/);
+		assert.match(sql($executeRaw.mock.calls[2]), /MERGE INTO consultee_area/);
 	});
 
 	test('refuses to clear the table for a file with no features', async () => {
@@ -344,8 +346,8 @@ describe('importConsulteeAreas', () => {
 			});
 			assert.equal(imported, 3);
 		});
-		// the delete, then one MERGE per chunk
-		assert.equal($executeRaw.mock.callCount(), 3);
+		// the deletes, then one MERGE per chunk
+		assert.equal($executeRaw.mock.callCount(), 4);
 		assert.deepEqual(progress, [
 			[2, 3],
 			[3, 3]
@@ -358,7 +360,7 @@ describe('importConsulteeAreas', () => {
 		await withFile(JSON.stringify({ type: 'FeatureCollection', features }), async (filePath) => {
 			assert.equal(await importConsulteeAreas(client, filePath, { chunkCharacters: 1 }), 2);
 		});
-		assert.equal($executeRaw.mock.callCount(), 3);
+		assert.equal($executeRaw.mock.callCount(), 4);
 	});
 });
 

@@ -83,3 +83,48 @@ model CaseBoundary {
   @@index([caseReference])
   @@map("case_boundary")
 }
+
+/// Consultee areas a later quarter's reference data replaced, by the quarter they were from - see
+/// the migration and seed/consultee-area-groups.ts.
+model ConsulteeAreaArchive {
+  id                              String                   @id @default(dbgenerated("newid()")) @db.UniqueIdentifier
+  // the consultee_area row's id
+  consulteeAreaId                 String                   @db.UniqueIdentifier
+  // the quarter the row's data was from: 2026-Q3
+  quarter                         String                   @db.NVarChar(7)
+  archivedAt                      DateTime                 @default(now())
+  geometry                        Unsupported("geography")
+  geometryType                    String                   @db.NVarChar(50)
+  sourceId                        String?                  @db.NVarChar(200)
+  consulteeCategory               String?                  @db.NVarChar(200)
+  consulteeGroup                  String?                  @db.NVarChar(100)
+  consulteeSubcategory            String?                  @db.NVarChar(200)
+  consulteeSubcategoryDescription String?                  @db.NVarChar(500)
+  consultee                       String?                  @db.NVarChar(200)
+  region                          String?                  @db.NVarChar(100)
+  metadata                        String                   @db.NVarChar(Max)
+  currentVersion                  Int
+  validFrom                       DateTime?                @db.Date
+  validTo                         DateTime?                @db.Date
+  lastUpdated                     DateTime
+
+  @@index([quarter, consulteeCategory])
+  @@map("consultee_area_archive")
+}
+
+/// Each time a group of the reference data was loaded - see seed/consultee-area-groups.ts.
+model ReferenceDataLoad {
+  id           String   @id @default(dbgenerated("newid()")) @db.UniqueIdentifier
+  // the group's slug (config/reference-data.yaml): public_bodies
+  dataGroup    String   @db.NVarChar(50)
+  blobName     String   @db.NVarChar(200)
+  // the date the data is from, as the file's name gives it, and its quarter
+  dataDate     DateTime @db.Date
+  quarter      String   @db.NVarChar(7)
+  rowsLoaded   Int
+  rowsArchived Int      @default(0)
+  loadedAt     DateTime @default(now())
+
+  @@index([dataGroup, loadedAt])
+  @@map("reference_data_load")
+}

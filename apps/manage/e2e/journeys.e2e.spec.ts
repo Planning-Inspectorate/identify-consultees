@@ -360,14 +360,17 @@ test.describe('manage journeys', () => {
 			}
 		});
 		await page.goto('/admin/upload-to-blob');
-		await page.setInputFiles('#file', {
+		const form = page.locator('form[data-chunked-upload]:not([data-blob-group])');
+		// once the script has taken the form over - else it posts the whole file
+		await expect(form).toHaveAttribute('data-upload-enhanced', '');
+		await page.setInputFiles('#file-another', {
 			name: 'e2e-upload.geojson',
 			mimeType: 'application/geo+json',
 			buffer: Buffer.from('{"type":"FeatureCollection","features":[]}')
 		});
-		await page.getByRole('button', { name: 'Upload', exact: true }).click();
+		await form.getByRole('button', { name: 'Upload', exact: true }).click();
 
-		await expect(page.locator('[data-upload-status]')).toHaveText(
+		await expect(form.locator('[data-upload-status]')).toHaveText(
 			'Could not upload the file: Blob storage is not configured for this environment.',
 			// a part the server can't take is tried three times, a second or two apart
 			{ timeout: 15_000 }
@@ -375,6 +378,33 @@ test.describe('manage journeys', () => {
 		expect(tokens.length).toBeGreaterThan(0);
 		expect(tokens[0]).not.toBe('');
 		await expect(page).toHaveURL(/\/admin\/upload-to-blob$/);
+	});
+
+	test("a group's upload takes its date from the file's name, and saves it as the group's file", async ({ page }) => {
+		const names: string[] = [];
+		page.on('request', (request) => {
+			const match = /\/admin\/upload-to-blob\/blocks\?name=([^&]+)/.exec(request.url());
+			if (match) {
+				names.push(decodeURIComponent(match[1]));
+			}
+		});
+		await page.goto('/admin/upload-to-blob');
+		const form = page.locator('form[data-blob-group="energy"]');
+		await expect(form).toHaveAttribute('data-upload-enhanced', '');
+		await page.setInputFiles('#file-energy', {
+			name: '20261020_combined_energy.geojson',
+			mimeType: 'application/geo+json',
+			buffer: Buffer.from('{"type":"FeatureCollection","features":[]}')
+		});
+		await expect(form.getByLabel('Day')).toHaveValue('20');
+		await expect(form.getByLabel('Month')).toHaveValue('10');
+		await expect(form.getByLabel('Year')).toHaveValue('2026');
+		await form.getByRole('button', { name: 'Upload Energy' }).click();
+
+		await expect(form.locator('[data-upload-status]')).toHaveText(/Blob storage is not configured/, {
+			timeout: 15_000
+		});
+		expect(names[0]).toBe('20261020_energy.geojson');
 	});
 
 	test('signed-out page offers sign in again', async ({ page }) => {
