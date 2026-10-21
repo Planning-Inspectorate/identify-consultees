@@ -103,7 +103,7 @@ export function buildReportCheckPage(service: ManageService): AsyncRequestHandle
 			'consultee report check page'
 		);
 
-		const { consultees, failed } = await runRulesetSafely(service, project, ruleset, req.session);
+		const { consultees, failed, siteScreenedAs } = await runRulesetSafely(service, project, ruleset, req.session);
 		const selection: ConsulteeSelection = consulteeSelection(req.query);
 
 		const viewModel: ReportCheckViewModel = {
@@ -121,7 +121,8 @@ export function buildReportCheckPage(service: ManageService): AsyncRequestHandle
 			groups: groupedConsultees(ruleset, project.id, consultees, selection, service.nearbyNsipRadiusMetres > 0),
 			generateReportUrl: reportCreatedUrl(project.id, ruleset.id, selection),
 			rulesetFailed: failed,
-			retryUrl: reportUrl(project.id, ruleset.id, selection)
+			retryUrl: reportUrl(project.id, ruleset.id, selection),
+			screenedBoundingBox: siteScreenedAs === 'boundingBox'
 		};
 
 		return res.render('views/consultees/report/view.njk', viewModel);
@@ -155,14 +156,14 @@ export function buildReportCreatedPage(service: ManageService): AsyncRequestHand
 
 		const selection: ConsulteeSelection = consulteeSelection(req.query);
 		const downloadUrl = reportDownloadUrl(project.id, ruleset.id, selection);
-		const { consultees, failed } = await runRulesetSafely(service, project, ruleset, req.session);
+		const { consultees, failed, siteScreenedAs } = await runRulesetSafely(service, project, ruleset, req.session);
 
 		let downloadSize = '';
 		if (!failed) {
 			try {
 				const report =
 					rememberedReportZip(downloadUrl) ??
-					(await buildReportZip({ service, project, ruleset, consultees, selection }));
+					(await buildReportZip({ service, project, ruleset, consultees, selection, siteScreenedAs }));
 				rememberReportZip(downloadUrl, report);
 				downloadSize = formatFileSize(report.contents.length);
 			} catch (error) {

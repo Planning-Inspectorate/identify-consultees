@@ -5,6 +5,7 @@ from pathlib import Path
 import pymssql
 import pytest
 
+from intersector import queries
 from intersector.database import is_deadlock_error, with_deadlock_retry
 from intersector.models import (
     AreaMatch,
@@ -14,14 +15,22 @@ from intersector.models import (
     NearbyReason,
     RuleCondition,
 )
+from intersector.queries import bounding_box, point_count
 from intersector.screening import (
     _nearest_first,
     answerable_from_nearby,
     meets_intersection_condition,
     nearby_radius_for,
-    run_ruleset,
+)
+from intersector.screening import (
+    run_ruleset as screen,
 )
 from intersector.tolerances import DISTANCE_MARGIN_METRES
+
+
+def run_ruleset(*args, **kwargs) -> list[Consultee]:
+    """The consultees a run found - what most of these tests look at."""
+    return screen(*args, **kwargs).consultees
 
 # distinct from the Node suite's fixture ids (packages/database/src/geospatial/*.test.ts), so the two
 # suites can run against the same database at once without deleting each other's rows
@@ -443,3 +452,66 @@ def test_finds_consultees_across_several_categories_for_a_real_project(connectio
     # ids come back lowercase, as the manage app's own (Prisma) queries see them
     assert all(match.area.id == match.area.id.lower() for match in result)
     uuid.UUID(ids[0])
+
+
+def test_point_count_counts_each_x_y_pair():
+    assert point_count("POINT (1 2)") == 1
+    assert point_count("POLYGON ((0 0, 1 0, 1 1, 0 0))") == 4
+    assert point_count("MULTILINESTRING ((-1.5 52.5, -1.4 52.6), (1e-3 2E+1, 3 4))") == 4
+
+
+def test_bounding_box_is_the_rectangle_around_the_site_grown_by_its_margin():
+    box = bounding_box("LINESTRING (0 0, 1 1)")
+    margin = queries.BOUNDING_BOX_MARGIN_METRES / queries.METRES_PER_DEGREE
+    west, south, east, north = -margin, -margin, 1 + margin, 1 + margin
+    numbers = [float(number) for number in box.removeprefix("POLYGON((").removesuffix("))").replace(",", " ").split()]
+    # anticlockwise from the south-west corner, closed - longitude margins wider than latitude's
+    # away from the equator, here a hair wider at 1 degree north
+    assert numbers[1::2] == pytest.approx([south, south, north, north, south])
+    assert numbers[0] == pytest.approx(west, rel=1e-3) and numbers[2] == pytest.approx(east, rel=1e-3)
+    assert numbers[0] < west and numbers[2] > east
+    assert numbers[0:2] == numbers[8:10]
+
+
+def test_a_detailed_site_is_screened_against_its_bounding_box_finding_areas_off_its_outline(
+    connection_params, areas
+):
+    # a long diagonal site, and an area in the corner of its bounding box, ~78km from the site itself
+    areas((TEST_AREA_ID, "POINT(0.9 0.1)", "Hospital", "Off The Diagonal"))
+    rules = [_rule(categories=("Hospital",), buffer_metres=1_000)]
+    site = "LINESTRING(0 0, 1 1)"
+
+    outline = screen(connection_params, site, rules, 1_000)
+    assert outline.site_screened_as == "outline"
+    assert TEST_AREA_ID not in _ids(_matched(outline.consultees))
+
+    # more points than the limit - the box; within it, still the outline
+    boxed = screen(connection_params, site, rules, 1_000, bounding_box_above_points=1)
+    assert boxed.site_screened_as == "boundingBox"
+    assert TEST_AREA_ID in _ids(_matched(boxed.consultees))
+    assert screen(connection_params, site, rules, 1_000, bounding_box_above_points=2).site_screened_as == "outline"
+
+    # or because the caller asked for it - its last chance after an outline run timed out
+    asked = screen(connection_params, site, rules, 1_000, bounding_box=True)
+    assert asked.site_screened_as == "boundingBox"
+    assert TEST_AREA_ID in _ids(_matched(asked.consultees))
+
+
+def test_a_bordering_condition_on_a_bounding_box_finds_the_hosts_neighbours_in_two_queries(connection_params, areas):
+    areas(
+        (HOST_AREA_ID, _square(0, 1), "Parish Council", "Host Parish"),
+        (NEIGHBOUR_AREA_ID, _square(1, 2), "Parish Council", "Neighbour Parish"),
+        (TEST_AREA_ID, _square(5, 6), "Parish Council", "Far Away Parish"),
+    )
+    rules = [_rule(logic_type="bordering", categories=("Parish Council",), host_category="Parish Council")]
+
+    boxed = screen(connection_params, "POINT(0.5 0.5)", rules, 20_000, bounding_box=True)
+
+    ids = _ids(_matched(boxed.consultees))
+    # everything the outline finds - and, around the hosts, the hosts themselves - but not beyond
+    assert NEIGHBOUR_AREA_ID in ids
+    assert HOST_AREA_ID in ids
+    assert TEST_AREA_ID not in ids
+    # with no host in the box, nothing borders it
+    nowhere = screen(connection_params, "POINT(40 40)", rules, 20_000, bounding_box=True)
+    assert _matched(nowhere.consultees) == []

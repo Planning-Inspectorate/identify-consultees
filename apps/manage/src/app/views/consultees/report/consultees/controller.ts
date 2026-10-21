@@ -37,6 +37,8 @@ export interface CategoryContext {
 	selection: ConsulteeSelection;
 	consultees: ConsulteeMatch[];
 	failed: boolean;
+	/** True when the site was screened against its bounding box - the list needs reviewing. */
+	screenedBoundingBox: boolean;
 }
 
 /**
@@ -61,7 +63,7 @@ export async function categoryContext(
 	}
 
 	const category = firstQueryValue(req.query.category);
-	const { consultees, failed } = await runRulesetSafely(service, project, ruleset, req.session);
+	const { consultees, failed, siteScreenedAs } = await runRulesetSafely(service, project, ruleset, req.session);
 	const found = consultees.some(
 		(consultee) => consultee.feature.properties.consulteeCategory === category && isIdentified(consultee)
 	);
@@ -70,7 +72,15 @@ export async function categoryContext(
 		res.status(404).render('views/errors/404.njk', { pageHeading: 'Page not found' });
 		return undefined;
 	}
-	return { project, ruleset, category, selection: consulteeSelection(req.query), consultees, failed };
+	return {
+		project,
+		ruleset,
+		category,
+		selection: consulteeSelection(req.query),
+		consultees,
+		failed,
+		screenedBoundingBox: siteScreenedAs === 'boundingBox'
+	};
 }
 
 /**
@@ -101,7 +111,7 @@ async function renderCategoryPage(
 	res: Response,
 	context: CategoryContext
 ): Promise<void> {
-	const { project, ruleset, category, selection, consultees, failed } = context;
+	const { project, ruleset, category, selection, consultees, failed, screenedBoundingBox } = context;
 	const excluded = excludedMatchIds(selection.removed);
 
 	// the map shows the category's consultees the nearby search found too, fainter (see
@@ -172,6 +182,7 @@ async function renderCategoryPage(
 			.map((removal) => ({ name: removal.name, reason: removal.reason })),
 		removedOpen: firstQueryValue(req.query.removed) === 'open',
 		rulesetFailed: failed,
+		screenedBoundingBox,
 		retryUrl: consulteesUrl(project.id, ruleset.id, category, selection),
 		matchCount: map.matchCount,
 		mapIsSampled: map.isSampled,

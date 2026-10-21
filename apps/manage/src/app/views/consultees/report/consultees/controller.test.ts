@@ -76,6 +76,27 @@ function handlerFor(db: unknown) {
 }
 
 describe('report consultees change page', () => {
+	it("should warn on a category's page when the site was screened against its bounding box", async () => {
+		const nunjucks = configureNunjucks();
+		const mockRes = {
+			status: mock.fn(() => mockRes),
+			render: mock.fn((view: string, data: object) => nunjucks.render(view, data))
+		};
+		const db = dbReturning([[realProjectRow()]]);
+		await buildReportConsulteesPage({
+			db,
+			logger: mockLogger(),
+			nearbyConsulteeRadiusMetres: 20_000,
+			rulesetRunner: mock.fn(async () => ({ consultees: [], siteScreenedAs: 'boundingBox' as const }))
+		} as never)(
+			{ params: { caseId: realProjectId }, query: { category: 'Parish Council' } } as never,
+			mockRes as never
+		);
+
+		assert.strictEqual(mockRes.render.mock.calls[0].arguments[1].screenedBoundingBox, true);
+		assert.match(mockRes.render.mock.calls[0].result as string, /outline is too detailed to screen in time/);
+	});
+
 	it('should render the category heading, map and consultee table with Remove links', async () => {
 		const nunjucks = configureNunjucks();
 		const mockRes = {

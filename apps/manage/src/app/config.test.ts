@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { afterEach, describe, test } from 'node:test';
 import { loadConfig, loadEnvironmentConfig, resetConfigCache } from './config.ts';
 import { loadNearbyConsultees } from './nearby-consultees.ts';
+import { loadScreeningConfig } from './screening-config.ts';
 
 const requiredAuthEnv = {
 	AUTH_CLIENT_ID: 'client-id',
@@ -107,6 +108,7 @@ describe('manage loadConfig', () => {
 		assert.strictEqual(config.nearbyConsulteeRadiusMetres, shipped.defaultRadiusMetres);
 		assert.deepStrictEqual(config.nearbyRadiusMetresByCategory, shipped.radiusMetresByCategory);
 		assert.strictEqual(config.nearbyNsipRadiusMetres, shipped.nsipRadiusMetres);
+		assert.strictEqual(config.boundingBoxAbovePoints, loadScreeningConfig().boundingBoxAbovePoints);
 	});
 
 	test('allows AUTH_DISABLED outside production', () => {

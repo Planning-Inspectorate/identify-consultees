@@ -13,11 +13,20 @@ import { fetchWithTimeout } from '@planning-inspectorate/core/util';
  * function (apps/function-python, `POST /api/run-ruleset`); this is the manage app's side of that
  * call. Injected through ManageService so tests can stand in for the function.
  */
-export type RulesetRunner = (site: Geometry, ruleset: Ruleset, nearbyRadiusMetres: number) => Promise<RunRulesetResult>;
+export type RulesetRunner = (
+	site: Geometry,
+	ruleset: Ruleset,
+	nearbyRadiusMetres: number,
+	/** `boundingBox` screens the site against the rectangle around it, whatever its detail. */
+	options?: { boundingBox?: boolean }
+) => Promise<RunRulesetResult>;
 
 // a typical run takes about a second and the largest real projects ~10s locally (several hundred
-// conditions' worth of spatial queries) - this only stops a hung function holding a page forever
-const RUN_RULESET_TIMEOUT_MS = 60_000;
+// conditions' worth of spatial queries), but many times that on Dev and Test's Basic database. A
+// run on the site's outline gets this long; if it doesn't finish, the page tries again on its
+// bounding box (see runRulesetSafely), which gets the longer one - both within Front Door's timeout
+export const OUTLINE_RUN_TIMEOUT_MS = 45_000;
+export const BOUNDING_BOX_RUN_TIMEOUT_MS = 60_000;
 
 interface RunRulesetResponseFeature {
 	id: string;
@@ -27,6 +36,7 @@ interface RunRulesetResponseFeature {
 
 interface RunRulesetResponse {
 	consultees: { feature: RunRulesetResponseFeature; distanceMetres: number; reasons: ConsulteeReason[] }[];
+	siteScreenedAs?: string;
 }
 
 /**
@@ -51,7 +61,8 @@ export function toRunRulesetResult(body: RunRulesetResponse): RunRulesetResult {
 				properties: feature.properties,
 				...(feature.geometryWkt ? { geometry: wktToGeometry(feature.geometryWkt) } : {})
 			}
-		}))
+		})),
+		siteScreenedAs: body.siteScreenedAs === 'boundingBox' ? 'boundingBox' : 'outline'
 	};
 }
 
@@ -66,15 +77,18 @@ export function buildPythonRulesetRunner(options: {
 	apiKey: string | undefined;
 	/** Each category's own nearby distance (config/nearby-consultees.yaml); others use nearbyRadiusMetres. */
 	nearbyRadiusMetresByCategory?: Record<string, number>;
+	/** Screen a site more detailed than this against its bounding box (config/screening.yaml); 0 never does. */
+	boundingBoxAbovePoints?: number;
 }): RulesetRunner {
-	const { pythonFunctionUrl, apiKey, nearbyRadiusMetresByCategory = {} } = options;
-	return async (site, ruleset, nearbyRadiusMetres) => {
+	const { pythonFunctionUrl, apiKey, nearbyRadiusMetresByCategory = {}, boundingBoxAbovePoints = 0 } = options;
+	return async (site, ruleset, nearbyRadiusMetres, runOptions = {}) => {
+		const boundingBox = runOptions.boundingBox === true;
 		if (!pythonFunctionUrl) {
 			throw new Error('PYTHON_FUNCTION_URL is not configured');
 		}
 		const response = await fetchWithTimeout(
 			runRulesetUrl(pythonFunctionUrl),
-			{ timeoutMs: RUN_RULESET_TIMEOUT_MS },
+			{ timeoutMs: boundingBox ? BOUNDING_BOX_RUN_TIMEOUT_MS : OUTLINE_RUN_TIMEOUT_MS },
 			{
 				method: 'POST',
 				// the function requires the x-api-key shared secret (see function_app.py) - a missing key
@@ -88,6 +102,8 @@ export function buildPythonRulesetRunner(options: {
 					// matches' original geometry - tens of MB for a run touching whole counties or
 					// National Parks - is left out, and the function never reads it
 					includeGeometry: false,
+					...(boundingBoxAbovePoints > 0 ? { boundingBoxAbovePoints } : {}),
+					boundingBox,
 					rules: ruleset.rules.map(({ id, logicType, categories, bufferMetres, hostCategory }) => ({
 						id,
 						logicType,

@@ -34,7 +34,8 @@ export class ManageService extends BaseService<PrismaClient> {
 			buildPythonRulesetRunner({
 				pythonFunctionUrl: config.pythonFunctionUrl,
 				apiKey: config.pythonFunctionApiKey,
-				nearbyRadiusMetresByCategory: config.nearbyRadiusMetresByCategory
+				nearbyRadiusMetresByCategory: config.nearbyRadiusMetresByCategory,
+				boundingBoxAbovePoints: config.boundingBoxAbovePoints
 			});
 	}
 

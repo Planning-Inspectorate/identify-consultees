@@ -1,4 +1,8 @@
-import type { ConsulteeMatch, Ruleset } from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
+import type {
+	ConsulteeMatch,
+	Ruleset,
+	SiteScreenedAs
+} from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
 import type { SheetData } from 'write-excel-file/node';
 import type { MetadataSelection, ReportColumn, ReportConfig } from '../../../../report-config.ts';
 import { categorySettings, REPORT_COLUMNS, REPORT_CONFIG } from '../../../../report-config.ts';
@@ -47,6 +51,8 @@ export interface ReportExport {
 	boundaryFileName: string | null;
 	boundaryReceivedDate: Date | null;
 	ruleset: Ruleset;
+	/** What the run screened - the outline unless said otherwise. */
+	siteScreenedAs?: SiteScreenedAs;
 	generatedAt: Date;
 	/** The consultees the ruleset's conditions identified, less any removed. */
 	identified: ConsulteeMatch[];
@@ -389,6 +395,12 @@ function summarySheet(report: ReportExport, tabs: Map<GroupTab, GroupTabContent>
 		detail('Boundary file', report.boundaryFileName),
 		detail('Boundary received', report.boundaryReceivedDate ? formatDate(report.boundaryReceivedDate) : null),
 		detail('Ruleset', report.ruleset.name),
+		detail(
+			'Screened against',
+			report.siteScreenedAs === 'boundingBox'
+				? "The site's bounding box - its outline was too detailed to screen in time, so the list can include consultees that aren't near the site"
+				: "The site's outline"
+		),
 		[bold('Generated'), { type: Date, value: report.generatedAt, format: 'd mmmm yyyy hh:mm' }],
 		[],
 		headerRow(['Tab', 'Consultees']),

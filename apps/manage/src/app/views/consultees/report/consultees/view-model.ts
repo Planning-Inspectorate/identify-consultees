@@ -40,6 +40,8 @@ export interface ReportConsulteesViewModel {
 	removedOpen: boolean;
 	/** True when the ruleset couldn't be run at all - the page shows an error, not an empty list. */
 	rulesetFailed: boolean;
+	/** True when the site was screened against its bounding box - the list needs reviewing. */
+	screenedBoundingBox: boolean;
 	retryUrl: string;
 	/** Total matches the ruleset found in this category - may exceed what the map draws. */
 	matchCount: number;

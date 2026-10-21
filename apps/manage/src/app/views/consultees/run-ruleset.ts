@@ -8,7 +8,8 @@ import {
 import type {
 	ConsulteeMatch,
 	Ruleset,
-	RunRulesetResult
+	RunRulesetResult,
+	SiteScreenedAs
 } from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
 import type { SearchAreaDisplay } from '../../maps/case-geojson.ts';
 import { findNearbyNsips, isNearbyNsip } from './nearby-nsips.ts';
@@ -30,6 +31,8 @@ export function firstQueryValue(value: unknown): string {
 interface RulesetRun extends RunRulesetResult {
 	// distinguishes "ran and matched nothing" from "couldn't run" - both have empty results
 	failed: boolean;
+	/** What was screened: the site's outline, or its bounding box (see runOutlineElseBoundingBox). */
+	siteScreenedAs: SiteScreenedAs;
 }
 
 /** The session field holding the last ruleset run - see runRulesetSafely. */
@@ -44,6 +47,8 @@ export interface StoredRulesetRun {
 	rulesetId: string;
 	ranAt: number;
 	consultees: ConsulteeMatch[];
+	/** Absent from a run kept before boxes were used - the outline, then. */
+	siteScreenedAs?: SiteScreenedAs;
 }
 
 /** Where a run is kept between requests: the request's session, if it has one. */
@@ -100,27 +105,53 @@ export async function runRulesetSafely(
 ): Promise<RulesetRun> {
 	const stored = storedRun(store, project, ruleset);
 	if (stored) {
-		return { consultees: stored.consultees, failed: false };
+		return { consultees: stored.consultees, failed: false, siteScreenedAs: stored.siteScreenedAs ?? 'outline' };
 	}
 	try {
 		const [run, nearbyNsips] = await Promise.all([
-			service.rulesetRunner(project.geometry, ruleset, service.nearbyConsulteeRadiusMetres),
+			runOutlineElseBoundingBox(service, project, ruleset),
 			findNearbyNsips(service.db, project, service.nearbyNsipRadiusMetres ?? 0)
 		]);
 		const consultees = [...run.consultees, ...nearbyNsips];
+		const siteScreenedAs = run.siteScreenedAs ?? 'outline';
 		if (store) {
 			const run: StoredRulesetRun = {
 				caseId: project.id,
 				rulesetId: ruleset.id,
 				ranAt: Date.now(),
-				consultees: consultees.map(withoutGeometry)
+				consultees: consultees.map(withoutGeometry),
+				siteScreenedAs
 			};
 			store[RULESET_RUN_SESSION_FIELD] = run;
 		}
-		return { consultees, failed: false };
+		return { consultees, failed: false, siteScreenedAs };
 	} catch (error) {
 		service.logger.error({ error, caseId: project.id, rulesetId: ruleset.id }, 'Failed to run ruleset');
-		return { consultees: [], failed: true };
+		return { consultees: [], failed: true, siteScreenedAs: 'outline' };
+	}
+}
+
+/**
+ * The ruleset run on the site's outline - or, if that fails or times out (a site too detailed to
+ * screen in time on a small database), on its bounding box: a list to review rather than none.
+ * The function screens the box up front for a site past config/screening.yaml's limit.
+ */
+async function runOutlineElseBoundingBox(
+	service: RulesetRunService,
+	project: CaseBoundaryFeature,
+	ruleset: Ruleset
+): Promise<RunRulesetResult> {
+	try {
+		return await service.rulesetRunner(project.geometry, ruleset, service.nearbyConsulteeRadiusMetres);
+	} catch (error) {
+		service.logger.warn(
+			{ error, caseId: project.id, rulesetId: ruleset.id },
+			"Couldn't screen the site's outline - screening its bounding box instead"
+		);
+		const run = await service.rulesetRunner(project.geometry, ruleset, service.nearbyConsulteeRadiusMetres, {
+			boundingBox: true
+		});
+		return { ...run, siteScreenedAs: 'boundingBox' };
 	}
 }
 

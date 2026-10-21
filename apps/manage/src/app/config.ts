@@ -2,6 +2,7 @@ import type { BaseConfig } from '@planning-inspectorate/core/app';
 import path from 'node:path';
 import { loadEnvFile } from 'node:process';
 import { loadNearbyConsultees } from './nearby-consultees.ts';
+import { loadScreeningConfig } from './screening-config.ts';
 
 export interface Config extends BaseConfig {
 	appHostname: string;
@@ -29,6 +30,9 @@ export interface Config extends BaseConfig {
 	// how far from the site another case is a Nearby NSIP - the same file's nsipRadiusKm; unset or 0
 	// looks for none
 	nearbyNsipRadiusMetres?: number;
+	// screen a site whose simplified outline has more points than this against its bounding box -
+	// config/screening.yaml (see screening-config.ts); unset or 0 never does up front
+	boundingBoxAbovePoints?: number;
 	// whether the prototype/debug pages are mounted (/items, /map-layers-demo, /components,
 	// /consultee-areas-python, /consultee-areas-direct). On by default outside production; set
 	// ENABLE_DEV_PAGES=true to enable them on a deployed environment running NODE_ENV=production
@@ -121,6 +125,7 @@ export function loadConfig(): Config {
 	}
 
 	const nearbyConsultees = loadNearbyConsultees();
+	const screening = loadScreeningConfig();
 
 	const isProduction = NODE_ENV === 'production';
 
@@ -150,6 +155,7 @@ export function loadConfig(): Config {
 		nearbyConsulteeRadiusMetres: nearbyConsultees.defaultRadiusMetres,
 		nearbyRadiusMetresByCategory: nearbyConsultees.radiusMetresByCategory,
 		nearbyNsipRadiusMetres: nearbyConsultees.nsipRadiusMetres,
+		boundingBoxAbovePoints: screening.boundingBoxAbovePoints,
 		devPagesEnabled: !isProduction || ENABLE_DEV_PAGES === 'true',
 		auth: {
 			authority: `https://login.microsoftonline.com/${AUTH_TENANT_ID}`,

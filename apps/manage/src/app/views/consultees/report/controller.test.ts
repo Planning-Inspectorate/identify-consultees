@@ -313,6 +313,24 @@ describe('consultee report check page', () => {
 		assert.ok(!groupedConsultees(ruleset, realProjectId, [], none).some((group) => group.name === 'Nearby NSIPs'));
 	});
 
+	it('should warn when the site was screened against its bounding box, so the list gets reviewed', async () => {
+		const nunjucks = configureNunjucks();
+		const mockRes = {
+			status: mock.fn(() => mockRes),
+			render: mock.fn((view: string, data: object) => nunjucks.render(view, data))
+		};
+		const db = dbReturning([[realProjectRow()], []]);
+		await buildReportCheckPage({
+			db,
+			logger: mockLogger(),
+			nearbyConsulteeRadiusMetres: 20_000,
+			rulesetRunner: mock.fn(async () => ({ consultees: [], siteScreenedAs: 'boundingBox' as const }))
+		} as never)({ params: { caseId: realProjectId }, query: {} } as never, mockRes as never);
+
+		assert.strictEqual(mockRes.render.mock.calls[0].arguments[1].screenedBoundingBox, true);
+		assert.match(mockRes.render.mock.calls[0].result as string, /outline is too detailed to screen in time/);
+	});
+
 	it('should run the default (first) ruleset when none is selected', async () => {
 		const mockRes = { status: mock.fn(() => mockRes), render: mock.fn() };
 		const db = dbReturning([[realProjectRow()], []]);

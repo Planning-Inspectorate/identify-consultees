@@ -37,12 +37,18 @@ class RunRulesetRequest:
     """A nearby radius for particular categories, overriding nearby_radius_metres for them."""
     include_geometry: bool = True
     """Whether condition matches carry their original geometry (`geometryWkt`) - see run_ruleset."""
+    bounding_box_above_points: int | None = None
+    """Screen a site whose simplified outline has more points than this against its bounding box."""
+    bounding_box: bool = False
+    """Screen the site against its bounding box whatever its detail."""
 
 
 def parse_run_ruleset_request(body: object) -> RunRulesetRequest:
     """Validate a decoded request body: `{siteWkt, rules: [{id, logicType, categories,
     bufferMetres?, hostCategory?}], nearbyRadiusMetres, nearbyRadiusMetresByCategory?,
-    includeGeometry?}` (includeGeometry defaults to true). Raises BadRequest."""
+    includeGeometry?, boundingBoxAbovePoints?, boundingBox?}` (includeGeometry defaults to true,
+    boundingBox to false; with no boundingBoxAbovePoints the outline is always screened). Raises
+    BadRequest."""
     if not isinstance(body, dict):
         raise BadRequest("request body must be a JSON object")
 
@@ -59,7 +65,17 @@ def parse_run_ruleset_request(body: object) -> RunRulesetRequest:
         nearby_radius_metres=_distance(body.get("nearbyRadiusMetres"), "nearbyRadiusMetres"),
         nearby_radius_metres_by_category=_radius_by_category(body.get("nearbyRadiusMetresByCategory", {})),
         include_geometry=_boolean(body.get("includeGeometry", True), "includeGeometry"),
+        bounding_box_above_points=_point_limit(body.get("boundingBoxAbovePoints")),
+        bounding_box=_boolean(body.get("boundingBox", False), "boundingBox"),
     )
+
+
+def _point_limit(value: object) -> int | None:
+    if value is None:
+        return None
+    if isinstance(value, bool) or not isinstance(value, int) or value < 1:
+        raise BadRequest("boundingBoxAbovePoints must be a whole number of points, at least 1")
+    return value
 
 
 def _boolean(value: object, name: str) -> bool:
@@ -109,10 +125,14 @@ def _string(value: object, name: str) -> str:
     return value
 
 
-def consultees_json(consultees: list[Consultee]) -> dict:
+def consultees_json(consultees: list[Consultee], site_screened_as: str = "outline") -> dict:
     """The response body: `{consultees: [{feature: {id, properties, geometryWkt?}, distanceMetres,
-    reasons}]}` - geometryWkt only for condition matches, and only when the request asked for it."""
-    return {"consultees": [_consultee_json(consultee) for consultee in consultees]}
+    reasons}], siteScreenedAs}` - geometryWkt only for condition matches, and only when the request
+    asked for it; siteScreenedAs `outline` or `boundingBox` (see run_ruleset)."""
+    return {
+        "consultees": [_consultee_json(consultee) for consultee in consultees],
+        "siteScreenedAs": site_screened_as,
+    }
 
 
 def _consultee_json(consultee: Consultee) -> dict:

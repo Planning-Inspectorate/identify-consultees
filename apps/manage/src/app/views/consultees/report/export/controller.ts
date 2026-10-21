@@ -42,13 +42,13 @@ export function buildReportDownload(service: ManageService): AsyncRequestHandler
 			return;
 		}
 
-		const { consultees, failed } = await runRulesetSafely(service, project, ruleset, req.session);
+		const { consultees, failed, siteScreenedAs } = await runRulesetSafely(service, project, ruleset, req.session);
 		if (failed) {
 			res.redirect(reportCreatedUrl(project.id, ruleset.id, selection));
 			return;
 		}
 
-		const report = await buildReportZip({ service, project, ruleset, consultees, selection });
+		const report = await buildReportZip({ service, project, ruleset, consultees, selection, siteScreenedAs });
 		res.set({
 			'Content-Type': 'application/zip',
 			'Content-Disposition': `attachment; filename="${report.fileName}"`

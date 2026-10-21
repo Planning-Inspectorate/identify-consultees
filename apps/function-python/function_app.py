@@ -225,16 +225,20 @@ def run_ruleset_route(req: func.HttpRequest) -> func.HttpResponse:
         "included" if request.include_geometry else "left out",
     )
     try:
-        consultees = run_ruleset(
+        screening = run_ruleset(
             connection_params_from_env(),
             request.site_wkt,
             request.rules,
             request.nearby_radius_metres,
             request.nearby_radius_metres_by_category,
             with_geometry=request.include_geometry,
+            bounding_box_above_points=request.bounding_box_above_points,
+            bounding_box=request.bounding_box,
         )
     except Exception:
         logger.exception("Failed to run the ruleset")
         return _json_response({"error": "Failed to run the ruleset"}, 500)
 
-    return _json_response(consultees_json(consultees))
+    if screening.site_screened_as == "boundingBox":
+        logger.info("run-ruleset: screened the site against its bounding box")
+    return _json_response(consultees_json(screening.consultees, screening.site_screened_as))
