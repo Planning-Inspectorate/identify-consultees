@@ -1,6 +1,10 @@
 import type { ManageService } from '#service';
 import type { CaseBoundaryFeature } from '@pins/identify-consultees-database/src/geospatial/case-boundaries.ts';
-import type { ConsulteeMatch, Ruleset } from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
+import type {
+	ConsulteeMatch,
+	Ruleset,
+	SiteScreenedAs
+} from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
 import { isIdentified } from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
 import { MapCache } from '@planning-inspectorate/core/util';
 import { strToU8, zipSync } from 'fflate';
@@ -79,6 +83,8 @@ export interface ReportZipContext {
 	ruleset: Ruleset;
 	consultees: ConsulteeMatch[];
 	selection: ConsulteeSelection;
+	/** What the run screened - the outline unless said otherwise. */
+	siteScreenedAs?: SiteScreenedAs;
 }
 
 /**
@@ -156,7 +162,8 @@ export async function buildReportZip({
 	project,
 	ruleset,
 	consultees,
-	selection
+	selection,
+	siteScreenedAs = 'outline'
 }: ReportZipContext): Promise<ReportZip> {
 	const { db, logger } = service;
 	const excluded = excludedMatchIds(selection.removed);
@@ -167,6 +174,7 @@ export async function buildReportZip({
 		boundaryFileName: project.properties.fileName ?? null,
 		boundaryReceivedDate: project.properties.receivedDate ?? null,
 		ruleset,
+		siteScreenedAs,
 		generatedAt: new Date(),
 		identified,
 		records: new Map([

@@ -1,0 +1,20 @@
+# Screening: how a site too detailed to screen in time is handled. Read when the app starts
+# (apps/manage/src/app/screening-config.ts), which refuses to start if a value here is invalid - so
+# a change is checked by `npm test` and takes effect on the next deploy.
+#
+#   boundingBoxAbovePoints - a site whose outline, simplified to 10m as the reference data is, has
+#                            more points than this is screened against its bounding box - the
+#                            rectangle around it - instead. That's fast whatever the site's detail,
+#                            but finds every consultee near the rectangle: for a long, diagonal
+#                            site, many that aren't near the site itself. The check page, category
+#                            pages and report say when it happened, so the list can be reviewed.
+#                            0 never uses the box up front. Of the 283 real sites, 10 have over
+#                            2,000 points and 33 over 1,000; locally those take 3-10s to screen, and
+#                            on Dev and Test's Basic database many times that.
+#
+# Whatever this is set to, a site whose outline can't be screened in time - the run fails or times
+# out - is screened against its bounding box instead, rather than showing no consultees.
+
+version: 1
+
+boundingBoxAbovePoints: 2000

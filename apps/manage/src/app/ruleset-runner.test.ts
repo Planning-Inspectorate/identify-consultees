@@ -65,12 +65,39 @@ describe('buildPythonRulesetRunner', () => {
 			nearbyRadiusMetres: 20_000,
 			nearbyRadiusMetresByCategory: { 'Parish Council': 5_000 },
 			includeGeometry: false,
+			// no limit configured - the outline whatever its detail, unless asked
+			boundingBox: false,
 			// the display name stays here - the function only needs what to run
 			rules: [
 				{ id: 'hospital', logicType: 'intersection', categories: ['Hospital'], bufferMetres: 10_000 },
 				{ id: 'parish', logicType: 'bordering', categories: ['Parish Council'], hostCategory: 'Parish Council' }
 			]
 		});
+	});
+
+	it('asks for the bounding box past the configured detail, or when told to, and says what the function screened', async () => {
+		const fetchMock = respondWith({ consultees: [], siteScreenedAs: 'boundingBox' });
+		const run = buildPythonRulesetRunner({
+			pythonFunctionUrl: 'http://localhost:7071/api/consultee-areas',
+			apiKey: undefined,
+			boundingBoxAbovePoints: 2_000
+		});
+
+		assert.equal((await run(site, ruleset, 20_000)).siteScreenedAs, 'boundingBox');
+		assert.equal((await run(site, ruleset, 20_000, { boundingBox: true })).siteScreenedAs, 'boundingBox');
+		const [outline, boxed] = fetchMock.mock.calls.map((call) => JSON.parse(String(call.arguments[1]?.body)));
+		assert.equal(outline.boundingBoxAbovePoints, 2_000);
+		assert.equal(outline.boundingBox, false);
+		assert.equal(boxed.boundingBox, true);
+	});
+
+	it('reads a response that says nothing about what it screened as the outline', async () => {
+		respondWith({ consultees: [] });
+		const run = buildPythonRulesetRunner({
+			pythonFunctionUrl: 'http://localhost:7071/api/consultee-areas',
+			apiKey: undefined
+		});
+		assert.equal((await run(site, ruleset, 20_000)).siteScreenedAs, 'outline');
 	});
 
 	it('maps each consultee with its reasons, with geometry only when the function sent it', async () => {

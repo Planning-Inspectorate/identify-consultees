@@ -1,8 +1,9 @@
 """Run a ruleset against a project site: which consultee areas it identifies, and why."""
 
 from concurrent.futures import ThreadPoolExecutor
-from dataclasses import replace
+from dataclasses import dataclass, replace
 from functools import partial
+from typing import Literal
 
 from intersector import queries
 from intersector.database import Database, open_database
@@ -20,6 +21,18 @@ from intersector.tolerances import (
 )
 from setup_database.db import ConnectionParams
 
+SiteScreenedAs = Literal["outline", "boundingBox"]
+
+
+@dataclass(frozen=True)
+class Screening:
+    """What a ruleset run found, and what it screened against: the site's outline, or - for a site
+    too detailed to screen in time - its bounding box, which finds more than the outline would."""
+
+    consultees: list[Consultee]
+    site_screened_as: SiteScreenedAs
+
+
 CONDITION_CONCURRENCY = 6
 """Conditions that need their own query run this many at a time. Fully parallel produced real
 deadlocks and timeouts once other work hit the same table."""
@@ -32,7 +45,9 @@ def run_ruleset(
     nearby_radius_metres: float,
     nearby_radius_metres_by_category: dict[str, float] | None = None,
     with_geometry: bool = True,
-) -> list[Consultee]:
+    bounding_box_above_points: int | None = None,
+    bounding_box: bool = False,
+) -> Screening:
     """Every consultee the ruleset identifies for the site, plus every area within its category's
     nearby radius (`nearby_radius_metres_by_category`, else `nearby_radius_metres`; any category
     but Railway), nearest first.
@@ -43,17 +58,30 @@ def run_ruleset(
     `with_geometry` gives condition matches their original geometry. Without it no geometry is
     read at all - the bulk of a run's time and response when the matches include whole counties
     or National Parks, and unneeded by a caller that draws from its own display geometry.
+
+    The site is screened against its bounding box instead of its outline when asked
+    (`bounding_box`), or when its outline - simplified as the reference data is - has more than
+    `bounding_box_above_points` points: the most detailed real sites take minutes to screen on a
+    small database. Every area the outline would find, the box finds too, and more besides.
     """
     radius_by_category = nearby_radius_metres_by_category or {}
     search_radius = max([nearby_radius_metres, *radius_by_category.values()])
     with open_database(params) as db:
         site = queries.simplify(db, site_wkt)
+        site_screened_as: SiteScreenedAs = "outline"
+        if bounding_box or (
+            bounding_box_above_points is not None and queries.point_count(site) > bounding_box_above_points
+        ):
+            site = queries.bounding_box(site)
+            site_screened_as = "boundingBox"
         # one query out to the largest radius: the nearby reasons, and the answer to most
         # conditions. No geometry - some rows are whole counties or National Parks, and most aren't drawn
         fetched = queries.find_areas_near(
             db, site, search_radius, excluded_categories=CATEGORIES_EXCLUDED_FROM_NEARBY, with_geometry=False
         )
-        matches_by_condition = _match_conditions(db, site, rules, fetched, search_radius, with_geometry)
+        matches_by_condition = _match_conditions(
+            db, site, rules, fetched, search_radius, with_geometry, boxed=site_screened_as == "boundingBox"
+        )
 
         nearby = [
             (match, radius)
@@ -64,7 +92,7 @@ def run_ruleset(
         _measure_unmeasured(db, site, consultees)
         if with_geometry:
             _add_geometry_to_condition_matches(db, consultees)
-        return sorted(consultees.values(), key=_nearest_first)
+        return Screening(sorted(consultees.values(), key=_nearest_first), site_screened_as)
 
 
 def nearby_radius_for(match: AreaMatch, default_metres: float, radius_by_category: dict[str, float]) -> float | None:
@@ -106,6 +134,7 @@ def _match_conditions(
     nearby: list[AreaMatch],
     nearby_radius_metres: float,
     with_geometry: bool,
+    boxed: bool = False,
 ) -> dict[str, list[AreaMatch]]:
     """Each condition's matches, by condition id - filtered from the nearby search where it can be,
     otherwise from the condition's own query."""
@@ -125,7 +154,7 @@ def _match_conditions(
         else None
     )
 
-    query = partial(_query_condition, db, site, site_within_margin, with_geometry)
+    query = partial(_query_condition, db, site, site_within_margin, with_geometry, boxed)
     with ThreadPoolExecutor(max_workers=CONDITION_CONCURRENCY) as pool:
         for rule, matches in zip(needs_query, pool.map(query, needs_query), strict=True):
             matches_by_condition[rule.id] = matches
@@ -133,15 +162,25 @@ def _match_conditions(
 
 
 def _query_condition(
-    db: Database, site: str, site_within_margin: str | None, with_geometry: bool, rule: RuleCondition
+    db: Database,
+    site: str,
+    site_within_margin: str | None,
+    with_geometry: bool,
+    boxed: bool,
+    rule: RuleCondition,
 ) -> list[AreaMatch]:
-    """`rule`'s matches from its own query."""
+    """`rule`'s matches from its own query - a bordering condition's, for a site screened against
+    its bounding box, from the rectangle around its hosts (see find_areas_bordering_box)."""
     if rule.logic_type == "intersection":
         return queries.find_areas_near(db, site, rule.buffer_metres, rule.categories, with_geometry=with_geometry)
     if not rule.host_category:
         return []
-    neighbours = queries.find_areas_bordering(
-        db, site_within_margin, rule.host_category, rule.categories, with_geometry=with_geometry
+    neighbours = (
+        queries.find_areas_bordering_box(db, site_within_margin, rule.host_category, rule.categories)
+        if boxed
+        else queries.find_areas_bordering(
+            db, site_within_margin, rule.host_category, rule.categories, with_geometry=with_geometry
+        )
     )
     return [AreaMatch(area, distance_metres=None) for area in neighbours]
 

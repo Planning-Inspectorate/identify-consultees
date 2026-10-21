@@ -81,9 +81,10 @@ Two techniques keep queries fast, and both are easy to undo by accident:
 
 ## Timeouts and failures
 
-- The web app waits 60s for a run (`RUN_RULESET_TIMEOUT_MS` in `apps/manage/src/app/ruleset-runner.ts`).
+- The web app waits 45s for a run on the site's outline (`OUTLINE_RUN_TIMEOUT_MS` in `apps/manage/src/app/ruleset-runner.ts`).
+- **Bounding box fallback.** A site too detailed to screen in time is screened against its bounding box instead: up front for a site whose simplified outline has more points than [`config/screening.yaml`](../../config/screening.yaml)'s `boundingBoxAbovePoints` (2,000; 10 of the 283 real sites), and otherwise when a run on the outline fails or times out, given 60s more (`BOUNDING_BOX_RUN_TIMEOUT_MS`, `runRulesetSafely`). Screening a box takes a fraction of a second whatever the site's detail, but finds every consultee near the rectangle. On the most detailed local site (102 x 55km) it found 842 areas touching it against the outline's 124. So the check page and each category page warn that the list can include consultees not near the site, and the workbook's Summary says what was screened. A bordering condition on a box doesn't query each host (a box can hold hundreds: 778 for the most detailed site), but takes the rectangle around every host's bounding circle and finds the condition's categories within it (`find_areas_bordering_box`). Every neighbour touches a host, so it's in that rectangle. On the 12 most detailed local sites, the box found every condition match the outline did, and many more. The two most detailed took 1.4s and 0.7s on their box against 10.5s and 8.2s on their outline. On Dev and Test's Basic (5 DTU) database, outlines like those ran past the timeout.
 - Deadlocks are retried up to 3 times (`intersector/database.py`). Timeouts aren't: re-running a slow query just repeats the wait, and that once caused multi-minute hangs.
-- Any failure shows "The ruleset could not be run" with Try again, never empty tables.
+- Any other failure (including the box run's) shows "The ruleset could not be run" with Try again, never empty tables.
 
 ## Performance
 

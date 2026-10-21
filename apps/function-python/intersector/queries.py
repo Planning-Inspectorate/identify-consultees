@@ -7,6 +7,8 @@ column lists and filters are developer-controlled text.
 """
 
 import json
+import math
+import re
 from collections.abc import Iterable
 
 from intersector.database import Database
@@ -75,6 +77,38 @@ def simplify(db: Database, wkt: str) -> str:
         (wkt, SIMPLIFY_TOLERANCE_METRES),
     )
     return row["wkt"]
+
+
+_NUMBER = re.compile(r"-?\d+(?:\.\d+)?(?:[eE][-+]?\d+)?")
+
+# a degree of latitude, in metres - near enough everywhere for growing a box
+METRES_PER_DEGREE = 111_320
+
+BOUNDING_BOX_MARGIN_METRES = 1_000
+"""How far a site's bounding box reaches past it. A geography's edges are great circles, not lines of
+latitude: a box 100km wide bows ~250m off its corners' latitude at its middle, so without a margin
+it could cut a corner of the site off."""
+
+
+def point_count(wkt: str) -> int:
+    """How many points a WKT shape has - each an x y pair."""
+    return len(_NUMBER.findall(wkt)) // 2
+
+
+def bounding_box(wkt: str, margin_metres: float = BOUNDING_BOX_MARGIN_METRES) -> str:
+    """The rectangle of longitude and latitude around `wkt`, grown by `margin_metres`, as
+    a polygon - anticlockwise, as SQL Server's geography needs its outer rings. Screening against it
+    rather than the site's outline is fast whatever the site's detail, but finds every area near the
+    rectangle - for a long, diagonal site, many that aren't near the site itself."""
+    numbers = [float(number) for number in _NUMBER.findall(wkt)]
+    longitudes, latitudes = numbers[0::2], numbers[1::2]
+    south, north = min(latitudes), max(latitudes)
+    latitude_margin = margin_metres / METRES_PER_DEGREE
+    widest = max(abs(south), abs(north)) + latitude_margin
+    longitude_margin = margin_metres / (METRES_PER_DEGREE * math.cos(math.radians(min(widest, 89))))
+    west, east = min(longitudes) - longitude_margin, max(longitudes) + longitude_margin
+    south, north = south - latitude_margin, north + latitude_margin
+    return f"POLYGON(({west} {south}, {east} {south}, {east} {north}, {west} {north}, {west} {south}))"
 
 
 def grow(db: Database, wkt: str, metres: float) -> str:
@@ -168,6 +202,58 @@ def find_areas_bordering(
         for row in rows:
             neighbours[row["id"]] = _area_from_row(row)
     return list(neighbours.values())
+
+
+def find_areas_bordering_box(
+    db: Database,
+    box_within_margin: str,
+    host_category: str,
+    categories: Iterable[str],
+) -> list[ConsulteeArea]:
+    """For a site screened against its bounding box: areas of `categories` within
+    BORDERING_TOLERANCE_METRES of the rectangle around every `host_category` area that intersects
+    the box (already grown by the distance margin). Unmeasured - see AreaMatch.
+
+    A box can hold hundreds of hosts - find_areas_bordering's query per host took 778 queries for
+    the most detailed real site - so this takes two: each host's bounding circle (no outlines read),
+    then one query for the rectangle around them all. Every area bordering a host touches it, so
+    it's in that rectangle: this finds everything find_areas_bordering would, and the hosts and
+    their other neighbours besides."""
+    categories = list(categories)
+    if not categories:
+        return []
+    hosts = db.query(
+        f"""
+        SELECT geometrySimplified.EnvelopeCenter().Lat AS latitude,
+            geometrySimplified.EnvelopeCenter().Long AS longitude,
+            geometrySimplified.EnvelopeAngle() AS angle
+        FROM consultee_area {USE_SPATIAL_INDEX}
+        WHERE consulteeCategory = %s
+            AND geometrySimplified.STIntersects({_geography()}) = 1
+        """,
+        (host_category, box_within_margin),
+    )
+    if not hosts:
+        return []
+    # each host's bounding circle as a rectangle of longitude and latitude: its angle north and
+    # south, and wider east and west - by the narrowest a degree of longitude is across them all
+    south = min(host["latitude"] - host["angle"] for host in hosts)
+    north = max(host["latitude"] + host["angle"] for host in hosts)
+    widest = min(max(abs(south), abs(north)), 89)
+    reach = max(host["angle"] for host in hosts) / math.cos(math.radians(widest))
+    west = min(host["longitude"] for host in hosts) - reach
+    east = max(host["longitude"] for host in hosts) + reach
+    hosts_box = bounding_box(f"LINESTRING ({west} {south}, {east} {north})", BORDERING_TOLERANCE_METRES)
+    rows = db.query(
+        f"""
+        SELECT {AREA_COLUMNS}
+        FROM consultee_area {USE_SPATIAL_INDEX}
+        WHERE consulteeCategory IN ({_placeholders(categories)})
+            AND geometrySimplified.STIntersects({_geography()}) = 1
+        """,
+        (*categories, hosts_box),
+    )
+    return [_area_from_row(row) for row in rows]
 
 
 def _select_by_id(db: Database, columns: str, ids: list[str], params_before: tuple = ()) -> list[dict]:

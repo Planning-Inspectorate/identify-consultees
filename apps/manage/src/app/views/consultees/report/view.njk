@@ -18,6 +18,14 @@
 		{{ govukNotificationBanner({ html: failureHtml }) }}
 	{% endif %}
 
+	{% if screenedBoundingBox and not rulesetFailed %}
+		{% from "govuk/components/warning-text/macro.njk" import govukWarningText %}
+		{{ govukWarningText({
+			text: "This site's outline is too detailed to screen in time, so its consultees were found using the rectangle around it (its bounding box). The list can include consultees that are not near the site - check each one before creating the report.",
+			iconFallbackText: "Warning"
+		}) }}
+	{% endif %}
+
 	<h2 class="govuk-heading-m">Report details</h2>
 	{{ govukSummaryList({
 		rows: [

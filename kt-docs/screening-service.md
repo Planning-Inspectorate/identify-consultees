@@ -21,6 +21,8 @@ Request:
 	"nearbyRadiusMetres": 20000,
 	"nearbyRadiusMetresByCategory": { "Parish Council": 5000, "Hospital": 0 },
 	"includeGeometry": false,
+	"boundingBoxAbovePoints": 2000,
+	"boundingBox": false,
 	"rules": [
 		{ "id": "hospital", "logicType": "intersection", "categories": ["Hospital"], "bufferMetres": 10000 },
 		{
@@ -52,7 +54,8 @@ Response (200):
 				{ "type": "nearby", "radiusMetres": 20000 }
 			]
 		}
-	]
+	],
+	"siteScreenedAs": "outline"
 }
 ```
 
@@ -61,6 +64,9 @@ Response (200):
 - `reasons`: at least one. A `condition` for each condition met, in the ruleset's order, then `nearby` if within the radius. The web app turns them into **Why identified** text (`views/consultees/reasons.ts`).
 - `includeGeometry` (optional, default `true`): whether condition matches carry `geometryWkt`. The web app sends `false`: its maps draw every consultee from its own display geometry. Leaving geometry out means it's never read, which about halves a run (EN0110007: 3.9s and 75MB to 2.0s and 0.13MB, with the full reference data loaded locally).
 - `geometryWkt`: only for condition matches, and only when `includeGeometry` is `true`.
+- `boundingBoxAbovePoints` (optional): screen a site whose outline, simplified to 10m, has more points than this against its bounding box instead: the rectangle of longitude and latitude around it, 1km wider all round (`queries.bounding_box`). The web app sends [`config/screening.yaml`](../config/screening.yaml)'s, 2,000 to start. Without it the outline is always screened.
+- `boundingBox` (optional, default `false`): screen the bounding box whatever the site's detail. The web app asks for it when a run on the outline fails or times out.
+- `siteScreenedAs`: `outline`, or `boundingBox`. A box finds every consultee the outline would and more: for a long, diagonal site, many that aren't near it (the most detailed local site: 708 "host" parishes against 89). The web app warns on the check and category pages, and the workbook's Summary says so.
 - Ids are lowercase, matching the web app's Prisma queries, which use them for display geometry and `exclude=` URLs.
 - Errors: 401 for a bad or missing key; 500 `{ "error": "Failed to run the ruleset" }` with no internal detail.
 

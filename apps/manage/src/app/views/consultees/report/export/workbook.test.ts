@@ -163,6 +163,16 @@ describe('report workbook', () => {
 		);
 	});
 
+	it("says on the Summary what the run screened - the site's outline, or its bounding box", () => {
+		const screenedAgainst = (sheets: ReturnType<typeof buildReportSheets>) =>
+			sheets[0].data.map(rowValues).find((cells) => cells[0] === 'Screened against')?.[1];
+		assert.strictEqual(screenedAgainst(buildReportSheets(report())), "The site's outline");
+		assert.match(
+			String(screenedAgainst(buildReportSheets(report({ siteScreenedAs: 'boundingBox' })))),
+			/^The site's bounding box - its outline was too detailed to screen in time/
+		);
+	});
+
 	it('lists each consultee with its stored columns, sorted by category then name', () => {
 		const sheets = buildReportSheets(
 			report({

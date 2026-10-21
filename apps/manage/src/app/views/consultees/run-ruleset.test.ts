@@ -86,7 +86,7 @@ describe('runRulesetSafely', () => {
 
 		const second = await runRulesetSafely(serviceWith(runner), project(), RULESETS[0], store);
 		assert.equal(runner.mock.callCount(), 1);
-		assert.deepStrictEqual(second, { consultees: stored.consultees, failed: false });
+		assert.deepStrictEqual(second, { consultees: stored.consultees, failed: false, siteScreenedAs: 'outline' });
 	});
 
 	it('runs again for another case or ruleset, keeping only the latest run', async () => {
@@ -121,9 +121,54 @@ describe('runRulesetSafely', () => {
 		const store: Record<string, unknown> = {};
 		const logger = mockLogger();
 		const failed = await runRulesetSafely(serviceWith(failingRulesetRunner(), logger), project(), RULESETS[0], store);
-		assert.deepStrictEqual(failed, { consultees: [], failed: true });
+		assert.deepStrictEqual(failed, { consultees: [], failed: true, siteScreenedAs: 'outline' });
 		assert.equal(store[RULESET_RUN_SESSION_FIELD], undefined);
+		// the outline, then the bounding box, both failed
+		assert.equal((logger.warn as ReturnType<typeof mock.fn>).mock.callCount(), 1);
 		assert.equal((logger.error as ReturnType<typeof mock.fn>).mock.callCount(), 1);
+	});
+
+	it("screens the site's bounding box when its outline can't be screened in time, and keeps that with the run", async () => {
+		const runner = mock.fn(
+			async (_site: unknown, _ruleset: unknown, _radius: unknown, options?: { boundingBox?: boolean }) => {
+				if (!options?.boundingBox) {
+					throw new Error('The operation was aborted due to timeout');
+				}
+				return { consultees: [], siteScreenedAs: 'boundingBox' as const };
+			}
+		);
+		const logger = mockLogger();
+		const store: Record<string, unknown> = {};
+		const run = await runRulesetSafely(serviceWith(runner as never, logger), project(), RULESETS[0], store);
+
+		assert.deepStrictEqual(run, { consultees: [], failed: false, siteScreenedAs: 'boundingBox' });
+		assert.deepStrictEqual(runner.mock.calls[1].arguments[3], { boundingBox: true });
+		assert.equal((logger.warn as ReturnType<typeof mock.fn>).mock.callCount(), 1);
+		assert.equal((store[RULESET_RUN_SESSION_FIELD] as StoredRulesetRun).siteScreenedAs, 'boundingBox');
+		// the kept run says so too
+		const kept = await runRulesetSafely(serviceWith(runner as never, logger), project(), RULESETS[0], store);
+		assert.equal(kept.siteScreenedAs, 'boundingBox');
+		assert.equal(runner.mock.callCount(), 2);
+	});
+
+	it('takes what the function screened - its bounding box, for a site past the limit - and reads an older kept run as the outline', async () => {
+		const runner = mock.fn(async () => ({ consultees: [], siteScreenedAs: 'boundingBox' as const }));
+		const store: Record<string, unknown> = {};
+		assert.equal(
+			(await runRulesetSafely(serviceWith(runner as never), project(), RULESETS[0], store)).siteScreenedAs,
+			'boundingBox'
+		);
+		delete (store[RULESET_RUN_SESSION_FIELD] as StoredRulesetRun).siteScreenedAs;
+		assert.equal(
+			(await runRulesetSafely(serviceWith(runner as never), project(), RULESETS[0], store)).siteScreenedAs,
+			'outline'
+		);
+		// a runner that doesn't say means the outline
+		const silent = mock.fn(async () => ({ consultees: [] }));
+		assert.equal(
+			(await runRulesetSafely(serviceWith(silent as never), project(), RULESETS[0])).siteScreenedAs,
+			'outline'
+		);
 	});
 
 	it('adds the cases near the site as Nearby NSIPs, with the radius the query used', async () => {
@@ -185,7 +230,8 @@ describe('runRulesetSafely', () => {
 		const store: Record<string, unknown> = {};
 		assert.deepStrictEqual(await runRulesetSafely(service, project(), RULESETS[0], store), {
 			consultees: [],
-			failed: true
+			failed: true,
+			siteScreenedAs: 'outline'
 		});
 		assert.equal(store[RULESET_RUN_SESSION_FIELD], undefined);
 		assert.equal((logger.error as ReturnType<typeof mock.fn>).mock.callCount(), 1);

@@ -499,7 +499,15 @@ export function isIdentified(match: Pick<ConsulteeMatch, 'reasons'>): boolean {
 	return match.reasons.some((reason) => reason.type !== 'nearby');
 }
 
+/**
+ * What a run screened: the site's outline, or - for a site too detailed to screen in time - the
+ * rectangle around it, which finds every consultee the outline would and more besides.
+ */
+export type SiteScreenedAs = 'outline' | 'boundingBox';
+
 export interface RunRulesetResult {
 	/** Every consultee, nearest first, each once: what any condition met, and everything nearby. */
 	consultees: ConsulteeMatch[];
+	/** The outline unless said otherwise. */
+	siteScreenedAs?: SiteScreenedAs;
 }
