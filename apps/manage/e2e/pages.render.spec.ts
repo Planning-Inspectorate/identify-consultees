@@ -156,6 +156,12 @@ const pages = [
 		mustSee: []
 	},
 	{
+		path: '/error-test',
+		name: 'error scenarios index',
+		heading: /Error scenarios/i,
+		mustSee: [/Rendered error pages/i, /CSRF check/i, /Needs the environment/i]
+	},
+	{
 		path: '/this-page-does-not-exist',
 		name: '404',
 		heading: /Page not found/i,

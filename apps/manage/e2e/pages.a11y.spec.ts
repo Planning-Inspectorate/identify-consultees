@@ -51,6 +51,7 @@ const pages = [
 	{ path: '/cookies', name: 'cookies' },
 	{ path: '/contact', name: 'contact' },
 	{ path: '/items', name: 'items list' },
+	{ path: '/error-test', name: 'error scenarios index' },
 	{ path: '/consultee-areas-python', name: 'consultee areas python' },
 	{ path: '/admin', name: 'admin overview' },
 	{ path: '/admin/database', name: 'admin database' },
