@@ -13,6 +13,13 @@ import type { Logger } from 'pino';
 // instead of aborting it arbitrarily at 15s.
 const APP_REQUEST_TIMEOUT_MS = 45_000;
 
+// Bulk loads from the admin pages - a group of the reference data, clearing the table, the case
+// boundaries - write and delete whole national-scale shapes (coastlines, county boundaries) a few
+// at a time, which on Dev's Basic tier takes well over the app's 45s per statement. They run on a
+// client of their own with this timeout, as the CLI import does; the request may outlast Front
+// Door's timeout, but the load carries on.
+export const BULK_REQUEST_TIMEOUT_MS = 10 * 60 * 1000;
+
 export function initDatabaseClient(
 	config: { database: DatabaseConfig; NODE_ENV: string },
 	logger: Logger

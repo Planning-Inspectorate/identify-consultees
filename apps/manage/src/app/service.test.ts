@@ -37,6 +37,18 @@ describe('ManageService', () => {
 		}
 	});
 
+	test('makes one bulk database client, for the admin loads, the first time it is needed', async () => {
+		const service = new ManageService(buildManageTestConfig(true));
+		try {
+			const bulk = service.bulkDb;
+			assert.notEqual(bulk, service.db);
+			assert.equal(service.bulkDb, bulk);
+		} finally {
+			await service.bulkDb.$disconnect().catch(() => undefined);
+			await service.db.$disconnect().catch(() => undefined);
+		}
+	});
+
 	test('looks for no Nearby NSIPs unless a distance is set, and searches out to it', async () => {
 		const service = new ManageService({ ...buildManageTestConfig(true), nearbyNsipRadiusMetres: undefined });
 		const further = new ManageService({ ...buildManageTestConfig(true), nearbyNsipRadiusMetres: 45_000 });

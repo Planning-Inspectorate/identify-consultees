@@ -1,4 +1,9 @@
-import { initDatabaseClient } from '@pins/identify-consultees-database';
+import {
+	BULK_REQUEST_TIMEOUT_MS,
+	initDatabaseClient,
+	newDatabaseClient,
+	withExtendedTimeout
+} from '@pins/identify-consultees-database';
 import type { PrismaClient } from '@pins/identify-consultees-database/src/client/client.ts';
 import { BaseService } from '@planning-inspectorate/core/app';
 import path from 'node:path';
@@ -16,6 +21,7 @@ export class ManageService extends BaseService<PrismaClient> {
 	 */
 	#config: Config;
 	#rulesetRunner: RulesetRunner;
+	#bulkDb: PrismaClient | undefined;
 
 	/**
 	 * @param rulesetRunner - stands in for the Python function in tests; defaults to calling it
@@ -30,6 +36,18 @@ export class ManageService extends BaseService<PrismaClient> {
 				apiKey: config.pythonFunctionApiKey,
 				nearbyRadiusMetresByCategory: config.nearbyRadiusMetresByCategory
 			});
+	}
+
+	/**
+	 * A database client for the admin pages' bulk loads, whose statements can run for minutes on
+	 * Dev's tier - see BULK_REQUEST_TIMEOUT_MS. Made the first time it's needed.
+	 */
+	get bulkDb(): PrismaClient {
+		// the connection string is set - the app doesn't start without one (initDatabaseClient)
+		this.#bulkDb ??= newDatabaseClient(
+			withExtendedTimeout(this.#config.database.connectionString!, BULK_REQUEST_TIMEOUT_MS)
+		);
+		return this.#bulkDb;
 	}
 
 	get authConfig(): Config['auth'] {
