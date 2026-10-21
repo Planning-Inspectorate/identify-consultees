@@ -3,6 +3,8 @@ import { describe, test } from 'node:test';
 import {
 	consulteeCategoryFor,
 	datasetCode,
+	groupBySlug,
+	groupForCategory,
 	parseReferenceDataConfig,
 	REFERENCE_DATA_CONFIG,
 	UnknownDatasetError
@@ -13,6 +15,8 @@ version: 1
 datasets:
   AMB_EW: Ambulance Trust
   IDB_WA: " Internal Drainage District "
+groups:
+  Public bodies: [Ambulance Trust, Internal Drainage District, Hospital]
 `;
 
 const WITH_SUBCATEGORIES = `
@@ -22,6 +26,8 @@ datasets:
     category: Offshore Wind Site
     subcategories:
       Offshore  Wind Export Cables: " Offshore Wind Export Cable "
+groups:
+  Energy: [Offshore Wind Site, Offshore Wind Export Cable]
 `;
 
 describe('reference data config', () => {
@@ -45,6 +51,32 @@ describe('reference data config', () => {
 		assert.equal(parseReferenceDataConfig(VALID).subcategories.size, 0);
 	});
 
+	test('reads each group, its slug and its categories, in order', () => {
+		const config = parseReferenceDataConfig(`${VALID}  Energy & Waste: [DNO]`);
+		assert.deepEqual(
+			config.groups.map((group) => [group.name, group.slug, [...group.categories]]),
+			[
+				['Public bodies', 'public_bodies', ['Ambulance Trust', 'Internal Drainage District', 'Hospital']],
+				['Energy & Waste', 'energy_waste', ['DNO']]
+			]
+		);
+		assert.equal(groupForCategory('Hospital', config)?.name, 'Public bodies');
+		assert.equal(groupForCategory('Railway', config), undefined);
+		assert.equal(groupForCategory(null, config), undefined);
+		assert.equal(groupBySlug('energy_waste', config)?.name, 'Energy & Waste');
+		assert.equal(groupBySlug('nope', config), undefined);
+	});
+
+	test("puts every category the app's own datasets load as in one of the report's five groups", () => {
+		assert.deepEqual(
+			REFERENCE_DATA_CONFIG.groups.map((group) => group.slug),
+			['administrative_boundaries', 'public_bodies', 'energy', 'transport', 'other']
+		);
+		assert.equal(groupForCategory('Parish Council')?.slug, 'administrative_boundaries');
+		assert.equal(groupForCategory('Offshore Wind Export Cable')?.slug, 'energy');
+		assert.equal(groupBySlug('transport')?.categories.has('Railway'), true);
+	});
+
 	test('reads config/reference-data.yaml', () => {
 		assert.equal(REFERENCE_DATA_CONFIG.datasets.get('AMB_EW'), 'Ambulance Trust');
 		assert.equal(REFERENCE_DATA_CONFIG.datasets.get('CJC_EW'), 'Corporate Joint Committee');
@@ -59,8 +91,30 @@ describe('reference data config', () => {
 	for (const [title, text, message] of [
 		['an empty file', '', /must be a version 1 document/],
 		['another version', 'version: 2', /must be a version 1 document/],
-		['an unknown top-level key', `${VALID}\ndataset: {}`, /the document has "dataset"/],
+		[
+			'an unknown top-level key',
+			`${VALID}\ndataset: {}`,
+			/the document has "dataset" - it can only have version, datasets, groups/
+		],
 		['no datasets', 'version: 1\ndatasets: {}', /datasets must map/],
+		['no groups', VALID.replace(/groups:\n.*\n/, ''), /groups must map each group/],
+		['a group with no categories', VALID.replace(/\[Ambulance.*\]/, '[]'), /groups.Public bodies must list/],
+		['a group without a name', VALID.replace('Public bodies:', '"--":'), /"--" isn't a group name/],
+		[
+			'a category in two groups',
+			`${VALID}  Other: [Hospital]`,
+			/groups: Hospital is in both Public bodies and Other - it can only be in one/
+		],
+		[
+			'a category no group has',
+			VALID.replace('Internal Drainage District, ', ''),
+			/groups: no group has Internal Drainage District, which a dataset loads as/
+		],
+		[
+			"a subcategory's category no group has",
+			WITH_SUBCATEGORIES.replace(', Offshore Wind Export Cable]', ']'),
+			/no group has Offshore Wind Export Cable/
+		],
 		['datasets as a list', 'version: 1\ndatasets: [AMB_EW]', /datasets must map/],
 		['a code without its area', VALID.replace('AMB_EW', 'AMB'), /"AMB" isn't a dataset code/],
 		['a lower-case code', VALID.replace('AMB_EW', 'amb_ew'), /"amb_ew" isn't a dataset code/],

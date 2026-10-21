@@ -548,10 +548,12 @@ job:
   until the platform team grants it Storage Blob Data Reader - use the in-app import meanwhile.
 - **In-app import**: the same blobs can be imported from the manage app itself at
   `/admin/import-reference-data` (with `/admin/upload-to-blob` for getting files into the
-  container) - the app's managed identity has Storage Blob Data Contributor. This route always
-  **replaces** the table (same safeguards as the pipeline's `replaceExistingData`), and shows the
-  rows currently loaded, so an import that outlasts Front Door's response timeout can be confirmed
-  by reloading the page.
+  container) - the app's managed identity has Storage Blob Data Contributor. Consultee areas load a
+  group at a time (`config/reference-data.yaml`'s `groups`, one file each), each load replacing
+  its group's rows - archiving them first when a later quarter's data comes in - and case
+  boundaries replace their table. The page shows the rows currently loaded, so a load that
+  outlasts Front Door's response timeout can be confirmed by reloading it. See
+  `kt-docs/data/data-model.md`.
 - **One-off local imports**: `npm run db-import -- --type=<consultee-areas|case-boundaries> --file=<path>`
   works against any `SQL_CONNECTION_STRING` you can reach directly (e.g. from a machine with a
   route to a real environment's database), independently of any pipeline.

@@ -74,6 +74,36 @@ export function parseArgs(argv: string[]): ParsedArgs {
 	return { type, blob: values.blob, batchSize, replace };
 }
 
+/** The container, by BLOB_STORE_HOST and BLOB_STORE_CONTAINER. */
+function referenceDataContainer() {
+	const blobStoreHost = process.env.BLOB_STORE_HOST;
+	const blobStoreContainer = process.env.BLOB_STORE_CONTAINER;
+	if (!blobStoreHost || !blobStoreContainer) {
+		throw new Error('BLOB_STORE_HOST and BLOB_STORE_CONTAINER are required to import from blob storage');
+	}
+	return new BlobServiceClient(blobStoreHost, new DefaultAzureCredential()).getContainerClient(blobStoreContainer);
+}
+
+/** A file in blob storage, as listBlobs gives it. */
+export interface StoredBlob {
+	name: string;
+	size: number;
+	lastModified: Date;
+}
+
+/** Every file in BLOB_STORE_CONTAINER - what's there to import. */
+export async function listBlobs(): Promise<StoredBlob[]> {
+	const blobs: StoredBlob[] = [];
+	for await (const blob of referenceDataContainer().listBlobsFlat()) {
+		blobs.push({
+			name: blob.name,
+			size: blob.properties.contentLength ?? 0,
+			lastModified: blob.properties.lastModified
+		});
+	}
+	return blobs;
+}
+
 /**
  * Download `blobName` from BLOB_STORE_CONTAINER to a local temp file, returning its path - the
  * existing import functions read from a file path, not a stream, so this just gets the source
@@ -82,14 +112,7 @@ export function parseArgs(argv: string[]): ParsedArgs {
 export async function downloadBlobToTempFile(
 	blobName: string
 ): Promise<{ filePath: string; cleanup: () => Promise<void> }> {
-	const blobStoreHost = process.env.BLOB_STORE_HOST;
-	const blobStoreContainer = process.env.BLOB_STORE_CONTAINER;
-	if (!blobStoreHost || !blobStoreContainer) {
-		throw new Error('BLOB_STORE_HOST and BLOB_STORE_CONTAINER are required to import from blob storage');
-	}
-
-	const blobServiceClient = new BlobServiceClient(blobStoreHost, new DefaultAzureCredential());
-	const containerClient = blobServiceClient.getContainerClient(blobStoreContainer);
+	const containerClient = referenceDataContainer();
 	const blobClient = containerClient.getBlobClient(blobName);
 
 	const tempDir = await mkdtemp(path.join(tmpdir(), 'identify-consultees-import-'));
@@ -99,7 +122,7 @@ export async function downloadBlobToTempFile(
 	const downloadResponse = await blobClient.download();
 	if (!downloadResponse.readableStreamBody) {
 		await cleanup();
-		throw new Error(`Blob "${blobName}" in container "${blobStoreContainer}" has no readable content`);
+		throw new Error(`Blob "${blobName}" in container "${containerClient.containerName}" has no readable content`);
 	}
 	await pipeline(downloadResponse.readableStreamBody, createWriteStream(filePath));
 

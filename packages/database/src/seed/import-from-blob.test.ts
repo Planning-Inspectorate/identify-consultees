@@ -11,7 +11,7 @@ import { loadConfig } from '../configuration/config.ts';
 import { acquireDbTestLock, releaseDbTestLock } from '../db-test-lock.ts';
 import { newDatabaseClient } from '../index.ts';
 import { deterministicId } from './geojson-import.ts';
-import { downloadBlobToTempFile, parseArgs } from './import-from-blob.ts';
+import { downloadBlobToTempFile, listBlobs, parseArgs } from './import-from-blob.ts';
 
 describe('parseArgs', () => {
 	test('parses a valid consultee-areas import', () => {
@@ -121,6 +121,26 @@ describe('downloadBlobToTempFile', () => {
 				assert.equal(getContainerClient.mock.calls[0].arguments[0], 'test-container');
 				await cleanup();
 				assert.equal(existsSync(filePath), false);
+			});
+		} finally {
+			getContainerClient.mock.restore();
+		}
+	});
+
+	test('lists every file in the container, with its size and when it was last changed', async () => {
+		const lastModified = new Date('2026-10-21T09:00:00Z');
+		const getContainerClient = mock.method(BlobServiceClient.prototype, 'getContainerClient', () => ({
+			listBlobsFlat: async function* () {
+				yield { name: '20261020_energy.geojson', properties: { contentLength: 1024, lastModified } };
+				yield { name: 'empty.geojson', properties: { lastModified } };
+			}
+		}));
+		try {
+			await withBlobEnv(BLOB_ENV.BLOB_STORE_HOST, BLOB_ENV.BLOB_STORE_CONTAINER, async () => {
+				assert.deepEqual(await listBlobs(), [
+					{ name: '20261020_energy.geojson', size: 1024, lastModified },
+					{ name: 'empty.geojson', size: 0, lastModified }
+				]);
 			});
 		} finally {
 			getContainerClient.mock.restore();

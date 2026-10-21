@@ -1,6 +1,7 @@
 {% extends "admin/layout.njk" %}
 
 {% from "govuk/components/button/macro.njk" import govukButton %}
+{% from "govuk/components/date-input/macro.njk" import govukDateInput %}
 {% from "govuk/components/error-message/macro.njk" import govukErrorMessage %}
 {% from "govuk/components/file-upload/macro.njk" import govukFileUpload %}
 {% from "govuk/components/notification-banner/macro.njk" import govukNotificationBanner %}
@@ -9,15 +10,49 @@
     {{ pageHeading }} - {{ config.headerTitle }}
 {% endblock %}
 
+{#
+  Each form: blob-upload.js sends the file a part at a time (data-chunk-bytes each) rather than in
+  one request, which a large file can't finish within Front Door's timeout; without it the form
+  posts the whole file. A group's form saves it as the group's file for its date
+  (YYYYMMDD_<group>.geojson) - the script fills the date in from the chosen file's name.
+#}
+{% macro uploadForm(id, buttonText, label, hint, group) %}
+    <form method="post" action="/admin/upload-to-blob/run" enctype="multipart/form-data" novalidate
+        data-chunked-upload data-chunk-bytes="{{ chunkBytes }}" data-max-upload-bytes="{{ maxUploadBytes }}"
+        data-csrf-token="{{ _csrf }}"{% if group %} data-blob-group="{{ group.slug }}"{% endif %}>
+        {% if group %}
+            <input type="hidden" name="group" value="{{ group.slug }}">
+        {% endif %}
+
+        {{ govukFileUpload({
+            id: "file-" ~ id,
+            name: "file",
+            label: { text: label, classes: "govuk-label--s" },
+            hint: { text: hint }
+        }) }}
+
+        {% if group %}
+            {{ govukDateInput({
+                id: "date-" ~ id,
+                namePrefix: "date",
+                fieldset: { legend: { text: "Date the data is from", classes: "govuk-fieldset__legend--s" } },
+                hint: { text: "Filled in from the file's name if it starts with the date, as the pipeline names its files: 20261020_" ~ group.slug ~ ".geojson." }
+            }) }}
+        {% endif %}
+
+        <p class="govuk-body" role="status" aria-live="polite" data-upload-status></p>
+
+        {{ govukButton({ text: buttonText }) }}
+    </form>
+{% endmacro %}
+
 {% block adminContent %}
     <h1 class="govuk-heading-l">{{ pageHeading }}</h1>
 
     <p class="govuk-body">
-        Internal tool - uploads a file directly to the application's own blob storage container
-        (<code>infrastructure/storage.tf</code>), using the app's managed identity. Useful for
-        getting a large file (e.g. the full real reference dataset - see
-        <code>packages/database/src/seed/import-from-blob.ts</code>) into storage without needing
-        VPN/Bastion access to the storage account's private endpoint.
+        Internal tool - uploads files to the application's own blob storage container
+        (<code>infrastructure/storage.tf</code>), using the app's managed identity, ready for
+        <a class="govuk-link" href="/admin/import-reference-data">loading into the database</a>.
     </p>
 
     {% if uploadedBlobName %}
@@ -28,27 +63,25 @@
         }) }}
     {% endif %}
 
-    {# blob-upload.js sends the file a part at a time (data-chunk-bytes each) rather than in one
-       request, which a large file can't finish within Front Door's timeout; without it the form
-       posts the whole file #}
-    <form method="post" action="/admin/upload-to-blob/run" enctype="multipart/form-data" novalidate
-        data-chunked-upload data-chunk-bytes="{{ chunkBytes }}" data-max-upload-bytes="{{ maxUploadBytes }}"
-        data-csrf-token="{{ _csrf }}">
-        {% if error %}
-            {{ govukErrorMessage({ text: error }) }}
-        {% endif %}
+    {% if error %}
+        {{ govukErrorMessage({ text: error }) }}
+    {% endif %}
 
-        {{ govukFileUpload({
-            id: "file",
-            name: "file",
-            label: { text: "Upload a file" },
-            hint: { text: "Up to 1GB. The file is saved under its own name - to import consultee areas, name it combined_reference_data_v1.geojson." }
-        }) }}
+    <h2 class="govuk-heading-m">Consultee areas, by group</h2>
+    <p class="govuk-body">
+        The reference data comes as a file per group - the report's tabs, as
+        <code>config/reference-data.yaml</code> sets them. Each is saved named for the date its data is
+        from and its group, replacing any file of that name.
+    </p>
 
-        <p class="govuk-body" role="status" aria-live="polite" data-upload-status></p>
+    {% for group in groups %}
+        <h3 class="govuk-heading-s">{{ group.name }}</h3>
+        <p class="govuk-body-s">{{ group.categories }}</p>
+        {{ uploadForm(group.slug, "Upload " ~ group.name, "Upload the " ~ group.name ~ " file", "Up to 1GB.", group) }}
+    {% endfor %}
 
-        {{ govukButton({ text: "Upload" }) }}
-    </form>
+    <h2 class="govuk-heading-m">Another file</h2>
+    {{ uploadForm("another", "Upload", "Upload a file", "Up to 1GB. Saved under its own name - the case boundaries as all-project-boundaries.geojson.") }}
 {% endblock %}
 
 {% block bodyEnd %}

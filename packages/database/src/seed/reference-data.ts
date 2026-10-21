@@ -15,6 +15,17 @@ export interface ReferenceDataConfig {
 	 * Export Cables → Offshore Wind Export Cable. Subcategories are keyed lower case.
 	 */
 	subcategories: ReadonlyMap<string, ReadonlyMap<string, string>>;
+	/** The groups the reference data is uploaded and loaded in, in the file's order. */
+	groups: readonly ReferenceDataGroup[];
+}
+
+/** A group of consultee categories the reference data is uploaded and loaded in - see the file. */
+export interface ReferenceDataGroup {
+	/** As the report's tab names it: Public bodies. */
+	name: string;
+	/** As its files and URLs name it: public_bodies. */
+	slug: string;
+	categories: ReadonlySet<string>;
 }
 
 const FILE = 'reference-data.yaml';
@@ -68,14 +79,50 @@ function datasetSettings(code: string, value: unknown): { category: string; subc
 	};
 }
 
+/** A group's name as its files and URLs give it: Administrative boundaries → administrative_boundaries. */
+export function groupSlug(name: string): string {
+	return name
+		.trim()
+		.toLowerCase()
+		.replace(/[^a-z0-9]+/g, '_')
+		.replace(/^_|_$/g, '');
+}
+
+function parseGroups(value: unknown): ReferenceDataGroup[] {
+	if (!isRecord(value) || Object.keys(value).length === 0) {
+		fail('groups must map each group to its consultee categories');
+	}
+	const grouped = new Map<string, string>();
+	return Object.entries(value).map(([name, categories]) => {
+		const slug = groupSlug(name);
+		if (slug === '') {
+			fail(`groups: "${name}" isn't a group name`);
+		}
+		if (!Array.isArray(categories) || categories.length === 0) {
+			fail(`groups.${name} must list its consultee categories`);
+		}
+		const names = categories.map((entry) => category(entry, `groups.${name}`));
+		for (const entry of names) {
+			const other = grouped.get(entry);
+			if (other !== undefined) {
+				fail(`groups: ${entry} is in both ${other} and ${name} - it can only be in one`);
+			}
+			grouped.set(entry, name);
+		}
+		return { name: name.trim(), slug, categories: new Set(names) };
+	});
+}
+
 export function parseReferenceDataConfig(text: string): ReferenceDataConfig {
 	const document = text.trim() === '' ? null : load(text);
 	if (!isRecord(document) || document.version !== 1) {
 		fail('must be a version 1 document');
 	}
-	const unknown = Object.keys(document).filter((key) => key !== 'version' && key !== 'datasets');
+	const unknown = Object.keys(document).filter((key) => !['version', 'datasets', 'groups'].includes(key));
 	if (unknown.length > 0) {
-		fail(`the document has ${unknown.map((key) => `"${key}"`).join(', ')} - it can only have version, datasets`);
+		fail(
+			`the document has ${unknown.map((key) => `"${key}"`).join(', ')} - it can only have version, datasets, groups`
+		);
 	}
 	if (!isRecord(document.datasets) || Object.keys(document.datasets).length === 0) {
 		fail('datasets must map each dataset code to its consultee category');
@@ -92,7 +139,33 @@ export function parseReferenceDataConfig(text: string): ReferenceDataConfig {
 			subcategories.set(code, settings.subcategories);
 		}
 	}
-	return { datasets, subcategories };
+	const groups = parseGroups(document.groups);
+	const loadedAs = new Set([
+		...datasets.values(),
+		...[...subcategories.values()].flatMap((byName) => [...byName.values()])
+	]);
+	for (const category of loadedAs) {
+		if (!groups.some((group) => group.categories.has(category))) {
+			fail(`groups: no group has ${category}, which a dataset loads as - add it to one`);
+		}
+	}
+	return { datasets, subcategories, groups };
+}
+
+/** The group a category is loaded in, if config/reference-data.yaml puts it in one. */
+export function groupForCategory(
+	category: string | null | undefined,
+	config: ReferenceDataConfig = REFERENCE_DATA_CONFIG
+): ReferenceDataGroup | undefined {
+	return category ? config.groups.find((group) => group.categories.has(category)) : undefined;
+}
+
+/** The group a slug names - from a file or URL - if there is one. */
+export function groupBySlug(
+	slug: unknown,
+	config: ReferenceDataConfig = REFERENCE_DATA_CONFIG
+): ReferenceDataGroup | undefined {
+	return config.groups.find((group) => group.slug === slug);
 }
 
 /** A feature from a dataset config/reference-data.yaml doesn't list - its message says which. */

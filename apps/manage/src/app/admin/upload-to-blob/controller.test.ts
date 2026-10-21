@@ -13,6 +13,7 @@ import {
 	CHUNK_BYTES,
 	isBlobName,
 	MAX_BLOCKS,
+	uploadBlobName,
 	uploadFileToBlob
 } from './controller.ts';
 
@@ -86,6 +87,64 @@ describe('admin upload to blob', () => {
 		const { error, uploadedBlobName } = res.render.mock.calls[0].arguments[1];
 		assert.strictEqual(error, undefined);
 		assert.strictEqual(uploadedBlobName, file.originalname);
+	});
+
+	it("has a form for each group of the reference data, with the date it's from, and one for any other file", async () => {
+		const res = newRes();
+		await buildUploadToBlobPage()({}, res);
+		const html = res.render.mock.calls[0].result as string;
+		for (const slug of ['administrative_boundaries', 'public_bodies', 'energy', 'transport', 'other']) {
+			assert.match(html, new RegExp(`data-blob-group="${slug}"`));
+			assert.match(html, new RegExp(`id="date-${slug}-day"`));
+		}
+		assert.match(html, />\s*Upload Public bodies\s*</);
+		assert.match(html, /Another file/);
+		assert.equal((res.render.mock.calls[0].arguments[1] as { groups: unknown[] }).groups.length, 5);
+	});
+
+	it("saves a group's file as the group's for its date - the form's, else its name's", () => {
+		assert.deepStrictEqual(uploadBlobName(undefined, 'all-project-boundaries.geojson'), {
+			name: 'all-project-boundaries.geojson'
+		});
+		assert.deepStrictEqual(uploadBlobName({ group: '' }, 'a.geojson'), { name: 'a.geojson' });
+		assert.deepStrictEqual(
+			uploadBlobName({ group: 'energy', 'date-day': '20', 'date-month': '10', 'date-year': '2026' }, 'energy.geojson'),
+			{ name: '20261020_energy.geojson' }
+		);
+		assert.deepStrictEqual(
+			uploadBlobName(
+				{ group: 'energy', 'date-day': '', 'date-month': ' ', 'date-year': '' },
+				'20261020_combined.geojson'
+			),
+			{ name: '20261020_energy.geojson' }
+		);
+		assert.deepStrictEqual(uploadBlobName({ group: 'energy' }, 'energy.geojson'), {
+			error: 'Enter the date the Energy data is from, as a real date.'
+		});
+		assert.deepStrictEqual(
+			uploadBlobName({ group: 'energy', 'date-day': '31', 'date-month': '2', 'date-year': '2026' }, 'e.geojson'),
+			{ error: 'Enter the date the Energy data is from, as a real date.' }
+		);
+		assert.deepStrictEqual(uploadBlobName({ group: 'nope' }, 'e.geojson'), {
+			error: 'Choose the group the file is for.'
+		});
+	});
+
+	it("uploads a group's file under its group name, and refuses one without a date - removing the temp file", async () => {
+		const uploadFile = mock.fn(async () => undefined);
+		const run = buildRunUploadToBlob({ logger: mockLogger(), blobStoreConfig }, uploadFile);
+		const named = newRes();
+		await run(
+			{ file: { ...newFile(), originalname: '20261020_energy_full.geojson' }, body: { group: 'energy' } },
+			named
+		);
+		assert.strictEqual(uploadFile.mock.calls[0].arguments[1], '20261020_energy.geojson');
+		assert.strictEqual(named.render.mock.calls[0].arguments[1].uploadedBlobName, '20261020_energy.geojson');
+
+		const undated = newRes();
+		await run({ file: newFile(), body: { group: 'energy' } }, undated);
+		assert.strictEqual(uploadFile.mock.callCount(), 1);
+		assert.match(undated.render.mock.calls[0].arguments[1].error, /Enter the date the Energy data is from/);
 	});
 
 	it('renders an error when the upload fails, without throwing', async () => {

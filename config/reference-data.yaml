@@ -17,6 +17,14 @@
 #              consultee_subcategory values loads as instead - compared ignoring case and repeated
 #              spaces. A subcategory not listed loads as the dataset's category.
 #
+#   groups   - the five groups the reference data is uploaded and loaded in - the report's tabs. The
+#              pipeline writes a file per group (YYYYMMDD_<group>.geojson, e.g.
+#              20261020_public_bodies.geojson), the admin pages upload and load each on its own,
+#              and loading a group replaces only its categories' rows. Every category a dataset or
+#              subcategory above loads as must be in exactly one group; a group can also list
+#              categories with no data yet. A file holding a category from another group isn't
+#              loaded, and the page names it.
+#
 # A feature whose id has no dataset code (parish_council_E04000001, railway_RAILWAY_0001) keeps
 # the category the file gives it.
 
@@ -66,3 +74,42 @@ datasets:
   # earlier exports' codes for the same datasets
   OWS_NA: Offshore Wind Site
   ONR_NA: ONR Site
+
+groups:
+  Administrative boundaries:
+    - Parish Council
+    - Lower Tier Authority
+    - Unitary Authority
+    - Upper Tier Authority
+    - Greater London Authority
+    - National Park
+  Public bodies:
+    - Ambulance Trust
+    - Fire and Rescue Authority
+    - Hospital
+    - ICB
+    - Internal Drainage Board
+    - Internal Drainage District
+    - Local Health Board
+    - Local Resilience Forum
+    - National Landscape
+    - Police
+  Energy:
+    - DNO
+    - Electricity Generator
+    - Interconnector
+    - Offshore Wind Site
+    - Offshore Wind Export Cable
+    - ONR Site
+  Transport:
+    - Canal
+    - Corporate Joint Committee
+    - Dock or Harbour
+    - Integrated Transport Authority
+    - Passenger Transport Executive
+    - Railway
+  Other:
+    - MOD Safeguarding Area
+    - MOD Low Flying Area
+    - Coal Mining Reporting Area
+    - Cheshire Brine Area

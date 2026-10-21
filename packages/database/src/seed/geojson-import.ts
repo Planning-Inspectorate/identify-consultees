@@ -129,7 +129,7 @@ export type ImportType = 'consultee-areas' | 'case-boundaries';
 
 // small enough that each delete is a short transaction on Azure SQL - a single DELETE of every row
 // (some carry whole county or national-scale geometry) is one long, log-heavy transaction
-const CLEAR_BATCH_SIZE = 500;
+export const CLEAR_BATCH_SIZE = 500;
 
 /**
  * Delete every row from `type`'s table, a batch at a time - so an import can replace a dataset
@@ -187,10 +187,11 @@ const CHUNK_CHARACTERS = 32 * 1024 * 1024;
 
 /**
  * Import a GeoJSON file into `type`'s table, a chunk at a time: read it once to check every
- * feature maps (a feature that doesn't throws before anything is deleted) and count them, clear
- * the table if `replace`, then read it again and load each chunk.
+ * feature maps (a feature that doesn't throws before anything is deleted) and count them, run
+ * `beforeLoad` with the count - clearing the table if replacing, say - then read it again and load
+ * each chunk.
  */
-async function importFile<F extends ConsulteeAreaFeature | CaseBoundaryFeature>(
+export async function importFile<F extends ConsulteeAreaFeature | CaseBoundaryFeature>(
 	dbClient: PrismaClient,
 	filePath: string,
 	type: ImportType,
@@ -200,14 +201,14 @@ async function importFile<F extends ConsulteeAreaFeature | CaseBoundaryFeature>(
 		featureCollection: { type: 'FeatureCollection'; features: F[] },
 		options: LoadOptions
 	) => Promise<number>,
-	options: ImportOptions & { replace: boolean }
+	options: Omit<ImportOptions, 'replace'> & { beforeLoad: (featureCount: number) => Promise<void> }
 ): Promise<number> {
 	let total = 0;
 	for await (const { feature } of streamFeatures<RawFeature>(filePath)) {
 		toRow(feature);
 		total++;
 	}
-	await clearIfReplacing(dbClient, type, total, options.replace);
+	await options.beforeLoad(total);
 
 	let loaded = 0;
 	let chunk: F[] = [];
@@ -238,7 +239,9 @@ async function importFile<F extends ConsulteeAreaFeature | CaseBoundaryFeature>(
 /**
  * Replace consultee_area with a reference-data GeoJSON file (the reference data export, or the
  * small sample in apps/function-python/setup_database/sample_data/reference_data.geojson). Always
- * a replace: the table holds exactly the file, never an older export's rows alongside it.
+ * a replace: the table holds exactly the file, never an older export's rows alongside it. Every
+ * group's rows are replaced at once, so the log of group loads (seed/consultee-area-groups.ts)
+ * starts again: the quarter of what's loaded isn't known until a group is next loaded.
  */
 export async function importConsulteeAreas(
 	dbClient: PrismaClient,
@@ -247,7 +250,10 @@ export async function importConsulteeAreas(
 ): Promise<number> {
 	return importFile(dbClient, filePath, 'consultee-areas', (feature) => toConsulteeArea(feature), loadConsulteeAreas, {
 		...options,
-		replace: true
+		beforeLoad: async (featureCount) => {
+			await clearIfReplacing(dbClient, 'consultee-areas', featureCount, true);
+			await dbClient.$executeRaw`DELETE FROM reference_data_load`;
+		}
 	});
 }
 
@@ -263,6 +269,6 @@ export async function importCaseBoundaries(
 ): Promise<number> {
 	return importFile(dbClient, filePath, 'case-boundaries', toCaseBoundary, loadCaseBoundaries, {
 		...options,
-		replace: Boolean(options.replace)
+		beforeLoad: (featureCount) => clearIfReplacing(dbClient, 'case-boundaries', featureCount, Boolean(options.replace))
 	});
 }

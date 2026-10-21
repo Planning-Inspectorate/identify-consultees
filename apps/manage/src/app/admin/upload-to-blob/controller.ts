@@ -1,6 +1,12 @@
 import type { ManageService } from '#service';
 import { DefaultAzureCredential } from '@azure/identity';
 import { BlobServiceClient } from '@azure/storage-blob';
+import {
+	dateFromFileName,
+	groupBlobName,
+	isoDate
+} from '@pins/identify-consultees-database/src/seed/consultee-area-groups.ts';
+import { groupBySlug, REFERENCE_DATA_CONFIG } from '@pins/identify-consultees-database/src/seed/reference-data.ts';
 import type { AsyncRequestHandler } from '@planning-inspectorate/core/util';
 import { unlink } from 'node:fs/promises';
 import type { UploadToBlobViewModel } from './view-model.ts';
@@ -86,13 +92,51 @@ export function buildUploadToBlobPage(): AsyncRequestHandler {
 	return async (req, res) => {
 		const uploaded = req.query?.uploaded;
 		const viewModel: UploadToBlobViewModel = {
-			pageHeading: PAGE_HEADING,
-			chunkBytes: CHUNK_BYTES,
-			maxUploadBytes: MAX_UPLOAD_BYTES,
+			...pageViewModel(),
 			...(isBlobName(uploaded) ? { uploadedBlobName: uploaded } : {})
 		};
 		return res.render(VIEW, viewModel);
 	};
+}
+
+/** What every render of the page needs: the groups to upload a file for, and the part size. */
+function pageViewModel(): UploadToBlobViewModel {
+	return {
+		pageHeading: PAGE_HEADING,
+		chunkBytes: CHUNK_BYTES,
+		maxUploadBytes: MAX_UPLOAD_BYTES,
+		groups: REFERENCE_DATA_CONFIG.groups.map((group) => ({
+			name: group.name,
+			slug: group.slug,
+			categories: [...group.categories].join(', ')
+		}))
+	};
+}
+
+/**
+ * The name a posted file is saved under: a group's, from the date its data is from - the form's
+ * date, else the date the file's name starts with - as in 20261020_public_bodies.geojson; else
+ * the file's own name.
+ */
+export function uploadBlobName(
+	body: Record<string, unknown> | undefined,
+	originalName: string
+): { name: string } | { error: string } {
+	if (!body?.group) {
+		return { name: originalName };
+	}
+	const group = groupBySlug(body.group);
+	if (!group) {
+		return { error: 'Choose the group the file is for.' };
+	}
+	const typed = [body['date-day'], body['date-month'], body['date-year']];
+	const dataDate = typed.every((part) => String(part ?? '').trim() === '')
+		? dateFromFileName(originalName)
+		: isoDate(typed[0], typed[1], typed[2]);
+	if (!dataDate) {
+		return { error: `Enter the date the ${group.name} data is from, as a real date.` };
+	}
+	return { name: groupBlobName(group, dataDate) };
 }
 
 type UploadsFor = (blobStoreConfig: BlobStoreConfig) => BlockUploads;
@@ -174,7 +218,7 @@ export function buildRunUploadToBlob(
 	const { logger, blobStoreConfig } = service;
 
 	return async (req, res) => {
-		const viewModel: UploadToBlobViewModel = { pageHeading: PAGE_HEADING };
+		const viewModel: UploadToBlobViewModel = pageViewModel();
 		const file = req.file;
 
 		if (!blobStoreConfig) {
@@ -186,9 +230,15 @@ export function buildRunUploadToBlob(
 			return res.render(VIEW, viewModel);
 		}
 
+		const target = uploadBlobName(req.body as Record<string, unknown> | undefined, file.originalname);
+		if ('error' in target) {
+			viewModel.error = target.error;
+			await unlink(file.path).catch(() => {});
+			return res.render(VIEW, viewModel);
+		}
 		try {
-			await uploadFile(file.path, file.originalname, blobStoreConfig);
-			viewModel.uploadedBlobName = file.originalname;
+			await uploadFile(file.path, target.name, blobStoreConfig);
+			viewModel.uploadedBlobName = target.name;
 		} catch (error) {
 			logger.error({ error }, 'Failed to upload file to blob storage');
 			viewModel.error = 'Could not upload the file to blob storage.';
