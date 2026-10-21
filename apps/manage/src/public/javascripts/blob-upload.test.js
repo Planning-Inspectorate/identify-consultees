@@ -209,8 +209,13 @@ describe('the upload form', () => {
 		return event;
 	}
 
-	/** Wait for the form's upload to finish, whichever way. */
-	const settle = () => new Promise((resolve) => setTimeout(resolve, 5));
+	/** Wait for the form's upload to finish, whichever way - the status stops counting parts. */
+	const settle = async (document) => {
+		const status = document.querySelector('[data-upload-status]');
+		for (let i = 0; i < 200 && status.textContent.startsWith('Uploading '); i++) {
+			await new Promise((resolve) => setTimeout(resolve, 5));
+		}
+	};
 
 	test('uploads the chosen file in parts, saying how far it has got, then shows the success message', async () => {
 		const document = documentWith();
@@ -227,7 +232,7 @@ describe('the upload form', () => {
 			document.querySelector('[data-upload-status]').textContent,
 			/Uploading data\.geojson: 0 of 3 parts sent \(0%\)/
 		);
-		await settle();
+		await settle(document);
 
 		assert.equal(partsOf(fetch)[0].arguments[1].headers['x-csrf-token'], 'token-1');
 		assert.equal(document.querySelector('[data-upload-status]').textContent, 'Uploaded data.geojson.');
@@ -242,7 +247,7 @@ describe('the upload form', () => {
 		enhanceUploadForm(document.querySelector('form'), { fetch, location: { assign: mock.fn() } });
 		choose(document, fileOf('abc'));
 		submit(document);
-		await settle();
+		await settle(document);
 
 		const status = document.querySelector('[data-upload-status]');
 		assert.equal(status.textContent, 'Could not upload the file: The upload sent an empty part.');
@@ -255,7 +260,7 @@ describe('the upload form', () => {
 		enhanceUploadForm(document.querySelector('form'), { fetch: () => Promise.reject('offline'), retryDelayMs: 0 });
 		choose(document, fileOf('abc'));
 		submit(document);
-		await settle();
+		await settle(document);
 		assert.equal(document.querySelector('[data-upload-status]').textContent, 'Could not upload the file: offline');
 	});
 
@@ -304,7 +309,7 @@ describe('the upload form', () => {
 		enhanceUploadForm(document.querySelector('form'), { fetch, location: { assign: mock.fn() } });
 		choose(document, fileOf('abc'));
 		submit(document);
-		await settle();
+		await settle(document);
 		assert.equal(partsOf(fetch)[0].arguments[1].headers['x-csrf-token'], '');
 	});
 
@@ -325,7 +330,7 @@ describe('the upload form', () => {
 			assert.deepEqual(fieldValues(document), ['20', '10', '2026']);
 
 			submit(document);
-			await settle();
+			await settle(document);
 			assert.equal(partsOf(fetch)[0].arguments[0], '/admin/upload-to-blob/blocks?name=20261020_energy.geojson&block=0');
 			assert.deepEqual(location.assign.mock.calls[0].arguments, [
 				'/admin/upload-to-blob?uploaded=20261020_energy.geojson'
@@ -344,7 +349,7 @@ describe('the upload form', () => {
 			change(document);
 			assert.deepEqual(fieldValues(document), ['1', '2', '2026']);
 			submit(document);
-			await settle();
+			await settle(document);
 			assert.equal(partsOf(fetch)[0].arguments[0], '/admin/upload-to-blob/blocks?name=20260201_energy.geojson&block=0');
 		});
 
