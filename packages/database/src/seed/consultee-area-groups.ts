@@ -2,7 +2,7 @@ import type { PrismaClient } from '../client/client.ts';
 import { Prisma } from '../client/client.ts';
 import { loadConsulteeAreas } from '../geospatial/consultee-areas.ts';
 import type { ImportOptions } from './geojson-import.ts';
-import { CLEAR_BATCH_SIZE, clearExistingRows, importFile, toConsulteeArea } from './geojson-import.ts';
+import { clearExistingRows, importFile, toConsulteeArea } from './geojson-import.ts';
 import type { ReferenceDataConfig, ReferenceDataGroup } from './reference-data.ts';
 import { groupBySlug, groupForCategory, REFERENCE_DATA_CONFIG } from './reference-data.ts';
 
@@ -16,6 +16,13 @@ import { groupBySlug, groupForCategory, REFERENCE_DATA_CONFIG } from './referenc
  * quarter; the same quarter's data just replaces them, so a corrected file can be loaded again.
  * Each load is logged in reference_data_load, which is how the next one knows the quarter.
  */
+
+// A group's rows can be whole national-scale shapes - Public bodies' 316 areas are over 200MB of
+// coastline and county boundaries - so its statements move little at a time: a few rows per
+// delete or archive, and a few megabytes of source per MERGE (a single larger shape goes alone).
+// Each is then short even on Dev's Basic tier, rather than one that runs for minutes.
+const GROUP_ROWS_PER_STATEMENT = 25;
+const GROUP_CHUNK_CHARACTERS = 4 * 1024 * 1024;
 
 // a group's file: the date its data is from, then the group
 const GROUP_BLOB_NAME = /^(\d{4})(\d{2})(\d{2})_([a-z0-9_]+)\.geojson$/;
@@ -109,7 +116,7 @@ async function archiveGroupRows(dbClient: PrismaClient, group: ReferenceDataGrou
 	let total = 0;
 	for (;;) {
 		const moved = await dbClient.$executeRaw`
-			DELETE TOP (${CLEAR_BATCH_SIZE}) FROM consultee_area
+			DELETE TOP (${GROUP_ROWS_PER_STATEMENT}) FROM consultee_area
 			OUTPUT DELETED.id, ${quarter}, DELETED.geometry, DELETED.geometryType, DELETED.sourceId,
 				DELETED.consulteeCategory, DELETED.consulteeGroup, DELETED.consulteeSubcategory,
 				DELETED.consulteeSubcategoryDescription, DELETED.consultee, DELETED.region, DELETED.metadata,
@@ -122,7 +129,7 @@ async function archiveGroupRows(dbClient: PrismaClient, group: ReferenceDataGrou
 			WHERE consulteeCategory IN (${categoriesOf(group)})
 		`;
 		total += moved;
-		if (moved < CLEAR_BATCH_SIZE) {
+		if (moved < GROUP_ROWS_PER_STATEMENT) {
 			return total;
 		}
 	}
@@ -133,10 +140,10 @@ async function deleteGroupRows(dbClient: PrismaClient, group: ReferenceDataGroup
 	let total = 0;
 	for (;;) {
 		const deleted = await dbClient.$executeRaw`
-			DELETE TOP (${CLEAR_BATCH_SIZE}) FROM consultee_area WHERE consulteeCategory IN (${categoriesOf(group)})
+			DELETE TOP (${GROUP_ROWS_PER_STATEMENT}) FROM consultee_area WHERE consulteeCategory IN (${categoriesOf(group)})
 		`;
 		total += deleted;
-		if (deleted < CLEAR_BATCH_SIZE) {
+		if (deleted < GROUP_ROWS_PER_STATEMENT) {
 			return total;
 		}
 	}
@@ -213,6 +220,7 @@ export async function importConsulteeAreaGroup(
 		},
 		loadConsulteeAreas,
 		{
+			chunkCharacters: GROUP_CHUNK_CHARACTERS,
 			...options,
 			beforeLoad: async (featureCount) => {
 				if (featureCount === 0) {

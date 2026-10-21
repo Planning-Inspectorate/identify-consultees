@@ -172,6 +172,29 @@ describe('admin import reference data', () => {
 			assert.match(htmlOf(res), /Loaded Public bodies from 20261020_public_bodies\.geojson/);
 		});
 
+		it('loads on the bulk client, whose statements can run for minutes, when there is one', async () => {
+			const bulkDb = databaseWith();
+			const runImport = mock.fn(async () => ({
+				group: {} as never,
+				quarter: '2026-Q4',
+				rowsLoaded: 5,
+				rowsArchived: 0
+			}));
+			const clear = mock.fn(async () => 1);
+			const importBoundaries = mock.fn(async () => 1);
+			const service = { db: databaseWith(), bulkDb, logger: mockLogger() } as never;
+			await buildRunImportConsulteeAreaGroup(
+				service,
+				files(),
+				runImport
+			)({ body: { group: 'public_bodies' } } as never, newRes());
+			await buildClearConsulteeAreas(service, files(), clear)({}, newRes());
+			await buildRunImportCaseBoundaries(service, files(), importBoundaries)({}, newRes());
+			assert.strictEqual(runImport.mock.calls[0].arguments[0], bulkDb);
+			assert.strictEqual(clear.mock.calls[0].arguments[0], bulkDb);
+			assert.strictEqual(importBoundaries.mock.calls[0].arguments[0], bulkDb);
+		});
+
 		it('says only what was loaded when nothing was archived', async () => {
 			const res = newRes();
 			const runImport = mock.fn(async () => ({

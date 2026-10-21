@@ -173,7 +173,9 @@ export function buildRunImportConsulteeAreaGroup(
 	files: BlobFiles = BLOB_STORAGE,
 	runImport: typeof importConsulteeAreaGroup = importConsulteeAreaGroup
 ): AsyncRequestHandler {
-	const { db, logger } = service;
+	const { logger } = service;
+	// loads run on the bulk client - their statements can take minutes (see ManageService.bulkDb)
+	const db = service.bulkDb ?? service.db;
 
 	return async (req, res) => {
 		const viewModel: ImportReferenceDataViewModel = { pageHeading: PAGE_HEADING };
@@ -223,7 +225,9 @@ export function buildClearConsulteeAreas(
 	files: BlobFiles = BLOB_STORAGE,
 	clear: typeof clearConsulteeAreas = clearConsulteeAreas
 ): AsyncRequestHandler {
-	const { db, logger } = service;
+	const { logger } = service;
+	// loads run on the bulk client - their statements can take minutes (see ManageService.bulkDb)
+	const db = service.bulkDb ?? service.db;
 
 	return async (req, res) => {
 		const viewModel: ImportReferenceDataViewModel = { pageHeading: PAGE_HEADING };
@@ -243,7 +247,9 @@ export function buildRunImportCaseBoundaries(
 	files: BlobFiles = BLOB_STORAGE,
 	runImport: typeof importCaseBoundaries = importCaseBoundaries
 ): AsyncRequestHandler {
-	const { db, logger } = service;
+	const { logger } = service;
+	// loads run on the bulk client - their statements can take minutes (see ManageService.bulkDb)
+	const db = service.bulkDb ?? service.db;
 
 	return async (req, res) => {
 		const viewModel: ImportReferenceDataViewModel = { pageHeading: PAGE_HEADING };
