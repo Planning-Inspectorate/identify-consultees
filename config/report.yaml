@@ -40,13 +40,13 @@
 version: 2
 
 defaults:
-  columns: [consultee, category, subcategory, region, whyIdentified, source]
+  columns: [consultee, category, subcategory, whyIdentified, source]
   metadata: { CODE: Code, NAME: Official name }
   mapKm: 10
 
 tabs:
   Administrative boundaries:
-    columns: [consultee, category, region, whyIdentified, source]
+    columns: [consultee, category, whyIdentified, source]
     categories:
       Parish Council: { summary: 'Parish, Town and Community Councils' }
       Lower Tier Authority: { summary: District Councils (Lower Tier Authorities) }
@@ -56,7 +56,7 @@ tabs:
       Greater London Authority: { summary: Greater London Authority }
 
   Public bodies:
-    columns: [consultee, category, region, whyIdentified, source]
+    columns: [consultee, category, whyIdentified, source]
     categories:
       Ambulance Trust: { summary: Ambulance Trusts }
       Fire and Rescue Authority:
@@ -79,7 +79,7 @@ tabs:
         metadata: { CODE: Code, NAME: Official name, NAT_ENG_CODE: Natural England code }
 
   Energy:
-    columns: [consultee, category, subcategory, subcategoryDescription, region, distanceKm, whyIdentified, source]
+    columns: [consultee, category, subcategory, subcategoryDescription, distanceKm, whyIdentified, source]
     metadata: { NAME: Official name }
     categories:
       Electricity Generator:
@@ -106,7 +106,7 @@ tabs:
         metadata: { NAME: Official name, LICENSEE: Operator, STATUS: Status }
 
   Transport:
-    columns: [consultee, category, subcategory, subcategoryDescription, region, distanceKm, whyIdentified, source]
+    columns: [consultee, category, subcategory, subcategoryDescription, distanceKm, whyIdentified, source]
     metadata: { NAME: Official name }
     categories:
       Canal: { summary: Canals }
