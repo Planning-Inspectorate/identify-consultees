@@ -100,7 +100,10 @@ tabs:
         summary: Wind Export Cables
         metadata: { NAME: Official name, TENANT: Operator }
       ONR Site: { summary: Office for Nuclear Regulation Sites }
-      Interconnector: { metadata: { NAME: Official name, LICENSEE: Operator, STATUS: Status } }
+      DNO: { summary: Distribution Network Operators }
+      Interconnector:
+        summary: Interconnectors
+        metadata: { NAME: Official name, LICENSEE: Operator, STATUS: Status }
 
   Transport:
     columns: [consultee, category, subcategory, subcategoryDescription, region, distanceKm, whyIdentified, source]
@@ -129,7 +132,9 @@ tabs:
           MAJOR_PORT: Major port
           STATUTORY_HARBOUR_AUTHORITY: Statutory harbour authority
           COMPETENT_HARBOUR_AUTHORITY: Competent harbour authority
-      Corporate Joint Committee: { metadata: { NAME: Official name, CTYUA23NM: Member councils } }
+      Corporate Joint Committee:
+        summary: Corporate Joint Committees (Wales)
+        metadata: { NAME: Official name, CTYUA23NM: Member councils }
 
   Other:
     categories:
