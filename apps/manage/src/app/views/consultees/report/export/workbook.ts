@@ -1,5 +1,6 @@
 import type {
 	ConsulteeMatch,
+	ConsulteeReason,
 	Ruleset,
 	SiteScreenedAs
 } from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
@@ -13,8 +14,8 @@ import {
 	summaryLines,
 	tabSettings
 } from '../../../../report-config.ts';
-import { NEARBY_NSIPS } from '../../nearby-nsips.ts';
-import { describeReasons } from '../../reasons.ts';
+import { isNearbyNsip, NEARBY_NSIPS, nsipType, splitNsipName } from '../../nearby-nsips.ts';
+import { describeReasons, kilometres as distanceText } from '../../reasons.ts';
 import type { AddedConsultee, RemovedConsultee } from '../urls.ts';
 
 /**
@@ -463,6 +464,33 @@ function consulteeList(heading: string, consultees: readonly { name: string; cat
 	];
 }
 
+/**
+ * The Summary's list of national infrastructure projects - the report's Nearby NSIPs: those found,
+ * nearest first, with the distance they were found within, then those added by hand, with the reason
+ * given - each with its project type and sub-type, from its case reference (see nsipType).
+ */
+function nsipList(report: ReportExport): Cell[][] {
+	const found = report.identified.filter(isNearbyNsip).map((match) => ({
+		name: match.feature.properties.consultee ?? '',
+		whyIdentified: match.reasons
+			.filter((reason): reason is Extract<ConsulteeReason, { type: 'nearbyNsip' }> => reason.type === 'nearbyNsip')
+			.map((reason) => `Within ${distanceText(reason.radiusMetres)} of the site`)
+			.join('\n')
+	}));
+	const added = report.added
+		.filter((add) => add.category === NEARBY_NSIPS)
+		.map((add) => ({ name: add.name, whyIdentified: add.reason }));
+	return [
+		[bold('List of National infrastructure projects')],
+		headerRow(['Name', 'Why identified', 'Type', 'Sub-type', 'Number']),
+		...[...found, ...added].map(({ name, whyIdentified }): Cell[] => {
+			const { projectName, caseReference } = splitNsipName(name);
+			const { type, subType } = nsipType(caseReference);
+			return [text(projectName), { value: whyIdentified, wrap: true }, text(type), text(subType), text(caseReference)];
+		})
+	];
+}
+
 function summarySheet(report: ReportExport, tabs: Map<GroupTab, GroupTabContent>, config: ReportConfig): SheetData {
 	const detail = (label: string, value: string | null | undefined): Cell[] => [bold(label), text(value)];
 	const tabLines = GROUP_TABS.flatMap((tab): Cell[][] => {
@@ -511,7 +539,9 @@ function summarySheet(report: ReportExport, tabs: Map<GroupTab, GroupTabContent>
 		[],
 		...consulteeList('Added consultees', report.added),
 		[],
-		...consulteeList('Removed consultees', report.removed)
+		...consulteeList('Removed consultees', report.removed),
+		[],
+		...nsipList(report)
 	];
 }
 
@@ -522,7 +552,7 @@ export function buildReportSheets(report: ReportExport, config: ReportConfig = R
 		{
 			sheet: 'Summary',
 			data: summarySheet(report, tabs, config),
-			columns: [{ width: 64 }, { width: 50 }, { width: 60 }]
+			columns: [{ width: 64 }, { width: 50 }, { width: 60 }, { width: 34 }, { width: 14 }]
 		},
 		...GROUP_TABS.map((tab) => {
 			const { header, widths, rows } = tabs.get(tab)!;

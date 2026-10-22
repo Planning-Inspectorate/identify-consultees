@@ -56,3 +56,51 @@ export async function findNearbyNsips(
 	const nearbyCases = await findNearbyCases(db, project.id, radiusMetres);
 	return nearbyCases.map((nearbyCase) => nearbyNsipMatch(nearbyCase, radiusMetres));
 }
+
+/**
+ * The project types a case reference's first four characters stand for: the Planning Act 2008
+ * sector (EN, TR...) and its sub-sector (EN01, EN02...), as the National Infrastructure Planning
+ * website's references use them - EN010012 is a generating station.
+ */
+const NSIP_TYPES: Record<string, string> = {
+	BC: 'Business and Commercial',
+	EN: 'Energy',
+	TR: 'Transport',
+	WA: 'Water',
+	WS: 'Waste',
+	WW: 'Waste Water'
+};
+const NSIP_SUBTYPES: Record<string, string> = {
+	EN01: 'Generating Stations',
+	EN02: 'Electric Lines',
+	EN03: 'Underground Gas Storage Facilities',
+	EN04: 'LNG Facilities',
+	EN05: 'Gas Reception Facilities',
+	EN06: 'Gas Transporter Pipe-lines',
+	EN07: 'Other Pipe-lines',
+	TR01: 'Highways',
+	TR02: 'Airports',
+	TR03: 'Harbour Facilities',
+	TR04: 'Railways',
+	TR05: 'Rail Freight Interchanges',
+	WA01: 'Dams and Reservoirs',
+	WA02: 'Transfer of Water Resources',
+	WS01: 'Hazardous Waste Facilities',
+	WW01: 'Waste Water Treatment Plants'
+};
+
+/** A case's project type and sub-type, from its reference - null for what a reference doesn't say. */
+export function nsipType(caseReference: string | null | undefined): { type: string | null; subType: string | null } {
+	const reference = (caseReference ?? '').trim().toUpperCase();
+	return { type: NSIP_TYPES[reference.slice(0, 2)] ?? null, subType: NSIP_SUBTYPES[reference.slice(0, 4)] ?? null };
+}
+
+/**
+ * A Nearby NSIP's project name and case reference from the name it's listed under - "Project
+ * (EN010001)", as nearbyNsipMatch names it, or as one added by hand was matched - else the name
+ * alone.
+ */
+export function splitNsipName(name: string): { projectName: string; caseReference?: string } {
+	const named = /^(.*\S)\s*\(([A-Za-z]{2}\d{6})\)$/.exec(name.trim());
+	return named ? { projectName: named[1], caseReference: named[2] } : { projectName: name.trim() };
+}
