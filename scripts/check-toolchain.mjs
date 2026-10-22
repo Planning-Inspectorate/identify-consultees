@@ -2,9 +2,11 @@
 /**
  * Guardrail so local installs stay aligned with Azure Pipelines `npm ci`.
  *
- * CI (`.azure/pipelines/*` via PINS `node_script.yml`) runs `nodeVersion: 24`,
- * which tracks the latest Node 24.x and its bundled npm 11.x. The repo pins the
- * *major* only - `engines` in package.json (`node: ^24`, `npm: >=11`) is the
+ * CI (`.azure/pipelines/*` via PINS `node_script.yml`) runs `nodeVersion: 24`;
+ * the npm ci steps first source scripts/ci-use-latest-node.sh so the agent gets
+ * the latest Node 24.x and its bundled npm 11.x rather than an older
+ * preinstalled one. The repo pins the
+ * *major* only - `engines` in package.json (`node: ^24.22.1`, `npm: >=11`) is the
  * single source of truth, and this script checks the running toolchain against
  * those ranges. Regenerating the lockfile under a different Node/npm major can
  * drop Prisma Studio peer entries (`react` / `react-dom` / `scheduler`) and
