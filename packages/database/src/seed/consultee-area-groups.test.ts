@@ -212,6 +212,11 @@ describe('loading a group (requires a local SQL Server - see docker-compose.yml)
 			assert.equal(await datasetInUse(dbClient), NEXT);
 			assert.deepEqual(await sourceIds(), ['groups-new']);
 			assert.deepEqual(await sourceIds(`consultee_area_${inUseBefore}`), ['groups-old']);
+
+			// clearing a quarter's dataset by name empties just its table
+			assert.equal(await clearConsulteeAreas(dbClient, NEXT), 2);
+			assert.deepEqual(await sourceIds(`consultee_area_${NEXT}`), []);
+			assert.deepEqual(await sourceIds(`consultee_area_${inUseBefore}`), ['groups-old']);
 		} finally {
 			await cleanup();
 		}

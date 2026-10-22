@@ -262,7 +262,10 @@ export function buildRunImportConsulteeAreaGroup(
 	};
 }
 
-/** Empty consultee_area - every group - leaving what's in blob storage, the archive and the load log. */
+/**
+ * Empty the chosen quarter's dataset - every group - leaving its table, other quarters', what's in
+ * blob storage and the load log.
+ */
 export function buildClearConsulteeAreas(
 	service: ManageService,
 	files: BlobFiles = BLOB_STORAGE,
@@ -274,11 +277,19 @@ export function buildClearConsulteeAreas(
 
 	return async (req, res) => {
 		const viewModel: ImportReferenceDataViewModel = { pageHeading: PAGE_HEADING };
+		const quarter = (req.body as { quarter?: unknown } | undefined)?.quarter;
 		try {
-			viewModel.consulteeAreasCleared = await clear(db);
-			logger.info({ rows: viewModel.consulteeAreasCleared }, 'cleared the consultee areas');
+			// only a quarter that has a dataset - the choice the page offers
+			const datasets = await listDatasets(db);
+			if (typeof quarter !== 'string' || !datasets.some((dataset) => dataset.quarter === quarter)) {
+				viewModel.error = 'Choose a dataset to clear.';
+				return res.render(VIEW, await withStatus(service, files, viewModel));
+			}
+			const deleted = await clear(db, quarter);
+			viewModel.consulteeAreasCleared = { quarter, deleted };
+			logger.info({ quarter, rows: deleted }, 'cleared a consultee area dataset');
 		} catch (error) {
-			logger.error({ error }, 'Failed to clear the consultee areas');
+			logger.error({ error, quarter }, 'Failed to clear a consultee area dataset');
 			viewModel.error = 'Could not clear the consultee areas.';
 		}
 		return res.render(VIEW, await withStatus(service, files, viewModel));

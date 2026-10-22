@@ -54,7 +54,7 @@ To run the function by hand: `cd apps/function-python`, activate `.venv`, then `
 | `npm start` says `func` not found                                 | `npm install -g azure-functions-core-tools@4`                                                                              |
 | Homepage search shows nothing                                     | The database isn't seeded: `npm run db-seed`                                                                               |
 | A project page 404s                                               | The URL needs the case boundary's id (a UUID), not its case reference                                                      |
-| Migrations fail                                                   | SQL isn't ready yet; wait, then `npm run db-migrate-dev`                                                                   |
+| Migrations fail                                                   | SQL isn't ready yet; wait, then `npm run db-migrate-prod`                                                                  |
 | `No command registered for 'migrate'`                             | The `prisma` CLI has moved ahead of `@prisma/client`. Put them on the same major and `npm ci`                              |
 | e2e journeys fail                                                 | They need the seeded local database. Run `npm start` once first                                                            |
 | Interactive map is blank                                          | Check the browser console, CSP and the `/vendor/*` routes                                                                  |

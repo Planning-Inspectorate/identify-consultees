@@ -8,7 +8,7 @@ import {
 	tableSql
 } from '../geospatial/consultee-areas.ts';
 import type { ImportOptions } from './geojson-import.ts';
-import { clearExistingRows, importFile, toConsulteeArea } from './geojson-import.ts';
+import { CLEAR_BATCH_SIZE, clearExistingRows, importFile, toConsulteeArea } from './geojson-import.ts';
 import type { ReferenceDataConfig, ReferenceDataGroup } from './reference-data.ts';
 import { groupBySlug, groupForCategory, REFERENCE_DATA_CONFIG } from './reference-data.ts';
 
@@ -263,7 +263,21 @@ export async function importConsulteeAreaGroup(
 	return { group, quarter, rowsLoaded, datasetInUse: inUse, waitingFor };
 }
 
-/** Empty the dataset in use - every group's rows - leaving other quarters' tables and the load log as they are. */
-export async function clearConsulteeAreas(dbClient: PrismaClient): Promise<number> {
-	return clearExistingRows(dbClient, 'consultee-areas');
+/**
+ * Empty a quarter's dataset - every group's rows - or by default the one in use, a batch at a
+ * time. The table stays, as do other quarters' and the load log.
+ */
+export async function clearConsulteeAreas(dbClient: PrismaClient, quarter?: string): Promise<number> {
+	if (quarter === undefined) {
+		return clearExistingRows(dbClient, 'consultee-areas');
+	}
+	const table = tableSql(consulteeAreaTable(quarter));
+	let total = 0;
+	for (;;) {
+		const deleted = await dbClient.$executeRaw`DELETE TOP (${CLEAR_BATCH_SIZE}) FROM ${table}`;
+		total += deleted;
+		if (deleted < CLEAR_BATCH_SIZE) {
+			return total;
+		}
+	}
 }

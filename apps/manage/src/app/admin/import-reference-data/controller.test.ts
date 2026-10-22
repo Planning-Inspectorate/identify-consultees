@@ -252,7 +252,7 @@ describe('admin import reference data', () => {
 				files(),
 				runImport
 			)({ body: { group: 'public_bodies' } } as never, newRes());
-			await buildClearConsulteeAreas(service, files(), clear)({}, newRes());
+			await buildClearConsulteeAreas(service, files(), clear)({ body: { quarter: '2026Q4' } } as never, newRes());
 			await buildRunImportCaseBoundaries(service, files(), importBoundaries)({}, newRes());
 			assert.strictEqual(runImport.mock.calls[0].arguments[0], bulkDb);
 			assert.strictEqual(clear.mock.calls[0].arguments[0], bulkDb);
@@ -346,21 +346,71 @@ describe('admin import reference data', () => {
 	});
 
 	describe('clearing consultee areas', () => {
-		it('deletes every consultee area and says how many', async () => {
+		it("deletes the chosen quarter's consultee areas and says how many", async () => {
 			const res = newRes();
 			const clear = mock.fn(async () => 15_605);
-			await buildClearConsulteeAreas({ db: databaseWith(), logger: mockLogger() } as never, files(), clear)({}, res);
-			assert.strictEqual(clear.mock.callCount(), 1);
-			assert.strictEqual(viewModelOf(res).consulteeAreasCleared, 15_605);
-			assert.match(htmlOf(res), /Cleared the consultee areas: deleted 15605/);
+			await buildClearConsulteeAreas(
+				{ db: databaseWith(), logger: mockLogger() } as never,
+				files(),
+				clear
+			)({ body: { quarter: '2026Q4' } } as never, res);
+			assert.deepStrictEqual(clear.mock.calls[0].arguments.slice(1), ['2026Q4']);
+			assert.deepStrictEqual(viewModelOf(res).consulteeAreasCleared, { quarter: '2026Q4', deleted: 15_605 });
+			assert.match(htmlOf(res), /Cleared the 2026Q4 dataset: deleted 15605 consultee areas/);
 		});
+
+		it('offers each quarter with a dataset, the one in use chosen', async () => {
+			const res = newRes();
+			const db = databaseWith({
+				datasets: [
+					{ name: 'consultee_area_2026Q4', rows: 15_605 },
+					{ name: 'consultee_area_2027Q1', rows: 1_929 }
+				]
+			});
+			await buildImportReferenceDataPage({ db, logger: mockLogger() } as never, files())({}, res);
+			const html = htmlOf(res);
+			assert.match(html, /<select class="govuk-select" id="quarter" name="quarter">/);
+			assert.match(html, /<option value="2026Q4" selected>2026Q4 - in use, 15605 consultee areas<\/option>/);
+			assert.match(html, /<option value="2027Q1">2027Q1 - loading, 1929 consultee areas<\/option>/);
+		});
+
+		it('says there is nothing to clear with no dataset', async () => {
+			const res = newRes();
+			await buildImportReferenceDataPage(
+				{ db: databaseWith({ datasets: [] }), logger: mockLogger() } as never,
+				files()
+			)({}, res);
+			assert.match(htmlOf(res), /There's no dataset to clear\./);
+		});
+
+		for (const [title, body] of [
+			['no quarter', undefined],
+			['a quarter with no dataset', { quarter: '2025Q1' }],
+			['something that is not a quarter', { quarter: ['2026Q4'] }]
+		] as const) {
+			it(`refuses ${title}, deleting nothing`, async () => {
+				const res = newRes();
+				const clear = mock.fn(async () => 0);
+				await buildClearConsulteeAreas(
+					{ db: databaseWith(), logger: mockLogger() } as never,
+					files(),
+					clear
+				)({ body } as never, res);
+				assert.strictEqual(clear.mock.callCount(), 0);
+				assert.strictEqual(viewModelOf(res).error, 'Choose a dataset to clear.');
+			});
+		}
 
 		it('says it could not when the delete fails', async () => {
 			const res = newRes();
 			const clear = mock.fn(async () => {
 				throw new Error('deadlock');
 			});
-			await buildClearConsulteeAreas({ db: databaseWith(), logger: mockLogger() } as never, files(), clear)({}, res);
+			await buildClearConsulteeAreas(
+				{ db: databaseWith(), logger: mockLogger() } as never,
+				files(),
+				clear
+			)({ body: { quarter: '2026Q4' } } as never, res);
 			assert.strictEqual(viewModelOf(res).error, 'Could not clear the consultee areas.');
 		});
 	});
