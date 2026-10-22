@@ -599,7 +599,6 @@ tabs:
 			'Category',
 			'Subcategory',
 			'Subcategory description',
-			'Region',
 			'Distance from site (km)',
 			'Why identified',
 			'Source',
@@ -628,13 +627,14 @@ tabs:
 		assert.deepStrictEqual(rowValues(admin.data[0]), [
 			'Consultee',
 			'Category',
-			'Region',
 			'Why identified',
 			'Source',
 			'Code',
 			'Official name'
 		]);
 		assert.deepStrictEqual(rowValues(admin.data[1]).slice(-2), ['E04000001', 'Abbey']);
+		// no tab shows a consultee's region
+		assert.ok(sheets.slice(1).every((sheet) => !rowValues(sheet.data[0]).includes('Region')));
 	});
 
 	it('has the columns config/report.yaml lists for its tab, in its order - any of the stored ones', () => {
