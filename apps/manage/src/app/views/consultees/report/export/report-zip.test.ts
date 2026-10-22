@@ -12,6 +12,7 @@ import {
 	formatFileSize,
 	rememberReportZip,
 	rememberedReportZip,
+	reportGeneratedBy,
 	screenedSite
 } from './report-zip.ts';
 
@@ -29,6 +30,14 @@ describe('remembered report ZIPs', () => {
 		const report = { fileName: 'report.zip', contents: Buffer.from('zip bytes') };
 		rememberReportZip('/consultees/a/report/download?ruleset=rs', report);
 		assert.strictEqual(rememberedReportZip('/consultees/a/report/download?ruleset=rs'), report);
+	});
+
+	it("keeps each user's own copy - its Summary names who generated it", () => {
+		const report = { fileName: 'report.zip', contents: Buffer.from('Sam') };
+		rememberReportZip('/consultees/a/report/download?ruleset=other', report, 'Sam Officer');
+		assert.strictEqual(rememberedReportZip('/consultees/a/report/download?ruleset=other', 'Sam Officer'), report);
+		assert.strictEqual(rememberedReportZip('/consultees/a/report/download?ruleset=other', 'Alex Officer'), undefined);
+		assert.strictEqual(rememberedReportZip('/consultees/a/report/download?ruleset=other'), undefined);
 	});
 
 	it('keeps only the newest few reports - each is tens of MB of process memory', () => {
@@ -222,5 +231,15 @@ describe("the report's maps", () => {
 		);
 		assert.ok(drawn.length > 0);
 		assert.ok(drawn.every((values) => !values.includes('a2')));
+	});
+});
+
+describe('who generated a report', () => {
+	it("is the signed-in user's name, else no one", () => {
+		assert.strictEqual(reportGeneratedBy({ account: { name: ' Sam Officer ' } } as never), 'Sam Officer');
+		assert.strictEqual(reportGeneratedBy({ account: { name: ' ' } } as never), undefined);
+		assert.strictEqual(reportGeneratedBy({ account: {} } as never), undefined);
+		assert.strictEqual(reportGeneratedBy({} as never), undefined);
+		assert.strictEqual(reportGeneratedBy(undefined), undefined);
 	});
 });

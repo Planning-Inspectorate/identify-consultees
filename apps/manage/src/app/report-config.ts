@@ -57,12 +57,23 @@ export const REPORT_TABS = [
 
 export type ReportTab = (typeof REPORT_TABS)[number];
 
+/** A line of the workbook's Summary tab: its label, and the categories it counts. */
+export interface SummaryLine {
+	label: string;
+	categories: string[];
+}
+
 export interface ReportConfig {
 	defaults: TabReportSettings;
 	/** Each tab the file sets, over the defaults. */
 	tabs: Partial<Record<ReportTab, TabReportSettings>>;
 	/** Each category the file sets, over its tab's settings. */
 	categories: Record<string, CategoryReportSettings>;
+	/**
+	 * Each tab's lines on the Summary tab, in the file's order: its categories' `summary` labels -
+	 * categories sharing a label share a line.
+	 */
+	summaryLines: Partial<Record<ReportTab, SummaryLine[]>>;
 }
 
 const FILE = 'report.yaml';
@@ -157,12 +168,18 @@ function parseCategory(tab: ReportTab, category: string, value: unknown, setting
 		);
 	}
 	if (!isRecord(value)) {
-		fail(`${name} must set metadata or mapKm`);
+		fail(`${name} must set metadata, mapKm or summary`);
 	}
-	onlyKeys(value, ['metadata', 'mapKm'], name);
+	onlyKeys(value, ['metadata', 'mapKm', 'summary'], name);
+	if (value.summary !== undefined && (typeof value.summary !== 'string' || value.summary.trim() === '')) {
+		fail(`${name}.summary must be the label the Summary tab gives it`);
+	}
 	return {
-		metadata: value.metadata === undefined ? settings.metadata : parseMetadata(value.metadata, name),
-		mapMarginMetres: value.mapKm === undefined ? settings.mapMarginMetres : parseMapKm(value.mapKm, name)
+		settings: {
+			metadata: value.metadata === undefined ? settings.metadata : parseMetadata(value.metadata, name),
+			mapMarginMetres: value.mapKm === undefined ? settings.mapMarginMetres : parseMapKm(value.mapKm, name)
+		},
+		summary: typeof value.summary === 'string' ? value.summary.trim() : undefined
 	};
 }
 
@@ -187,6 +204,7 @@ export function parseReportConfig(text: string): ReportConfig {
 	}
 	const tabs: Partial<Record<ReportTab, TabReportSettings>> = {};
 	const categories: Record<string, CategoryReportSettings> = {};
+	const summaryLines: Partial<Record<ReportTab, SummaryLine[]>> = {};
 	for (const [tab, value] of Object.entries(tabsSection)) {
 		if (!REPORT_TABS.includes(tab as ReportTab)) {
 			fail(`tabs: "${tab}" isn't a tab - use any of ${REPORT_TABS.join(', ')}`);
@@ -198,10 +216,25 @@ export function parseReportConfig(text: string): ReportConfig {
 			fail(`tabs.${tab}.categories must map each category to its settings`);
 		}
 		for (const [category, categoryValue] of Object.entries(listed)) {
-			categories[category] = parseCategory(tab as ReportTab, category, categoryValue, settings);
+			const parsed = parseCategory(tab as ReportTab, category, categoryValue, settings);
+			categories[category] = parsed.settings;
+			if (parsed.summary) {
+				const lines = (summaryLines[tab as ReportTab] ??= []);
+				const line = lines.find((candidate) => candidate.label === parsed.summary);
+				if (line) {
+					line.categories.push(category);
+				} else {
+					lines.push({ label: parsed.summary, categories: [category] });
+				}
+			}
 		}
 	}
-	return { defaults, tabs, categories };
+	return { defaults, tabs, categories, summaryLines };
+}
+
+/** A tab's lines on the Summary tab, in order - none if its categories set no `summary`. */
+export function summaryLines(tab: ReportTab, config: ReportConfig = REPORT_CONFIG): SummaryLine[] {
+	return config.summaryLines[tab] ?? [];
 }
 
 /** A tab's settings: its own, or the defaults. */

@@ -1,7 +1,7 @@
-# Report: which columns each tab of the downloaded workbook shows, and how much each category's map
-# shows around the site. Read when the app starts (apps/manage/src/app/report-config.ts), which
-# refuses to start if a value here is invalid - so a change is checked by `npm test` and takes
-# effect on the next deploy.
+# Report: which columns each tab of the downloaded workbook shows, how much each category's map
+# shows around the site, and the lines of its Summary tab. Read when the app starts
+# (apps/manage/src/app/report-config.ts), which refuses to start if a value here is invalid - so a
+# change is checked by `npm test` and takes effect on the next deploy.
 #
 # A tab's columns are its `columns`, then the metadata its consultees export:
 #
@@ -27,9 +27,15 @@
 #
 #   mapKm     how much a category's map shows around the site, in km.
 #
+#   summary   a category's line on the Summary tab - the label it gives the category's count.
+#             Each tab's lines are in the order its categories are listed here; categories with the
+#             same label share a line. A line shows even when its count is 0. A category without a
+#             label that has consultees in a report gets a line of its own, under its name, after
+#             the tab's labelled lines - so the counts always add up to the tab's total.
+#
 # Each is set in `defaults`, can be set again for a tab, and `metadata` and `mapKm` again for one
 # of the tab's categories - the nearest wins. A category belongs to the tab its group is named
-# for in config/reference-data.yaml; list it only where it differs from its tab.
+# for in config/reference-data.yaml; list it there.
 
 version: 2
 
@@ -41,20 +47,43 @@ defaults:
 tabs:
   Administrative boundaries:
     columns: [consultee, category, region, whyIdentified, source]
+    categories:
+      Parish Council: { summary: 'Parish, Town and Community Councils' }
+      Lower Tier Authority: { summary: District Councils (Lower Tier Authorities) }
+      Unitary Authority: { summary: Unitary Authorities }
+      National Park: { summary: National Parks and Broads }
+      Upper Tier Authority: { summary: County Councils (Upper Tier Authorities) }
+      Greater London Authority: { summary: Greater London Authority }
 
   Public bodies:
     columns: [consultee, category, region, whyIdentified, source]
     categories:
-      Fire and Rescue Authority: { metadata: { ONS_CODE: Code, NAME: Official name } }
-      ICB: { metadata: { ICB26CD: Code, ICB26NM: Official name } }
-      Police: { metadata: { PFA22CD: Code, NAME: Official name, PFA22NM: Police force area } }
-      National Landscape: { metadata: { CODE: Code, NAME: Official name, NAT_ENG_CODE: Natural England code } }
+      Ambulance Trust: { summary: Ambulance Trusts }
+      Fire and Rescue Authority:
+        summary: Fire and Rescue Authorities
+        metadata: { ONS_CODE: Code, NAME: Official name }
+      Police:
+        summary: Police and Crime Commissioners
+        metadata: { PFA22CD: Code, NAME: Official name, PFA22NM: Police force area }
+      Hospital: { summary: Hospitals operated by NHS Trusts and NHS Foundation Trusts (England) }
+      ICB:
+        summary: Integrated Care Boards (England)
+        metadata: { ICB26CD: Code, ICB26NM: Official name }
+      # a drainage district's consultee is its board
+      Internal Drainage Board: { summary: Internal Drainage Boards }
+      Internal Drainage District: { summary: Internal Drainage Boards }
+      Local Resilience Forum: { summary: Local Resilience Forums }
+      Local Health Board: { summary: Local Health Boards (Wales) }
+      National Landscape:
+        summary: National Landscapes
+        metadata: { CODE: Code, NAME: Official name, NAT_ENG_CODE: Natural England code }
 
   Energy:
     columns: [consultee, category, subcategory, subcategoryDescription, region, distanceKm, whyIdentified, source]
     metadata: { NAME: Official name }
     categories:
       Electricity Generator:
+        summary: Electricity Generators
         metadata:
           NAME: Official name
           COMPANY_NAME: Operator
@@ -64,15 +93,36 @@ tabs:
           COMMISSIONED_DATE: Commissioned
           PINS_REFERENCE: PINS reference
           DUKES_REFERENCE: DUKES reference
+      Offshore Wind Site:
+        summary: Offshore Wind Sites
+        metadata: { NAME: Official name, TENANT: Operator }
+      Offshore Wind Export Cable:
+        summary: Wind Export Cables
+        metadata: { NAME: Official name, TENANT: Operator }
+      ONR Site: { summary: Office for Nuclear Regulation Sites }
       Interconnector: { metadata: { NAME: Official name, LICENSEE: Operator, STATUS: Status } }
-      Offshore Wind Site: { metadata: { NAME: Official name, TENANT: Operator } }
-      Offshore Wind Export Cable: { metadata: { NAME: Official name, TENANT: Operator } }
 
   Transport:
     columns: [consultee, category, subcategory, subcategoryDescription, region, distanceKm, whyIdentified, source]
     metadata: { NAME: Official name }
     categories:
+      Canal: { summary: Canals }
+      Railway:
+        summary: Railways
+        metadata: { STATUS: Status, HS2: HS2 }
+      Passenger Transport Executive:
+        summary: Passenger Transport Executives
+        metadata:
+          &combined_authority {
+            COMB_AUTH_CODE: Code,
+            COMB_AUTH_NAME: Official name,
+            PTE_NAME: Passenger transport executive
+          }
+      Integrated Transport Authority:
+        summary: Integrated Transport Authorities
+        metadata: *combined_authority
       Dock or Harbour:
+        summary: Docks and Harbours operated by Statutory Harbour Authorities
         metadata:
           NAME: Official name
           STATUS: Ownership
@@ -80,12 +130,13 @@ tabs:
           STATUTORY_HARBOUR_AUTHORITY: Statutory harbour authority
           COMPETENT_HARBOUR_AUTHORITY: Competent harbour authority
       Corporate Joint Committee: { metadata: { NAME: Official name, CTYUA23NM: Member councils } }
-      Integrated Transport Authority: &combined_authority
-        metadata: { COMB_AUTH_CODE: Code, COMB_AUTH_NAME: Official name, PTE_NAME: Passenger transport executive }
-      Passenger Transport Executive: *combined_authority
-      Railway: { metadata: { STATUS: Status, HS2: HS2 } }
 
-  Other: {}
+  Other:
+    categories:
+      MOD Safeguarding Area: { summary: Ministry of Defence Safeguarding Areas }
+      MOD Low Flying Area: { summary: Ministry of Defence Low Flying Areas }
+      Coal Mining Reporting Area: { summary: Coal Mining Reporting Areas }
+      Cheshire Brine Area: { summary: Cheshire Brine Area }
 
   Nearby NSIPs:
     columns: [consultee, whyIdentified, source]
@@ -95,3 +146,5 @@ tabs:
       Shapefile: Shapefile
       Received: Received
       Distance (km): Distance from site (km)
+    categories:
+      Nearby NSIPs: { summary: National infrastructure projects }
