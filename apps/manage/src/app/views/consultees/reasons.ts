@@ -4,7 +4,8 @@ import type {
 	Ruleset
 } from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
 
-function kilometres(metres: number): string {
+/** A distance as the report pages give it - `10km`, `2.5km`. */
+export function kilometres(metres: number): string {
 	return `${Number((metres / 1000).toFixed(2))}km`;
 }
 

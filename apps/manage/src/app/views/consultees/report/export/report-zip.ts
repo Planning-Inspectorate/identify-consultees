@@ -18,7 +18,7 @@ import { computeBounds } from '../../../../maps/geometry-bounds.ts';
 import { buildConsulteeStaticMapResponse } from '../../../../maps/serve-static-map.ts';
 import { consulteeColours, projectColours } from '../../../../maps/static-map.ts';
 import { categorySettings } from '../../../../report-config.ts';
-import { isNearbyNsip, NEARBY_NSIPS } from '../../nearby-nsips.ts';
+import { isNearbyNsip, NEARBY_NSIPS, nsipType } from '../../nearby-nsips.ts';
 import { buildSearchAreaSafely, RULESET_RUN_MAX_AGE_MS } from '../../run-ruleset.ts';
 import { reportByCategory } from '../report-consultees.ts';
 import type { ConsulteeSelection } from '../urls.ts';
@@ -74,6 +74,8 @@ async function nearbyNsipRecords(
 				'Project name': row.caseName,
 				Shapefile: row.fileName,
 				Received: row.receivedDate ? formatDate(row.receivedDate) : null,
+				Type: nsipType(row.caseReference).type,
+				'Sub-type': nsipType(row.caseReference).subType,
 				'Distance (km)': Math.round(distances.get(id)! / 10) / 100
 			}),
 			lastUpdated: row.lastUpdated

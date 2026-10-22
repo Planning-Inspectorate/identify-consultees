@@ -150,6 +150,8 @@ tabs:
       Project name: Project name
       Shapefile: Shapefile
       Received: Received
+      Type: Type
+      Sub-type: Sub-type
       Distance (km): Distance from site (km)
     categories:
       Nearby NSIPs: { summary: National infrastructure projects }
