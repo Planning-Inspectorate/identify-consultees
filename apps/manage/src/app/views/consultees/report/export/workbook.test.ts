@@ -85,6 +85,19 @@ function report(overrides: Partial<ReportExport> = {}): ReportExport {
 	};
 }
 
+// the workbook as these tests build it: the same columns on every tab, every metadata attribute
+const TEST_CONFIG = parseReportConfig(`
+version: 2
+defaults:
+  columns: [consultee, category, group, subcategory, subcategoryDescription, region, whyIdentified, source]
+  metadata: all
+  mapKm: 10
+`);
+
+function sheetsOf(exported: ReportExport, config = TEST_CONFIG) {
+	return buildReportSheets(exported, config);
+}
+
 // a cell's value, whether written bare or as a cell object
 const valueOf = (cell: unknown) => (cell && typeof cell === 'object' && 'value' in cell ? cell.value : cell);
 const rowValues = (row: unknown[]) => row.map(valueOf);
@@ -118,7 +131,7 @@ describe('report workbook', () => {
 	});
 
 	it('writes a Summary tab, the five group tabs, then Nearby NSIPs', () => {
-		const sheets = buildReportSheets(report());
+		const sheets = sheetsOf(report());
 		assert.deepStrictEqual(
 			sheets.map((sheet) => sheet.sheet),
 			['Summary', 'Administrative boundaries', 'Public bodies', 'Energy', 'Transport', 'Other', NEARBY_NSIPS]
@@ -131,7 +144,7 @@ describe('report workbook', () => {
 			...match('n', NEARBY_NSIPS, 'Neighbouring Solar Farm (EN010200)', 'odd', 2_345),
 			reasons: [{ type: 'nearbyNsip' as const, radiusMetres: 10_000 }]
 		};
-		const sheets = buildReportSheets(
+		const sheets = sheetsOf(
 			report({
 				identified: [nearbyNsip],
 				records: new Map([
@@ -166,15 +179,15 @@ describe('report workbook', () => {
 	it("says on the Summary what the run screened - the site's outline, or its bounding box", () => {
 		const screenedAgainst = (sheets: ReturnType<typeof buildReportSheets>) =>
 			sheets[0].data.map(rowValues).find((cells) => cells[0] === 'Screened against')?.[1];
-		assert.strictEqual(screenedAgainst(buildReportSheets(report())), "The site's outline");
+		assert.strictEqual(screenedAgainst(sheetsOf(report())), "The site's outline");
 		assert.match(
-			String(screenedAgainst(buildReportSheets(report({ siteScreenedAs: 'boundingBox' })))),
+			String(screenedAgainst(sheetsOf(report({ siteScreenedAs: 'boundingBox' })))),
 			/^The site's bounding box - its outline was too detailed to screen in time/
 		);
 	});
 
 	it('lists each consultee with its stored columns, sorted by category then name', () => {
-		const sheets = buildReportSheets(
+		const sheets = sheetsOf(
 			report({
 				identified: [
 					match('b', 'Parish Council', 'Zeal Parish Council', 'b_host_parish'),
@@ -246,7 +259,7 @@ describe('report workbook', () => {
 	});
 
 	it("spreads each tab's metadata into a column per attribute, blank where a consultee lacks one", () => {
-		const sheets = buildReportSheets(
+		const sheets = sheetsOf(
 			report({
 				identified: [
 					match('a', 'Parish Council', 'Abbey', 'b_host_parish'),
@@ -324,7 +337,7 @@ describe('report workbook', () => {
 	});
 
 	it('summarises the report, counting each tab, and lists removals with their reasons', () => {
-		const sheets = buildReportSheets(
+		const sheets = sheetsOf(
 			report({
 				identified: [match('a', 'Parish Council', 'Abbey', 'b_host_parish')],
 				added: [{ category: 'Hospital', name: 'Added Hospital', reason: 'Asked to be consulted' }],
@@ -344,9 +357,7 @@ describe('report workbook', () => {
 	});
 
 	it('leaves out optional details that are missing, and the removals section when there are none', () => {
-		const summary = buildReportSheets(report({ boundaryFileName: null, boundaryReceivedDate: null }))[0].data.map(
-			rowValues
-		);
+		const summary = sheetsOf(report({ boundaryFileName: null, boundaryReceivedDate: null }))[0].data.map(rowValues);
 		assert.deepStrictEqual(
 			summary.find((cells) => cells[0] === 'Boundary file'),
 			['Boundary file', null]
@@ -359,7 +370,7 @@ describe('report workbook', () => {
 	});
 
 	it('gives a consultee added by hand its stored region and metadata', () => {
-		const admin = buildReportSheets(
+		const admin = sheetsOf(
 			report({
 				records: new Map([['p', record('p', { region: 'Stored region' })]]),
 				added: [{ id: 'p', category: 'Parish Council', name: 'Picked Parish', reason: 'Borders the site' }]
@@ -384,7 +395,7 @@ describe('report workbook', () => {
 			distanceMetres: null,
 			reasons: [{ type: 'condition', conditionId: 'b_host_parish' }]
 		} as unknown as ConsulteeMatch;
-		const admin = buildReportSheets(report({ identified: [unnamed] })).find(
+		const admin = sheetsOf(report({ identified: [unnamed] })).find(
 			(sheet) => sheet.sheet === 'Administrative boundaries'
 		)!;
 		assert.deepStrictEqual(rowValues(admin.data[1]), [
@@ -409,15 +420,101 @@ describe('report workbook', () => {
 		);
 	});
 
-	it('has the columns config/report.yaml lists, in its order - any of the stored ones', () => {
+	it("builds each tab from config/report.yaml's own columns and metadata", () => {
+		const generator = {
+			...match('g', 'Electricity Generator', 'Solar Farm', 'odd', 2_500),
+			reasons: [{ type: 'condition' as const, conditionId: 'generators' }]
+		};
+		const withGenerators: Ruleset = {
+			...ruleset,
+			rules: [
+				...ruleset.rules,
+				{
+					id: 'generators',
+					name: 'Electricity generators',
+					group: 'Energy',
+					logicType: 'intersection',
+					categories: ['Electricity Generator'],
+					bufferMetres: 10_000
+				}
+			]
+		};
+		const sheets = buildReportSheets(
+			report({
+				ruleset: withGenerators,
+				identified: [generator, match('a', 'Parish Council', 'Abbey', 'b_host_parish')],
+				records: new Map([
+					[
+						'g',
+						record('g', {
+							consultee: 'Solar Farm',
+							consulteeCategory: 'Electricity Generator',
+							consulteeSubcategory: 'Solar',
+							metadata: JSON.stringify({ NAME: 'Solar Farm (England)', PRIMARY_TYPE: 'Solar', LAT: '51.3' })
+						})
+					],
+					[
+						'a',
+						record('a', { consultee: 'Abbey', metadata: JSON.stringify({ CODE: 'E04000001', NAME: 'Abbey', FID: 7 }) })
+					]
+				])
+			})
+		);
+		const energy = sheets.find((sheet) => sheet.sheet === 'Energy')!;
+		assert.deepStrictEqual(rowValues(energy.data[0]), [
+			'Consultee',
+			'Category',
+			'Subcategory',
+			'Subcategory description',
+			'Region',
+			'Distance from site (km)',
+			'Why identified',
+			'Source',
+			// every attribute the category lists, blank where this consultee has none
+			'Official name',
+			'Operator',
+			'Technology',
+			'Capacity (MW)',
+			'Status',
+			'Commissioned',
+			'PINS reference',
+			'DUKES reference'
+		]);
+		assert.deepStrictEqual(rowValues(energy.data[1]).slice(-8), [
+			'Solar Farm (England)',
+			null,
+			'Solar',
+			null,
+			null,
+			null,
+			null,
+			null
+		]);
+		const admin = sheets.find((sheet) => sheet.sheet === 'Administrative boundaries')!;
+		// only the attributes listed - CODE and NAME, not FID
+		assert.deepStrictEqual(rowValues(admin.data[0]), [
+			'Consultee',
+			'Category',
+			'Region',
+			'Why identified',
+			'Source',
+			'Code',
+			'Official name'
+		]);
+		assert.deepStrictEqual(rowValues(admin.data[1]).slice(-2), ['E04000001', 'Abbey']);
+	});
+
+	it('has the columns config/report.yaml lists for its tab, in its order - any of the stored ones', () => {
 		const config = parseReportConfig(
 			[
-				'version: 1',
-				'columns: [lastUpdated, consultee, distanceKm, consulteeAreaId, geometryType, sourceId, group, subcategory, subcategoryDescription, source]',
-				'defaults: { mapKm: 10, metadata: none }'
+				'version: 2',
+				'defaults:',
+				'  columns: [lastUpdated, consultee, distanceKm, consulteeAreaId, geometryType, sourceId, group, subcategory, subcategoryDescription, source]',
+				'  metadata: none',
+				'  mapKm: 10'
 			].join('\n')
 		);
-		const admin = buildReportSheets(
+		const admin = sheetsOf(
 			report({
 				identified: [match('a', 'Parish Council', 'Abbey', 'b_host_parish', 2500)],
 				records: new Map([
@@ -477,16 +574,16 @@ describe('report workbook', () => {
 	it("exports each category's metadata as config/report.yaml sets - shared headings share a column", () => {
 		const config = parseReportConfig(
 			[
-				'version: 1',
-				'columns: [consultee]',
-				'defaults: { mapKm: 10, metadata: all }',
-				'categories:',
-				'  Parish Council:',
-				'    metadata: { PARNCP23CD: ONS code, PARNCP23NM: Name }',
-				'  Unitary Authority:',
-				'    metadata: { LAD24CD: ONS code }',
-				'  Hospital:',
-				'    metadata: none'
+				'version: 2',
+				'defaults: { columns: [consultee], metadata: all, mapKm: 10 }',
+				'tabs:',
+				'  Administrative boundaries:',
+				'    categories:',
+				'      Parish Council: { metadata: { PARNCP23CD: ONS code, PARNCP23NM: Name } }',
+				'      Unitary Authority: { metadata: { LAD24CD: ONS code } }',
+				'  Public bodies:',
+				'    categories:',
+				'      Hospital: { metadata: none }'
 			].join('\n')
 		);
 		const withUnitaries: Ruleset = {
@@ -503,7 +600,7 @@ describe('report workbook', () => {
 				}
 			]
 		};
-		const sheets = buildReportSheets(
+		const sheets = sheetsOf(
 			report({
 				ruleset: withUnitaries,
 				identified: [

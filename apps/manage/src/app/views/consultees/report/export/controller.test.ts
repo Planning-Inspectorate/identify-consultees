@@ -251,7 +251,7 @@ describe('report download', () => {
 			'Another NSIP within 10km of the site',
 			'neighbour.geojson',
 			'1 September 2026',
-			'Distance (km)'
+			'Distance from site (km)'
 		]) {
 			assert.ok(xml.includes(text), text);
 		}

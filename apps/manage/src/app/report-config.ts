@@ -1,12 +1,15 @@
 import { CONFIG_DIR } from '@pins/identify-consultees-database/src/config-dir.ts';
+import { groupForCategory } from '@pins/identify-consultees-database/src/seed/reference-data.ts';
 import { load } from 'js-yaml';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
+import { NEARBY_NSIPS } from './views/consultees/nearby-nsips.ts';
 
 /**
- * What the consultee report shows for each consultee category, from config/report.yaml: how much
- * the category's map shows around the site, and the downloaded workbook's columns - its fixed
- * columns, then each category's metadata attributes. See the file for what each setting means.
+ * What the consultee report shows, from config/report.yaml: each workbook tab's fixed columns, the
+ * metadata attributes each category exports after them, and how much each category's map shows
+ * around the site - set by default, for a tab, and for a category on it, the nearest winning. See
+ * the file for what each setting means.
  */
 
 /** The workbook's fixed columns, by the name config/report.yaml uses, with their headings. */
@@ -37,9 +40,28 @@ export interface CategoryReportSettings {
 	metadata: MetadataSelection;
 }
 
-export interface ReportConfig {
+/** A tab's settings: its fixed columns, and its categories' metadata and map size unless they set their own. */
+export interface TabReportSettings extends CategoryReportSettings {
 	columns: ReportColumn[];
-	defaults: CategoryReportSettings;
+}
+
+/** The workbook's tabs after Summary, in order: the groups of config/reference-data.yaml, then Nearby NSIPs. */
+export const REPORT_TABS = [
+	'Administrative boundaries',
+	'Public bodies',
+	'Energy',
+	'Transport',
+	'Other',
+	NEARBY_NSIPS
+] as const;
+
+export type ReportTab = (typeof REPORT_TABS)[number];
+
+export interface ReportConfig {
+	defaults: TabReportSettings;
+	/** Each tab the file sets, over the defaults. */
+	tabs: Partial<Record<ReportTab, TabReportSettings>>;
+	/** Each category the file sets, over its tab's settings. */
 	categories: Record<string, CategoryReportSettings>;
 }
 
@@ -63,17 +85,19 @@ function onlyKeys(section: Record<string, unknown>, allowed: string[], name: str
 	}
 }
 
-function parseColumns(value: unknown): ReportColumn[] {
+function parseColumns(value: unknown, name: string): ReportColumn[] {
 	if (!Array.isArray(value) || value.length === 0) {
-		fail('columns must list at least one column');
+		fail(`${name}.columns must list at least one column`);
 	}
 	const columns: ReportColumn[] = [];
 	for (const column of value) {
 		if (typeof column !== 'string' || !(column in REPORT_COLUMNS)) {
-			fail(`columns: "${String(column)}" isn't a column - use any of ${Object.keys(REPORT_COLUMNS).join(', ')}`);
+			fail(
+				`${name}.columns: "${String(column)}" isn't a column - use any of ${Object.keys(REPORT_COLUMNS).join(', ')}`
+			);
 		}
 		if (columns.includes(column as ReportColumn)) {
-			fail(`columns lists "${column}" twice`);
+			fail(`${name}.columns lists "${column}" twice`);
 		}
 		columns.push(column as ReportColumn);
 	}
@@ -92,7 +116,7 @@ function parseMetadata(value: unknown, name: string): MetadataSelection {
 		return value;
 	}
 	if (!isRecord(value) || Object.keys(value).length === 0) {
-		fail(`${name}.metadata must be all, none, or a list of attribute: column heading`);
+		fail(`${name}.metadata must be all, none, or attribute: column heading pairs`);
 	}
 	return Object.entries(value).map(([attribute, heading]) => {
 		if (typeof heading !== 'string' || heading.trim() === '') {
@@ -102,46 +126,102 @@ function parseMetadata(value: unknown, name: string): MetadataSelection {
 	});
 }
 
-function parseSettings(value: unknown, name: string, fallback?: CategoryReportSettings): CategoryReportSettings {
+/** The tab a category's settings go under: its group's in config/reference-data.yaml, or Nearby NSIPs. */
+export function tabForCategorySettings(category: string | null | undefined): ReportTab | undefined {
+	if (category === NEARBY_NSIPS) {
+		return NEARBY_NSIPS;
+	}
+	const group = groupForCategory(category)?.name;
+	return REPORT_TABS.find((tab) => tab === group);
+}
+
+function parseTab(tab: ReportTab, value: unknown, defaults: TabReportSettings): TabReportSettings {
+	const name = `tabs.${tab}`;
 	if (!isRecord(value)) {
-		fail(`${name} must set mapKm and metadata`);
+		fail(`${name} must be a tab's settings - {} for the defaults`);
 	}
-	onlyKeys(value, ['mapKm', 'metadata'], name);
-	if (!fallback && (value.mapKm === undefined || value.metadata === undefined)) {
-		fail(`${name} must set both mapKm and metadata`);
-	}
+	onlyKeys(value, ['columns', 'metadata', 'mapKm', 'categories'], name);
 	return {
-		mapMarginMetres: value.mapKm === undefined ? fallback!.mapMarginMetres : parseMapKm(value.mapKm, name),
-		metadata: value.metadata === undefined ? fallback!.metadata : parseMetadata(value.metadata, name)
+		columns: value.columns === undefined ? defaults.columns : parseColumns(value.columns, name),
+		metadata: value.metadata === undefined ? defaults.metadata : parseMetadata(value.metadata, name),
+		mapMarginMetres: value.mapKm === undefined ? defaults.mapMarginMetres : parseMapKm(value.mapKm, name)
+	};
+}
+
+function parseCategory(tab: ReportTab, category: string, value: unknown, settings: TabReportSettings) {
+	const name = `tabs.${tab}.categories.${category}`;
+	const home = tabForCategorySettings(category);
+	if (home !== tab) {
+		fail(
+			`${name}: ${category} isn't on ${tab} - config/reference-data.yaml puts it in ${home ?? 'no group'}; list it there`
+		);
+	}
+	if (!isRecord(value)) {
+		fail(`${name} must set metadata or mapKm`);
+	}
+	onlyKeys(value, ['metadata', 'mapKm'], name);
+	return {
+		metadata: value.metadata === undefined ? settings.metadata : parseMetadata(value.metadata, name),
+		mapMarginMetres: value.mapKm === undefined ? settings.mapMarginMetres : parseMapKm(value.mapKm, name)
 	};
 }
 
 export function parseReportConfig(text: string): ReportConfig {
 	const document = text.trim() === '' ? null : load(text);
-	if (!isRecord(document) || document.version !== 1) {
-		fail('must be a version 1 document');
+	if (!isRecord(document) || document.version !== 2) {
+		fail('must be a version 2 document');
 	}
-	onlyKeys(document, ['version', 'columns', 'defaults', 'categories'], 'the document');
-	const defaults = parseSettings(document.defaults, 'defaults');
-	const categories = document.categories ?? {};
-	if (!isRecord(categories)) {
-		fail('categories must map each category to its settings');
+	onlyKeys(document, ['version', 'defaults', 'tabs'], 'the document');
+	if (!isRecord(document.defaults)) {
+		fail('defaults must set columns, metadata and mapKm');
 	}
-	return {
-		columns: parseColumns(document.columns),
-		defaults,
-		categories: Object.fromEntries(
-			Object.entries(categories).map(([category, settings]) => [
-				category,
-				parseSettings(settings, `categories.${category}`, defaults)
-			])
-		)
+	onlyKeys(document.defaults, ['columns', 'metadata', 'mapKm'], 'defaults');
+	const defaults: TabReportSettings = {
+		columns: parseColumns(document.defaults.columns, 'defaults'),
+		metadata: parseMetadata(document.defaults.metadata, 'defaults'),
+		mapMarginMetres: parseMapKm(document.defaults.mapKm, 'defaults')
 	};
+	const tabsSection = document.tabs ?? {};
+	if (!isRecord(tabsSection)) {
+		fail('tabs must map each tab to its settings');
+	}
+	const tabs: Partial<Record<ReportTab, TabReportSettings>> = {};
+	const categories: Record<string, CategoryReportSettings> = {};
+	for (const [tab, value] of Object.entries(tabsSection)) {
+		if (!REPORT_TABS.includes(tab as ReportTab)) {
+			fail(`tabs: "${tab}" isn't a tab - use any of ${REPORT_TABS.join(', ')}`);
+		}
+		const settings = parseTab(tab as ReportTab, value, defaults);
+		tabs[tab as ReportTab] = settings;
+		const listed = (value as Record<string, unknown>).categories ?? {};
+		if (!isRecord(listed)) {
+			fail(`tabs.${tab}.categories must map each category to its settings`);
+		}
+		for (const [category, categoryValue] of Object.entries(listed)) {
+			categories[category] = parseCategory(tab as ReportTab, category, categoryValue, settings);
+		}
+	}
+	return { defaults, tabs, categories };
 }
 
-/** A category's settings: its own, or the defaults for anything it leaves out. */
-export function categorySettings(category: string | null | undefined, config: ReportConfig = REPORT_CONFIG) {
-	return category && Object.hasOwn(config.categories, category) ? config.categories[category] : config.defaults;
+/** A tab's settings: its own, or the defaults. */
+export function tabSettings(tab: ReportTab, config: ReportConfig = REPORT_CONFIG): TabReportSettings {
+	return config.tabs[tab] ?? config.defaults;
+}
+
+/**
+ * A category's settings: its own, else its tab's (its group's in config/reference-data.yaml), else
+ * the defaults.
+ */
+export function categorySettings(
+	category: string | null | undefined,
+	config: ReportConfig = REPORT_CONFIG
+): CategoryReportSettings {
+	if (category && Object.hasOwn(config.categories, category)) {
+		return config.categories[category];
+	}
+	const tab = tabForCategorySettings(category);
+	return tab ? tabSettings(tab, config) : config.defaults;
 }
 
 export const REPORT_CONFIG = parseReportConfig(readFileSync(path.join(CONFIG_DIR, FILE), 'utf8'));
