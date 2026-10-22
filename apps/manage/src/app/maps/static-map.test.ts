@@ -11,6 +11,8 @@ import {
 	escapeXml,
 	fetchOsmBasemapTiles,
 	googleMapsApiKeyFromEnv,
+	insideRings,
+	labelText,
 	listOsmTilesForViewport,
 	lngLatToWorldPixel,
 	osmTileCacheSizeForTests,
@@ -731,5 +733,226 @@ describe('visiblePathPoints', () => {
 		// 2,000 points far above the map - just the two ends
 		assert.equal(paths[0].split(/[ML]/).filter(Boolean).length, 2);
 		assert.equal(paths[1].split(/[ML]/).filter(Boolean).length, 2);
+	});
+});
+
+// the labels and buffers the report's maps draw
+
+const MAP = { center: [-1.75, 50.65] as const, zoom: 10, width: 400, height: 300 };
+
+function box(west: number, south: number, east: number, north: number) {
+	return {
+		type: 'Polygon' as const,
+		coordinates: [
+			[
+				[west, south],
+				[east, south],
+				[east, north],
+				[west, north],
+				[west, south]
+			]
+		]
+	};
+}
+
+function collection(
+	...features: { properties: Record<string, unknown>; geometry: unknown }[]
+): GeoJsonFeatureCollection {
+	return {
+		type: 'FeatureCollection',
+		features: features.map((feature) => ({ type: 'Feature', ...feature })) as GeoJsonFeatureCollection['features']
+	};
+}
+
+/** Where on the test map a position draws. */
+function pixel(lng: number, lat: number): [number, number] {
+	const { left, top } = staticMapViewportOrigin(MAP.center, MAP.zoom, MAP.width, MAP.height);
+	const [x, y] = lngLatToWorldPixel(lng, lat, MAP.zoom);
+	return [x - left, y - top];
+}
+
+/** Each label drawn: its text and where its middle is. */
+function labels(svg: string): { text: string; x: number; y: number }[] {
+	return [...svg.matchAll(/<text x="([\d.-]+)" y="([\d.-]+)"[^>]*>([^<]*)<\/text>/g)].map(([, x, y, text]) => ({
+		text,
+		x: Number(x),
+		// drawn from its baseline, a little below its middle
+		y: Number(y) - 11 * 0.35
+	}));
+}
+
+function overlay(consultees: GeoJsonFeatureCollection, extra: Record<string, unknown> = {}): string {
+	return renderStaticMapOverlaySvg({
+		...MAP,
+		projectGeojson: emptyCollection,
+		consulteeGeojson: consultees,
+		labels: true,
+		...extra
+	});
+}
+
+describe('static-map labels', () => {
+	test('names each area inside it, once per name, where labels have room', () => {
+		const svg = overlay(
+			collection(
+				// a county around the whole map
+				{ properties: { name: 'Big County' }, geometry: box(-3, 49.5, -0.5, 51.8) },
+				{ properties: { name: 'Abbey Parish' }, geometry: box(-1.8, 50.6, -1.7, 50.7) },
+				// another of its areas - named once
+				{ properties: { name: 'Abbey Parish' }, geometry: box(-1.65, 50.6, -1.6, 50.65) },
+				{ properties: { name: '' }, geometry: box(-1.75, 50.6, -1.7, 50.65) },
+				{ properties: {}, geometry: box(-1.75, 50.6, -1.7, 50.65) }
+			)
+		);
+		const drawn = labels(svg);
+		assert.deepEqual(drawn.map(({ text }) => text).toSorted(), ['Abbey Parish', 'Big County']);
+		// on the smaller of its areas - placed first, as it has fewest spots
+		const abbey = drawn.find(({ text }) => text === 'Abbey Parish')!;
+		const [west, north] = pixel(-1.65, 50.65);
+		const [east, south] = pixel(-1.6, 50.6);
+		assert.ok(abbey.x > west && abbey.x < east && abbey.y > north && abbey.y < south, JSON.stringify(abbey));
+		// the county's label is on the map, clear of the parish's
+		const county = drawn.find(({ text }) => text === 'Big County')!;
+		assert.ok(county.x > 0 && county.x < MAP.width && county.y > 0 && county.y < MAP.height);
+		assert.ok(Math.abs(county.y - abbey.y) >= 14 || Math.abs(county.x - abbey.x) >= 70);
+		// with a halo, over everything else
+		assert.match(svg, /stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke">Abbey/);
+		assert.ok(svg.lastIndexOf('<path') < svg.indexOf('<text'));
+	});
+
+	test('names a line on it, a point at it, and an area smaller than the grid at its middle', () => {
+		const drawn = labels(
+			overlay(
+				collection(
+					{
+						properties: { name: 'Railway' },
+						geometry: {
+							type: 'LineString',
+							coordinates: [
+								[-1.85, 50.62],
+								[-1.65, 50.62]
+							]
+						}
+					},
+					{ properties: { name: 'Port' }, geometry: { type: 'Point', coordinates: [-1.75, 50.68] } },
+					{ properties: { name: 'Tiny' }, geometry: box(-1.701, 50.655, -1.699, 50.656) }
+				)
+			)
+		);
+		const at = (text: string) => drawn.find((label) => label.text === text)!;
+		assert.ok(Math.abs(at('Railway').y - pixel(-1.75, 50.62)[1]) < 1);
+		const [portX, portY] = pixel(-1.75, 50.68);
+		assert.ok(Math.abs(at('Port').x - portX) < 1 && Math.abs(at('Port').y - portY) < 1);
+		const [tinyX, tinyY] = pixel(-1.7, 50.6555);
+		assert.ok(Math.abs(at('Tiny').x - tinyX) < 1 && Math.abs(at('Tiny').y - tinyY) < 1);
+	});
+
+	test('leaves out a label with nowhere free, and an area off the map', () => {
+		const drawn = labels(
+			overlay(
+				collection(
+					{ properties: { name: 'First' }, geometry: box(-1.701, 50.655, -1.699, 50.656) },
+					{ properties: { name: 'Second' }, geometry: box(-1.701, 50.655, -1.699, 50.656) },
+					{ properties: { name: 'Far away' }, geometry: box(0, 52, 0.1, 52.1) },
+					{
+						properties: { name: 'Far railway' },
+						geometry: {
+							type: 'LineString',
+							coordinates: [
+								[0, 52],
+								[0.1, 52.1]
+							]
+						}
+					},
+					// on the map, but too near its edge for a label
+					{ properties: { name: 'Edge' }, geometry: box(-2.024, 50.556, -2.022, 50.557) }
+				)
+			)
+		);
+		assert.deepEqual(
+			drawn.map(({ text }) => text),
+			['First']
+		);
+	});
+
+	test('draws no labels unless asked', () => {
+		const svg = overlay(collection({ properties: { name: 'Abbey Parish' }, geometry: box(-1.8, 50.6, -1.7, 50.7) }), {
+			labels: false
+		});
+		assert.doesNotMatch(svg, /<text/);
+	});
+
+	test('keeps a name to one short line', () => {
+		assert.equal(labelText('  Abbey \n Parish  '), 'Abbey Parish');
+		assert.equal(labelText('A'.repeat(40)), 'A'.repeat(40));
+		assert.equal(labelText(`${'A'.repeat(38)} BBB`), `${'A'.repeat(38)}…`);
+		assert.equal(labelText('<Parish & Town>'), '<Parish & Town>');
+		assert.match(
+			overlay(collection({ properties: { name: '<Parish & Town>' }, geometry: box(-1.8, 50.6, -1.7, 50.7) })),
+			/>&lt;Parish &amp; Town&gt;</
+		);
+	});
+
+	test('counts a hole as outside its area', () => {
+		const rings: [number, number][][] = [
+			[
+				[0, 0],
+				[10, 0],
+				[10, 10],
+				[0, 10],
+				[0, 0]
+			],
+			[
+				[4, 4],
+				[6, 4],
+				[6, 6],
+				[4, 6],
+				[4, 4]
+			]
+		];
+		assert.equal(insideRings([2, 2], rings), true);
+		assert.equal(insideRings([5, 5], rings), false);
+		assert.equal(insideRings([12, 5], rings), false);
+	});
+});
+
+describe('static-map buffers', () => {
+	test('draws each buffer dashed and unfilled, named on its outline above the site, else below it', () => {
+		const svg = overlay(emptyCollection, {
+			labels: false,
+			bufferGeojson: collection(
+				{ properties: { label: '2 km' }, geometry: box(-1.8, 50.62, -1.7, 50.68) },
+				// its top is off the map
+				{ properties: { label: '10 km' }, geometry: box(-1.9, 50.6, -1.6, 52) },
+				{ properties: {}, geometry: box(-1.85, 50.61, -1.65, 50.69) },
+				// beside the site, not around it - nowhere above or below it to go
+				{ properties: { label: 'beside' }, geometry: box(-1.72, 50.6, -1.7, 50.7) },
+				// nothing to draw
+				{ properties: { label: 'none' }, geometry: { type: 'Polygon', coordinates: [[[-1.8, 50.6]]] } }
+			)
+		});
+		assert.equal(svg.match(/stroke-dasharray="8 5"/g)?.length, 4);
+		assert.match(svg, /<path d="[^"]+" fill="none" stroke="#0b0c0c" stroke-width="2" stroke-dasharray="8 5"\/>/);
+		const drawn = labels(svg);
+		assert.deepEqual(
+			drawn.map(({ text }) => text),
+			['2 km', '10 km']
+		);
+		assert.ok(Math.abs(drawn[0].y - pixel(-1.75, 50.68)[1]) < 1);
+		assert.ok(Math.abs(drawn[1].y - pixel(-1.75, 50.6)[1]) < 1);
+		assert.ok(drawn.every(({ x }) => x === MAP.width / 2));
+	});
+
+	test("keeps the areas' labels clear of a buffer's", () => {
+		const drawn = labels(
+			overlay(collection({ properties: { name: 'Abbey Parish' }, geometry: box(-1.8, 50.6, -1.7, 50.7) }), {
+				bufferGeojson: collection({ properties: { label: '2 km' }, geometry: box(-1.8, 50.6, -1.7, 50.65) })
+			})
+		);
+		assert.deepEqual(
+			drawn.map(({ text }) => text),
+			['2 km', 'Abbey Parish']
+		);
+		assert.ok(Math.abs(drawn[0].y - drawn[1].y) >= 14 || Math.abs(drawn[0].x - drawn[1].x) >= 70);
 	});
 });

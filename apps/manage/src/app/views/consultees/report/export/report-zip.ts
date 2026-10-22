@@ -1,15 +1,18 @@
 import type { ManageService } from '#service';
 import type { CaseBoundaryFeature } from '@pins/identify-consultees-database/src/geospatial/case-boundaries.ts';
+import { bufferGeometryForDisplay } from '@pins/identify-consultees-database/src/geospatial/consultee-areas.ts';
 import type {
 	ConsulteeMatch,
 	Ruleset,
 	SiteScreenedAs
 } from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
 import { isIdentified } from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
+import type { Geometry } from '@pins/identify-consultees-database/src/geospatial/wkt.ts';
 import { MapCache } from '@planning-inspectorate/core/util';
 import { strToU8, zipSync } from 'fflate';
 import writeExcelFile from 'write-excel-file/node';
 import { buildCaseMapConfig, markAddedByHand } from '../../../../maps/case-geojson.ts';
+import { computeBounds } from '../../../../maps/geometry-bounds.ts';
 import { buildConsulteeStaticMapResponse } from '../../../../maps/serve-static-map.ts';
 import { consulteeColours, projectColours } from '../../../../maps/static-map.ts';
 import { categorySettings } from '../../../../report-config.ts';
@@ -87,18 +90,106 @@ export interface ReportZipContext {
 	siteScreenedAs?: SiteScreenedAs;
 }
 
+// how far the bounding box a too-detailed site is screened as reaches past it - as
+// apps/function-python/intersector/queries.py's BOUNDING_BOX_MARGIN_METRES
+const BOUNDING_BOX_MARGIN_METRES = 1_000;
+const METRES_PER_DEGREE = 111_320;
+// a map shows a little past its widest buffer, so the outline isn't on its edge
+const BUFFER_MAP_MARGIN = 1.1;
+
 /**
- * One category's map as its Change page draws it - the category's consultees less removals, nearby
- * ones faint and the ones added by hand as identified - as a PNG for the PDF,
- * with the colours it draws in for the PDF's key.
+ * The distances a category's consultees were looked for within: each ruleset condition that finds
+ * the category within a buffer of the site, or - for Nearby NSIPs - the Nearby NSIPs distance.
+ * Smallest first, each once; a condition that needs them to touch the site, or borders a host area,
+ * has none.
+ */
+export function categoryBufferMetres(ruleset: Ruleset, category: string, nearbyNsipRadiusMetres: number): number[] {
+	const metres =
+		category === NEARBY_NSIPS
+			? [nearbyNsipRadiusMetres]
+			: ruleset.rules
+					.filter((rule) => rule.logicType === 'intersection' && rule.categories.includes(category))
+					.map((rule) => rule.bufferMetres ?? 0);
+	return [...new Set(metres.filter((value) => value > 0))].toSorted((a, b) => a - b);
+}
+
+/** A buffer distance as the map and its key give it - `500 m`, `2 km`, `1.5 km`. */
+export function formatBufferDistance(metres: number): string {
+	return metres < 1000 ? `${Math.round(metres)} m` : `${Math.round(metres / 100) / 10} km`;
+}
+
+/**
+ * What a run screened, to grow the buffers from: the site's outline, or the rectangle around it
+ * (grown by BOUNDING_BOX_MARGIN_METRES) for a site too detailed to screen in time - as the
+ * function's bounding_box builds it.
+ */
+export function screenedSite(project: CaseBoundaryFeature, siteScreenedAs: SiteScreenedAs): Geometry {
+	if (siteScreenedAs !== 'boundingBox') {
+		return project.geometry;
+	}
+	const bounds = computeBounds({ features: [{ geometry: project.geometry }] })!;
+	const latitudeMargin = BOUNDING_BOX_MARGIN_METRES / METRES_PER_DEGREE;
+	const widest = Math.max(Math.abs(bounds.south), Math.abs(bounds.north)) + latitudeMargin;
+	const longitudeMargin =
+		BOUNDING_BOX_MARGIN_METRES / (METRES_PER_DEGREE * Math.cos((Math.min(widest, 89) * Math.PI) / 180));
+	const [west, east] = [bounds.west - longitudeMargin, bounds.east + longitudeMargin];
+	const [south, north] = [bounds.south - latitudeMargin, bounds.north + latitudeMargin];
+	return {
+		type: 'Polygon',
+		coordinates: [
+			[
+				[west, south],
+				[east, south],
+				[east, north],
+				[west, north],
+				[west, south]
+			]
+		]
+	};
+}
+
+/** A report being built: its context, and the buffers its maps have drawn, by distance - shared by its maps. */
+interface ReportMapsContext extends ReportZipContext {
+	buffers: Map<number, Promise<Geometry | undefined>>;
+}
+
+/** The site - as the run screened it - grown by `metres`, once per report; none if it can't be drawn. */
+function bufferAroundSite(context: ReportMapsContext, metres: number): Promise<Geometry | undefined> {
+	let buffer = context.buffers.get(metres);
+	if (!buffer) {
+		const { service, project, siteScreenedAs = 'outline' } = context;
+		buffer = bufferGeometryForDisplay(service.db, screenedSite(project, siteScreenedAs), metres).catch(
+			(error: unknown) => {
+				// a buffer that can't be drawn leaves it off the map - the rest still draws
+				service.logger.warn({ error, caseId: project.id, metres }, 'could not draw a buffer on the report map');
+				return undefined;
+			}
+		);
+		context.buffers.set(metres, buffer);
+	}
+	return buffer;
+}
+
+/**
+ * One category's map for the PDF: the category's consultees in the report - those the ruleset
+ * identified, less removals, and those added by hand - each named on it, over a grey basemap, with
+ * the ruleset's buffers for the category drawn around the site. As a PNG, with the colours it draws
+ * in and the buffers it shows, for the PDF's key.
  */
 async function categoryMap(
-	{ service, project, ruleset, consultees, selection }: ReportZipContext,
+	context: ReportMapsContext,
 	category: string
-): Promise<Pick<MapPdfInput, 'image' | 'colours' | 'mapNote'>> {
+): Promise<Pick<MapPdfInput, 'image' | 'colours' | 'buffers' | 'mapNote'>> {
+	const { service, project, ruleset, consultees, selection } = context;
 	const excluded = excludedMatchIds(selection.removed);
+	const added = addedMatchIds(selection.adds);
+	// consultees only the nearby search found aren't in the report, so aren't drawn - they made the
+	// maps harder to read
 	const visible = consultees.filter(
-		(match) => match.feature.properties.consulteeCategory === category && !excluded.has(match.feature.id)
+		(match) =>
+			match.feature.properties.consulteeCategory === category &&
+			!excluded.has(match.feature.id) &&
+			(isIdentified(match) || added.has(match.feature.id))
 	);
 	// its own search area, as its Change page builds - an area that can't be drawn spoils only its
 	// category's map
@@ -109,13 +200,22 @@ async function categoryMap(
 		service.nearbySearchRadiusMetres,
 		service.logger
 	);
+	const bufferMetres = categoryBufferMetres(ruleset, category, service.nearbyNsipRadiusMetres);
+	const buffers = (
+		await Promise.all(
+			bufferMetres.map(async (metres) => ({ metres, geometry: await bufferAroundSite(context, metres) }))
+		)
+	).filter((buffer): buffer is { metres: number; geometry: Geometry } => buffer.geometry !== undefined);
+	// wide enough for the widest buffer, as well as the category's mapKm
+	const widest = Math.max(0, ...buffers.map((buffer) => buffer.metres));
+	const boxMargin = context.siteScreenedAs === 'boundingBox' ? BOUNDING_BOX_MARGIN_METRES : 0;
 	const map = buildCaseMapConfig(
 		project,
-		markAddedByHand(visible, addedMatchIds(selection.adds)),
+		markAddedByHand(visible, added),
 		category,
 		searchArea,
 		undefined,
-		categorySettings(category).mapMarginMetres
+		Math.max(categorySettings(category).mapMarginMetres, widest && (widest + boxMargin) * BUFFER_MAP_MARGIN)
 	);
 	const site = projectColours(map.projectGeojson.features[0]);
 	const colours = {
@@ -131,10 +231,27 @@ async function categoryMap(
 	const image = await buildConsulteeStaticMapResponse({
 		geometryId: project.id,
 		sectionId: ruleset.id,
-		map,
+		map: {
+			...map,
+			labels: true,
+			basemap: 'greyscale',
+			bufferGeojson: {
+				type: 'FeatureCollection',
+				features: buffers.map(({ metres, geometry }) => ({
+					type: 'Feature',
+					properties: { label: formatBufferDistance(metres) },
+					geometry
+				}))
+			}
+		},
 		accept: 'image/png'
 	});
-	return { image: image.body as Buffer, colours, ...(mapNote ? { mapNote } : {}) };
+	return {
+		image: image.body as Buffer,
+		colours,
+		buffers: buffers.map(({ metres }) => formatBufferDistance(metres)),
+		...(mapNote ? { mapNote } : {})
+	};
 }
 
 /** A download's size as the link gives it - `512KB`, `1.4MB`, `25MB`. */
@@ -196,7 +313,15 @@ export async function buildReportZip({
 	};
 
 	const sections = reportByCategory(ruleset, consultees, selection);
-	const context: ReportZipContext = { service, project, ruleset, consultees, selection };
+	const context: ReportMapsContext = {
+		service,
+		project,
+		ruleset,
+		consultees,
+		selection,
+		siteScreenedAs,
+		buffers: new Map()
+	};
 	// one at a time: the maps frame the same view, so they share basemap tiles - fetched once,
 	// then cached (see AGENTS.md)
 	for (const [index, section] of sections.entries()) {

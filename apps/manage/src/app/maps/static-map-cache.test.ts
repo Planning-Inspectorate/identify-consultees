@@ -29,6 +29,14 @@ describe('static-map-cache', () => {
 		// each negotiated variant needs its own ETag — a shared one would let a
 		// webp cache entry validate an avif request body
 		assert.notEqual(buildStaticMapFingerprint(input), buildStaticMapFingerprint({ ...input, format: 'avif' }));
+		// the report's labels, grey basemap and buffers are part of the image too
+		for (const extra of [
+			{ labels: true },
+			{ basemap: 'greyscale' },
+			{ bufferGeojson: { type: 'FeatureCollection', features: [{}] } }
+		]) {
+			assert.notEqual(buildStaticMapFingerprint(input), buildStaticMapFingerprint({ ...input, ...extra }));
+		}
 	});
 
 	it('matches If-None-Match lists against the response ETag', () => {

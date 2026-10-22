@@ -112,6 +112,37 @@ describe('renderStaticMapRaster', () => {
 		assert.equal(body.subarray(0, 4).toString('hex'), '89504e47');
 	});
 
+	test('greys the basemap - tiles or a provided PNG - leaving the areas over it in colour', async () => {
+		const sharp = (await import('sharp')).default;
+		const green = await sharp({ create: { width: 256, height: 256, channels: 3, background: '#00a000' } })
+			.png()
+			.toBuffer();
+		const pixelAt = async (png: Buffer, x: number, y: number) => {
+			const { data, info } = await sharp(png).raw().toBuffer({ resolveWithObject: true });
+			return [...data.subarray((y * info.width + x) * info.channels, (y * info.width + x) * info.channels + 3)];
+		};
+		const options = { ...baseOptions, projectGeojson: emptyCollection, basemap: 'greyscale' as const };
+		for (const body of [
+			await renderStaticMapRaster(options, 'png', [{ tileX: 0, tileY: 0, x: 0, y: 0, png: green }]),
+			await renderStaticMapRaster(options, 'png', [], green)
+		]) {
+			// the basemap, away from the area: grey, and lighter than the green's grey
+			const [r, g, b] = await pixelAt(body, 10, 10);
+			assert.ok(r === g && g === b, `basemap ${[r, g, b]} isn't grey`);
+			assert.ok(r > 120, `basemap ${r} isn't lightened`);
+			// the consultee area, in the middle: still its green
+			const [areaR, areaG] = await pixelAt(body, 128, 128);
+			assert.ok(areaG > areaR + 20, `area ${[areaR, areaG]} lost its colour`);
+		}
+		// in colour unless asked
+		const [r, g] = await pixelAt(
+			await renderStaticMapRaster({ ...options, basemap: 'colour' }, 'png', [], green),
+			10,
+			10
+		);
+		assert.ok(g > r + 100);
+	});
+
 	test('uses MAP_VIEWPORT defaults when size is omitted', async () => {
 		const body = await renderStaticMapRaster(
 			{ center: [-1.75, 50.65], zoom: 10, projectGeojson: square, consulteeGeojson: emptyCollection },
@@ -137,6 +168,18 @@ describe('renderSvgBasemapImage', () => {
 			{ tileX: 1, tileY: 0, x: -128, y: 0, png: tinyPng }
 		]);
 		assert.equal(jpeg?.subarray(0, 3).toString('hex'), 'ffd8ff');
+	});
+
+	test('greys the tiles for a greyscale map', async () => {
+		const sharp = (await import('sharp')).default;
+		const green = await sharp({ create: { width: 256, height: 256, channels: 3, background: '#00a000' } })
+			.png()
+			.toBuffer();
+		const jpeg = await renderSvgBasemapImage({ ...baseOptions, basemap: 'greyscale' }, [
+			{ tileX: 0, tileY: 0, x: 0, y: 0, png: green }
+		]);
+		const { channels } = await sharp(jpeg).stats();
+		assert.ok(Math.abs(channels[0].mean - channels[1].mean) < 2, 'not grey');
 	});
 
 	test('returns undefined when there are no tiles', async () => {

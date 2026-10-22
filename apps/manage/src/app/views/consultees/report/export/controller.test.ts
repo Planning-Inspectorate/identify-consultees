@@ -58,7 +58,7 @@ function serviceWith(
 ) {
 	return {
 		db: {
-			$queryRaw: mock.fn(async (sql: TemplateStringsArray) => {
+			$queryRaw: mock.fn(async (sql: TemplateStringsArray, ..._values: unknown[]) => {
 				const text = sql.join('');
 				// the maps' search area is a query on the site alone (no table)
 				if (!/\bFROM\b/.test(text)) {
@@ -130,7 +130,7 @@ describe('report download', () => {
 				matchRow(identifiedParish, identifiedReason),
 				matchRow(removedParish, identifiedReason),
 				matchRow(pickedParish, nearbyReason),
-				// only the nearby search found it, and no one added it - on the map, not in the report
+				// only the nearby search found it, and no one added it - not in the report, nor on its map
 				matchRow(nearbyParish, nearbyReason)
 			])
 		);
@@ -174,6 +174,17 @@ describe('report download', () => {
 		assert.ok(!parish.some((line) => line.startsWith('The consultee areas could not be drawn')));
 		const landowner = pdfTextLines(Buffer.from(files['maps/02 Landowner.pdf']));
 		assert.ok(landowner.includes('Manually added - not on the map'));
+
+		// the map draws the identified parish and the picked one - the nearby-only one's area is never
+		// looked up - with no buffer: the ruleset finds parishes that touch or border the site
+		const drawn = service.db.$queryRaw.mock.calls
+			.filter(({ arguments: [sql] }) => sql.join('').includes('AS tolerance'))
+			.flatMap(({ arguments: [, ...values] }) =>
+				values.flatMap((value) => (value as { values?: unknown[] })?.values ?? [value])
+			);
+		assert.ok(drawn.includes(identifiedParish) && drawn.includes(pickedParish));
+		assert.ok(!drawn.includes(nearbyParish));
+		assert.ok(!parish.some((line) => line.startsWith('Ruleset buffer') || line.startsWith('Nearby')));
 	});
 
 	it("puts Nearby NSIPs in the report like any category - their own tab, with their case's details, and a map", async () => {
@@ -257,6 +268,8 @@ describe('report download', () => {
 		}
 		const nsips = pdfTextLines(Buffer.from(files['maps/02 Nearby NSIPs.pdf']));
 		assert.ok(nsips.includes('Nearby NSIPs: 2 in the report'));
+		// with the distance they were looked for within drawn around the site
+		assert.ok(nsips.includes('Ruleset buffer (10 km)'));
 		assert.ok(nsips.includes('Neighbouring Solar Farm (EN010200)'));
 		assert.ok(nsips.includes('Undated Wind Farm (EN010201)'));
 	});
