@@ -136,7 +136,11 @@ describe('report download', () => {
 		);
 		const res = response();
 		await buildReportDownload(service as never)(
-			{ params: { caseId: realProjectId }, query: { ruleset, exclude: removal, add: [pickedAdd, typedAdd] } } as never,
+			{
+				params: { caseId: realProjectId },
+				query: { ruleset, exclude: removal, add: [pickedAdd, typedAdd] },
+				session: { account: { name: 'Sam Officer' } }
+			} as never,
 			res as never
 		);
 
@@ -162,6 +166,8 @@ describe('report download', () => {
 			.map(([, data]) => strFromU8(data))
 			.join('');
 		assert.ok(sheets.includes('Borders the site'));
+		// the Summary names who generated it
+		assert.ok(sheets.includes('Sam Officer'));
 		assert.ok(sheets.includes('Manually added'));
 		assert.ok(!sheets.includes(pickedParish) && !sheets.includes('Consultee area id'));
 

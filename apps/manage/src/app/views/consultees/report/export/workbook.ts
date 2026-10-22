@@ -10,6 +10,7 @@ import {
 	REPORT_COLUMNS,
 	REPORT_CONFIG,
 	REPORT_TABS,
+	summaryLines,
 	tabSettings
 } from '../../../../report-config.ts';
 import { NEARBY_NSIPS } from '../../nearby-nsips.ts';
@@ -53,6 +54,8 @@ export interface ReportExport {
 	/** What the run screened - the outline unless said otherwise. */
 	siteScreenedAs?: SiteScreenedAs;
 	generatedAt: Date;
+	/** Who built it - the signed-in user's name, when there is one. */
+	generatedBy?: string;
 	/** The consultees the ruleset's conditions identified, less any removed. */
 	identified: ConsulteeMatch[];
 	/**
@@ -284,11 +287,15 @@ function byCategoryThenName(a: SortableRow, b: SortableRow): number {
 	return a.category.localeCompare(b.category, 'en-GB') || a.name.localeCompare(b.name, 'en-GB');
 }
 
-/** One group tab: its columns (the fixed ones, then its metadata headings) and a row per consultee. */
+/**
+ * One group tab: its columns (the fixed ones, then its metadata headings), a row per consultee, and
+ * how many of them are of each category - for the Summary tab.
+ */
 interface GroupTabContent {
 	header: string[];
 	widths: number[];
 	rows: Cell[][];
+	categoryCounts: Map<string, number>;
 }
 
 /**
@@ -314,7 +321,11 @@ function tabContent(rows: SortableRow[], columns: readonly ReportColumn[]): Grou
 			...columns.map((column) => COLUMN_WIDTHS[column]),
 			...headings.map((heading) => Math.min(40, Math.max(12, heading.length + 2)))
 		],
-		rows: sorted.map((row) => [...row.cells, ...headings.map((heading) => metadataCell(row.metadata.get(heading)))])
+		rows: sorted.map((row) => [...row.cells, ...headings.map((heading) => metadataCell(row.metadata.get(heading)))]),
+		categoryCounts: sorted.reduce(
+			(counts, row) => counts.set(row.category, (counts.get(row.category) ?? 0) + 1),
+			new Map<string, number>()
+		)
 	};
 }
 
@@ -389,9 +400,84 @@ export function formatDate(date: Date): string {
 	});
 }
 
-function summarySheet(report: ReportExport, tabs: Map<GroupTab, GroupTabContent>): SheetData {
-	const detail = (label: string, value: string | null): Cell[] => [bold(label), text(value)];
-	const sheet: SheetData = [
+/**
+ * A tab's lines on the Summary tab, with their counts: config/report.yaml's lines for it, in order,
+ * each shown even at 0 - then any other category the tab has consultees of, under its own name, so
+ * the lines add up to the tab's total.
+ */
+export function summaryCounts(
+	tab: GroupTab,
+	categoryCounts: Map<string, number>,
+	config: ReportConfig = REPORT_CONFIG
+): { label: string; count: number }[] {
+	const lines = summaryLines(tab, config);
+	const labelled = new Set(lines.flatMap((line) => line.categories));
+	return [
+		...lines.map(({ label, categories }) => ({
+			label,
+			count: categories.reduce((sum, category) => sum + (categoryCounts.get(category) ?? 0), 0)
+		})),
+		...[...categoryCounts]
+			.filter(([category]) => !labelled.has(category))
+			.toSorted(([a], [b]) => a.localeCompare(b, 'en-GB'))
+			.map(([category, count]) => ({ label: category || 'No category', count }))
+	];
+}
+
+/**
+ * `date` as a clock in the UK shows it, for a spreadsheet cell: Excel has no time zones, and is
+ * written a date's UTC fields - an hour behind in British Summer Time.
+ */
+export function ukClockTime(date: Date): Date {
+	const parts = Object.fromEntries(
+		new Intl.DateTimeFormat('en-GB', {
+			timeZone: 'Europe/London',
+			year: 'numeric',
+			month: 'numeric',
+			day: 'numeric',
+			hour: 'numeric',
+			minute: 'numeric',
+			second: 'numeric',
+			hourCycle: 'h23'
+		})
+			.formatToParts(date)
+			.map(({ type, value }) => [type, Number(value)])
+	);
+	return new Date(Date.UTC(parts.year, parts.month - 1, parts.day, parts.hour, parts.minute, parts.second));
+}
+
+function count(value: number, fontWeight?: 'bold'): Cell {
+	return { type: Number, value, ...(fontWeight ? { fontWeight } : {}) };
+}
+
+/** A list of consultees added or removed, under its heading - a table of none when there are none. */
+function consulteeList(heading: string, consultees: readonly { name: string; category: string; reason: string }[]) {
+	return [
+		[bold(heading)],
+		headerRow(['Consultee', 'Category', 'Reason']),
+		...consultees.map((consultee): Cell[] => [
+			text(consultee.name),
+			text(consultee.category),
+			{ value: consultee.reason, wrap: true }
+		])
+	];
+}
+
+function summarySheet(report: ReportExport, tabs: Map<GroupTab, GroupTabContent>, config: ReportConfig): SheetData {
+	const detail = (label: string, value: string | null | undefined): Cell[] => [bold(label), text(value)];
+	const tabLines = GROUP_TABS.flatMap((tab): Cell[][] => {
+		const { rows, categoryCounts } = tabs.get(tab)!;
+		const lines = summaryCounts(tab, categoryCounts, config);
+		// Nearby NSIPs are one category, so their line is their tab's total
+		if (tab === NEARBY_NSIPS) {
+			return lines.map(({ label, count: value }) => [bold(label), count(value, 'bold')]);
+		}
+		return [
+			[bold(`${tab} - Total`), count(rows.length, 'bold')],
+			...lines.map(({ label, count: value }): Cell[] => [{ value: label, indent: 1 }, count(value)])
+		];
+	});
+	return [
 		[{ value: 'Consultee report', fontWeight: 'bold', fontSize: 16 }],
 		[],
 		detail('Project', report.caseName),
@@ -399,36 +485,45 @@ function summarySheet(report: ReportExport, tabs: Map<GroupTab, GroupTabContent>
 		detail('Boundary file', report.boundaryFileName),
 		detail('Boundary received', report.boundaryReceivedDate ? formatDate(report.boundaryReceivedDate) : null),
 		detail('Ruleset', report.ruleset.name),
-		detail(
-			'Screened against',
-			report.siteScreenedAs === 'boundingBox'
-				? "The site's bounding box - its outline was too detailed to screen in time, so the list can include consultees that aren't near the site"
-				: "The site's outline"
-		),
-		[bold('Generated'), { type: Date, value: report.generatedAt, format: 'd mmmm yyyy hh:mm' }],
+		// said only when it matters: the list can include consultees that aren't near the site
+		...(report.siteScreenedAs === 'boundingBox'
+			? [
+					detail(
+						'Screened against',
+						"The site's bounding box - its outline was too detailed to screen in time, so the list can include consultees that aren't near the site"
+					)
+				]
+			: []),
+		[
+			bold('Report generated date'),
+			{ type: Date, value: ukClockTime(report.generatedAt), format: 'd mmmm yyyy hh:mm' }
+		],
+		detail('Report generated by', report.generatedBy),
 		[],
 		headerRow(['Tab', 'Consultees']),
-		...GROUP_TABS.map((tab): Cell[] => [{ value: tab }, { type: Number, value: tabs.get(tab)!.rows.length }]),
-		[bold('Total'), { type: Number, value: report.identified.length + report.added.length, fontWeight: 'bold' }],
+		...tabLines,
 		[],
-		detail('Identified by the ruleset', String(report.identified.length)),
-		detail('Manually added', String(report.added.length)),
-		detail('Removed', String(report.removed.length))
+		[bold('Total'), count(report.identified.length + report.added.length, 'bold')],
+		[],
+		[bold('Identified by the ruleset'), count(report.identified.length)],
+		[bold('Manually added'), count(report.added.length)],
+		[bold('Removed'), count(report.removed.length)],
+		[],
+		...consulteeList('Added consultees', report.added),
+		[],
+		...consulteeList('Removed consultees', report.removed)
 	];
-	if (report.removed.length > 0) {
-		sheet.push([], [bold('Removed consultees')], headerRow(['Consultee', 'Category', 'Reason']));
-		for (const removal of report.removed) {
-			sheet.push([text(removal.name), text(removal.category), { value: removal.reason, wrap: true }]);
-		}
-	}
-	return sheet;
 }
 
 /** The workbook's sheets, ready for write-excel-file: Summary, the five group tabs, then Nearby NSIPs. */
 export function buildReportSheets(report: ReportExport, config: ReportConfig = REPORT_CONFIG) {
 	const tabs = groupTabs(report, config);
 	return [
-		{ sheet: 'Summary', data: summarySheet(report, tabs), columns: [{ width: 28 }, { width: 50 }, { width: 60 }] },
+		{
+			sheet: 'Summary',
+			data: summarySheet(report, tabs, config),
+			columns: [{ width: 64 }, { width: 50 }, { width: 60 }]
+		},
 		...GROUP_TABS.map((tab) => {
 			const { header, widths, rows } = tabs.get(tab)!;
 			return {

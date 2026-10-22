@@ -6,6 +6,7 @@ import {
 	REPORT_COLUMNS,
 	REPORT_CONFIG,
 	REPORT_TABS,
+	summaryLines,
 	tabForCategorySettings,
 	tabSettings
 } from './report-config.ts';
@@ -90,10 +91,37 @@ describe('report config', () => {
 		assert.equal(tabForCategorySettings(null), undefined);
 	});
 
+	test("reads each tab's Summary lines in order, categories sharing a label sharing a line", () => {
+		const config = parseReportConfig(`
+version: 2
+defaults: { columns: [consultee], metadata: none, mapKm: 1 }
+tabs:
+  Public bodies:
+    categories:
+      Police: { summary: ' Police and Crime Commissioners ', metadata: all }
+      Internal Drainage Board: { summary: Internal Drainage Boards }
+      Hospital: { mapKm: 5 }
+      Internal Drainage District: { summary: Internal Drainage Boards }
+`);
+		assert.deepStrictEqual(summaryLines('Public bodies', config), [
+			{ label: 'Police and Crime Commissioners', categories: ['Police'] },
+			{ label: 'Internal Drainage Boards', categories: ['Internal Drainage Board', 'Internal Drainage District'] }
+		]);
+		// a label leaves the category's other settings as they were
+		assert.equal(categorySettings('Police', config).metadata, 'all');
+		assert.deepStrictEqual(summaryLines('Energy', config), []);
+		// config/report.yaml labels every tab's categories in the Summary's order
+		assert.equal(summaryLines('Administrative boundaries')[0].label, 'Parish, Town and Community Councils');
+		assert.deepStrictEqual(summaryLines('Nearby NSIPs'), [
+			{ label: 'National infrastructure projects', categories: ['Nearby NSIPs'] }
+		]);
+	});
+
 	test('treats tabs as optional', () => {
 		const config = parseReportConfig('version: 2\ndefaults: { columns: [consultee], metadata: none, mapKm: 1 }\n');
 		assert.deepEqual(config.tabs, {});
 		assert.deepEqual(config.categories, {});
+		assert.deepEqual(config.summaryLines, {});
 	});
 
 	for (const [title, text, message] of [
@@ -137,7 +165,17 @@ describe('report config', () => {
 		[
 			'a category without settings',
 			VALID.replace('Police: { metadata: none, mapKm: 30 }', 'Police: 5'),
-			/Police must set metadata or mapKm/
+			/Police must set metadata, mapKm or summary/
+		],
+		[
+			'a blank summary label',
+			VALID.replace('Ambulance Trust: { mapKm: 5 }', "Ambulance Trust: { summary: ' ' }"),
+			/categories.Ambulance Trust.summary must be the label the Summary tab gives it/
+		],
+		[
+			'a summary label that is not text',
+			VALID.replace('Ambulance Trust: { mapKm: 5 }', 'Ambulance Trust: { summary: 5 }'),
+			/Ambulance Trust.summary must be the label/
 		],
 		[
 			'a typo in a category',
