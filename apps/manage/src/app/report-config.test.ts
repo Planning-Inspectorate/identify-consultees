@@ -1,3 +1,4 @@
+import { REFERENCE_DATA_CONFIG } from '@pins/identify-consultees-database/src/seed/reference-data.ts';
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
 import {
@@ -110,8 +111,13 @@ tabs:
 		// a label leaves the category's other settings as they were
 		assert.equal(categorySettings('Police', config).metadata, 'all');
 		assert.deepStrictEqual(summaryLines('Energy', config), []);
-		// config/report.yaml labels every tab's categories in the Summary's order
+		// config/report.yaml labels every tab's categories in the Summary's order - every category in
+		// config/reference-data.yaml, so none is left to show under its bare name
 		assert.equal(summaryLines('Administrative boundaries')[0].label, 'Parish, Town and Community Councils');
+		const labelled = new Set(REPORT_TABS.flatMap((tab) => summaryLines(tab).flatMap((line) => line.categories)));
+		for (const category of REFERENCE_DATA_CONFIG.groups.flatMap((group) => [...group.categories])) {
+			assert.ok(labelled.has(category), `${category} has no summary label in config/report.yaml`);
+		}
 		assert.deepStrictEqual(summaryLines('Nearby NSIPs'), [
 			{ label: 'National infrastructure projects', categories: ['Nearby NSIPs'] }
 		]);
