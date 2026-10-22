@@ -33,6 +33,7 @@ export type InteractiveMapExampleKind =
 	| 'place-marker'
 	| 'select-feature'
 	| 'draw-tools'
+	| 'measure'
 	| 'style-switcher';
 
 /**
@@ -55,6 +56,8 @@ export interface InteractiveMapExampleConfig {
 	mapKey?: boolean;
 	/** Use the local layers-key plugin: one panel combining the Layers toggles and key symbols. */
 	layersKey?: boolean;
+	/** Use the local measure plugin: measure tools drawn with the vendor draw plugin. */
+	measure?: Record<string, unknown>;
 	mapStyles?: Record<string, unknown>[];
 	marker?: Record<string, unknown>;
 	markers?: Record<string, unknown>[];
@@ -526,6 +529,34 @@ export const INTERACTIVE_MAP_EXAMPLES: readonly InteractiveMapExample[] = [
 			projectGeojson: FIELD_PARCELS_GEOJSON,
 			consulteeGeojson: EMPTY_COLLECTION,
 			alt: 'Static map of the field parcels used as snapping targets for the draw tools.'
+		}
+	},
+	{
+		id: 'measure',
+		title: 'Measure tools',
+		summary:
+			'The local measure plugin builds on the draw plugin: each Measure tool starts a draw session and ' +
+			'reports the shape back as a measurement. "Between two points" finishes on the second click, ' +
+			'"Along a path" totals every vertex until Done, and "Of a bounded box" turns two corner clicks ' +
+			'into a rectangle and reports its area. The Measure panel also switches between metres, ' +
+			'kilometres, feet and miles.',
+		interaction:
+			'Open the Measure menu, pick a tool, then click on the map — the measurement updates live as ' +
+			'you move and lands in the Measure panel when the shape finishes.',
+		plugins: ['draw'],
+		clientConfig: {
+			kind: 'measure',
+			behaviour: 'inline',
+			center: AMBLESIDE_CENTER,
+			zoom: 13,
+			height: DEFAULT_HEIGHT,
+			mapLabel: 'Map with measure tools near Ambleside',
+			measure: { modes: ['distance', 'path', 'area'], units: 'metric' }
+		},
+		staticMap: {
+			projectGeojson: EMPTY_COLLECTION,
+			consulteeGeojson: EMPTY_COLLECTION,
+			alt: 'Static map of the Ambleside area where the interactive version offers measure tools.'
 		}
 	},
 	{
