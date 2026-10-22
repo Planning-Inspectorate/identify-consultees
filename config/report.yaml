@@ -1,72 +1,97 @@
-# Report: what the consultee report shows for each consultee category - how much its map shows
-# around the site, and which columns the downloaded workbook has. Read when the app starts
-# (apps/manage/src/app/report-config.ts), which refuses to start if a value here is invalid - so a
-# change is checked by `npm test` and takes effect on the next deploy.
+# Report: which columns each tab of the downloaded workbook shows, and how much each category's map
+# shows around the site. Read when the app starts (apps/manage/src/app/report-config.ts), which
+# refuses to start if a value here is invalid - so a change is checked by `npm test` and takes
+# effect on the next deploy.
 #
-#   columns    - the columns every row of the workbook's group tabs starts with, in order. Any of:
-#                  consultee        Consultee           the consultee's name
-#                  category         Category
-#                  region           Region
-#                  whyIdentified    Why identified      the ruleset conditions it met, or the reason
-#                                                       it was added by hand
-#                  source           Source              Ruleset, or Manually added
-#                  group            Group               the reference data's broad group: Health,
-#                                                       Local Authorities, Transport...
-#                  subcategory      Subcategory         what kind of consultee within its category:
-#                                                       a port's Statutory or NonStatutory, a
-#                                                       railway's Active or Inactive, an
-#                                                       interconnector's build status
-#                  subcategoryDescription
-#                                   Subcategory description
-#                                                       what the subcategory means
-#                  distanceKm       Distance from site (km)
-#                  consulteeAreaId  Consultee area id
-#                  sourceId         Source id           the reference data's own id
-#                  geometryType     Geometry type
-#                  lastUpdated      Last updated
-#                Then come the metadata columns each category exports (below): one per attribute,
-#                as readable values - a nested attribute under a dotted name (area.ha), a list as
-#                comma-separated text - never JSON.
+# A tab's columns are its `columns`, then the metadata its consultees export:
 #
-#   defaults   - for every category not listed under categories (and anything one leaves out):
-#     mapKm      the least distance, in km, its map shows around the site on every side - the
-#                category's map on the report pages, and its page in the report's PDF maps. Maps
-#                zoom in whole levels, so they open at the closest zoom that shows at least this.
-#                The results page's map, of every category, uses the default.
-#     metadata   which of the source data's metadata attributes the workbook exports:
-#                  all    every attribute, each headed by its own name
-#                  none   none
-#                  or a list of attribute: column heading - only these, in this order. Attributes
-#                  given the same heading - in this category or others on the same tab - share one
-#                  column, so different datasets' codes or names can be combined.
+#   columns   the fixed columns, in order - any of:
+#               consultee               Consultee
+#               category                Category
+#               subcategory             Subcategory              a port's Statutory or NonStatutory...
+#               subcategoryDescription  Subcategory description
+#               group                   Group                    the reference data's broad group
+#               region                  Region
+#               whyIdentified           Why identified
+#               source                  Source                   Ruleset, or Manually added
+#               distanceKm              Distance from site (km)
+#               sourceId                Source id                the reference data's own id
+#               consulteeAreaId         Consultee area id
+#               geometryType            Geometry type
+#               lastUpdated             Last updated
 #
-#   categories - a category's own settings, overriding the defaults. Names must match
-#                consultee_area.consulteeCategory exactly (see kt-docs/data/reference-data.md).
+#   metadata  `attribute: heading` pairs, in order - the source data's attributes that become
+#             columns. Attributes with the same heading share a column, so different datasets'
+#             codes and names line up. Anything not listed isn't exported. A consultee without
+#             an attribute leaves its cell blank.
 #
-# Example:
-#   categories:
-#     Parish Council:
-#       mapKm: 5
-#       metadata:
-#         PARNCP23NW: Parish name (Welsh)
-#     Police:
-#       mapKm: 30
-#       metadata: none
+#   mapKm     how much a category's map shows around the site, in km.
+#
+# Each is set in `defaults`, can be set again for a tab, and `metadata` and `mapKm` again for one
+# of the tab's categories - the nearest wins. A category belongs to the tab its group is named
+# for in config/reference-data.yaml; list it only where it differs from its tab.
 
-version: 1
-
-columns:
-  - consultee
-  - category
-  - group
-  - subcategory
-  - subcategoryDescription
-  - region
-  - whyIdentified
-  - source
+version: 2
 
 defaults:
+  columns: [consultee, category, subcategory, region, whyIdentified, source]
+  metadata: { CODE: Code, NAME: Official name }
   mapKm: 10
-  metadata: all
 
-categories: {}
+tabs:
+  Administrative boundaries:
+    columns: [consultee, category, region, whyIdentified, source]
+
+  Public bodies:
+    columns: [consultee, category, region, whyIdentified, source]
+    categories:
+      Fire and Rescue Authority: { metadata: { ONS_CODE: Code, NAME: Official name } }
+      ICB: { metadata: { ICB26CD: Code, ICB26NM: Official name } }
+      Police: { metadata: { PFA22CD: Code, NAME: Official name, PFA22NM: Police force area } }
+      National Landscape: { metadata: { CODE: Code, NAME: Official name, NAT_ENG_CODE: Natural England code } }
+
+  Energy:
+    columns: [consultee, category, subcategory, subcategoryDescription, region, distanceKm, whyIdentified, source]
+    metadata: { NAME: Official name }
+    categories:
+      Electricity Generator:
+        metadata:
+          NAME: Official name
+          COMPANY_NAME: Operator
+          PRIMARY_TYPE: Technology
+          INSTALLED_CAPACITY_MW: Capacity (MW)
+          STATUS: Status
+          COMMISSIONED_DATE: Commissioned
+          PINS_REFERENCE: PINS reference
+          DUKES_REFERENCE: DUKES reference
+      Interconnector: { metadata: { NAME: Official name, LICENSEE: Operator, STATUS: Status } }
+      Offshore Wind Site: { metadata: { NAME: Official name, TENANT: Operator } }
+      Offshore Wind Export Cable: { metadata: { NAME: Official name, TENANT: Operator } }
+
+  Transport:
+    columns: [consultee, category, subcategory, subcategoryDescription, region, distanceKm, whyIdentified, source]
+    metadata: { NAME: Official name }
+    categories:
+      Dock or Harbour:
+        metadata:
+          NAME: Official name
+          STATUS: Ownership
+          MAJOR_PORT: Major port
+          STATUTORY_HARBOUR_AUTHORITY: Statutory harbour authority
+          COMPETENT_HARBOUR_AUTHORITY: Competent harbour authority
+      Corporate Joint Committee: { metadata: { NAME: Official name, CTYUA23NM: Member councils } }
+      Integrated Transport Authority: &combined_authority
+        metadata: { COMB_AUTH_CODE: Code, COMB_AUTH_NAME: Official name, PTE_NAME: Passenger transport executive }
+      Passenger Transport Executive: *combined_authority
+      Railway: { metadata: { STATUS: Status, HS2: HS2 } }
+
+  Other: {}
+
+  Nearby NSIPs:
+    columns: [consultee, whyIdentified, source]
+    metadata:
+      Case reference: Case reference
+      Project name: Project name
+      Shapefile: Shapefile
+      Received: Received
+      Distance (km): Distance from site (km)

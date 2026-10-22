@@ -5,7 +5,13 @@ import type {
 } from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
 import type { SheetData } from 'write-excel-file/node';
 import type { MetadataSelection, ReportColumn, ReportConfig } from '../../../../report-config.ts';
-import { categorySettings, REPORT_COLUMNS, REPORT_CONFIG } from '../../../../report-config.ts';
+import {
+	categorySettings,
+	REPORT_COLUMNS,
+	REPORT_CONFIG,
+	REPORT_TABS,
+	tabSettings
+} from '../../../../report-config.ts';
 import { NEARBY_NSIPS } from '../../nearby-nsips.ts';
 import { describeReasons } from '../../reasons.ts';
 import type { AddedConsultee, RemovedConsultee } from '../urls.ts';
@@ -18,15 +24,8 @@ import type { AddedConsultee, RemovedConsultee } from '../urls.ts';
  * per heading.
  */
 
-/** The tabs after Summary, in order. */
-export const GROUP_TABS = [
-	'Administrative boundaries',
-	'Public bodies',
-	'Energy',
-	'Transport',
-	'Other',
-	NEARBY_NSIPS
-] as const;
+/** The tabs after Summary, in order - config/report.yaml sets each one's columns. */
+export const GROUP_TABS = REPORT_TABS;
 
 type GroupTab = (typeof GROUP_TABS)[number];
 
@@ -319,11 +318,12 @@ function tabContent(rows: SortableRow[], columns: readonly ReportColumn[]): Grou
 	};
 }
 
-function sortableRow(source: RowSource, config: ReportConfig): SortableRow {
+/** A consultee's row on `tab`: the tab's fixed columns, then the metadata its category exports. */
+function sortableRow(source: RowSource, tab: GroupTab, config: ReportConfig): SortableRow {
 	return {
 		category: source.category ?? '',
 		name: source.name ?? '',
-		cells: config.columns.map((column) => COLUMN_CELLS[column](source)),
+		cells: tabSettings(tab, config).columns.map((column) => COLUMN_CELLS[column](source)),
 		metadata: exportedMetadata(
 			parseMetadata(source.record?.metadata),
 			categorySettings(source.category, config).metadata
@@ -336,7 +336,8 @@ function groupTabs(report: ReportExport, config: ReportConfig): Map<GroupTab, Gr
 	for (const match of report.identified) {
 		const record = report.records.get(match.feature.id);
 		const properties = match.feature.properties;
-		rows.get(tabForMatch(match, report.ruleset))!.push(
+		const tab = tabForMatch(match, report.ruleset);
+		rows.get(tab)!.push(
 			sortableRow(
 				{
 					id: match.feature.id,
@@ -349,6 +350,7 @@ function groupTabs(report: ReportExport, config: ReportConfig): Map<GroupTab, Gr
 					distanceMetres: match.distanceMetres,
 					record
 				},
+				tab,
 				config
 			)
 		);
@@ -356,7 +358,8 @@ function groupTabs(report: ReportExport, config: ReportConfig): Map<GroupTab, Gr
 	for (const add of report.added) {
 		// one from before additions had to be real consultees may have no stored row
 		const record = add.id ? report.records.get(add.id) : undefined;
-		rows.get(tabForCategory(add.category, report.ruleset))!.push(
+		const tab = tabForCategory(add.category, report.ruleset);
+		rows.get(tab)!.push(
 			sortableRow(
 				{
 					id: add.id,
@@ -368,11 +371,12 @@ function groupTabs(report: ReportExport, config: ReportConfig): Map<GroupTab, Gr
 					distanceMetres: add.distanceMetres,
 					record
 				},
+				tab,
 				config
 			)
 		);
 	}
-	return new Map([...rows].map(([tab, tabRows]) => [tab, tabContent(tabRows, config.columns)]));
+	return new Map([...rows].map(([tab, tabRows]) => [tab, tabContent(tabRows, tabSettings(tab, config).columns)]));
 }
 
 /** A date as the report writes it: "6 July 2026". */
