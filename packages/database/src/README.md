@@ -1,86 +1,35 @@
 # Database
 
-This project uses a SQL database for data. It uses [Prisma](https://www.prisma.io/) as an ORM. The schema is in this folder: [schema.prisma](./schema.prisma).
+SQL Server through [Prisma](https://www.prisma.io/). The schema is [`schema.prisma`](./schema.prisma).
 
-## Schema Changes
+## Changing the schema
 
-To update the schema, follow these steps:
+1. Edit `schema.prisma`.
+2. In this package, write the migration without applying it: `npx prisma migrate dev --create-only --name <name>`.
+3. **Delete every statement about `consultee_area` or `consultee_area_<quarter>`** from the generated SQL, unless the change is to the consultee areas (see below).
+4. Apply it with `npm run db-migrate-prod` from the root, and commit the schema and the migration.
 
-1. Make changes to the `schema.prisma` file, see [Field Types](https://www.prisma.io/docs/orm/reference/prisma-schema-reference#model-field-scalar-types) and associated Prisma documentation.
-2. Write the migration with `npx prisma migrate dev --create-only --name <name>` in this package. It writes the SQL without applying it.
-3. **Remove every statement about `consultee_area` or `consultee_area_<quarter>` from the generated SQL** unless the change is to the consultee areas themselves (see below). Then apply it with `npm run db-migrate-prod` in the root package, and commit the schema and the migration.
-
-`npm start` applies the committed migrations with `prisma migrate deploy`, as CI and the deployed environments do. Don't run `npm run db-migrate-dev` against a database holding data you want to keep.
+Never run `npm run db-migrate-dev` against a database whose data you want to keep. `npm start`, CI and the deployed environments all apply migrations with `prisma migrate deploy`.
 
 ### Consultee areas are a table per quarter
 
-Each quarter's consultee areas have a table of their own (`consultee_area_2026Q4`), and `consultee_area` is a **synonym** for the one in use - see the `20261022090000_consultee_area_quarterly_datasets` migration and [kt-docs/data/data-model.md](../../../kt-docs/data/data-model.md). Prisma doesn't know synonyms: comparing `schema.prisma` with the database, it sees `consultee_area` as a table that's missing and `consultee_area_2026Q4` as one to drop. So a migration Prisma generates will try to drop the quarter's table, with every row, and create an empty `consultee_area`. That's why step 3 removes those statements.
+Each quarter has its own table (`consultee_area_2026Q4`), and `consultee_area` is a **synonym** for the one in use (see the `20261022090000_consultee_area_quarterly_datasets` migration and [`kt-docs/data/data-model.md`](../../../kt-docs/data/data-model.md)). Prisma can't see synonyms, so a generated migration tries to drop the quarter's table, with all its rows, and create an empty `consultee_area`. That's why step 3 deletes those statements.
 
-A change to the consultee areas' columns is written by hand: alter every `consultee_area_<quarter>` table, and the table `dbo.create_consultee_area_dataset` makes for a new quarter.
+To change the consultee areas' columns, write the migration by hand: alter every `consultee_area_<quarter>` table, and the table that `dbo.create_consultee_area_dataset` creates for a new quarter.
 
-## Comments
+## Geometry (`GEOGRAPHY`)
 
-Prisma schemas support comments, please add them to any models and fields/columns to explain the purpose and any important context. Comments that are only relevant in the context of the schema should start with `//`, comments that are relevant to users of the model should use `///`. Comments with `///` will end up in the generated type definitions, which is useful for users of the models. See https://www.prisma.io/docs/concepts/components/prisma-schema#comments.
+`ConsulteeArea` and `CaseBoundary` store their shapes as SQL Server `GEOGRAPHY` (WGS84, SRID 4326). Prisma has no type for it, so these columns are `Unsupported("geography")`:
 
-## IDs
-
-We use GUIDs for IDs (see https://learn.microsoft.com/en-us/sql/t-sql/data-types/uniqueidentifier-transact-sql?view=sql-server-ver16) this is because these IDs may be used in URLs and it makes them harder to guess. While we don't rely on that for security, it adds an extra layer. While not everything needs this, it is easier to make them all consistent and the increase in size (vs int) is negligible.
-
-To add a model with a GUID ID field, use:
-
-`@id @default(dbgenerated("newid()")) @db.UniqueIdentifier`
-
-The meanings of these tags are:
-* `@id` - this is an ID field (PRIMARY KEY)
-* `@default(dbgenerated("newid()"))` - the default value is the native `newid()` function
-* `@db.UniqueIdentifier` - the field type is a specific string type, UniqueIdentifier (see https://www.prisma.io/docs/reference/api-reference/prisma-schema-reference#microsoft-sql-server)
+- **Read and write them with raw SQL.** `geography::STGeomFromText(wkt, 4326)` writes them and `.STAsText()` reads them, as in [`geospatial/consultee-areas.ts`](./geospatial/consultee-areas.ts) and [`geospatial/case-boundaries.ts`](./geospatial/case-boundaries.ts).
+- **Add spatial indexes and `geometryType` checks to the migration by hand**, as in the `add_geometry_tables` migration. Without a spatial index, `STDistance` and `STIntersects` scan the whole table.
+- **Convert GeoJSON with [`geospatial/wkt.ts`](./geospatial/wkt.ts).** It fixes ring winding, which SQL Server needs (outer rings anticlockwise) and may otherwise silently invert.
+- **`STDistance` returns metres** on a `geography`. Never compare degrees as if they were a distance.
+- **Screening uses `geometrySimplified`** (simplified to 10m on import), while `geometry` keeps the original. Keep `SIMPLIFY_TOLERANCE_METRES` in `geospatial/consultee-areas.ts` equal to the one in `apps/function-python/intersector/tolerances.py`.
 
 ## Conventions
 
-We follow Prisma's suggested conventions, see [naming-conventions](https://www.prisma.io/docs/reference/api-reference/prisma-schema-reference#naming-conventions). At a high-level:
-
-* Model names should use PascalCase, e.g. `AppealUser`
-* Column names should use camelCase, e.g. `AppealUser.serviceUserId`
-* Relation names should use PascalCase, e.g. `AppealUser.SecurityToken`
-
-## Strings
-
-The default `String` type in Prisma is `nvarchar(1000)` in MSSQL. Use a more specific type if you need a larger (or smaller) string, by adding an `@db.` attribute, such as `@db.NVarChar(2000)`. See [prisma-schema-reference#microsoft-sql-server](https://www.prisma.io/docs/reference/api-reference/prisma-schema-reference#microsoft-sql-server).
-
-## Geometry columns (GEOGRAPHY)
-
-`ConsulteeArea` and `CaseBoundary` store GIS boundaries in SQL Server's native `GEOGRAPHY` type
-(WGS84 / SRID 4326). This needs the full SQL Server image locally (`docker-compose.yml`) - Azure
-SQL Edge does not support spatial types.
-
-Prisma has no native geometry type, so these columns are declared as `Unsupported("geography")`.
-That means:
-
-* They're excluded from the generated Prisma Client - there's no `prisma.consulteeArea.create(...)`
-  for the `geometry` field. Read and write them with raw SQL (`$queryRaw`/`$executeRaw`) instead -
-  see [geospatial/consultee-areas.ts](./geospatial/consultee-areas.ts) and
-  [geospatial/case-boundaries.ts](./geospatial/case-boundaries.ts) for the pattern (GeoJSON in,
-  `geography::STGeomFromText(wkt, 4326)` to write, `.STAsText()` back to GeoJSON to read).
-* Prisma can't express a spatial index or a `CHECK` constraint on `geometryType` declaratively, so
-  both are hand-added directly to the generated migration SQL after `prisma migrate dev
-  --create-only` - see the `add_geometry_tables` migration for the pattern to follow when adding
-  another geometry column. Without the spatial index (`CREATE SPATIAL INDEX ... USING
-  GEOGRAPHY_AUTO_GRID`), `STDistance`/`STIntersects` queries full-scan the table.
-
-Other things worth knowing before touching this code:
-
-* [geospatial/wkt.ts](./geospatial/wkt.ts) converts GeoJSON to/from WKT, including correcting ring
-  winding (SQL Server requires exterior rings counter-clockwise, holes clockwise, and doesn't
-  reliably reject a backwards ring - it can silently treat it as its geometric complement instead).
-  Don't skip this when writing geometry from a new source.
-* `STDistance` returns true great-circle **metres** for `geography` columns - don't compare raw
-  WGS84 degrees as if they were a distance unit, a degree of longitude is a very different distance
-  depending on latitude.
-* Screening runs in the Python function against `consultee_area.geometrySimplified` (each area
-  simplified to 10m, maintained on import here), while `geometry` keeps the original. Keep
-  `SIMPLIFY_TOLERANCE_METRES` in [geospatial/consultee-areas.ts](./geospatial/consultee-areas.ts)
-  equal to the one in `apps/function-python/intersector/tolerances.py`. See
-  [kt-docs/data/data-model.md](../../../kt-docs/data/data-model.md).
-* `caseReference` on `ConsulteeArea` is a loose link by value, not an enforced foreign key - an area
-  can relate to several boundary parts sharing one reference, so it isn't unique and can't be an FK
-  target.
+- **Ids** are GUIDs, `@id @default(dbgenerated("newid()")) @db.UniqueIdentifier`, so ids in URLs are hard to guess.
+- **Names** follow [Prisma's conventions](https://www.prisma.io/docs/reference/api-reference/prisma-schema-reference#naming-conventions): PascalCase models and relations, camelCase columns.
+- **`String`** is `nvarchar(1000)`. Set a size where that's wrong, such as `@db.NVarChar(2000)`.
+- **Comment** models and fields. `///` comments reach the generated types; `//` comments stay in the schema.

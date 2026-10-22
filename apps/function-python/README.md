@@ -1,91 +1,54 @@
 # Function (Python)
 
-A Python Azure Function app - the `pins-func-consultees-orchestrator-*` Function App
-(`infrastructure/app-function.tf`).
+The `pins-func-consultees-orchestrator-*` Function App ([`infrastructure/app-function.tf`](../../infrastructure/app-function.tf)). It runs the screening against our database, and reads case boundaries from CBOS, the back office.
 
-`consultee-areas` runs a real SQL query against the `consultee_area` table (see
-[packages/database/src/schema.prisma](../../packages/database/src/schema.prisma)) using
-[pymssql](https://pypi.org/project/pymssql/), the same database the rest of this project uses. The
-`geometry` column is converted to WKT text with `STAsText()` before being returned, since it can't
-be read back over pymssql directly - the same pattern the Node data-access layer
-([packages/database/src/geospatial](../../packages/database/src/geospatial)) uses.
+| Route | What |
+| ----- | ---- |
+| `GET /api/health` | Checks it can reach our database. No key needed |
+| `POST /api/run-ruleset` | Screens a site against a ruleset: the consultees and why each qualifies |
+| `GET /api/consultee-areas` | A sample of `consultee_area` rows. The manage app's `PYTHON_FUNCTION_URL` names this route, and the others are found beside it |
+| `GET /api/cbos/health` | Checks it can reach CBOS's database and document storage |
+| `GET /api/cbos/boundary-files[/{guid}/{version}]` | CBOS's case boundaries, and one's GeoJSON, for the boundary import |
+| `GET /api/cbos/gis-files[/{guid}/{version}]` | Every file in CBOS's GIS Shapefiles folders, for debugging the import |
+
+Every route but `health` needs the `x-api-key` header to match `CONSULTEE_AREAS_API_KEY`, the same value as the manage app's `PYTHON_FUNCTION_API_KEY`. Without the setting, those routes refuse to serve (500). CBOS is reached as the app's managed identity, or locally as whoever is signed in to the Azure CLI; see [`cbos/config.py`](./cbos/config.py) for its settings.
 
 ## Layout
 
 ```
-function_app.py            HTTP routes: health, consultee-areas, run-ruleset (Azure Functions needs it at the root)
-intersector/               rule-based screening - the consultee intersection logic behind run-ruleset
-  screening.py             run_ruleset: the steps of a run, from the site to the consultees and their reasons
-  queries.py               the SQL against consultee_area (the geometry maths runs in SQL Server)
-  models.py                RuleCondition, ConsulteeArea, Consultee and the reasons a consultee qualified
-  tolerances.py            the distance margins screening works to, and why
-  database.py              a connection per thread for a run, with deadlock retries
-  api.py                   the run-ruleset request validation and response JSON
-setup_database/
-  db.py                    connection string parsing and connecting
-  sample_data/             real UK boundary GeoJSON exports - also loaded by `npm run db-seed`
-querying/
-  consultee_areas.py       the consultee-areas demo query
+function_app.py     the HTTP routes (Azure Functions needs it at the root)
+intersector/        the screening: start at run_ruleset in screening.py, whose SQL is in queries.py
+cbos/               reading CBOS's database and blob storage
+setup_database/     connecting to our database; sample_data/ is what `npm run db-seed` loads
+querying/           the consultee-areas query
 ```
 
-This mirrors the directory concerns of the `PINS-data-spike` reference this was built from
-(`setup_database/`, `querying/`, `intersector/`, plus `data_processing/` and `orchestrator/` for
-GeoJSON conversion and writing data) - add those in the same style if/when this function needs to
-write geometry data, rather than pre-building empty stubs now.
+Tests sit beside the code they test (`test_screening.py` beside `screening.py`).
 
-To follow a run, start at `run_ruleset` in `intersector/screening.py`: each step is a named
-function, and the SQL each one runs is in `queries.py`.
+## Run and test
 
-Tests are colocated next to the code they test (`test_db.py` beside `db.py`, etc.), matching this
-repo's convention for the TypeScript apps.
+`npm start` from the repo root sets up the virtual environment and a local API key, and runs the function with the web app. By hand, in this folder:
 
-## Setup
+```bash
+python3 -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt pytest ruff
+func start                                  # needs local.settings.json, below
+curl http://localhost:7071/api/health
+ruff check . && pytest                      # database tests skip without SQL_CONNECTION_STRING
+```
 
-To set up your local dev environment, in `/apps/function-python`:
+`local.settings.json` (not committed; match the connection string to `packages/database/.env`):
 
-* install Python 3.12
-* create a virtual environment and install dependencies:
-  ```
-  python3 -m venv .venv
-  source .venv/bin/activate
-  pip install -r requirements.txt
-  pip install pytest ruff
-  ```
-* install azure-functions-core-tools with `npm install -g azure-functions-core-tools@4`
-* install the azurite storage emulator with `npm install -g azurite`
-* start the local database (`docker compose up` from the repo root, see the root README)
-* create `local.settings.json` with:
-  ```json
-  {
-    "IsEncrypted": false,
-    "Values": {
-      "FUNCTIONS_WORKER_RUNTIME": "python",
-      "AzureWebJobsStorage": "UseDevelopmentStorage=true",
-      "SQL_CONNECTION_STRING": "sqlserver://localhost:1434;database=identify-consultees;user=sa;password=DockerDatabaseP@22word!;trustServerCertificate=true",
-      "CONSULTEE_AREAS_API_KEY": "any-local-shared-secret"
-    }
+```json
+{
+  "IsEncrypted": false,
+  "Values": {
+    "FUNCTIONS_WORKER_RUNTIME": "python",
+    "AzureWebJobsStorage": "UseDevelopmentStorage=true",
+    "SQL_CONNECTION_STRING": "sqlserver://localhost:1434;database=identify-consultees;user=sa;password=DockerDatabaseP@22word!;trustServerCertificate=true",
+    "CONSULTEE_AREAS_API_KEY": "any-local-shared-secret"
   }
-  ```
-  (match the connection string to whatever's in `packages/database/.env`)
+}
+```
 
-  `CONSULTEE_AREAS_API_KEY` is the shared `x-api-key` secret the `consultee-areas` and `run-ruleset` routes check -
-  **the endpoint fails closed without it** (500 "Endpoint is not configured"). Set the same value as
-  `PYTHON_FUNCTION_API_KEY` in `apps/manage/.env` for the manage app to call it; a wrong or missing
-  header gets a 401. `/api/health` needs no key.
-
-See also [Code and test Azure Functions locally](https://learn.microsoft.com/en-us/azure/azure-functions/functions-develop-local?pivots=programming-language-python).
-
-## Run
-
-`npm start` from the repo root does all of the above (venv, dependencies, a shared local API key) and
-runs the function alongside the manage app. By hand:
-
-* Run `func start` in `apps/function-python`, with the venv activated, to start the function. The
-  HTTP routes run without a storage emulator; run `azurite` too if you add a trigger that needs one
-* `curl http://localhost:7071/api/health` to check it can reach the database
-
-## Test
-
-* `ruff check .` to lint
-* `pytest` to test (from within the activated virtual environment) - the database-backed tests skip
-  gracefully if `SQL_CONNECTION_STRING` isn't set or no database is reachable
+How the screening works: [`kt-docs/screening-service.md`](../../kt-docs/screening-service.md) and [`kt-docs/data/screening-engine.md`](../../kt-docs/data/screening-engine.md).
