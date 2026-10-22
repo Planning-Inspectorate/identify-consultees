@@ -34,7 +34,7 @@ Without the function, the app still runs but project pages say "The ruleset coul
 | Script | Purpose |
 | ------ | ------- |
 | `npm start` | Full local bootstrap |
-| `npm run db-migrate-dev` | Apply Prisma migrations |
+| `npm run db-migrate-prod` | Apply Prisma migrations (writing a new one: see [packages/database/src/README.md](packages/database/src/README.md)) |
 | `npm run db-seed` | Seed the sample data (merges, safe to re-run) |
 | `npm run db-import -- --type=<consultee-areas\|case-boundaries> --file=<path>` | Import a GeoJSON file |
 | `npm run db-import-from-blob -- --type=<...> --blob=<name>` | Import a GeoJSON blob from the app's container |

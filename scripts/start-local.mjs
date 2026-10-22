@@ -243,8 +243,11 @@ async function main() {
 	// SQL Edge can accept TCP before it is ready for logins/migrations.
 	await new Promise((resolve) => setTimeout(resolve, 5000));
 
+	// apply the committed migrations, as CI and the deployed environments do - `prisma migrate dev`
+	// is only for writing a new one, and with consultee_area a synonym (see packages/database's
+	// README) it would offer to replace the quarter's table with an empty one
 	console.log('Running database migrations...');
-	await run('npm', ['run', 'db-migrate-dev']);
+	await run('npm', ['run', 'db-migrate-prod']);
 
 	console.log('Seeding sample data...');
 	await run('npm', ['run', 'db-seed']);

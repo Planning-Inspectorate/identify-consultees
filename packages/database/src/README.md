@@ -7,8 +7,16 @@ This project uses a SQL database for data. It uses [Prisma](https://www.prisma.i
 To update the schema, follow these steps:
 
 1. Make changes to the `schema.prisma` file, see [Field Types](https://www.prisma.io/docs/orm/reference/prisma-schema-reference#model-field-scalar-types) and associated Prisma documentation.
-2. Run `npm run db-migrate-dev` in the root package, this will prompt for a migration name (this can include spaces, they'll be replaced with underscores)
-3. Commit the schema + migration script
+2. Write the migration with `npx prisma migrate dev --create-only --name <name>` in this package. It writes the SQL without applying it.
+3. **Remove every statement about `consultee_area` or `consultee_area_<quarter>` from the generated SQL** unless the change is to the consultee areas themselves (see below). Then apply it with `npm run db-migrate-prod` in the root package, and commit the schema and the migration.
+
+`npm start` applies the committed migrations with `prisma migrate deploy`, as CI and the deployed environments do. Don't run `npm run db-migrate-dev` against a database holding data you want to keep.
+
+### Consultee areas are a table per quarter
+
+Each quarter's consultee areas have a table of their own (`consultee_area_2026Q4`), and `consultee_area` is a **synonym** for the one in use - see the `20261022090000_consultee_area_quarterly_datasets` migration and [kt-docs/data/data-model.md](../../../kt-docs/data/data-model.md). Prisma doesn't know synonyms: comparing `schema.prisma` with the database, it sees `consultee_area` as a table that's missing and `consultee_area_2026Q4` as one to drop. So a migration Prisma generates will try to drop the quarter's table, with every row, and create an empty `consultee_area`. That's why step 3 removes those statements.
+
+A change to the consultee areas' columns is written by hand: alter every `consultee_area_<quarter>` table, and the table `dbo.create_consultee_area_dataset` makes for a new quarter.
 
 ## Comments
 

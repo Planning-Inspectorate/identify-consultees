@@ -27,7 +27,8 @@ export interface ImportReferenceDataViewModel {
 	error?: string;
 	/** What loading a group did, said on the page. */
 	groupLoaded?: string;
-	consulteeAreasCleared?: number;
+	/** Which quarter's dataset was cleared, and how many rows it held. */
+	consulteeAreasCleared?: { quarter: string; deleted: number };
 	caseBoundariesImported?: number;
 	/** Rows in each table now - how to confirm a load finished if the request timed out. */
 	loadedConsulteeAreas?: number;

@@ -5,6 +5,7 @@
 {% from "govuk/components/notification-banner/macro.njk" import govukNotificationBanner %}
 {% from "govuk/components/warning-text/macro.njk" import govukWarningText %}
 {% from "govuk/components/summary-list/macro.njk" import govukSummaryList %}
+{% from "govuk/components/select/macro.njk" import govukSelect %}
 {% from "govuk/components/table/macro.njk" import govukTable %}
 
 {% block pageTitle %}
@@ -33,11 +34,11 @@
         {{ govukNotificationBanner({ type: "success", titleText: "Success", text: groupLoaded }) }}
     {% endif %}
 
-    {% if consulteeAreasCleared != undefined %}
+    {% if consulteeAreasCleared %}
         {{ govukNotificationBanner({
             type: "success",
             titleText: "Success",
-            text: "Cleared the consultee areas: deleted " ~ consulteeAreasCleared ~ "."
+            text: "Cleared the " ~ consulteeAreasCleared.quarter ~ " dataset: deleted " ~ consulteeAreasCleared.deleted ~ " consultee areas."
         }) }}
     {% endif %}
 
@@ -153,14 +154,32 @@
     }) }}
 
     <h2 class="govuk-heading-m">Clear consultee areas</h2>
-    {{ govukWarningText({
-        text: "Deletes every consultee area in the dataset in use, in every group. The table itself, other quarters' datasets and the files in blob storage are left as they are - load each group again afterwards.",
-        iconFallbackText: "Warning"
-    }) }}
-    <form method="post" action="/admin/import-reference-data/clear-consultee-areas" novalidate>
-        <input type="hidden" name="_csrf" value="{{ _csrf }}">
-        {{ govukButton({ text: "Clear consultee areas", classes: "govuk-button--warning" }) }}
-    </form>
+    {% if datasets and datasets.length > 0 %}
+        {{ govukWarningText({
+            text: "Deletes every consultee area in the dataset you choose, in every group. Its table, other quarters' datasets and the files in blob storage are left as they are - load each group again afterwards.",
+            iconFallbackText: "Warning"
+        }) }}
+        {% set datasetItems = [] %}
+        {% for dataset in datasets %}
+            {% set datasetItems = (datasetItems.push({
+                value: dataset.quarter,
+                text: dataset.quarter ~ " - " ~ (dataset.status | lower) ~ ", " ~ dataset.rows ~ " consultee areas",
+                selected: dataset.quarter == datasetInUse
+            }), datasetItems) %}
+        {% endfor %}
+        <form method="post" action="/admin/import-reference-data/clear-consultee-areas" novalidate>
+            <input type="hidden" name="_csrf" value="{{ _csrf }}">
+            {{ govukSelect({
+                id: "quarter",
+                name: "quarter",
+                label: { text: "Dataset to clear" },
+                items: datasetItems
+            }) }}
+            {{ govukButton({ text: "Clear consultee areas", classes: "govuk-button--warning" }) }}
+        </form>
+    {% else %}
+        <p class="govuk-body">There's no dataset to clear.</p>
+    {% endif %}
 
     <h2 class="govuk-heading-m">Case boundaries</h2>
     <p class="govuk-body">Replaces all case boundaries with <code>all-project-boundaries.geojson</code> from blob storage.</p>
