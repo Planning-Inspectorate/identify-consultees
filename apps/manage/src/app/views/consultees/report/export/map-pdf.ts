@@ -1,5 +1,5 @@
 import PDFDocument from 'pdfkit';
-import { LOCAL_FILL_OPACITY, NEARBY_LOCAL_FILL_OPACITY } from '../../../../maps/case-geojson.ts';
+import { LOCAL_FILL_OPACITY } from '../../../../maps/case-geojson.ts';
 import { formatDate } from './workbook.ts';
 
 /**
@@ -26,6 +26,8 @@ export interface MapPdfInput {
 	image: Buffer;
 	/** The colours the map draws the category's consultees and the site in, for the key. */
 	colours: { consultee: string; site: string; siteFillOpacity: number };
+	/** The ruleset's buffers the map draws around the site - `2 km`, `10 km` - for the key. */
+	buffers: string[];
 	/** Said under the map when it couldn't draw the category's consultee areas. */
 	mapNote?: string;
 	consultees: MapPdfConsultee[];
@@ -61,18 +63,40 @@ function swatch(doc: PDFKit.PDFDocument, x: number, y: number, colour: string, f
 	doc.save().strokeColor(colour).lineWidth(1).rect(x, y, SWATCH, SWATCH).stroke().restore();
 }
 
-function drawKey(doc: PDFKit.PDFDocument, y: number, colours: MapPdfInput['colours']): void {
-	const entries: [string, number, string][] = [
-		[colours.consultee, LOCAL_FILL_OPACITY, 'In the report'],
-		[colours.consultee, NEARBY_LOCAL_FILL_OPACITY, 'Nearby, not in the report'],
-		[colours.site, colours.siteFillOpacity, 'The site']
+// as the map draws a buffer (static-map.ts): a dark dashed line
+const BUFFER_KEY_COLOUR = '#0b0c0c';
+
+/** A dashed line, as the map draws a buffer's outline. */
+function dashedSwatch(doc: PDFKit.PDFDocument, x: number, y: number): void {
+	doc
+		.save()
+		.strokeColor(BUFFER_KEY_COLOUR)
+		.lineWidth(1.5)
+		.dash(3, { space: 2 })
+		.moveTo(x, y + SWATCH / 2)
+		.lineTo(x + SWATCH * 2, y + SWATCH / 2)
+		.stroke()
+		.restore();
+}
+
+function drawKey(doc: PDFKit.PDFDocument, y: number, colours: MapPdfInput['colours'], buffers: string[]): void {
+	const entries: [(x: number) => void, number, string][] = [
+		[(x) => swatch(doc, x, y, colours.consultee, LOCAL_FILL_OPACITY), SWATCH, 'In the report'],
+		[(x) => swatch(doc, x, y, colours.site, colours.siteFillOpacity), SWATCH, 'The site']
 	];
+	if (buffers.length > 0) {
+		entries.push([
+			(x) => dashedSwatch(doc, x, y),
+			SWATCH * 2,
+			`Ruleset ${buffers.length === 1 ? 'buffer' : 'buffers'} (${buffers.join(', ')})`
+		]);
+	}
 	let x = MARGIN;
 	doc.font('Helvetica').fontSize(9).fillColor(TEXT_COLOUR);
-	for (const [colour, opacity, label] of entries) {
-		swatch(doc, x, y, colour, opacity);
-		doc.fillColor(TEXT_COLOUR).text(label, x + SWATCH + 6, y + 1, { lineBreak: false });
-		x += SWATCH + 6 + doc.widthOfString(label) + 24;
+	for (const [draw, swatchWidth, label] of entries) {
+		draw(x);
+		doc.fillColor(TEXT_COLOUR).text(label, x + swatchWidth + 6, y + 1, { lineBreak: false });
+		x += swatchWidth + 6 + doc.widthOfString(label) + 24;
 	}
 }
 
@@ -112,7 +136,7 @@ export function buildMapPdf(input: MapPdfInput): Promise<Buffer> {
 
 	const mapTop = doc.y;
 	doc.image(input.image, MARGIN, mapTop, { fit: [width, MAP_HEIGHT], align: 'center' });
-	drawKey(doc, mapTop + MAP_HEIGHT + 10, input.colours);
+	drawKey(doc, mapTop + MAP_HEIGHT + 10, input.colours, input.buffers);
 	if (input.mapNote) {
 		doc
 			.font('Helvetica-Bold')

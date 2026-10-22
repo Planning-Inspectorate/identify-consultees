@@ -120,7 +120,10 @@ export async function buildConsulteeStaticMapResponse(
 		preferGoogle,
 		format,
 		markers: options.map.markers,
-		featureBadges: options.map.featureBadges
+		featureBadges: options.map.featureBadges,
+		labels: options.map.labels,
+		basemap: options.map.basemap,
+		bufferGeojson: options.map.bufferGeojson
 	};
 	const etag = etagFromFingerprint(buildStaticMapFingerprint(fingerprintInput));
 

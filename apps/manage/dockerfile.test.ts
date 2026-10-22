@@ -26,6 +26,11 @@ describe('manage Dockerfile hardening', () => {
 		);
 	});
 
+	it('installs a font - the report maps draw their labels with it, and Alpine has none', () => {
+		assert.match(dockerfile, /^RUN apk add --no-cache fontconfig font-dejavu$/m);
+		assert.ok(dockerfile.indexOf('font-dejavu') < dockerfile.indexOf('USER node'), 'installed as root');
+	});
+
 	it('runs the app as the non-root node user', () => {
 		assert.match(dockerfile, /^USER node$/m);
 	});

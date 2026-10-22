@@ -7,7 +7,7 @@
  * both the <noscript> and JS-fallback paths. PNG remains the safe default.
  */
 
-import sharp from 'sharp';
+import sharp, { type OutputInfo, type Sharp } from 'sharp';
 import { MAP_VIEWPORT } from './sample-geojson.ts';
 import { renderStaticMapOverlaySvg, type OsmBasemapTile, type StaticMapBuildOptions } from './static-map.ts';
 
@@ -20,6 +20,8 @@ export const STATIC_MAP_CONTENT_TYPES: Record<StaticMapFormat, string> = {
 };
 
 const BASEMAP_BACKGROUND = '#f5f5f0';
+// a greyscale basemap keeps this much of its contrast, lightened towards white for the rest
+const GREYSCALE_CONTRAST = 0.8;
 
 /**
  * Pick the best raster format the client accepts, preferring the smallest
@@ -57,7 +59,7 @@ export function negotiateStaticMapFormat(acceptHeader: string | undefined): Stat
  * Returns undefined when there are no tiles - the SVG's flat background suffices.
  */
 export async function renderSvgBasemapImage(
-	options: Pick<StaticMapBuildOptions, 'width' | 'height'>,
+	options: Pick<StaticMapBuildOptions, 'width' | 'height' | 'basemap'>,
 	basemapTiles: OsmBasemapTile[]
 ): Promise<Buffer | undefined> {
 	if (basemapTiles.length === 0) {
@@ -65,18 +67,52 @@ export async function renderSvgBasemapImage(
 	}
 	const width = options.width ?? MAP_VIEWPORT.width;
 	const height = options.height ?? MAP_VIEWPORT.height;
-	return sharp({
-		create: { width, height, channels: 3, background: BASEMAP_BACKGROUND }
-	})
-		.composite(
-			basemapTiles.map((tile) => ({
-				input: tile.png,
-				left: Math.round(tile.x),
-				top: Math.round(tile.y)
-			}))
-		)
+	return basemapInput(await renderBasemap(options, width, height, basemapTiles))
 		.jpeg({ quality: 70 })
 		.toBuffer();
+}
+
+/**
+ * The basemap alone, as raw pixels: `basemapPng` fitted to the map, else the tiles on a flat
+ * background - in grey for a greyscale map, lightened a little so the coloured areas over it
+ * stand out. A step of its own: sharp composites after its other operations, so a greyscale
+ * applied with the overlay would leave the tiles in colour.
+ */
+type RawImage = { data: Buffer; info: OutputInfo };
+
+async function renderBasemap(
+	options: Pick<StaticMapBuildOptions, 'basemap'>,
+	width: number,
+	height: number,
+	basemapTiles: OsmBasemapTile[],
+	basemapPng?: Buffer
+): Promise<RawImage> {
+	// one composite() call — sharp replaces (not appends) the input list on successive calls,
+	// which would silently drop tiles
+	const base = basemapPng
+		? sharp(basemapPng).resize(width, height, { fit: 'fill' })
+		: sharp({ create: { width, height, channels: 3, background: BASEMAP_BACKGROUND } }).composite(
+				basemapTiles.map((tile) => ({
+					input: tile.png,
+					left: Math.round(tile.x),
+					top: Math.round(tile.y)
+				}))
+			);
+	const flattened = await base.removeAlpha().raw().toBuffer({ resolveWithObject: true });
+	if (options.basemap !== 'greyscale') {
+		return flattened;
+	}
+	return basemapInput(flattened)
+		.greyscale()
+		.linear(GREYSCALE_CONTRAST, 255 * (1 - GREYSCALE_CONTRAST))
+		.toColourspace('srgb')
+		.raw()
+		.toBuffer({ resolveWithObject: true });
+}
+
+/** sharp's input for a basemap from renderBasemap. */
+function basemapInput({ data, info }: RawImage): Sharp {
+	return sharp(data, { raw: { width: info.width, height: info.height, channels: info.channels } });
 }
 
 /**
@@ -93,29 +129,9 @@ export async function renderStaticMapRaster(
 	const width = options.width ?? MAP_VIEWPORT.width;
 	const height = options.height ?? MAP_VIEWPORT.height;
 
-	// one composite() call — sharp replaces (not appends) the input list on
-	// successive calls, which would silently drop the basemap tiles
-	const base = basemapPng
-		? sharp(basemapPng).resize(width, height, { fit: 'fill' })
-		: sharp({
-				create: {
-					width,
-					height,
-					channels: 3,
-					background: BASEMAP_BACKGROUND
-				}
-			});
-
+	const basemap = basemapInput(await renderBasemap(options, width, height, basemapTiles, basemapPng));
 	const overlay = Buffer.from(renderStaticMapOverlaySvg({ ...options, width, height }));
-
-	const composite = base.composite([
-		...basemapTiles.map((tile) => ({
-			input: tile.png,
-			left: Math.round(tile.x),
-			top: Math.round(tile.y)
-		})),
-		{ input: overlay, left: 0, top: 0 }
-	]);
+	const composite = basemap.composite([{ input: overlay, left: 0, top: 0 }]);
 
 	switch (format) {
 		case 'avif':

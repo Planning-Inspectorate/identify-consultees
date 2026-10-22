@@ -13,6 +13,10 @@ ENV npm_config_cache=/home/node/.npm
 
 ARG GIT_SHA
 
+# Fonts for the text sharp draws into map images - the report maps' labels (see
+# src/app/maps/static-map.ts). Alpine has none, so without them the labels draw as nothing.
+RUN apk add --no-cache fontconfig font-dejavu
+
 # Build as the runtime user: installing and copying as node means no 15s+
 # `chown -R` pass at the end (which also wrote a full duplicate-metadata layer,
 # inflating image export). Single-level only: /usr/src/app itself must be

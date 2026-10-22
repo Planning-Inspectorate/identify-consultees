@@ -48,6 +48,8 @@ Both maps frame the search area, or the project and matches when there isn't one
 
 Every input that changes the rendered static image must be part of `buildStaticMapFingerprint`'s payload, or caches serve stale images.
 
+The static image has options only the report's map PDFs use (`StaticMapBuildOptions`): `labels` names each consultee area where a label fits (on a grid over the part of the area on the map, nearest its middle, smallest areas placed first, none overlapping), `basemap: 'greyscale'` greys and lightens the basemap - tiles or Google's image - before the overlay goes on (sharp composites after its other operations, so it's a step of its own), and `bufferGeojson` draws dashed outlines, each labelled on its outline above the site. The labels are SVG text, which needs a font installed (see `apps/manage/Dockerfile`).
+
 ## Dev pages
 
 `/components/interactive-map` has worked Defra examples (style switcher, draw tools, selection panel, fullscreen variants, static parity) from `interactive-map-examples-data.ts`; it's the safest place to learn the component. `/map-layers-demo` is a layer-toggle prototype. Neither touches the database.

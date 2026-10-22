@@ -37,6 +37,15 @@ export type StaticMapBuildOptions = {
 	markers?: { coords: LngLat; label?: string }[];
 	/** Small numbered badges tying map features to the legend list below the page image. */
 	featureBadges?: { coords: LngLat; label: string; fill?: string }[];
+	/** Draw each consultee area's name on it, where there's room - the report's map PDFs. */
+	labels?: boolean;
+	/** A grey basemap, so the coloured areas stand out on it - the report's map PDFs. Colour by default. */
+	basemap?: 'colour' | 'greyscale';
+	/**
+	 * Outlines drawn dashed and unfilled over the consultee areas, each with its `label` property
+	 * written on it - the ruleset's buffers around the site, in the report's map PDFs.
+	 */
+	bufferGeojson?: GeoJsonFeatureCollection;
 };
 
 const GOOGLE_STATIC_MAP_MAX_URL_LENGTH = 16_384;
@@ -426,18 +435,35 @@ export function visiblePathPoints(pixels: [number, number][], width: number, hei
 	return kept;
 }
 
-function svgPathCommandsForLine(
+/** A line's points in map pixels, less what can't be seen (see visiblePathPoints). */
+function visibleLinePixels(
 	line: Position[],
 	project: (lng: number, lat: number) => [number, number],
 	width: number,
 	height: number
-): string {
+): [number, number][] {
 	const pixels = line
 		.filter((point) => point?.[0] !== undefined && point?.[1] !== undefined)
 		.map((point) => project(point[0], point[1]));
+	return visiblePathPoints(pixels, width, height);
+}
+
+/** Each of a geometry's lines and rings that has a length, in map pixels, less what can't be seen. */
+function visibleGeometryPixels(
+	geometry: Geometry,
+	project: (lng: number, lat: number) => [number, number],
+	width: number,
+	height: number
+): [number, number][][] {
+	return collectLines(geometry)
+		.filter((line) => line.length >= 2)
+		.map((line) => visibleLinePixels(line, project, width, height));
+}
+
+function svgPathCommandsForLine(pixels: [number, number][]): string {
 	const commands: string[] = [];
 	let previous = '';
-	for (const [x, y] of visiblePathPoints(pixels, width, height)) {
+	for (const [x, y] of pixels) {
 		const coordinates = `${x.toFixed(1)} ${y.toFixed(1)}`;
 		if (coordinates !== previous) {
 			commands.push(`${commands.length === 0 ? 'M' : 'L'}${coordinates}`);
@@ -455,15 +481,208 @@ function pathForFeature(
 	height: number
 ): string {
 	const filled = isArealGeometryType(feature.geometry.type);
-	const subpaths = collectLines(feature.geometry)
-		.filter((line) => line.length >= 2)
-		.map((line) => `${svgPathCommandsForLine(line, project, width, height)}${filled ? ' Z' : ''}`);
+	const subpaths = visibleGeometryPixels(feature.geometry, project, width, height).map(
+		(pixels) => `${svgPathCommandsForLine(pixels)}${filled ? ' Z' : ''}`
+	);
 	if (subpaths.length === 0) {
 		return '';
 	}
 	const fillAttributes = filled ? `fill="${colours.fill}" fill-opacity="${colours.fillOpacity}"` : 'fill="none"';
 	// the GIS Styling default values give the overlays a 1.5px border (AGENTS.md)
 	return `<path d="${subpaths.join(' ')}" ${fillAttributes} stroke="${colours.stroke}" stroke-width="1.5"/>`;
+}
+
+// a buffer's outline: dark and dashed, so it reads as a distance rather than as another area
+const BUFFER_STROKE = '#0b0c0c';
+
+function bufferPath(
+	feature: GeoJsonFeature,
+	project: (lng: number, lat: number) => [number, number],
+	width: number,
+	height: number
+): string {
+	const subpaths = visibleGeometryPixels(feature.geometry, project, width, height).map(svgPathCommandsForLine);
+	return subpaths.length === 0
+		? ''
+		: `<path d="${subpaths.join(' ')}" fill="none" stroke="${BUFFER_STROKE}" stroke-width="2" stroke-dasharray="8 5"/>`;
+}
+
+const LABEL_FONT_SIZE = 11;
+// a character's width at that size in a bold sans-serif, near enough to keep labels apart
+const LABEL_CHARACTER_WIDTH = 6.4;
+const LABEL_HEIGHT = 14;
+const LABEL_MAX_CHARACTERS = 40;
+// how far apart the spots a label could go are tried, and how far a label keeps from the map's edge
+const LABEL_GRID_PIXELS = 12;
+const LABEL_EDGE_PIXELS = 4;
+// DejaVu Sans is the font the app's image installs (apps/manage/Dockerfile) - Alpine has none
+const LABEL_FONT_FAMILY = 'DejaVu Sans, Arial, Helvetica, sans-serif';
+
+type LabelBox = { left: number; top: number; right: number; bottom: number };
+
+/** A name as a label: one line, shortened with an ellipsis past LABEL_MAX_CHARACTERS. */
+export function labelText(name: string): string {
+	const text = name.replace(/\s+/g, ' ').trim();
+	return text.length > LABEL_MAX_CHARACTERS ? `${text.slice(0, LABEL_MAX_CHARACTERS - 1).trimEnd()}…` : text;
+}
+
+function labelBox(text: string, [x, y]: [number, number]): LabelBox {
+	const halfWidth = (text.length * LABEL_CHARACTER_WIDTH) / 2;
+	return { left: x - halfWidth, top: y - LABEL_HEIGHT / 2, right: x + halfWidth, bottom: y + LABEL_HEIGHT / 2 };
+}
+
+function overlaps(a: LabelBox, b: LabelBox): boolean {
+	return a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
+}
+
+function onMap(box: LabelBox, width: number, height: number): boolean {
+	return (
+		box.left >= LABEL_EDGE_PIXELS &&
+		box.top >= LABEL_EDGE_PIXELS &&
+		box.right <= width - LABEL_EDGE_PIXELS &&
+		box.bottom <= height - LABEL_EDGE_PIXELS
+	);
+}
+
+/** True when a pixel is inside `rings` - even-odd, so a polygon's holes, and a multipolygon's parts, count. */
+export function insideRings([x, y]: [number, number], rings: [number, number][][]): boolean {
+	let inside = false;
+	for (const ring of rings) {
+		for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+			const [xi, yi] = ring[i];
+			const [xj, yj] = ring[j];
+			if (yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) {
+				inside = !inside;
+			}
+		}
+	}
+	return inside;
+}
+
+/**
+ * Where a feature's label could go, best first: for an area, the spots on a grid over the part of
+ * it on the map, nearest that part's middle first - so a county covering the whole map is labelled
+ * in the open, not off the map where its centroid is; for a line, its points on the map, nearest its
+ * middle first; for a point, the point.
+ */
+function labelSpots(rings: [number, number][][], areal: boolean, width: number, height: number): [number, number][] {
+	const points = rings.flat();
+	const visible = points.filter(([x, y]) => x >= 0 && y >= 0 && x <= width && y <= height);
+	let spots: [number, number][] = visible;
+	if (areal) {
+		// the part of its bounding box on the map - a loop, as a coastline's points would overflow
+		// Math.min(...points)'s arguments
+		let [left, top, right, bottom] = [width, height, 0, 0];
+		for (const [x, y] of points) {
+			left = Math.max(0, Math.min(left, x));
+			right = Math.min(width, Math.max(right, x));
+			top = Math.max(0, Math.min(top, y));
+			bottom = Math.min(height, Math.max(bottom, y));
+		}
+		spots = [];
+		for (let y = Math.ceil(top / LABEL_GRID_PIXELS) * LABEL_GRID_PIXELS; y <= bottom; y += LABEL_GRID_PIXELS) {
+			for (let x = Math.ceil(left / LABEL_GRID_PIXELS) * LABEL_GRID_PIXELS; x <= right; x += LABEL_GRID_PIXELS) {
+				if (insideRings([x, y], rings)) {
+					spots.push([x, y]);
+				}
+			}
+		}
+		// smaller than the grid: the middle of its part on the map - for an area off the map, a spot
+		// on the map's edge, where no label fits
+		if (spots.length === 0) {
+			spots = [[(left + right) / 2, (top + bottom) / 2]];
+		}
+	}
+	if (spots.length === 0) {
+		return [];
+	}
+	const middleX = spots.reduce((sum, [x]) => sum + x, 0) / spots.length;
+	const middleY = spots.reduce((sum, [, y]) => sum + y, 0) / spots.length;
+	const distance = ([x, y]: [number, number]) => (x - middleX) ** 2 + (y - middleY) ** 2;
+	return spots.toSorted((a, b) => distance(a) - distance(b));
+}
+
+function labelMarkup(text: string, [x, y]: [number, number]): string {
+	return (
+		`<text x="${x.toFixed(1)}" y="${(y + LABEL_FONT_SIZE * 0.35).toFixed(1)}" text-anchor="middle" ` +
+		`font-family="${LABEL_FONT_FAMILY}" font-size="${LABEL_FONT_SIZE}" font-weight="700" fill="#0b0c0c" ` +
+		`stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke">${escapeXml(text)}</text>`
+	);
+}
+
+/** Where `lines` cross the vertical line at `x`, top to bottom. */
+function verticalCrossings(lines: [number, number][][], x: number): number[] {
+	const crossings: number[] = [];
+	for (const line of lines) {
+		for (let i = 1; i < line.length; i++) {
+			const [[x1, y1], [x2, y2]] = [line[i - 1], line[i]];
+			if (x1 <= x !== x2 <= x) {
+				crossings.push(y1 + ((x - x1) * (y2 - y1)) / (x2 - x1));
+			}
+		}
+	}
+	return crossings.toSorted((a, b) => a - b);
+}
+
+/**
+ * Labels for the buffers and the consultee areas, placed so none overlap: each buffer's on its
+ * outline above the site (else below it), then each area's name at its best spot that's free - the
+ * areas with fewest spots placed first, so a small parish isn't crowded out by the county around
+ * it. A name already on the map, or with nowhere free, isn't drawn again - the PDF lists them all.
+ */
+function renderLabels(
+	options: StaticMapBuildOptions,
+	project: (lng: number, lat: number) => [number, number],
+	width: number,
+	height: number
+): string {
+	const placed: LabelBox[] = [];
+	const markup: string[] = [];
+	const place = (text: string, spots: [number, number][]): boolean => {
+		for (const spot of spots) {
+			const box = labelBox(text, spot);
+			if (onMap(box, width, height) && !placed.some((other) => overlaps(box, other))) {
+				placed.push(box);
+				markup.push(labelMarkup(text, spot));
+				return true;
+			}
+		}
+		return false;
+	};
+
+	for (const feature of options.bufferGeojson?.features ?? []) {
+		const label = typeof feature.properties.label === 'string' ? labelText(feature.properties.label) : '';
+		const crossings = verticalCrossings(visibleGeometryPixels(feature.geometry, project, width, height), width / 2);
+		if (label && crossings.length > 0) {
+			// on the outline straight above the site - the map's centre - else straight below it
+			place(label, [
+				[width / 2, crossings[0]],
+				[width / 2, crossings[crossings.length - 1]]
+			]);
+		}
+	}
+
+	if (options.labels) {
+		const candidates = options.consulteeGeojson.features
+			.map((feature) => ({
+				text: labelText(String(feature.properties.name ?? '')),
+				spots: labelSpots(
+					visibleGeometryPixels(feature.geometry, project, width, height),
+					isArealGeometryType(feature.geometry.type),
+					width,
+					height
+				)
+			}))
+			.filter(({ text, spots }) => text !== '' && spots.length > 0)
+			.toSorted((a, b) => a.spots.length - b.spots.length);
+		const labelled = new Set<string>();
+		for (const { text, spots } of candidates) {
+			if (!labelled.has(text) && place(text, spots)) {
+				labelled.add(text);
+			}
+		}
+	}
+	return markup.join('\n');
 }
 
 /**
@@ -511,6 +730,10 @@ export function renderStaticMapOverlaySvg(options: StaticMapBuildOptions): strin
 		.map((feature) => pathForFeature(feature, project, consulteeColours(feature), width, height))
 		.filter(Boolean)
 		.join('\n');
+	const bufferPaths = (options.bufferGeojson?.features ?? [])
+		.map((feature) => bufferPath(feature, project, width, height))
+		.filter(Boolean)
+		.join('\n');
 	const projectPaths = options.projectGeojson.features
 		.map((feature) => pathForFeature(feature, project, projectColours(feature), width, height))
 		.filter(Boolean)
@@ -549,9 +772,11 @@ export function renderStaticMapOverlaySvg(options: StaticMapBuildOptions): strin
 
 	return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
   ${consulteePaths}
+  ${bufferPaths}
   ${projectPaths}
   ${markerMarkup}
   ${badgeMarkup}
+  ${renderLabels(options, project, width, height)}
   <rect x="1" y="1" width="${width - 2}" height="${height - 2}" fill="none" stroke="#b1b4b6"/>
 </svg>`;
 }

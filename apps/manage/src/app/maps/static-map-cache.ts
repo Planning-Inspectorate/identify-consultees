@@ -45,6 +45,10 @@ export type StaticMapFingerprintInput = {
 	/** Optional overlay extras (markers, numbered badges) — part of the image. */
 	markers?: unknown;
 	featureBadges?: unknown;
+	/** The report's extras (labels, a greyscale basemap, buffers) - also part of the image. */
+	labels?: boolean;
+	basemap?: string;
+	bufferGeojson?: unknown;
 };
 
 export function buildStaticMapFingerprint(input: StaticMapFingerprintInput): string {
@@ -61,7 +65,10 @@ export function buildStaticMapFingerprint(input: StaticMapFingerprintInput): str
 		preferGoogle: input.preferGoogle,
 		format: input.format,
 		markers: input.markers,
-		featureBadges: input.featureBadges
+		featureBadges: input.featureBadges,
+		labels: input.labels,
+		basemap: input.basemap,
+		bufferGeojson: input.bufferGeojson
 	});
 	return createHash('sha256').update(payload).digest('hex');
 }

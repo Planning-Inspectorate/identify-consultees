@@ -14,6 +14,7 @@ function input(overrides: Partial<MapPdfInput> = {}): MapPdfInput {
 		category: 'Parish Council',
 		image: ONE_PIXEL_PNG,
 		colours: { consultee: '#4c72b0', site: '#ff0000', siteFillOpacity: 0.2 },
+		buffers: ['2 km', '10 km'],
 		consultees: [
 			{ name: 'Abbey Parish Council', identified: ['"B" host Parish Councils: intersects the site'], mapped: true },
 			{ name: 'Added Parish', identified: ['Asked to be consulted'], mapped: false }
@@ -37,8 +38,8 @@ describe('report map PDF', () => {
 		]);
 		for (const line of [
 			'In the report',
-			'Nearby, not in the report',
 			'The site',
+			'Ruleset buffers (2 km, 10 km)',
 			'Parish Council: 2 in the report',
 			'Abbey Parish Council',
 			'"B" host Parish Councils: intersects the site',
@@ -49,6 +50,13 @@ describe('report map PDF', () => {
 			assert.ok(lines.includes(line), `missing "${line}"`);
 		}
 		assert.equal(lines.filter((line) => line === 'Manually added - not on the map').length, 1);
+		// consultees not in the report aren't drawn, so aren't in the key
+		assert.ok(!lines.some((line) => line.startsWith('Nearby')));
+	});
+
+	it('keys one buffer, and none when the map draws none', async () => {
+		assert.ok(pdfTextLines(await buildMapPdf(input({ buffers: ['500 m'] }))).includes('Ruleset buffer (500 m)'));
+		assert.ok(!pdfTextLines(await buildMapPdf(input({ buffers: [] }))).some((line) => line.startsWith('Ruleset b')));
 	});
 
 	it("leaves out a boundary file it doesn't have, and notes a map that couldn't draw its consultees", async () => {
