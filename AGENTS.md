@@ -124,16 +124,16 @@ And mechanically:
 
 Local installs must use the **same Node major and npm** as CI so `package-lock.json` stays compatible with `npm ci`. We pin the **major version only** — minor and patch releases float to the latest automatically, so routine Node releases need no repo change.
 
-| Tool    | Required version       | Where it is pinned                                                                                                                                          |
-| ------- | ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Node.js | **24.x** (current LTS) | `.nvmrc`, `.node-version`, `.tool-versions` (`24`), `package.json` `engines.node` `^24`, Azure `nodeVersion: 24`, `apps/manage/Dockerfile` `node:24-alpine` |
-| npm     | **11.x+** (bundled)    | `engines.npm` is a `>=11` floor only — npm ships with Node 24 and is never patch-pinned                                                                     |
+| Tool    | Required version                    | Where it is pinned                                                                                                                                               |
+| ------- | ----------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Node.js | **24.x** (current LTS), `>=24.22.1` | `.nvmrc`, `.node-version`, `.tool-versions` (`24`), `package.json` `engines.node` `^24.22.1`, Azure `nodeVersion: 24`, `apps/manage/Dockerfile` `node:24-alpine` |
+| npm     | **11.x+** (bundled)                 | `engines.npm` is a `>=11` floor only — npm ships with Node 24 and is never patch-pinned                                                                          |
 
-Azure jobs use PINS `node_script.yml` with `nodeVersion: 24` (see `.azure/pipelines/pr.yml` and `infrastructure/pipelines/terraform-ci-commit.yaml`), so CI always tracks the latest Node 24.x and its bundled npm.
+Azure jobs use PINS `node_script.yml` with `nodeVersion: 24` (see `.azure/pipelines/pr.yml` and `infrastructure/pipelines/terraform-ci-commit.yaml`). The template runs `nvm use 24`, which resolves to the newest 24.x **preinstalled on the agent image** — that can lag upstream releases, so each `npm ci` step first sources `scripts/ci-use-latest-node.sh`, which installs the true latest into a job-private nvm dir when the preinstalled one fails `check-toolchain` (the pool's shared `/usr/local/nvm` makes `nvm install` race on a lock and may not be agent-writable).
 
 ### Agent rules for the toolchain
 
-- Pin majors, not patches: `.nvmrc`, `.node-version`, `.tool-versions`, the Dockerfile base tag, and Azure `nodeVersion` all resolve to the **latest 24.x**; `engines.node` `^24` enforces the same range. Only major/LTS bumps should touch these files — never pin an exact patch (it forces a repo change per Node release and causes EBADENGINE drift against the floating tags).
+- Pin majors, not patches: `.nvmrc`, `.node-version`, `.tool-versions`, the Dockerfile base tag, and Azure `nodeVersion` all resolve to the **latest 24.x**; `engines.node` `^24.22.1` enforces the same range with a security floor — `>=24.22.1` patches in the October 2026 security release (<https://nodejs.org/en/blog/vulnerability/october-2026-security-releases>), everything above still floats. Only major/LTS bumps or new security floors should touch these files — never pin an exact patch (it forces a repo change per Node release and causes EBADENGINE drift against the floating tags).
 - Do **not** re-add a `packageManager` field or an exact `engines.npm` — pinning a specific npm defeats the float-above and, under corepack, can force an npm that doesn't match Node's bundled one.
 - Before changing dependencies or regenerating the lockfile: `nvm use` (or equivalent) so Node is **24.x** with its bundled **npm 11.x**. Do **not** regenerate `package-lock.json` under a different Node/npm major.
 - Prefer `npm ci` for a clean tree (same command as CI). Use `npm install` only when intentionally updating dependencies.

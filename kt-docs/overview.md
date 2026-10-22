@@ -144,15 +144,15 @@ The main journey is **database-backed**: there are no fixtures. Locally the data
 
 ## Decisions
 
-| Decision                                                                             | Why                                                                                        |
-| ------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------ |
-| Server-rendered GOV.UK Frontend and Nunjucks, no SPA or custom design system         | GDS alignment, accessible defaults, PINS core patterns                                     |
-| Maps are progressive enhancement: interactive when JS works, a static image when not | The journey must work without JavaScript                                                   |
-| Screening runs in the Python function, as SQL `GEOGRAPHY` queries                    | The geo logic lives with the Python tooling. One implementation, no Node fallback          |
-| The web app sends the ruleset's conditions with each run                             | The definitions have one home, which the report pages also read                            |
-| Selections (removed and added consultees) live in the URL                            | No server-side state; counts and lists always agree                                        |
-| Node 24 and npm 11, major versions pinned                                            | Same as Azure Pipelines; minor and patch float                                             |
-| Express `trust proxy` is a hop count (`1`), and the origin stays HTTP/1.1            | Secure cookies and safe rate limiting behind Front Door, which terminates HTTP/2 and later |
+| Decision                                                                             | Why                                                                                            |
+| ------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------- |
+| Server-rendered GOV.UK Frontend and Nunjucks, no SPA or custom design system         | GDS alignment, accessible defaults, PINS core patterns                                         |
+| Maps are progressive enhancement: interactive when JS works, a static image when not | The journey must work without JavaScript                                                       |
+| Screening runs in the Python function, as SQL `GEOGRAPHY` queries                    | The geo logic lives with the Python tooling. One implementation, no Node fallback              |
+| The web app sends the ruleset's conditions with each run                             | The definitions have one home, which the report pages also read                                |
+| Selections (removed and added consultees) live in the URL                            | No server-side state; counts and lists always agree                                            |
+| Node 24 and npm 11, major versions pinned                                            | Same as Azure Pipelines; minor and patch float above the `engines` security floor (`^24.22.1`) |
+| Express `trust proxy` is a hop count (`1`), and the origin stays HTTP/1.1            | Secure cookies and safe rate limiting behind Front Door, which terminates HTTP/2 and later     |
 
 ## Open questions
 

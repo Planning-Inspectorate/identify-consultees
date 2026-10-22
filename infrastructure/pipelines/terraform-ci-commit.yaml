@@ -37,15 +37,24 @@ extends:
           - template: ../steps/node_script.yml
             parameters:
               displayName: 'npm ci'
+              # ci-use-latest-node.sh first: `nvm use 24` in the template resolves to the
+              # newest 24.x preinstalled on the agent image, which can lag the engines.node
+              # security floor
               nodeVersion: 24
-              script: npm ci
+              script: |
+                source scripts/ci-use-latest-node.sh 24
+                npm ci
               environmentVariables:
                 npm_config_cache: $(Pipeline.Workspace)/.npm
           - template: ../steps/node_script.yml
             parameters:
               displayName: 'npm run check-toolchain'
+              # validates engines against the running Node - the shared image's `nvm use 24`
+              # can be older than the floor, same as the npm ci step above
               nodeVersion: 24
-              script: npm run check-toolchain
+              script: |
+                source scripts/ci-use-latest-node.sh 24
+                npm run check-toolchain
           - template: ../steps/node_script.yml
             parameters:
               displayName: 'npm run commitlint'

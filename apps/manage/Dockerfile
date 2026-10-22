@@ -1,6 +1,6 @@
 # Stage 1/2 - Builder
 # Major-only tag on purpose: tracks the latest Node 24.x (matching .nvmrc and
-# engines.node ^24) so the image picks up minor/patch releases without a code
+# engines.node ^24.22.1) so the image picks up minor/patch releases without a code
 # change. engines.npm is a >=11 floor, so the bundled npm always satisfies
 # engine-strict - no EBADENGINE drift.
 FROM node:24-alpine AS base
