@@ -195,8 +195,13 @@ $font-family: arial, helvetica, sans-serif;
 // the report check page's "Show more" details: a plain link with no triangle;
 // open, the summary moves below the list and reads "Show less" (the control
 // stays the native summary, so the toggle keeps working for keyboard/AT and
-// needs no JS). The revealed names carry no govuk-details border or indent so
-// their bullets continue the list above
+// needs no JS). The revealed names carry no govuk-details border, indent or
+// padding, so their bullets continue the list above - which drops its bottom
+// margin while open for the same reason
+.govuk-list:has(+ .pins-show-more[open]) {
+	margin-bottom: 0;
+}
+
 .pins-show-more {
 	.govuk-details__summary {
 		padding-left: 0;
@@ -207,6 +212,7 @@ $font-family: arial, helvetica, sans-serif;
 	}
 
 	.govuk-details__text {
+		padding-top: 0;
 		padding-left: 0;
 		border-left: 0;
 	}
