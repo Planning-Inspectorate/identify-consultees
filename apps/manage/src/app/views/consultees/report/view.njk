@@ -95,7 +95,12 @@
 									{% endfor %}
 								</ul>
 							{% endset %}
-							{{ govukDetails({ summaryText: "Show more", html: moreHtml }) }}
+							{# "Show less" is the same summary element moved below the list by CSS
+							when open - keeps the native details toggle (no JS needed) #}
+							{% set summaryHtml %}
+								<span class="pins-show-more__more">Show more</span><span class="pins-show-more__less">Show less</span>
+							{% endset %}
+							{{ govukDetails({ summaryHtml: summaryHtml, html: moreHtml, classes: "pins-show-more" }) }}
 						{% endif %}
 					{% endif %}
 				{% endset %}

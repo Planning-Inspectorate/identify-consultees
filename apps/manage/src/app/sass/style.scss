@@ -191,3 +191,43 @@ $font-family: arial, helvetica, sans-serif;
 	white-space: pre-wrap;
 	background: index.govuk-colour('black', $variant: 'tint-95');
 }
+
+// the report check page's "Show more" details: closed it looks like the usual
+// govuk-details triangle; open, the summary moves below the list and reads
+// "Show less" without a triangle (the control stays the native summary, so the
+// toggle keeps working for keyboard/AT and needs no JS)
+.pins-show-more {
+	.pins-show-more__less {
+		display: none;
+	}
+
+	&[open] {
+		display: flex;
+		flex-direction: column;
+
+		.govuk-details__text {
+			order: 1;
+		}
+
+		.govuk-details__summary {
+			order: 2;
+
+			&::before {
+				display: none;
+			}
+		}
+
+		.govuk-details__summary-text {
+			padding-left: 0;
+			margin-bottom: 0;
+		}
+
+		.pins-show-more__more {
+			display: none;
+		}
+
+		.pins-show-more__less {
+			display: inline;
+		}
+	}
+}

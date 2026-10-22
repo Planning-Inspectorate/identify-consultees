@@ -292,9 +292,19 @@ test.describe('manage journeys', () => {
 		const count = listedNames.length || ((await returnedValue.innerText()).trim() === 'No consultees' ? 0 : 1);
 		expect(count).toBe(expectedTotal);
 		expect((await returnedValue.innerHTML()).includes('First Test Consultee')).toBe(true);
-		// past the fifth name the rest sit behind a closed "Show more" (still in the DOM)
+		// past the fifth name the rest sit behind a closed "Show more" (still in the DOM);
+		// opening swaps the toggle to "Show less", which the CSS moves below the last name
 		if (expectedTotal > 5) {
 			await expect(returnedValue.getByText('Show more')).toBeVisible();
+			await returnedValue.locator('.pins-show-more__more').click();
+			const details = returnedValue.locator('details.pins-show-more');
+			await expect(details).toHaveAttribute('open', '');
+			const showLess = returnedValue.locator('.pins-show-more__less');
+			await expect(showLess).toBeVisible();
+			const lastName = await details.locator('li').last().boundingBox();
+			expect((await showLess.boundingBox()).y).toBeGreaterThan(lastName.y + lastName.height);
+			await showLess.click();
+			await expect(details).not.toHaveAttribute('open', '');
 		}
 
 		// "Create report" leads to the confirmation page with the download link, naming the built ZIP's size
