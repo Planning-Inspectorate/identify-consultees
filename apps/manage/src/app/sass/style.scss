@@ -192,11 +192,25 @@ $font-family: arial, helvetica, sans-serif;
 	background: index.govuk-colour('black', $variant: 'tint-95');
 }
 
-// the report check page's "Show more" details: closed it looks like the usual
-// govuk-details triangle; open, the summary moves below the list and reads
-// "Show less" without a triangle (the control stays the native summary, so the
-// toggle keeps working for keyboard/AT and needs no JS)
+// the report check page's "Show more" details: a plain link with no triangle;
+// open, the summary moves below the list and reads "Show less" (the control
+// stays the native summary, so the toggle keeps working for keyboard/AT and
+// needs no JS). The revealed names carry no govuk-details border or indent so
+// their bullets continue the list above
 .pins-show-more {
+	.govuk-details__summary {
+		padding-left: 0;
+
+		&::before {
+			display: none;
+		}
+	}
+
+	.govuk-details__text {
+		padding-left: 0;
+		border-left: 0;
+	}
+
 	.pins-show-more__less {
 		display: none;
 	}
@@ -212,6 +226,7 @@ $font-family: arial, helvetica, sans-serif;
 		.govuk-details__summary {
 			order: 2;
 
+			// govuk's [open] arrow rule outranks the closed one - hide it again
 			&::before {
 				display: none;
 			}
