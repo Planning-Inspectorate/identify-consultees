@@ -7,6 +7,7 @@ import pytest
 from cbos.boundaries import (
     GET_BOUNDARY_FILE,
     LIST_BOUNDARY_FILES,
+    LIST_CASE_BOUNDARY_FILES,
     BoundaryFile,
     BoundaryFileNotFound,
     fetch_boundary_geojson,
@@ -38,6 +39,17 @@ def test_the_query_reads_every_geojson_version_in_gis_shapefiles_folders():
         # every version, not just the newest - a replaced boundary's earlier ones too
         assert "newest" not in sql and "ROW_NUMBER" not in sql
         assert "d.isDeleted = 0" in sql and "dv.isDeleted = 0" in sql and "f.deletedAt IS NULL" in sql
+
+
+def test_list_boundary_files_for_one_case_asks_for_its_reference():
+    patcher, connection = _fake_connect([_row()])
+    with patcher:
+        files = list_boundary_files(CONFIG, CREDENTIAL, "EN010001")
+
+    sql, params = connection.cursor.return_value.execute.call_args.args
+    assert sql == LIST_CASE_BOUNDARY_FILES and "c.reference = ?" in sql
+    assert params == ("EN010001",)
+    assert [file.case_reference for file in files] == ["EN010001"]
 
 
 def test_list_boundary_files_maps_rows_and_closes_the_connection():

@@ -122,6 +122,15 @@ CBOS (the IDAS back office) is PINS's system of record for cases. A case officer
 
 Nothing else is done to the geometry: screening simplifies the site to 10m when it runs, as for any boundary.
 
+### Keeping up with CBOS
+
+CBOS publishes an event on its `nsip-document` Service Bus topic whenever a document changes, including when its `process-shapefile` job saves a boundary's GeoJSON (an `Update`). The web app subscribes (`apps/manage/src/app/cbos/subscriber.ts`): for each event about a GeoJSON that's a GIS shapefile, or is in a GIS Shapefiles folder, it imports that case's boundaries again, through the same import as the admin page (the function's `cbos/boundary-files?caseReference=`). Every other event is ignored.
+
+- **Where it's set up**: `infrastructure/idas-back-office.tf` makes our subscription, `identify-consultees-nsip-document`, on CBOS's namespace (`pins-sb-back-office-<env>-ukw-001`), passing `Create` and `Update` events, and gives the live web app's identity `Azure Service Bus Data Receiver` on it.
+- **Off until turned on**: set `cbos_subscriber_enabled = true` in an environment's tfvars and apply. The staging slot always has it off (`CBOS_SUBSCRIBER_ENABLED` is sticky), so only the live app takes the events.
+- **When an import fails** (the function down, say) the event is tried again, up to 5 times, then dead-lettered on the subscription. A file that can't be read is logged and passed over, as on the admin page.
+- **Deleting in CBOS deletes nothing here**: the import only adds and updates. The admin import remains for catching up, such as after turning the subscriber on.
+
 **When a case's boundary isn't imported**, the usual reasons are a ZIP CBOS marked `invalid`, one never virus checked and so never sent for conversion, a ZIP with no `.prj` (GeoJSON in grid metres, turned away above), or a file outside a GIS Shapefiles folder. CBOS's historical boundaries migration adds its GeoJSON as version 1 of a new document, so the import reads those too, once it has run in that environment.
 
 1. Edit `schema.prisma`, then run `npx prisma migrate dev --create-only` in `packages/database`.
