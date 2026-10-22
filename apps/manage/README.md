@@ -1,28 +1,15 @@
 # Manage
 
-The main web app for Identify consultees: a server-rendered GOV.UK Frontend service (Express +
-Nunjucks + vanilla JS). Users search project boundaries (`case_boundary`), pick a ruleset, and
-review the consultees it matches (`consultee_area`) on an interactive map with a static-image
-fallback.
+The web app: server-rendered GOV.UK Frontend (Express, Nunjucks, plain JavaScript). Users find a case's boundary, pick a ruleset, review the consultees it identifies on a map, and download the report.
 
-## Run
+`npm start` from the repo root runs it on http://localhost:8090 (see the [root README](../../README.md)).
 
-From the repo root, `npm start` sets up env files, brings up the local SQL Server container,
-migrates, seeds the sample boundary dataset, and starts this app in watch mode on
-**http://localhost:8090** — see the [root README](../../README.md).
+| Script (`--workspace identify-consultees-manage`) | What |
+| ------------------------------------------------- | ---- |
+| `npm run dev` | Build assets and run the server in watch mode |
+| `npm run build` | Build fingerprinted assets into `src/.static` |
+| `npm test` | Unit and integration tests (`node --test`) |
+| `npm run test:coverage` | The 100% line, branch and function gate for `src/**` |
+| `npm run test:e2e` | Playwright journeys, accessibility and rendering (needs the seeded database) |
 
-This package's own scripts:
-
-| Script | Purpose |
-| ------ | ------- |
-| `npm run dev --workspace identify-consultees-manage` | Build assets + watch-mode server |
-| `npm run build --workspace identify-consultees-manage` | Build fingerprinted assets into `src/.static` |
-| `npm test --workspace identify-consultees-manage` | Unit/integration tests (`node --test`) |
-| `npm run test:e2e --workspace identify-consultees-manage` | Playwright e2e/a11y/render — needs the seeded local DB |
-| `npm run test:coverage --workspace identify-consultees-manage` | 100% line/function/branch coverage gate for `src/**` |
-
-## Further reading
-
-- [`kt-docs/`](../../kt-docs/README.md) — the onboarding pack: overview, routes, maps, screening, testing, deployment
-- [`AGENTS.md`](../../AGENTS.md) — GDS rules, map/styling requirements, toolchain pins, integration gotchas
-- [`kt-docs/testing.md`](../../kt-docs/testing.md) — the full test matrix
+Routes, journeys and the report: [`kt-docs/web-app.md`](../../kt-docs/web-app.md). Tests: [`kt-docs/testing.md`](../../kt-docs/testing.md).

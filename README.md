@@ -1,56 +1,52 @@
 # Identify consultees
 
-The monorepo for the Identify consultees service: finds who must be consulted about a Nationally Significant Infrastructure Project by screening its site boundary against consultee areas.
+Finds who must be consulted about a Nationally Significant Infrastructure Project, by screening its site boundary against consultee areas.
 
-| Path | Purpose |
-| ---- | ------- |
-| `apps/manage` | Web app (Express + Nunjucks + GOV.UK Frontend) |
-| `apps/function-python` | Python Azure Function: runs the screening (`run-ruleset`) |
-| `packages/database` | Prisma schema, migrations, geospatial SQL, rulesets, seed and import |
-| `config` | **Configuration to edit**: rulesets, map styles, nearby-consultee distances. Start at [`config/README.md`](./config/README.md) |
-| `infrastructure` | Azure / Terraform |
+| Path | What |
+| ---- | ---- |
+| `apps/manage` | Web app: Express, Nunjucks, GOV.UK Frontend |
+| `apps/function-python` | Python Azure Function: runs the screening, and reads CBOS |
+| `packages/database` | Prisma schema, migrations, geospatial SQL, rulesets, data import |
+| `config` | **What the service does**: rulesets, report, map and distance settings. See [`config/README.md`](./config/README.md) |
+| `infrastructure` | Terraform for Azure |
 
-## Prerequisites
+## Run it locally
 
-- **Node.js 24.x** and the **npm 11.x** it ships with ([`.nvmrc`](./.nvmrc); `engines` and Azure Pipelines pin the same major)
-- **Docker**, for SQL Server with spatial types. On Apple Silicon it runs under `linux/amd64` emulation; Azure SQL Edge doesn't support `GEOGRAPHY`
-- **Python 3.12** and [Azure Functions Core Tools](https://learn.microsoft.com/en-us/azure/azure-functions/functions-run-local) (`npm install -g azure-functions-core-tools@4`), for the screening function
-
-## Getting started
+You need Node.js 24 ([`.nvmrc`](./.nvmrc)), Docker, Python 3.12 and Azure Functions Core Tools (`npm install -g azure-functions-core-tools@4`).
 
 ```bash
-git clone git@github.com:Planning-Inspectorate/identify-consultees.git
-cd identify-consultees
 nvm use
 npm run check-toolchain
 npm ci
 npm start
 ```
 
-Then open **http://localhost:8090**. `npm start` creates the `.env` files (auth disabled), starts SQL Server in Docker on port 1434, migrates and seeds a real sample of UK boundaries, starts the Python function on port 7071 and the web app in watch mode. `Ctrl+C` stops the app and function; `docker compose down` stops SQL.
+Then open http://localhost:8090. `npm start` writes the `.env` files (sign-in disabled), starts SQL Server in Docker on port 1434, migrates and seeds it, and runs the Python function (port 7071) and the web app. `Ctrl+C` stops them; `docker compose down` stops SQL Server.
 
-Without the function, the app still runs but project pages say "The ruleset could not be run". Configuration, Entra sign-in and troubleshooting: [`kt-docs/local-development.md`](./kt-docs/local-development.md).
+> **`npm start` and `npm run db-seed` replace the consultee areas in use with the 80-area sample.** Case boundaries are merged. If you've loaded the full reference data locally, apply migrations with `npm run db-migrate-prod` and start the app and function without `npm start`.
 
-| Script | Purpose |
-| ------ | ------- |
-| `npm start` | Full local bootstrap |
-| `npm run db-migrate-prod` | Apply Prisma migrations (writing a new one: see [packages/database/src/README.md](packages/database/src/README.md)) |
-| `npm run db-seed` | Seed the sample data (merges, safe to re-run) |
+On Apple Silicon, SQL Server runs under `linux/amd64` emulation (Azure SQL Edge has no `GEOGRAPHY`). Sign-in, settings and troubleshooting: [`kt-docs/local-development.md`](./kt-docs/local-development.md).
+
+## Scripts
+
+| Script | What |
+| ------ | ---- |
+| `npm start` | Everything above |
+| `npm run db-migrate-prod` | Apply migrations. To write one, see [`packages/database/src/README.md`](./packages/database/src/README.md) |
+| `npm run db-seed` | Load the sample data (replaces the consultee areas in use) |
 | `npm run db-import -- --type=<consultee-areas\|case-boundaries> --file=<path>` | Import a GeoJSON file |
-| `npm run db-import-from-blob -- --type=<...> --blob=<name>` | Import a GeoJSON blob from the app's container |
-| `npm run lint` / `npm run check-types` / `npm run format-prettier-check` | Static checks |
-| `npm test` | Unit tests, the 100% frontend coverage gate and Playwright (needs the seeded database) |
-| `npm run playwright:install` | Install Chromium, Firefox and WebKit, once |
+| `npm run db-import-from-blob -- --type=<...> --blob=<name>` | Import a GeoJSON blob from the app's storage |
+| `npm run lint`, `npm run check-types`, `npm run format-prettier-check` | Static checks |
+| `npm test` | Unit tests, the 100% coverage gate and Playwright (needs the seeded database) |
+| `npm run playwright:install` | Install the Playwright browsers, once |
 
-## Where to read next
+## Read next
 
-- [`kt-docs/`](./kt-docs/README.md): how the service works and how to work on it — start with the [overview](./kt-docs/overview.md), which includes the architecture diagram
-- [CONTRIBUTING.md](./CONTRIBUTING.md): branches, commits and PRs
-- [AGENTS.md](./AGENTS.md): GDS, maps, toolchain and PR rules (for agents and people)
-- [ACCESSIBILITY.md](./ACCESSIBILITY.md), [SECURITY.md](./SECURITY.md)
+- [`kt-docs/`](./kt-docs/README.md): how the service works, starting with the [overview](./kt-docs/overview.md)
+- [`CONTRIBUTING.md`](./CONTRIBUTING.md): branches, commits and PRs
+- [`AGENTS.md`](./AGENTS.md): GDS, maps, toolchain and PR rules, for agents and people
+- [`ACCESSIBILITY.md`](./ACCESSIBILITY.md), [`SECURITY.md`](./SECURITY.md)
 
-## Editor setup
+## Editors
 
-The root [`tsconfig.json`](./tsconfig.json) stays compatible with the VS Code / Cursor TypeScript service. Stricter checks (`erasableSyntaxOnly`) live in [`tsconfig.check.json`](./tsconfig.check.json) and run with `npm run check-types` (TypeScript 7, `@typescript/native`). `.vscode` points `typescript.tsdk` at `node_modules/@typescript/old/lib`; choose **Use Workspace Version** if prompted.
-
-WebStorm run configurations are included for most npm scripts; set the Node interpreter and package manager under Settings > Languages and Frameworks > Node.js.
+`npm run check-types` uses [`tsconfig.check.json`](./tsconfig.check.json) (stricter, TypeScript 7). The root [`tsconfig.json`](./tsconfig.json) stays compatible with the editor's TypeScript service: in VS Code or Cursor, choose **Use Workspace Version** if asked. WebStorm run configurations are included; set the Node interpreter under Settings > Languages and Frameworks > Node.js.

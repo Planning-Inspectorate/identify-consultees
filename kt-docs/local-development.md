@@ -8,7 +8,7 @@ Start with the [README](../README.md): `nvm use`, `npm ci`, `npm start`. This pa
 
 1. Creates `packages/database/.env` and `apps/manage/.env` from their `.env.example` files if missing (auth disabled, SQL pointed at Docker)
 2. Starts SQL Server in Docker (`docker compose up -d`) on **localhost:1434** and waits for it
-3. Runs migrations and seeds the sample dataset (`npm run db-seed`; safe to re-run, rows merge)
+3. Runs migrations and seeds the sample dataset (`npm run db-seed`): it replaces the consultee areas in use with the 80-area sample, and merges the case boundaries
 4. Starts the Python function on **localhost:7071**: creates `apps/function-python/.venv` (Python 3.12) if missing, installs `requirements.txt`, and gives the function and the web app the same local API key
 5. Starts the web app in watch mode on **localhost:8090**
 
