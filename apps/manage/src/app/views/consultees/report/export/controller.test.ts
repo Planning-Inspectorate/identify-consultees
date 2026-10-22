@@ -342,6 +342,28 @@ describe('report download', () => {
 		assert.equal(res.send.mock.callCount(), 0);
 	});
 
+	it('goes back to the Report created page with a download-failed flag when the report cannot be built', async () => {
+		const service = serviceWith(rulesetRunnerReturning([matchRow(identifiedParish, identifiedReason)]));
+		service.db.consulteeArea.findMany = mock.fn(async () => {
+			throw new Error('db down');
+		});
+		const res = response();
+		await buildReportDownload(service as never)(
+			{
+				params: { caseId: realProjectId },
+				// a URL no other test uses - a kept copy would serve instead of rebuilding
+				query: { ruleset, exclude: 'eeeeeeee-0000-0000-0000-000000000042' }
+			} as never,
+			res as never
+		);
+
+		assert.equal(res.send.mock.callCount(), 0);
+		const [location] = res.redirect.mock.calls[0].arguments as unknown as [string];
+		assert.match(location, new RegExp(`^/consultees/${realProjectId}/report/created\\?ruleset=${ruleset}`));
+		assert.match(location, /download=failed/);
+		assert.match(location, /exclude=/);
+	});
+
 	for (const [title, params, query, projectRows] of [
 		['an unknown case', { caseId: realProjectId }, { ruleset }, []],
 		['a malformed case id', { caseId: 'not-a-uuid' }, { ruleset }, [realProjectRow()]],

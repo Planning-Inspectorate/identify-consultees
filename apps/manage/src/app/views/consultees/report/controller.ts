@@ -179,7 +179,9 @@ export function buildReportCreatedPage(service: ManageService): AsyncRequestHand
 			downloadUrl,
 			downloadText: `Download ${project.properties.caseName} Consultee List report (ZIP${downloadSize ? `, ${downloadSize}` : ''})`,
 			rulesetFailed: failed,
-			retryUrl: reportCreatedUrl(project.id, ruleset.id, selection)
+			retryUrl: reportCreatedUrl(project.id, ruleset.id, selection),
+			// the download sends them back here with ?download=failed when the report can't be built
+			downloadFailed: firstQueryValue(req.query.download) === 'failed'
 		};
 		return res.render('views/consultees/report/created.njk', viewModel);
 	};

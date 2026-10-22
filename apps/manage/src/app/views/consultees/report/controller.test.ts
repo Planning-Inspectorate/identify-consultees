@@ -554,6 +554,26 @@ describe('report created page', () => {
 		assert.match(mockRes.render.mock.calls[0].result, /\(ZIP, [\d.]+[KM]B\)/);
 	});
 
+	it('should show a retry download banner when the download itself failed', async () => {
+		const { handler, mockRes } = createdPage([parishRow()]);
+		await handler(
+			{
+				params: { caseId: realProjectId },
+				query: { download: 'failed', exclude: 'ffffffff-0000-0000-0000-000000000042' }
+			},
+			mockRes
+		);
+
+		const viewModel = mockRes.render.mock.calls[0].arguments[1];
+		assert.strictEqual(viewModel.downloadFailed, true);
+		const html = mockRes.render.mock.calls[0].result;
+		assert.match(html, /scoping report could not be downloaded/);
+		assert.match(html, /try again/);
+		// the retry is the download itself - the report builds again on click
+		assert.match(html, />Retry download</);
+		assert.match(html, new RegExp(`href="/consultees/${realProjectId}/report/download\\?ruleset=`));
+	});
+
 	it('should say the ruleset could not be run rather than build a report', async () => {
 		const { handler, mockRes, db } = createdPage([], failingRulesetRunner());
 		await handler({ params: { caseId: realProjectId }, query: { exclude: 'abc' } }, mockRes);

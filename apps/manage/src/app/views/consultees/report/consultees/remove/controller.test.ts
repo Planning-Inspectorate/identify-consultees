@@ -303,13 +303,13 @@ describe('report consultee remove submit', () => {
 
 		assert.strictEqual(mockRes.redirect.mock.callCount(), 0);
 		const viewModel = mockRes.render.mock.calls[0].arguments[1];
-		assert.strictEqual(viewModel.reasonError.text, 'Enter a reason for removing this consultee.');
+		assert.strictEqual(viewModel.reasonError.text, 'Enter a reason for removing this consultee');
 		assert.strictEqual(viewModel.reasonValue, '   ');
 		assert.strictEqual(viewModel.errorSummary[0].href, '#removal-reason');
 
 		const html = mockRes.render.mock.calls[0].result;
 		assert.match(html, /There is a problem/);
-		assert.match(html, /Enter a reason for removing this consultee\./);
+		assert.match(html, /Enter a reason for removing this consultee(?!\.)/);
 		assert.match(html, /govuk-textarea--error/);
 	});
 
@@ -318,7 +318,7 @@ describe('report consultee remove submit', () => {
 		await removeSubmit(dbReturning([[realProjectRow()]], [parishMatchRow()]))(request({ body: {} }), mockRes);
 		assert.strictEqual(
 			mockRes.render.mock.calls[0].arguments[1].reasonError.text,
-			'Enter a reason for removing this consultee.'
+			'Enter a reason for removing this consultee'
 		);
 
 		const mockResNoBody = { render: mock.fn(), redirect: mock.fn(), status: mock.fn(() => mockResNoBody) };
@@ -328,7 +328,7 @@ describe('report consultee remove submit', () => {
 		);
 		assert.strictEqual(
 			mockResNoBody.render.mock.calls[0].arguments[1].reasonError.text,
-			'Enter a reason for removing this consultee.'
+			'Enter a reason for removing this consultee'
 		);
 	});
 

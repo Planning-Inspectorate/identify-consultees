@@ -51,23 +51,29 @@ async function mapFiles(
  * The boundary page's view model: the map draws every shapefile the case holds (the page's own
  * file visible first), and the radios below ask the user to confirm which single file is carried
  * into the report - never pre-selected, so `shapefileError` marks them invalid after an
- * unanswered submit.
+ * unanswered submit. A map that can't be built - a file's geometry failed to load - is replaced
+ * by a notification banner offering to try again; the radios still render, so the page works
+ * without the map.
  */
 async function boundaryPageViewModel(
 	db: ManageService['db'],
+	logger: ManageService['logger'],
 	project: CaseBoundaryFeature,
 	options: BoundaryFileOption[],
 	shapefileError?: string
 ): Promise<ConsulteeProjectViewModel> {
-	const map = buildBoundaryMapConfig(
-		project.properties.caseName,
-		project.properties.caseReference,
-		await mapFiles(db, project, options),
-		{
-			src: `/consultees/${encodeURIComponent(project.id)}/boundary-map`,
-			alt: `Static map showing the project boundary for ${project.properties.caseName}`
-		}
-	);
+	const fallback = {
+		src: `/consultees/${encodeURIComponent(project.id)}/boundary-map`,
+		alt: `Static map showing the project boundary for ${project.properties.caseName}`
+	};
+	const map = await mapFiles(db, project, options)
+		.then((files) =>
+			buildBoundaryMapConfig(project.properties.caseName, project.properties.caseReference, files, fallback)
+		)
+		.catch((error: unknown) => {
+			logger.error({ error, caseId: project.id }, 'Failed to load the boundary page map');
+			return undefined;
+		});
 
 	return {
 		pageHeading: 'Project boundary',
@@ -86,13 +92,18 @@ async function boundaryPageViewModel(
 		...(shapefileError
 			? { shapefileError: { text: shapefileError }, errorSummary: [{ text: shapefileError, href: '#shapefile' }] }
 			: {}),
-		mapId: 'case-map',
-		mapRegionLabel: `Map showing the project boundary for ${project.properties.caseName}`,
-		staticMapSrc: `/consultees/${encodeURIComponent(project.id)}/boundary-map`,
-		staticMapAlt: `Static map showing the project boundary for ${project.properties.caseName}`,
-		mapWidth: MAP_VIEWPORT.width,
-		mapHeight: MAP_VIEWPORT.height,
-		mapConfigJson: stringifyForInlineScript(map)
+		retryUrl: `/consultees/${encodeURIComponent(project.id)}`,
+		...(map
+			? {
+					mapId: 'case-map',
+					mapRegionLabel: `Map showing the project boundary for ${project.properties.caseName}`,
+					staticMapSrc: fallback.src,
+					staticMapAlt: fallback.alt,
+					mapWidth: MAP_VIEWPORT.width,
+					mapHeight: MAP_VIEWPORT.height,
+					mapConfigJson: stringifyForInlineScript(map)
+				}
+			: { mapFailed: true })
 	};
 }
 
@@ -118,7 +129,7 @@ export function buildConsulteeProjectPage(service: ManageService): AsyncRequestH
 
 		const files = await listCaseBoundaryFiles(db, project.properties.caseReference);
 		const options = boundaryFileOptions(files, project.id);
-		const viewModel = await boundaryPageViewModel(db, project, options);
+		const viewModel = await boundaryPageViewModel(db, logger, project, options);
 
 		return res.render('views/consultees/project/view.njk', viewModel);
 	};
@@ -130,7 +141,7 @@ export function buildConsulteeProjectPage(service: ManageService): AsyncRequestH
  * with a validation error rather than guessing a file.
  */
 export function buildBoundarySubmit(service: ManageService): AsyncRequestHandlerWithBody<{ shapefile?: unknown }> {
-	const { db } = service;
+	const { db, logger } = service;
 
 	return async (req, res) => {
 		const caseId = String(req.params.caseId ?? '');
@@ -146,7 +157,7 @@ export function buildBoundarySubmit(service: ManageService): AsyncRequestHandler
 		if (!chosen) {
 			res.render(
 				'views/consultees/project/view.njk',
-				await boundaryPageViewModel(db, project, options, 'Select a shapefile')
+				await boundaryPageViewModel(db, logger, project, options, 'Select a shapefile')
 			);
 			return;
 		}

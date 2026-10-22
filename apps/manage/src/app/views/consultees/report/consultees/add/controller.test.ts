@@ -3,7 +3,7 @@ import assert from 'node:assert';
 import { describe, it, mock } from 'node:test';
 import { configureNunjucks } from '../../../../../nunjucks.ts';
 import { failingRulesetRunner, rulesetRunnerReturning } from '../../../../../testing/ruleset-runner-stub.ts';
-import { buildReportConsulteeAddPage, buildReportConsulteeAddSubmit, notAConsulteeError } from './controller.ts';
+import { buildReportConsulteeAddPage, buildReportConsulteeAddSubmit } from './controller.ts';
 
 // a selection entry as the app's URLs carry it - base64url-encoded JSON (see urls.ts's ENCODED_JSON)
 const urlParam = (json: string) => Buffer.from(json).toString('base64url');
@@ -215,24 +215,19 @@ describe('add a consultee page', () => {
 
 		assert.strictEqual(res.redirect.mock.callCount(), 0);
 		const viewModel = viewModelOf(res);
-		assert.strictEqual(
-			viewModel.addForm.nameError.text,
-			'Banana does not exist as a Parish Council consultee. Enter a valid consultee.'
-		);
+		assert.strictEqual(viewModel.addForm.nameError.text, 'Consultee not found');
 		assert.strictEqual(viewModel.addForm.nameValue, 'Banana');
 		assert.strictEqual(viewModel.addForm.reasonValue, 'Looks important');
-		assert.deepStrictEqual(viewModel.errorSummary, [
-			{ text: notAConsulteeError('Banana', 'Parish Council'), href: '#consultee-name' }
-		]);
+		assert.deepStrictEqual(viewModel.errorSummary, [{ text: 'Consultee not found', href: '#consultee-name' }]);
 		const html = res.render.mock.calls[0].result as string;
 		assert.match(html, /There is a problem/);
-		assert.match(html, /Banana does not exist as a Parish Council consultee/);
+		assert.match(html, /Consultee not found/);
 
 		// a consultee of another category isn't one of this one's - and a missing reason is said too
 		const otherCategory = await submit({ name: 'Banana Hospital', reason: '' });
 		assert.deepStrictEqual(
 			viewModelOf(otherCategory).errorSummary.map((error: { text: string }) => error.text),
-			[notAConsulteeError('Banana Hospital', 'Parish Council'), 'Enter a reason for adding this consultee.']
+			['Consultee not found', 'Enter a reason for adding this consultee']
 		);
 	});
 
@@ -246,11 +241,11 @@ describe('add a consultee page', () => {
 			nameValue: '  ',
 			reasonValue: '',
 			nameError: { text: 'Enter the consultee name' },
-			reasonError: { text: 'Enter a reason for adding this consultee.' }
+			reasonError: { text: 'Enter a reason for adding this consultee' }
 		});
 		assert.deepStrictEqual(viewModel.errorSummary, [
 			{ text: 'Enter the consultee name', href: '#consultee-name' },
-			{ text: 'Enter a reason for adding this consultee.', href: '#consultee-reason' }
+			{ text: 'Enter a reason for adding this consultee', href: '#consultee-reason' }
 		]);
 		const html = res.render.mock.calls[0].result as string;
 		assert.match(html, /<title>\s*Error: Add a consultee/);
