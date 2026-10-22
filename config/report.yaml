@@ -145,6 +145,8 @@ tabs:
 
   Nearby NSIPs:
     columns: [consultee, whyIdentified, source]
+    # as far as config/nearby-consultees.yaml's nsipRadiusKm looks, so the cases found fit the map
+    mapKm: 35
     metadata:
       Case reference: Case reference
       Project name: Project name

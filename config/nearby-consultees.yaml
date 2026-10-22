@@ -24,7 +24,7 @@ version: 1
 
 defaultRadiusKm: 20
 
-nsipRadiusKm: 10
+nsipRadiusKm: 35
 
 categories:
   # local government
