@@ -74,15 +74,13 @@ Response (200):
 
 ## Other routes
 
-| Route                                           | What it does                                                                                                                                                                                                                    |
-| ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `GET /api/health`                               | Checks the database is reachable. No key                                                                                                                                                                                        |
-| `GET /api/cbos/health`                          | Signs in to CBOS's database and document storage as the app's identity and reports each. Used by `/admin/cbos-connection`                                                                                                       |
-| `GET /api/cbos/boundary-files`                  | Every case boundary file CBOS has converted to GeoJSON (see [Data model and loading](./data/data-model.md#case-boundaries-from-cbos))                                                                                           |
-| `GET /api/cbos/boundary-files/{guid}/{version}` | One file's GeoJSON. The blob path comes from CBOS's database, never the caller                                                                                                                                                  |
-| `GET /api/cbos/gis-files`                       | Every live version of every file in CBOS's GIS Shapefiles folders, and any GeoJSON filed elsewhere, with its status and blob path; and how many cases have a reference and a GIS Shapefiles folder. Used by `/admin/cbos-files` |
-| `GET /api/cbos/gis-files/{guid}/{version}`      | One of those files, its document's other versions, and what its blob holds: a GeoJSON summary, a ZIP's listing, or the start of the text - or why it couldn't be read                                                           |
-| `GET /api/consultee-areas`                      | Nearby `consultee_area` rows as WKT. Used by the `/consultee-areas-python` dev page; `/consultee-areas-direct` runs the same query from Node, to tell "the function is down" from "the database is down"                        |
+| Route                                           | What it does                                                                                                                                                                                             |
+| ----------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET /api/health`                               | Checks the database is reachable. No key                                                                                                                                                                 |
+| `GET /api/cbos/health`                          | Signs in to CBOS's database and document storage as the app's identity and reports each - for checking access from the command line                                                                      |
+| `GET /api/cbos/boundary-files`                  | Every case boundary file CBOS has converted to GeoJSON, every version (see [Data model and loading](./data/data-model.md#case-boundaries-from-cbos))                                                     |
+| `GET /api/cbos/boundary-files/{guid}/{version}` | One file's GeoJSON. The blob path comes from CBOS's database, never the caller                                                                                                                           |
+| `GET /api/consultee-areas`                      | Nearby `consultee_area` rows as WKT. Used by the `/consultee-areas-python` dev page; `/consultee-areas-direct` runs the same query from Node, to tell "the function is down" from "the database is down" |
 
 ## Security
 

@@ -13,23 +13,12 @@
 {% block adminContent %}
     <h1 class="govuk-heading-l">{{ pageHeading }}</h1>
 
-    <p class="govuk-body">
-        Internal tool - reads every boundary file in CBOS's "GIS Shapefiles" folders, as CBOS
-        converted it to GeoJSON, and saves each one as a case boundary. Boundaries already here
-        are updated, and nothing is deleted.
-    </p>
-
-    <p class="govuk-body">
-        It can take several minutes. If the page times out, the import carries on - wait a few
-        minutes, then reload this page and check the counts below rather than submitting again.
-    </p>
-
-    {% if loadedCaseBoundaries != undefined %}
-        <h2 class="govuk-heading-m">Currently loaded</h2>
+    {% if loaded %}
+        <h2 class="govuk-heading-m">In the database</h2>
         {{ govukSummaryList({
             rows: [
-                { key: { text: "Case boundaries" }, value: { text: loadedCaseBoundaries } },
-                { key: { text: "From CBOS" }, value: { text: loadedFromCbos } }
+                { key: { text: "Cases" }, value: { text: loaded.cases ~ " (" ~ loaded.casesFromCbos ~ " from CBOS)" } },
+                { key: { text: "Case boundaries" }, value: { text: loaded.boundaries ~ " (" ~ loaded.boundariesFromCbos ~ " from CBOS)" } }
             ]
         }) }}
     {% endif %}
@@ -42,7 +31,7 @@
         {{ govukNotificationBanner({
             type: "success",
             titleText: "Success",
-            text: "Imported " ~ imported ~ " of " ~ filesFound ~ " CBOS boundary files."
+            text: "Imported " ~ imported ~ " of " ~ filesFound ~ " CBOS boundary files, for " ~ casesImported ~ " cases."
         }) }}
     {% endif %}
 
@@ -62,8 +51,19 @@
         }) }}
     {% endif %}
 
+    <p class="govuk-body">
+        Imports every case boundary in CBOS's "GIS Shapefiles" folders - every version CBOS converted
+        to GeoJSON. Boundaries already here are updated, and nothing is deleted. A case's boundary page
+        lists them all to pick from; elsewhere, as for Nearby NSIPs, a case is its newest boundary.
+    </p>
+
+    <p class="govuk-body">
+        It can take several minutes. If the page times out, the import carries on: reload this page
+        in a few minutes and check the counts, rather than importing again.
+    </p>
+
     <form method="post" action="/admin/import-from-cbos/run" novalidate>
         <input type="hidden" name="_csrf" value="{{ _csrf }}">
-        {{ govukButton({ text: "Import case boundaries" }) }}
+        {{ govukButton({ text: "Import cases from CBOS" }) }}
     </form>
 {% endblock %}

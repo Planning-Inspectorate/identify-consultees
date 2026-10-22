@@ -2,9 +2,11 @@ import type { CbosImportFailure } from './cbos-boundaries.ts';
 
 export interface ImportFromCbosViewModel {
 	pageHeading: string;
-	loadedCaseBoundaries?: number;
-	loadedFromCbos?: number;
+	/** What's in the database now: cases and their boundaries, in all and from CBOS. */
+	loaded?: { cases: number; boundaries: number; casesFromCbos: number; boundariesFromCbos: number };
 	filesFound?: number;
+	/** How many cases the imported boundaries are for. */
+	casesImported?: number;
 	imported?: number;
 	failures?: CbosImportFailure[];
 	error?: string;

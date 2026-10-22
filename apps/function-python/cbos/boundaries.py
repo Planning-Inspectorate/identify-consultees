@@ -21,28 +21,22 @@ from cbos.database import connect
 GIS_SHAPEFILES_FOLDER_NAME = "GIS Shapefiles"
 GEOJSON_MIME = "application/geo+json"
 
-# The latest GeoJSON version of each live document in a live GIS Shapefiles folder, on a case with
-# a reference. A failed conversion of a newer ZIP adds no GeoJSON version, so this keeps the last
-# good boundary rather than none. CBOS's tables are its Prisma model names (Case needs brackets).
+# Every GeoJSON version of each live document in a live GIS Shapefiles folder, on a case with a
+# reference - a replaced boundary's earlier versions too, so a case keeps every boundary it's had.
+# A failed conversion adds no GeoJSON version. CBOS's tables are its Prisma model names (Case needs
+# brackets).
 _BOUNDARY_FILES = f"""
-WITH geojson_versions AS (
-    SELECT dv.documentGuid, dv.version, dv.fileName, dv.dateCreated,
-        dv.privateBlobContainer, dv.privateBlobPath,
-        ROW_NUMBER() OVER (PARTITION BY dv.documentGuid ORDER BY dv.version DESC) AS newest
-    FROM DocumentVersion dv
-    WHERE dv.mime = '{GEOJSON_MIME}' AND dv.isDeleted = 0
-)
-SELECT g.documentGuid, g.version, c.reference, c.title, g.fileName, g.dateCreated,
-    g.privateBlobContainer, g.privateBlobPath
-FROM geojson_versions g
-JOIN Document d ON d.guid = g.documentGuid AND d.isDeleted = 0
+SELECT dv.documentGuid, dv.version, c.reference, c.title, dv.fileName, dv.dateCreated,
+    dv.privateBlobContainer, dv.privateBlobPath
+FROM DocumentVersion dv
+JOIN Document d ON d.guid = dv.documentGuid AND d.isDeleted = 0
 JOIN Folder f ON f.id = d.folderId AND f.deletedAt IS NULL AND f.displayNameEn = '{GIS_SHAPEFILES_FOLDER_NAME}'
 JOIN [Case] c ON c.id = d.caseId AND c.reference IS NOT NULL
-WHERE g.newest = 1
+WHERE dv.mime = '{GEOJSON_MIME}' AND dv.isDeleted = 0
 """
 
-LIST_BOUNDARY_FILES = _BOUNDARY_FILES + "ORDER BY c.reference, g.documentGuid"
-GET_BOUNDARY_FILE = _BOUNDARY_FILES + "AND g.documentGuid = ? AND g.version = ?"
+LIST_BOUNDARY_FILES = _BOUNDARY_FILES + "ORDER BY c.reference, dv.documentGuid, dv.version"
+GET_BOUNDARY_FILE = _BOUNDARY_FILES + "AND dv.documentGuid = ? AND dv.version = ?"
 
 
 @dataclass(frozen=True)

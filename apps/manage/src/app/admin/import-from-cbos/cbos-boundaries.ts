@@ -45,6 +45,8 @@ export interface CbosImportFailure {
 export interface CbosImportResult {
 	filesFound: number;
 	imported: number;
+	/** How many cases the imported boundaries are for. */
+	casesImported: number;
 	failures: CbosImportFailure[];
 }
 
@@ -178,6 +180,36 @@ export function toCaseBoundaryFromCbos(file: CbosBoundaryFile, collection: CbosF
 	};
 }
 
+/**
+ * The files with names their case_boundary rows can tell apart. Every version of a boundary CBOS
+ * converted is kept, so a case can have two files of one name - a ZIP replaced by another of the
+ * same name, or two documents named alike. The newest keeps its name, and so the row a file import
+ * made for it; each older one is named for its version as well ("site.geojson (version 2)").
+ */
+export function distinctFileNames(files: CbosBoundaryFile[]): CbosBoundaryFile[] {
+	const newestFirst = files.toSorted(
+		(a, b) => (b.createdAt ?? '').localeCompare(a.createdAt ?? '') || b.version - a.version
+	);
+	const taken = new Set<string>();
+	const renamed = new Map<CbosBoundaryFile, CbosBoundaryFile>();
+	for (const file of newestFirst) {
+		if (!file.fileName) {
+			continue;
+		}
+		const key = (name: string) => `${file.caseReference}\n${name}`;
+		let fileName = file.fileName;
+		if (taken.has(key(fileName))) {
+			fileName = `${file.fileName} (version ${file.version})`;
+		}
+		if (taken.has(key(fileName))) {
+			fileName = `${file.fileName} (version ${file.version}, ${file.documentGuid.slice(0, 8)})`;
+		}
+		taken.add(key(fileName));
+		renamed.set(file, fileName === file.fileName ? file : { ...file, fileName });
+	}
+	return files.map((file) => renamed.get(file) ?? file);
+}
+
 function describe(error: unknown): string {
 	return error instanceof Error ? error.message : String(error);
 }
@@ -195,7 +227,7 @@ const DEFAULT_DEPENDENCIES: CbosImportDependencies = {
 };
 
 /**
- * Save every CBOS boundary file to case_boundary. It merges: rows are upserted by id and nothing is
+ * Save every CBOS boundary file - every version of each - to case_boundary. It merges: rows are upserted by id and nothing is
  * deleted, so boundaries loaded from elsewhere stay. A file that can't be fetched or read is
  * reported and skipped rather than failing the rest; failing to list the files rejects.
  */
@@ -204,7 +236,7 @@ export async function importCaseBoundariesFromCbos(
 	options: CbosFunctionOptions,
 	dependencies: CbosImportDependencies = DEFAULT_DEPENDENCIES
 ): Promise<CbosImportResult> {
-	const files = await dependencies.listFiles(options);
+	const files = distinctFileNames(await dependencies.listFiles(options));
 	const boundaries: CaseBoundaryFeature[] = [];
 	const failures: CbosImportFailure[] = [];
 
@@ -223,5 +255,6 @@ export async function importCaseBoundariesFromCbos(
 
 	const imported =
 		boundaries.length > 0 ? await dependencies.load(db, { type: 'FeatureCollection', features: boundaries }) : 0;
-	return { filesFound: files.length, imported, failures };
+	const casesImported = new Set(boundaries.map((boundary) => boundary.properties.caseReference)).size;
+	return { filesFound: files.length, imported, casesImported, failures };
 }

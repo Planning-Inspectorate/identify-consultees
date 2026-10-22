@@ -4,6 +4,7 @@ import { describe, it, mock } from 'node:test';
 import type { CbosBoundaryFile, CbosFeatureCollection } from './cbos-boundaries.ts';
 import {
 	combineGeometries,
+	distinctFileNames,
 	fetchCbosBoundaryGeoJson,
 	importCaseBoundariesFromCbos,
 	listCbosBoundaryFiles,
@@ -214,11 +215,35 @@ describe('CBOS boundaries', () => {
 			assert.deepStrictEqual(result, {
 				filesFound: 3,
 				imported: 1,
+				casesImported: 1,
 				failures: [
 					{ caseReference: 'EN010001', fileName: 'broken.geojson', reason: 'status 500' },
 					{ caseReference: 'EN010001', fileName: 'empty.geojson', reason: 'the GeoJSON has no geometry' }
 				]
 			});
+		});
+
+		it("keeps every version of a case's boundaries, telling apart ones of the same name", async () => {
+			const load = mock.fn(async (_db: unknown, features: { features: { properties: object }[] }) => {
+				saved.push(...features.features.map((feature) => feature.properties));
+				return features.features.length;
+			});
+			const saved: object[] = [];
+			const result = await importCaseBoundariesFromCbos(db, OPTIONS, {
+				listFiles: async () => [
+					{ ...FILE, version: 2, createdAt: '2026-01-01T09:00:00+00:00' },
+					{ ...FILE, version: 4, createdAt: '2026-05-01T09:00:00+00:00' },
+					{ ...FILE, caseReference: 'TR010001', documentGuid: 'other' }
+				],
+				fetchGeoJson: async () => collection({ geometry: SQUARE }),
+				load: load as never
+			});
+
+			assert.strictEqual(result.casesImported, 2);
+			assert.deepStrictEqual(
+				saved.map((properties) => (properties as { fileName: string }).fileName),
+				['site.geojson (version 2)', 'site.geojson', 'site.geojson']
+			);
 		});
 
 		it('saves nothing when no file could be read, and describes non-Error failures', async () => {
@@ -249,6 +274,42 @@ describe('CBOS boundaries', () => {
 				}),
 				/status 500/
 			);
+		});
+	});
+
+	describe('distinctFileNames', () => {
+		it('leaves the newest of a name as it is, and names older ones for their version', () => {
+			const newest = { ...FILE, version: 4, createdAt: '2026-05-01T09:00:00+00:00' };
+			const older = { ...FILE, version: 2, createdAt: '2026-01-01T09:00:00+00:00' };
+			assert.deepStrictEqual(
+				distinctFileNames([older, newest]).map((file) => file.fileName),
+				['site.geojson (version 2)', 'site.geojson']
+			);
+			// the newest file keeps its own object - nothing about it changes
+			assert.strictEqual(distinctFileNames([older, newest])[1], newest);
+		});
+
+		it('tells apart two older versions of one number, and orders undated files last', () => {
+			const files = [
+				{ ...FILE, documentGuid: 'aaaaaaaa-1111', version: 2, createdAt: null },
+				{ ...FILE, documentGuid: 'bbbbbbbb-2222', version: 2, createdAt: null },
+				{ ...FILE, documentGuid: 'cccccccc-3333', version: 3, createdAt: '2026-05-01T09:00:00+00:00' }
+			];
+			assert.deepStrictEqual(
+				distinctFileNames(files).map((file) => file.fileName),
+				['site.geojson (version 2)', 'site.geojson (version 2, bbbbbbbb)', 'site.geojson']
+			);
+		});
+
+		it("leaves files without a name, and other cases' files, as they are", () => {
+			const unnamed = { ...FILE, fileName: null };
+			const otherCase = { ...FILE, caseReference: 'TR010001' };
+			assert.deepStrictEqual(distinctFileNames([unnamed, unnamed, FILE, otherCase]), [
+				unnamed,
+				unnamed,
+				FILE,
+				otherCase
+			]);
 		});
 	});
 });
