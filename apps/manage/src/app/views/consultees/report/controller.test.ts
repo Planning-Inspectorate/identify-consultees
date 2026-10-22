@@ -253,6 +253,10 @@ describe('consultee report check page', () => {
 		// all twelve names are in the row - the first five listed, the rest inside the details
 		const html = mockRes.render.mock.calls[0].result;
 		assert.match(html, /Show more/);
+		// the open state's "Show less" is the same summary moved below the list (see
+		// .pins-show-more in style.scss) - both labels ship inside the one summary
+		assert.match(html, /class="govuk-details pins-show-more"/);
+		assert.match(html, /pins-show-more__less">Show less/);
 		assert.strictEqual(html.match(/<li>Parish Council \d+<\/li>/g)?.length, 12);
 		const shown = html.slice(0, html.indexOf('Show more'));
 		assert.match(shown, /<li>Parish Council 5<\/li>/);
