@@ -10,30 +10,37 @@ import {
 	buildRunImportCaseBoundaries,
 	buildRunImportConsulteeAreaGroup,
 	CASE_BOUNDARIES_BLOB_NAME,
-	formatSize
+	formatSize,
+	loadOutcome
 } from './controller.ts';
 
 const lastModified = new Date('2026-10-21T09:00:00Z');
 const blob = (name: string, size = 250 * 1024 * 1024) => ({ name, size, lastModified });
 
 /**
- * A database answering the page's queries: the two tables' counts, each group's rows (by the
- * first category it counts) and the load log.
+ * A database answering the page's queries: the two tables' counts, the dataset in use and every
+ * quarter's table, each group's rows in a table (by the first category it counts) and the load log.
  */
 function databaseWith({
 	consulteeAreas = 15_605,
 	caseBoundaries = 283,
+	inUse = '2026Q4',
+	datasets = [{ name: 'consultee_area_2026Q4', rows: 15_605 }] as { name: string; rows: number }[],
 	groupRows = {} as Record<string, number>,
+	pendingGroupRows = {} as Record<string, number>,
 	loads = [] as Record<string, unknown>[]
 } = {}) {
 	return {
 		$queryRaw: mock.fn(async (sql: TemplateStringsArray, ...values: unknown[]) => {
 			const text = sql.join('');
 			if (text.includes('AS consulteeAreas')) return [{ consulteeAreas, caseBoundaries }];
+			if (text.includes('sys.synonyms')) return [{ baseObjectName: `[dbo].[consultee_area_${inUse}]` }];
+			if (text.includes('sys.tables')) return datasets;
 			if (text.includes('FROM reference_data_load')) return loads;
-			// a group's count - its categories arrive joined, as one Prisma.Sql value
-			const [firstCategory] = (values[0] as { values: string[] }).values;
-			return [{ count: groupRows[firstCategory] ?? 0 }];
+			// a group's count in a table - the table, then its categories joined as one Prisma.Sql value
+			const table = (values[0] as { sql: string }).sql;
+			const [firstCategory] = (values[1] as { values: string[] }).values;
+			return [{ count: (table === 'consultee_area' ? groupRows : pendingGroupRows)[firstCategory] ?? 0 }];
 		})
 	};
 }
@@ -57,12 +64,11 @@ describe('admin import reference data', () => {
 			loads: [
 				{
 					dataGroup: 'public_bodies',
-					blobName: '20260801_public_bodies.geojson',
-					dataDate: new Date('2026-08-01T00:00:00Z'),
-					quarter: '2026-Q3',
+					blobName: '20261001_public_bodies.geojson',
+					dataDate: new Date('2026-10-01T00:00:00Z'),
+					quarter: '2026Q4',
 					rowsLoaded: 12_000,
-					rowsArchived: 0,
-					loadedAt: new Date('2026-08-02T09:30:00Z')
+					loadedAt: new Date('2026-10-02T09:30:00Z')
 				}
 			]
 		});
@@ -87,14 +93,13 @@ describe('admin import reference data', () => {
 			categories:
 				'Ambulance Trust, Fire and Rescue Authority, Hospital, ICB, Internal Drainage Board, Internal Drainage District, Local Health Board, Local Resilience Forum, National Landscape, Police',
 			// the newest by the date its data is from, whatever order they're listed in
-			file: { name: '20261020_public_bodies.geojson', dataDate: '20 October 2026', quarter: '2026-Q4', size: '250MB' },
+			file: { name: '20261020_public_bodies.geojson', dataDate: '20 October 2026', quarter: '2026Q4', size: '250MB' },
 			rows: 12_000,
 			load: {
-				blobName: '20260801_public_bodies.geojson',
-				quarter: '2026-Q3',
-				loadedAt: '2 August 2026 at 10:30',
-				rowsLoaded: 12_000,
-				rowsArchived: 0
+				blobName: '20261001_public_bodies.geojson',
+				quarter: '2026Q4',
+				loadedAt: '2 October 2026 at 10:30',
+				rowsLoaded: 12_000
 			}
 		});
 		assert.strictEqual((energy as { file: { size: string } }).file.size, '1.4MB');
@@ -107,6 +112,11 @@ describe('admin import reference data', () => {
 		// a group with no file has nothing to load
 		assert.doesNotMatch(html, /aria-label="Load Transport"/);
 		assert.match(html, /Quarter not known - loaded before loads were logged/);
+		// the one dataset, in use
+		assert.strictEqual(viewModelOf(res).datasetInUse, '2026Q4');
+		assert.deepStrictEqual(viewModelOf(res).datasets, [{ quarter: '2026Q4', rows: 15_605, status: 'In use' }]);
+		assert.strictEqual(viewModelOf(res).pending, undefined);
+		assert.match(html, /11548 consultee areas in 2026Q4/);
 		assert.match(html, /Clear consultee areas/);
 		assert.match(html, /Replace case boundaries/);
 	});
@@ -134,7 +144,60 @@ describe('admin import reference data', () => {
 		assert.ok((groups as Record<string, unknown>[]).every((group) => !('rows' in group) && !('file' in group)));
 		assert.doesNotMatch(htmlOf(res), /Currently loaded/);
 		assert.match(htmlOf(res), /Blob storage couldn&#39;t be read/);
-		assert.strictEqual((logger.warn as ReturnType<typeof mock.fn>).mock.callCount(), 4);
+		// the counts, each group's rows, the dataset in use, the datasets and blob storage
+		assert.strictEqual((logger.warn as ReturnType<typeof mock.fn>).mock.callCount(), 5);
+		assert.strictEqual(viewModelOf(res).datasetInUse, undefined);
+	});
+
+	it('lists every quarter, and says what a newer one being loaded is still waiting for', async () => {
+		const res = newRes();
+		const db = databaseWith({
+			datasets: [
+				{ name: 'consultee_area_2026Q3', rows: 15_000 },
+				{ name: 'consultee_area_2027Q1', rows: 1_929 },
+				{ name: 'consultee_area_2026Q4', rows: 15_605 }
+			],
+			groupRows: { 'Parish Council': 11_901, 'Ambulance Trust': 316, DNO: 1_929, Canal: 1_459 },
+			pendingGroupRows: { DNO: 1_929 }
+		});
+		await buildImportReferenceDataPage({ db, logger: mockLogger() } as never, files())({}, res);
+
+		const { datasets, pending, groups } = viewModelOf(res);
+		assert.deepStrictEqual(datasets, [
+			{ quarter: '2027Q1', rows: 1_929, status: 'Loading' },
+			{ quarter: '2026Q4', rows: 15_605, status: 'In use' },
+			{ quarter: '2026Q3', rows: 15_000, status: 'Archive' }
+		]);
+		assert.deepStrictEqual(pending, {
+			quarter: '2027Q1',
+			waitingFor: ['Administrative boundaries', 'Public bodies', 'Transport']
+		});
+		assert.strictEqual((groups as { slug: string; pendingRows: number }[])[2].pendingRows, 1_929);
+		assert.match(
+			htmlOf(res),
+			/2027Q1 is being loaded\. The tool keeps using 2026Q4 until Administrative boundaries, Public bodies, Transport are loaded for 2027Q1\./
+		);
+		assert.match(htmlOf(res), /1929 in 2027Q1/);
+	});
+
+	it('words what a load means for the dataset in use', () => {
+		const group = (name: string) => ({ name, slug: name, categories: new Set<string>() });
+		assert.strictEqual(
+			loadOutcome({ quarter: '2026Q4', datasetInUse: '2026Q4', waitingFor: [] }),
+			'2026Q4 is the dataset in use.'
+		);
+		assert.strictEqual(
+			loadOutcome({ quarter: '2027Q1', datasetInUse: '2026Q4', waitingFor: [group('Transport')] }),
+			'The tool keeps using 2026Q4 until Transport is loaded for 2027Q1.'
+		);
+		assert.strictEqual(
+			loadOutcome({
+				quarter: '2027Q1',
+				datasetInUse: '2026Q4',
+				waitingFor: [group('Energy'), group('Transport'), group('Other')]
+			}),
+			'The tool keeps using 2026Q4 until Energy, Transport and Other are loaded for 2027Q1.'
+		);
 	});
 
 	describe('loading a group', () => {
@@ -146,10 +209,10 @@ describe('admin import reference data', () => {
 			);
 			const runImport = mock.fn(async () => ({
 				group: {} as never,
-				quarter: '2026-Q4',
+				quarter: '2027Q1',
 				rowsLoaded: 1_100,
-				rowsArchived: 900,
-				archivedQuarter: '2026-Q3'
+				datasetInUse: '2026Q4',
+				waitingFor: [{ name: 'Energy', slug: 'energy', categories: new Set<string>() }]
 			}));
 			const run = buildRunImportConsulteeAreaGroup(
 				{ db: databaseWith(), logger: mockLogger() } as never,
@@ -167,7 +230,7 @@ describe('admin import reference data', () => {
 			assert.strictEqual(error, undefined);
 			assert.strictEqual(
 				groupLoaded,
-				'Loaded Public bodies from 20261020_public_bodies.geojson: 1100 consultee areas, 2026-Q4. Archived its 900 2026-Q3 consultee areas.'
+				'Loaded Public bodies from 20261020_public_bodies.geojson into 2027Q1: 1100 consultee areas. The tool keeps using 2026Q4 until Energy is loaded for 2027Q1.'
 			);
 			assert.match(htmlOf(res), /Loaded Public bodies from 20261020_public_bodies\.geojson/);
 		});
@@ -176,9 +239,10 @@ describe('admin import reference data', () => {
 			const bulkDb = databaseWith();
 			const runImport = mock.fn(async () => ({
 				group: {} as never,
-				quarter: '2026-Q4',
+				quarter: '2026Q4',
 				rowsLoaded: 5,
-				rowsArchived: 0
+				datasetInUse: '2026Q4',
+				waitingFor: []
 			}));
 			const clear = mock.fn(async () => 1);
 			const importBoundaries = mock.fn(async () => 1);
@@ -195,13 +259,14 @@ describe('admin import reference data', () => {
 			assert.strictEqual(importBoundaries.mock.calls[0].arguments[0], bulkDb);
 		});
 
-		it('says only what was loaded when nothing was archived', async () => {
+		it('says when the load is into the dataset in use', async () => {
 			const res = newRes();
 			const runImport = mock.fn(async () => ({
 				group: {} as never,
-				quarter: '2026-Q4',
+				quarter: '2026Q4',
 				rowsLoaded: 5,
-				rowsArchived: 0
+				datasetInUse: '2026Q4',
+				waitingFor: []
 			}));
 			await buildRunImportConsulteeAreaGroup(
 				{ db: databaseWith(), logger: mockLogger() } as never,
@@ -210,7 +275,7 @@ describe('admin import reference data', () => {
 			)({ body: { group: 'public_bodies' } } as never, res);
 			assert.strictEqual(
 				viewModelOf(res).groupLoaded,
-				'Loaded Public bodies from 20261020_public_bodies.geojson: 5 consultee areas, 2026-Q4.'
+				'Loaded Public bodies from 20261020_public_bodies.geojson into 2026Q4: 5 consultee areas. 2026Q4 is the dataset in use.'
 			);
 		});
 
@@ -240,7 +305,9 @@ describe('admin import reference data', () => {
 
 		it("says why the load refused the file - another group's category, an earlier quarter, an unknown dataset", async () => {
 			for (const error of [
-				new GroupLoadError('20261020_public_bodies.geojson holds 2026-Q4 data. Nothing was changed'),
+				new GroupLoadError(
+					'20261020_public_bodies.geojson is from 2026Q3, earlier than the dataset in use, 2026Q4. Nothing was changed'
+				),
 				new UnknownDatasetError(
 					"Feature other_HOS_EW_00001 is from dataset HOS_EW, which config/reference-data.yaml doesn't list"
 				)

@@ -103,12 +103,87 @@ export interface LoadOptions {
 	 */
 	batchSize?: number;
 	onProgress?: (loaded: number, total: number) => void;
+	/** Which table to load into - a quarter's (see consulteeAreaTable), or by default the dataset in use. */
+	table?: string;
 }
 
 const DEFAULT_LOAD_BATCH_SIZE = 200;
 
 /**
- * Upsert (by id) every feature in `featureCollection` into consultee_area, `batchSize` rows per
+ * The consultee areas are kept a quarter at a time, a table each (consultee_area_2026Q4), and
+ * `consultee_area` is a synonym for the dataset in use - see the 20261022090000 migration. Every
+ * query that doesn't name a quarter goes through the synonym.
+ */
+export const CONSULTEE_AREA = 'consultee_area';
+
+const QUARTER = /^\d{4}Q[1-4]$/;
+
+/** Whether `quarter` names one as the tables do: 2026Q4. */
+export function isQuarter(quarter: unknown): quarter is string {
+	return typeof quarter === 'string' && QUARTER.test(quarter);
+}
+
+/** A quarter's consultee area table: 2026Q4 -> consultee_area_2026Q4. */
+export function consulteeAreaTable(quarter: string): string {
+	if (!isQuarter(quarter)) {
+		throw new Error(`"${quarter}" isn't a quarter - write it as in 2026Q4`);
+	}
+	return `${CONSULTEE_AREA}_${quarter}`;
+}
+
+/**
+ * A table name as raw SQL - only the synonym or a quarter's table, so nothing else can reach a
+ * query's text.
+ */
+export function tableSql(table: string): Prisma.Sql {
+	if (
+		table !== CONSULTEE_AREA &&
+		!(table.startsWith(`${CONSULTEE_AREA}_`) && isQuarter(table.slice(CONSULTEE_AREA.length + 1)))
+	) {
+		throw new Error(`${table} isn't a consultee area table`);
+	}
+	return Prisma.raw(table);
+}
+
+/** The quarter of the dataset in use - the table the consultee_area synonym points at. */
+export async function datasetInUse(dbClient: PrismaClient): Promise<string> {
+	const [synonym] = await withDeadlockRetry(
+		() => dbClient.$queryRaw<{ baseObjectName: string }[]>`
+			SELECT base_object_name AS baseObjectName FROM sys.synonyms WHERE name = ${CONSULTEE_AREA}
+		`
+	);
+	const quarter = /consultee_area_(\d{4}Q[1-4])\]?$/.exec(synonym?.baseObjectName ?? '')?.[1];
+	if (!quarter) {
+		throw new Error(`The ${CONSULTEE_AREA} synonym doesn't point at a quarter's table`);
+	}
+	return quarter;
+}
+
+/** A quarter's consultee areas, as listDatasets gives them. */
+export interface ConsulteeAreaDataset {
+	quarter: string;
+	rows: number;
+}
+
+/** Every quarter's consultee area table, newest first, with its rows. */
+export async function listDatasets(dbClient: PrismaClient): Promise<ConsulteeAreaDataset[]> {
+	const rows = await withDeadlockRetry(
+		() => dbClient.$queryRaw<{ name: string; rows: bigint | number }[]>`
+			SELECT t.name, SUM(p.rows) AS rows
+			FROM sys.tables t
+			JOIN sys.partitions p ON p.object_id = t.object_id AND p.index_id IN (0, 1)
+			WHERE t.name LIKE 'consultee[_]area[_][0-9][0-9][0-9][0-9]Q[1-4]'
+			GROUP BY t.name
+		`
+	);
+	return rows
+		.map((row) => ({ quarter: row.name.slice(CONSULTEE_AREA.length + 1), rows: Number(row.rows) }))
+		.sort((a, b) => b.quarter.localeCompare(a.quarter));
+}
+
+/**
+ * Upsert (by id) every feature in `featureCollection` into consultee_area - the dataset in use, or
+ * `options.table` - `batchSize` rows per
  * round trip via `OPENJSON` rather than one round trip per row - the difference between a load
  * that takes seconds and one that takes tens of minutes once this holds a real, large dataset.
  * Safe to re-run over data that's already there.
@@ -118,8 +193,9 @@ export async function loadConsulteeAreas(
 	featureCollection: ConsulteeAreaFeatureCollection,
 	options: LoadOptions = {}
 ): Promise<number> {
-	const { batchSize = DEFAULT_LOAD_BATCH_SIZE, onProgress } = options;
+	const { batchSize = DEFAULT_LOAD_BATCH_SIZE, onProgress, table = CONSULTEE_AREA } = options;
 	const features = featureCollection.features;
+	const target = tableSql(table);
 
 	for (let i = 0; i < features.length; i += batchSize) {
 		// MERGE can't join against a source with duplicate keys within one statement - real source
@@ -149,7 +225,7 @@ export async function loadConsulteeAreas(
 		);
 
 		await dbClient.$executeRaw`
-			MERGE INTO consultee_area AS target
+			MERGE INTO ${target} AS target
 			USING (
 				SELECT parsed.*, parsed.geometry.Reduce(${SIMPLIFY_TOLERANCE_METRES}).MakeValid() AS geometrySimplified
 				FROM (
