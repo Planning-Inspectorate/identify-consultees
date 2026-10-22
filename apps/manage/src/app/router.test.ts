@@ -317,7 +317,7 @@ describe('manage router wiring', () => {
 			.send({ _csrf: csrf, name: 'Banana', reason: 'Not a consultee' });
 		assert.equal(response.status, 200);
 		assert.match(response.text, /There is a problem/);
-		assert.match(response.text, /Banana does not exist as a Parish Council consultee\. Enter a valid consultee\./);
+		assert.match(response.text, /Consultee not found/);
 	});
 
 	test('POST /consultees/:id/report/consultees/add re-renders with an error when the name is blank', async () => {
@@ -355,7 +355,7 @@ describe('manage router wiring', () => {
 			.send({ _csrf: csrf, name: 'Router Test Consultee', reason: '' });
 		assert.equal(response.status, 200);
 		assert.match(response.text, /There is a problem/);
-		assert.match(response.text, /Enter a reason for adding this consultee\./);
+		assert.match(response.text, /Enter a reason for adding this consultee(?!\.)/);
 	});
 
 	test('POST /consultees/:id/report/consultees/remove records the reason and lists the removal', async () => {
@@ -418,7 +418,7 @@ describe('manage router wiring', () => {
 		const response = await agent.post(removeUrl).type('form').send({ _csrf: csrf, reason: '' });
 		assert.equal(response.status, 200);
 		assert.match(response.text, /There is a problem/);
-		assert.match(response.text, /Enter a reason for removing this consultee\./);
+		assert.match(response.text, /Enter a reason for removing this consultee(?!\.)/);
 	});
 
 	test('GET /consultees/:id/report/consultees/remove 404s without a target', async () => {

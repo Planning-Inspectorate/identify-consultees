@@ -176,7 +176,7 @@ test.describe('manage journeys', () => {
 			await expect(page.getByRole('heading', { level: 1 })).toContainText('Remove consultee');
 			await page.getByRole('button', { name: 'Remove consultee' }).click();
 			await expect(page.getByText('There is a problem')).toBeVisible();
-			await expect(page.getByRole('link', { name: 'Enter a reason for removing this consultee.' })).toBeVisible();
+			await expect(page.getByRole('link', { name: 'Enter a reason for removing this consultee' })).toBeVisible();
 			await page.getByLabel('Reason for removing').fill('Duplicate of another consultee');
 			await page.getByRole('button', { name: 'Remove consultee' }).click();
 			await expect(page).toHaveURL(/\/report\/consultees\?.*exclude=/);
@@ -197,7 +197,7 @@ test.describe('manage journeys', () => {
 		await addButton.click();
 		await expect(page.getByText('There is a problem')).toBeVisible();
 		await expect(page.getByRole('link', { name: 'Enter the consultee name' })).toBeVisible();
-		await expect(page.getByRole('link', { name: 'Enter a reason for adding this consultee.' })).toBeVisible();
+		await expect(page.getByRole('link', { name: 'Enter a reason for adding this consultee' })).toBeVisible();
 		await page.getByLabel('Reason for adding').fill('Entered first');
 		await addButton.click();
 		await expect(page.getByRole('link', { name: 'Enter the consultee name' })).toBeVisible();
@@ -208,9 +208,7 @@ test.describe('manage journeys', () => {
 		await nameInput.fill('Banana');
 		await addButton.click();
 		await expect(page.getByText('There is a problem')).toBeVisible();
-		await expect(
-			page.getByRole('link', { name: 'Banana does not exist as a Parish Council consultee. Enter a valid consultee.' })
-		).toBeVisible();
+		await expect(page.getByRole('link', { name: 'Consultee not found' })).toBeVisible();
 
 		// adding a consultee returns to the category page with it listed below the map - and any
 		// number can be added one at a time

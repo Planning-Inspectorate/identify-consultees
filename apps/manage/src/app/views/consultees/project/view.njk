@@ -1,6 +1,7 @@
 {% extends "views/layouts/main.njk" %}
 
 {% from "govuk/components/button/macro.njk" import govukButton %}
+{% from "govuk/components/notification-banner/macro.njk" import govukNotificationBanner %}
 {% from "govuk/components/radios/macro.njk" import govukRadios %}
 
 {% block pageTitle %}
@@ -14,13 +15,21 @@
 {% endblock %}
 
 {% block pageContent %}
-	{% set mapRegionLabel = mapRegionLabel %}
-	{% set staticMapSrc = staticMapSrc %}
-	{% set staticMapAlt = staticMapAlt %}
-	{% set mapWidth = mapWidth %}
-	{% set mapHeight = mapHeight %}
-	{% set mapConfigJson = mapConfigJson %}
-	{% include "views/partials/consultee-map-region.njk" %}
+	{% if mapFailed %}
+		{% set failureHtml %}
+			<h3 class="govuk-notification-banner__heading">There's a problem loading the map – try again later</h3>
+			<p class="govuk-body">The boundary map could not be retrieved. <a class="govuk-notification-banner__link" href="{{ retryUrl }}">Try again</a>.</p>
+		{% endset %}
+		{{ govukNotificationBanner({ html: failureHtml }) }}
+	{% else %}
+		{% set mapRegionLabel = mapRegionLabel %}
+		{% set staticMapSrc = staticMapSrc %}
+		{% set staticMapAlt = staticMapAlt %}
+		{% set mapWidth = mapWidth %}
+		{% set mapHeight = mapHeight %}
+		{% set mapConfigJson = mapConfigJson %}
+		{% include "views/partials/consultee-map-region.njk" %}
+	{% endif %}
 
 	<form method="post" action="{{ formAction }}" novalidate class="govuk-!-margin-top-6">
 		<input type="hidden" name="_csrf" value="{{ _csrf }}">

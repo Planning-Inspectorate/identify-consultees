@@ -136,6 +136,37 @@ describe('consultee project boundary page', () => {
 		assert.strictEqual(mapConfig.shapefileDatasets[0].id, `shapefile-${realProjectId}`);
 	});
 
+	it('should show an error banner with a retry link when the map cannot be loaded', async () => {
+		const nunjucks = configureNunjucks();
+		const mockRes = {
+			status: mock.fn(() => mockRes),
+			render: mock.fn((view, data) => nunjucks.render(view, data))
+		};
+		// the sibling is listed as a file, but fetching its geometry fails
+		let call = 0;
+		const db = {
+			$queryRaw: mock.fn(async () => {
+				call += 1;
+				if (call === 1) return [realProjectRow()];
+				if (call === 2) return [boundaryFile(siblingProjectRow()), boundaryFile(realProjectRow())];
+				throw new Error('geometry store down');
+			})
+		};
+		await pageHandlerFor(db)({ params: { caseId: realProjectId }, query: {} }, mockRes);
+
+		const viewModel = mockRes.render.mock.calls[0].arguments[1];
+		assert.strictEqual(viewModel.mapFailed, true);
+		assert.strictEqual(viewModel.retryUrl, `/consultees/${realProjectId}`);
+		// the radios still render - the page works without the map
+		assert.strictEqual(viewModel.files.length, 2);
+
+		const html = mockRes.render.mock.calls[0].result;
+		assert.match(html, /problem loading the map/);
+		assert.match(html, /try again later/);
+		assert.match(html, />Try again</);
+		assert.doesNotMatch(html, /app-consultee-map/);
+	});
+
 	it('should render radios without hints when the files have no upload date', async () => {
 		const mockRes = { status: mock.fn(() => mockRes), render: mock.fn() };
 		const undatedRow = realProjectRow({ receivedDate: null });

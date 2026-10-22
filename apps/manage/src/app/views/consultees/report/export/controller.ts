@@ -12,8 +12,8 @@ import { buildReportZip, rememberedReportZip } from './report-zip.ts';
  * the file's size and the download serves without rebuilding. A restart or expiry, or a hit with
  * no page visit first, builds it here instead - from the run the report pages kept in the session
  * (see runRulesetSafely), so the ruleset only runs again if that has gone; nothing is written to
- * disk or the session. If the ruleset can't be run, it goes back to the Report created page, which
- * says so.
+ * disk or the session. If the ruleset can't be run, or the report can't be built, it goes back to
+ * the Report created page, which says so and offers to retry the download.
  */
 export function buildReportDownload(service: ManageService): AsyncRequestHandler {
 	const { db, logger } = service;
@@ -48,7 +48,14 @@ export function buildReportDownload(service: ManageService): AsyncRequestHandler
 			return;
 		}
 
-		const report = await buildReportZip({ service, project, ruleset, consultees, selection, siteScreenedAs });
+		let report;
+		try {
+			report = await buildReportZip({ service, project, ruleset, consultees, selection, siteScreenedAs });
+		} catch (error) {
+			logger.error({ error, caseId: project.id, rulesetId: ruleset.id }, 'Failed to build the report ZIP for download');
+			res.redirect(`${reportCreatedUrl(project.id, ruleset.id, selection)}&download=failed`);
+			return;
+		}
 		res.set({
 			'Content-Type': 'application/zip',
 			'Content-Disposition': `attachment; filename="${report.fileName}"`

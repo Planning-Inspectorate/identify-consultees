@@ -29,6 +29,14 @@
 				{% endset %}
 				{{ govukNotificationBanner({ html: failureHtml }) }}
 			{% endif %}
+
+			{% if downloadFailed %}
+				{% set downloadFailedHtml %}
+					<h3 class="govuk-notification-banner__heading">The scoping report could not be downloaded – try again</h3>
+					<p class="govuk-body"><a class="govuk-notification-banner__link" href="{{ downloadUrl }}">Retry download</a>.</p>
+				{% endset %}
+				{{ govukNotificationBanner({ html: downloadFailedHtml }) }}
+			{% endif %}
 		</div>
 	</div>
 {% endblock %}

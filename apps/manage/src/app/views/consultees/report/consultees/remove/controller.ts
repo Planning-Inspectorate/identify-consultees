@@ -193,7 +193,7 @@ export function buildReportConsulteeRemoveSubmit(
 				viewModel(
 					context,
 					typeof req.body?.reason === 'string' ? req.body.reason : '',
-					'Enter a reason for removing this consultee.'
+					'Enter a reason for removing this consultee'
 				)
 			);
 		}

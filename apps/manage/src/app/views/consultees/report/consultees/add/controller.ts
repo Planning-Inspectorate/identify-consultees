@@ -60,11 +60,6 @@ export function buildReportConsulteeAddPage(service: ManageService): AsyncReques
 	};
 }
 
-/** Why a name was refused: it isn't a consultee of the category in the reference data. */
-export function notAConsulteeError(name: string, category: string): string {
-	return `${name} does not exist as a ${category} consultee. Enter a valid consultee.`;
-}
-
 /**
  * Saves a hand-added consultee. The name and the reason are both required - like the removal
  * reason, the reason is recorded for auditing and shows in the Identified column. The name has to
@@ -120,9 +115,9 @@ export function buildReportConsulteeAddSubmit(
 			: alreadyListed
 				? `${name} is already listed in ${category}`
 				: !stored
-					? notAConsulteeError(name, category)
+					? 'Consultee not found'
 					: undefined;
-		const reasonError = reason ? undefined : 'Enter a reason for adding this consultee.';
+		const reasonError = reason ? undefined : 'Enter a reason for adding this consultee';
 		// no consultee found always comes with a name error
 		if (!stored || reasonError) {
 			return renderAddPage(res, context, {
