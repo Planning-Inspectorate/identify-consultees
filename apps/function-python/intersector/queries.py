@@ -1,4 +1,5 @@
-"""The SQL screening runs against `consultee_area`.
+"""The SQL screening runs against the consultee areas - `db.table`: the dataset in use, the
+`consultee_area` synonym, or a quarter's table (see database.dataset_table).
 
 The geometry maths runs inside SQL Server (`geography` STDistance / STIntersects /
 BufferWithTolerance) against the spatial index on `geometrySimplified`; these functions only build
@@ -67,6 +68,12 @@ def _area_from_row(row: dict) -> ConsulteeArea:
         },
         geometry_wkt=row.get("geometryWkt"),
     )
+
+
+def table_exists(db: Database, table: str) -> bool:
+    """Whether the consultee area table `table` exists."""
+    [row] = db.query("SELECT OBJECT_ID(%s, 'U') AS id", (f"dbo.{table}",))
+    return row["id"] is not None
 
 
 def simplify(db: Database, wkt: str) -> str:
@@ -145,7 +152,7 @@ def find_areas_near(
         f"""
         SELECT {AREA_COLUMNS_WITH_GEOMETRY if with_geometry else AREA_COLUMNS},
             geometrySimplified.STDistance({_geography()}) AS distanceMetres
-        FROM consultee_area {USE_SPATIAL_INDEX}
+        FROM {db.table} {USE_SPATIAL_INDEX}
         WHERE geometrySimplified.STDistance({_geography()}) <= %s
             {category_filter}
             {excluded_filter}
@@ -180,7 +187,7 @@ def find_areas_bordering(
     hosts = db.query(
         f"""
         SELECT {ID} AS id, geometrySimplified.BufferWithTolerance(%s, 1, 0).STAsText() AS grownWkt
-        FROM consultee_area {USE_SPATIAL_INDEX}
+        FROM {db.table} {USE_SPATIAL_INDEX}
         WHERE consulteeCategory = %s
             AND geometrySimplified.STIntersects({_geography()}) = 1
         """,
@@ -192,7 +199,7 @@ def find_areas_bordering(
         rows = db.query(
             f"""
             SELECT {AREA_COLUMNS_WITH_GEOMETRY if with_geometry else AREA_COLUMNS}
-            FROM consultee_area {USE_SPATIAL_INDEX}
+            FROM {db.table} {USE_SPATIAL_INDEX}
             WHERE consulteeCategory IN ({_placeholders(categories)})
                 AND id <> CAST(%s AS UNIQUEIDENTIFIER)
                 AND geometrySimplified.STIntersects({_geography()}) = 1
@@ -227,7 +234,7 @@ def find_areas_bordering_box(
         SELECT geometrySimplified.EnvelopeCenter().Lat AS latitude,
             geometrySimplified.EnvelopeCenter().Long AS longitude,
             geometrySimplified.EnvelopeAngle() AS angle
-        FROM consultee_area {USE_SPATIAL_INDEX}
+        FROM {db.table} {USE_SPATIAL_INDEX}
         WHERE consulteeCategory = %s
             AND geometrySimplified.STIntersects({_geography()}) = 1
         """,
@@ -247,7 +254,7 @@ def find_areas_bordering_box(
     rows = db.query(
         f"""
         SELECT {AREA_COLUMNS}
-        FROM consultee_area {USE_SPATIAL_INDEX}
+        FROM {db.table} {USE_SPATIAL_INDEX}
         WHERE consulteeCategory IN ({_placeholders(categories)})
             AND geometrySimplified.STIntersects({_geography()}) = 1
         """,
@@ -262,7 +269,7 @@ def _select_by_id(db: Database, columns: str, ids: list[str], params_before: tup
         batch = ids[start : start + ID_LOOKUP_BATCH_SIZE]
         rows.extend(
             db.query(
-                f"SELECT {columns} FROM consultee_area WHERE id IN ({_placeholders(batch)})",
+                f"SELECT {columns} FROM {db.table} WHERE id IN ({_placeholders(batch)})",
                 (*params_before, *batch),
             )
         )

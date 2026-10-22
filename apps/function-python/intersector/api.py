@@ -3,6 +3,7 @@
 See kt-docs/screening-service.md. The manage app's side is apps/manage/src/app/ruleset-runner.ts.
 """
 
+import re
 from dataclasses import dataclass
 
 from intersector.models import (
@@ -41,14 +42,16 @@ class RunRulesetRequest:
     """Screen a site whose simplified outline has more points than this against its bounding box."""
     bounding_box: bool = False
     """Screen the site against its bounding box whatever its detail."""
+    dataset: str | None = None
+    """A quarter's consultee areas to screen (2026Q4), rather than the dataset in use."""
 
 
 def parse_run_ruleset_request(body: object) -> RunRulesetRequest:
     """Validate a decoded request body: `{siteWkt, rules: [{id, logicType, categories,
     bufferMetres?, hostCategory?}], nearbyRadiusMetres, nearbyRadiusMetresByCategory?,
-    includeGeometry?, boundingBoxAbovePoints?, boundingBox?}` (includeGeometry defaults to true,
-    boundingBox to false; with no boundingBoxAbovePoints the outline is always screened). Raises
-    BadRequest."""
+    includeGeometry?, boundingBoxAbovePoints?, boundingBox?, dataset?}` (includeGeometry defaults to
+    true, boundingBox to false; with no boundingBoxAbovePoints the outline is always screened; with
+    no dataset, the dataset in use). Raises BadRequest."""
     if not isinstance(body, dict):
         raise BadRequest("request body must be a JSON object")
 
@@ -67,7 +70,16 @@ def parse_run_ruleset_request(body: object) -> RunRulesetRequest:
         include_geometry=_boolean(body.get("includeGeometry", True), "includeGeometry"),
         bounding_box_above_points=_point_limit(body.get("boundingBoxAbovePoints")),
         bounding_box=_boolean(body.get("boundingBox", False), "boundingBox"),
+        dataset=_dataset(body.get("dataset")),
     )
+
+
+def _dataset(value: object) -> str | None:
+    if value is None:
+        return None
+    if not isinstance(value, str) or not re.match(r"^\d{4}Q[1-4]$", value):
+        raise BadRequest("dataset must be a quarter, as in 2026Q4")
+    return value
 
 
 def _point_limit(value: object) -> int | None:

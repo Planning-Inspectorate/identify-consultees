@@ -59,14 +59,46 @@
         }) }}
     {% endif %}
 
+    <h2 class="govuk-heading-m">Datasets</h2>
+    <p class="govuk-body">
+        Each quarter's consultee areas are a dataset - a table of their own,
+        <code>consultee_area_2026Q4</code> - and the tool uses the newest quarter that has every
+        group loaded. Earlier quarters are kept as they are.
+    </p>
+
+    {% if datasets %}
+        {% set datasetRows = [] %}
+        {% for dataset in datasets %}
+            {% set datasetRows = (datasetRows.push([
+                { text: dataset.quarter },
+                { text: dataset.rows, format: "numeric" },
+                { text: dataset.status }
+            ]), datasetRows) %}
+        {% endfor %}
+        {{ govukTable({
+            caption: "Consultee area datasets",
+            captionClasses: "govuk-visually-hidden",
+            firstCellIsHeader: true,
+            head: [{ text: "Quarter" }, { text: "Consultee areas", format: "numeric" }, { text: "Status" }],
+            rows: datasetRows
+        }) }}
+    {% endif %}
+
+    {% if pending %}
+        {% from "govuk/components/inset-text/macro.njk" import govukInsetText %}
+        {{ govukInsetText({
+            text: pending.quarter ~ " is being loaded. The tool keeps using " ~ datasetInUse ~ " until " ~ (pending.waitingFor | join(", ")) ~ (" are" if pending.waitingFor.length > 1 else " is") ~ " loaded for " ~ pending.quarter ~ "."
+        }) }}
+    {% endif %}
+
     <h2 class="govuk-heading-m">Consultee areas, by group</h2>
     <p class="govuk-body">
         The reference data is loaded a group at a time - the report's tabs, as
         <code>config/reference-data.yaml</code> sets them. Loading a group takes its newest file in
         blob storage (<code>YYYYMMDD_&lt;group&gt;.geojson</code>, named for the date its data is
-        from) and replaces that group's consultee areas. If the file is from a later quarter than
-        the group's loaded data, the loaded data is moved to the archive first. A file holding a
-        category from another group, or from an earlier quarter, isn't loaded.
+        from) and replaces that group's consultee areas in the dataset for its quarter, made the
+        first time one of the quarter's groups is loaded. A file holding a category from another
+        group, or from an earlier quarter than the one in use, isn't loaded.
     </p>
 
     {% if blobStorageRead === false %}
@@ -84,7 +116,8 @@
             {% endif %}
         {% endset %}
         {% set loadedHtml %}
-            {% if group.rows != undefined %}{{ group.rows }} consultee areas{% endif %}
+            {% if group.rows != undefined %}{{ group.rows }} consultee areas{% if datasetInUse %} in {{ datasetInUse }}{% endif %}{% endif %}
+            {% if group.pendingRows != undefined %}<br><span class="govuk-hint">{{ group.pendingRows }} in {{ pending.quarter }}</span>{% endif %}
             {% if group.load %}
                 <br><span class="govuk-hint">{{ group.load.quarter }}, from {{ group.load.blobName }}, loaded {{ group.load.loadedAt }}</span>
             {% elif group.rows %}
@@ -121,7 +154,7 @@
 
     <h2 class="govuk-heading-m">Clear consultee areas</h2>
     {{ govukWarningText({
-        text: "Deletes every consultee area, in every group. The table itself, the files in blob storage and the archive are left as they are - load each group again afterwards.",
+        text: "Deletes every consultee area in the dataset in use, in every group. The table itself, other quarters' datasets and the files in blob storage are left as they are - load each group again afterwards.",
         iconFallbackText: "Warning"
     }) }}
     <form method="post" action="/admin/import-reference-data/clear-consultee-areas" novalidate>

@@ -23,6 +23,7 @@ Request:
 	"includeGeometry": false,
 	"boundingBoxAbovePoints": 2000,
 	"boundingBox": false,
+	"dataset": "2026Q4",
 	"rules": [
 		{ "id": "hospital", "logicType": "intersection", "categories": ["Hospital"], "bufferMetres": 10000 },
 		{
@@ -66,6 +67,7 @@ Response (200):
 - `geometryWkt`: only for condition matches, and only when `includeGeometry` is `true`.
 - `boundingBoxAbovePoints` (optional): screen a site whose outline, simplified to 10m, has more points than this against its bounding box instead: the rectangle of longitude and latitude around it, 1km wider all round (`queries.bounding_box`). The web app sends [`config/screening.yaml`](../config/screening.yaml)'s, 2,000 to start. Without it the outline is always screened.
 - `boundingBox` (optional, default `false`): screen the bounding box whatever the site's detail. The web app asks for it when a run on the outline fails or times out.
+- `dataset` (optional): a quarter's consultee areas to screen (`2026Q4`, its table `consultee_area_2026Q4`) rather than the dataset in use (the `consultee_area` synonym - see [Data model and loading](./data/data-model.md#loading)). One with no table is a 400 `{ "error": "There is no 2025Q1 dataset" }`. The web app doesn't send it yet.
 - `siteScreenedAs`: `outline`, or `boundingBox`. A box finds every consultee the outline would and more: for a long, diagonal site, many that aren't near it (the most detailed local site: 708 "host" parishes against 89). The web app warns on the check and category pages, and the workbook's Summary says so.
 - Ids are lowercase, matching the web app's Prisma queries, which use them for display geometry and `exclude=` URLs.
 - Errors: 401 for a bad or missing key; 500 `{ "error": "Failed to run the ruleset" }` with no internal detail.

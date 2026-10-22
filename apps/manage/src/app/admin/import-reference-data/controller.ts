@@ -1,9 +1,11 @@
 import type { ManageService } from '#service';
-import type { LatestGroupLoad } from '@pins/identify-consultees-database/src/seed/consultee-area-groups.ts';
+import { datasetInUse, listDatasets } from '@pins/identify-consultees-database/src/geospatial/consultee-areas.ts';
+import type { GroupLoad, LatestGroupLoad } from '@pins/identify-consultees-database/src/seed/consultee-area-groups.ts';
 import {
 	clearConsulteeAreas,
 	GroupLoadError,
 	groupRowCounts,
+	groupsStillToLoad,
 	importConsulteeAreaGroup,
 	latestGroupLoads,
 	parseGroupBlobName,
@@ -77,7 +79,8 @@ function groupStatus(
 	group: ReferenceDataGroup,
 	file: (StoredBlob & { dataDate: string }) | undefined,
 	rows: number | undefined,
-	load: LatestGroupLoad | undefined
+	load: LatestGroupLoad | undefined,
+	pendingRows: number | undefined
 ): GroupStatus {
 	return {
 		name: group.name,
@@ -100,19 +103,20 @@ function groupStatus(
 						blobName: load.blobName,
 						quarter: load.quarter,
 						loadedAt: formatDateTime(load.loadedAt),
-						rowsLoaded: load.rowsLoaded,
-						rowsArchived: load.rowsArchived
+						rowsLoaded: load.rowsLoaded
 					}
 				}
-			: {})
+			: {}),
+		...(pendingRows === undefined ? {} : { pendingRows })
 	};
 }
 
 /**
- * The page as it stands: rows in each table, and each group - its newest file in blob storage,
- * its rows now and its last load. A full load can outlast Front Door's response timeout - the
- * browser shows an error while it carries on - so the counts are how to confirm it finished.
- * Informational only: what can't be read is left off the page, and logged.
+ * The page as it stands: rows in each table, the quarters' datasets - which is in use, and what a
+ * newer one is still waiting for - and each group: its newest file in blob storage, its rows now
+ * and its last load. A full load can outlast Front Door's response timeout - the browser shows an
+ * error while it carries on - so the counts are how to confirm it finished. Informational only:
+ * what can't be read is left off the page, and logged.
  */
 async function withStatus(
 	service: Pick<ManageService, 'db' | 'logger'>,
@@ -128,7 +132,7 @@ async function withStatus(
 			return undefined;
 		}
 	};
-	const [counts, rows, loads, blobs] = await Promise.all([
+	const [counts, rows, inUse, datasets, blobs] = await Promise.all([
 		attempt('the loaded reference data', async () => {
 			const [row] = await db.$queryRaw<{ consulteeAreas: number; caseBoundaries: number }[]>`
 				SELECT (SELECT COUNT(*) FROM consultee_area) AS consulteeAreas,
@@ -137,16 +141,47 @@ async function withStatus(
 			return row;
 		}),
 		attempt("each group's rows", () => groupRowCounts(db)),
-		attempt("each group's last load", () => latestGroupLoads(db)),
+		attempt('the dataset in use', () => datasetInUse(db)),
+		attempt('the datasets', () => listDatasets(db)),
 		attempt('the files in blob storage', files.list)
+	]);
+	// a newer quarter than the one in use is being loaded, a group at a time
+	const pending = inUse ? datasets?.find((dataset) => dataset.quarter > inUse) : undefined;
+	const [loads, pendingRows, waitingFor] = await Promise.all([
+		inUse ? attempt("each group's last load", () => latestGroupLoads(db, inUse)) : undefined,
+		pending
+			? attempt(`each group's rows in ${pending.quarter}`, () => groupRowCounts(db, undefined, pending.quarter))
+			: undefined,
+		pending
+			? attempt(`what ${pending.quarter} is waiting for`, () => groupsStillToLoad(db, pending.quarter))
+			: undefined
 	]);
 	const groupFiles = latestGroupFiles(blobs ?? []);
 	return {
 		...viewModel,
 		...(counts ? { loadedConsulteeAreas: counts.consulteeAreas, loadedCaseBoundaries: counts.caseBoundaries } : {}),
+		...(inUse ? { datasetInUse: inUse } : {}),
+		...(datasets
+			? {
+					datasets: datasets.map((dataset) => ({
+						quarter: dataset.quarter,
+						rows: dataset.rows,
+						status: dataset.quarter === inUse ? 'In use' : inUse && dataset.quarter > inUse ? 'Loading' : 'Archive'
+					}))
+				}
+			: {}),
+		...(pending && waitingFor
+			? { pending: { quarter: pending.quarter, waitingFor: waitingFor.map((group) => group.name) } }
+			: {}),
 		blobStorageRead: blobs !== undefined,
 		groups: REFERENCE_DATA_CONFIG.groups.map((group) =>
-			groupStatus(group, groupFiles.get(group.slug), rows?.get(group.slug), loads?.get(group.slug))
+			groupStatus(
+				group,
+				groupFiles.get(group.slug),
+				rows?.get(group.slug),
+				loads?.get(group.slug),
+				pendingRows?.get(group.slug)
+			)
 		)
 	};
 }
@@ -164,9 +199,19 @@ function groupOf(req: Request): ReferenceDataGroup | undefined {
 	return groupBySlug((req.body as { group?: unknown } | undefined)?.group);
 }
 
+/** What a group load means for the dataset in use. */
+export function loadOutcome(load: Pick<GroupLoad, 'quarter' | 'datasetInUse' | 'waitingFor'>): string {
+	if (load.datasetInUse === load.quarter) {
+		return `${load.quarter} is the dataset in use.`;
+	}
+	const names = load.waitingFor.map((group) => group.name);
+	const list = names.length > 1 ? `${names.slice(0, -1).join(', ')} and ${names.at(-1)}` : names[0];
+	return `The tool keeps using ${load.datasetInUse} until ${list} ${names.length > 1 ? 'are' : 'is'} loaded for ${load.quarter}.`;
+}
+
 /**
- * Load a group: its newest file in blob storage replaces its rows - or, from a later quarter than
- * the group's, archives them first (see importConsulteeAreaGroup).
+ * Load a group: its newest file in blob storage replaces its rows in its quarter's table, which
+ * becomes the dataset in use once every group has been loaded into it (see importConsulteeAreaGroup).
  */
 export function buildRunImportConsulteeAreaGroup(
 	service: ManageService,
@@ -192,16 +237,14 @@ export function buildRunImportConsulteeAreaGroup(
 			const { filePath, cleanup } = await files.download(file.name);
 			try {
 				const load = await runImport(db, filePath, file.name);
-				viewModel.groupLoaded =
-					`Loaded ${group.name} from ${file.name}: ${load.rowsLoaded} consultee areas, ${load.quarter}.` +
-					(load.archivedQuarter ? ` Archived its ${load.rowsArchived} ${load.archivedQuarter} consultee areas.` : '');
+				viewModel.groupLoaded = `Loaded ${group.name} from ${file.name} into ${load.quarter}: ${load.rowsLoaded} consultee areas. ${loadOutcome(load)}`;
 				logger.info(
 					{
 						group: group.slug,
 						blob: file.name,
 						quarter: load.quarter,
 						rowsLoaded: load.rowsLoaded,
-						rowsArchived: load.rowsArchived
+						inUse: load.datasetInUse
 					},
 					'loaded a reference data group'
 				);

@@ -16,6 +16,26 @@ T = TypeVar("T")
 
 DEADLOCK_RETRIES = 3
 
+CONSULTEE_AREA = "consultee_area"
+"""The consultee areas in use: a synonym for the newest quarter's table - see dataset_table."""
+
+_QUARTER = re.compile(r"^\d{4}Q[1-4]$")
+
+
+class UnknownDataset(ValueError):
+    """A dataset was asked for that isn't a quarter, or has no table. The message is safe to return."""
+
+
+def dataset_table(dataset: str | None) -> str:
+    """The table a run screens: a quarter's dataset (2026Q4 -> consultee_area_2026Q4), or with none
+    the one in use - the consultee_area synonym, which the manage app moves to the newest quarter
+    with every group loaded. Only these names ever reach a query's text."""
+    if dataset is None:
+        return CONSULTEE_AREA
+    if not _QUARTER.match(dataset):
+        raise UnknownDataset("dataset must be a quarter, as in 2026Q4")
+    return f"{CONSULTEE_AREA}_{dataset}"
+
 
 def is_deadlock_error(error: BaseException) -> bool:
     return re.search("deadlock", str(error), re.IGNORECASE) is not None
@@ -39,13 +59,14 @@ def with_deadlock_retry(fn: Callable[[], T], retries: int = DEADLOCK_RETRIES) ->
 
 
 @contextmanager
-def open_database(params: ConnectionParams) -> Iterator["Database"]:
-    """The database for one screening run, its connections closed when the block ends.
+def open_database(params: ConnectionParams, table: str = CONSULTEE_AREA) -> Iterator["Database"]:
+    """The database for one screening run, its connections closed when the block ends - its
+    queries against `table` (see dataset_table).
 
     with open_database(params) as db:
         rows = db.query("SELECT ...", (param,))
     """
-    db = Database(params)
+    db = Database(params, table)
     try:
         yield db
     finally:
@@ -56,8 +77,10 @@ class Database:
     """The connections one screening run uses: one per thread, since a pymssql connection can't be
     shared across threads. Use open_database, which closes them."""
 
-    def __init__(self, params: ConnectionParams):
+    def __init__(self, params: ConnectionParams, table: str = CONSULTEE_AREA):
         self._params = params
+        self.table = table
+        """The consultee area table the run's queries use."""
         self._local = threading.local()
         self._connections: list[pymssql.Connection] = []
         self._lock = threading.Lock()

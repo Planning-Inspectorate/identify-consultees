@@ -17,6 +17,7 @@ from function_app import (
     health,
     run_ruleset_route,
 )
+from intersector.database import UnknownDataset
 from intersector.models import (
     ConditionReason,
     Consultee,
@@ -163,6 +164,7 @@ def test_run_ruleset_runs_the_posted_conditions_and_returns_each_consultee_with_
         with_geometry=True,
         bounding_box_above_points=None,
         bounding_box=False,
+        dataset=None,
     )
 
 
@@ -175,7 +177,32 @@ def test_run_ruleset_leaves_geometry_out_when_asked():
         response = run_ruleset_route(_ruleset_request({**VALID_BODY, "includeGeometry": False}))
 
     assert response.status_code == 200
-    assert run.call_args.kwargs == {"with_geometry": False, "bounding_box_above_points": None, "bounding_box": False}
+    assert run.call_args.kwargs == {
+        "with_geometry": False,
+        "bounding_box_above_points": None,
+        "bounding_box": False,
+        "dataset": None,
+    }
+
+
+def test_run_ruleset_screens_a_quarters_dataset_when_asked_and_refuses_one_with_no_table():
+    with (
+        patch.dict("os.environ", {"CONSULTEE_AREAS_API_KEY": API_KEY}),
+        patch("function_app.connection_params_from_env", return_value=object()),
+        patch("function_app.run_ruleset", return_value=Screening([], "outline")) as run,
+    ):
+        response = run_ruleset_route(_ruleset_request({**VALID_BODY, "dataset": "2026Q4"}))
+    assert response.status_code == 200
+    assert run.call_args.kwargs["dataset"] == "2026Q4"
+
+    with (
+        patch.dict("os.environ", {"CONSULTEE_AREAS_API_KEY": API_KEY}),
+        patch("function_app.connection_params_from_env", return_value=object()),
+        patch("function_app.run_ruleset", side_effect=UnknownDataset("There is no 2025Q1 dataset")),
+    ):
+        missing = run_ruleset_route(_ruleset_request({**VALID_BODY, "dataset": "2025Q1"}))
+    assert missing.status_code == 400
+    assert json.loads(missing.get_body()) == {"error": "There is no 2025Q1 dataset"}
 
 
 def test_run_ruleset_screens_against_the_bounding_box_when_asked_and_says_so():
@@ -232,6 +259,9 @@ def test_run_ruleset_passes_each_categorys_nearby_radius_on():
         {**VALID_BODY, "boundingBoxAbovePoints": True},
         {**VALID_BODY, "boundingBoxAbovePoints": "2000"},
         {**VALID_BODY, "boundingBox": "yes"},
+        {**VALID_BODY, "dataset": "2026-Q4"},
+        {**VALID_BODY, "dataset": "2026Q5"},
+        {**VALID_BODY, "dataset": 2026},
     ],
 )
 def test_run_ruleset_rejects_a_malformed_request_before_touching_the_database(body):

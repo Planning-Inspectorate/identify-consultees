@@ -549,8 +549,9 @@ job:
 - **In-app import**: the same blobs can be imported from the manage app itself at
   `/admin/import-reference-data` (with `/admin/upload-to-blob` for getting files into the
   container) - the app's managed identity has Storage Blob Data Contributor. Consultee areas load a
-  group at a time (`config/reference-data.yaml`'s `groups`, one file each), each load replacing
-  its group's rows - archiving them first when a later quarter's data comes in - and case
+  group at a time (`config/reference-data.yaml`'s `groups`, one file each) into its quarter's
+  table (`consultee_area_2026Q4`); the `consultee_area` synonym points at the newest quarter with
+  every group loaded, which everything else uses - and case
   boundaries replace their table. The page shows the rows currently loaded, so a load that
   outlasts Front Door's response timeout can be confirmed by reloading it. See
   `kt-docs/data/data-model.md`.

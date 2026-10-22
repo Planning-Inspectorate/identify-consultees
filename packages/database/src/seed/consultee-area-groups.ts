@@ -1,25 +1,29 @@
 import type { PrismaClient } from '../client/client.ts';
 import { Prisma } from '../client/client.ts';
-import { loadConsulteeAreas } from '../geospatial/consultee-areas.ts';
+import {
+	CONSULTEE_AREA,
+	consulteeAreaTable,
+	datasetInUse,
+	loadConsulteeAreas,
+	tableSql
+} from '../geospatial/consultee-areas.ts';
 import type { ImportOptions } from './geojson-import.ts';
 import { clearExistingRows, importFile, toConsulteeArea } from './geojson-import.ts';
 import type { ReferenceDataConfig, ReferenceDataGroup } from './reference-data.ts';
 import { groupBySlug, groupForCategory, REFERENCE_DATA_CONFIG } from './reference-data.ts';
 
 /**
- * The reference data, a group at a time. The pipeline writes a file per group of
- * config/reference-data.yaml - the report's five tabs - named for the date its data is from:
- * 20261020_public_bodies.geojson. Loading one replaces just that group's rows: its categories'.
- *
- * In production there's one dataset per quarter. Loading a group's data from a later quarter than
- * the one loaded first moves the group's rows to consultee_area_archive, labelled with their
- * quarter; the same quarter's data just replaces them, so a corrected file can be loaded again.
- * Each load is logged in reference_data_load, which is how the next one knows the quarter.
+ * The reference data, a group at a time, a quarter at a time. The pipeline writes a file per
+ * group of config/reference-data.yaml - the report's five tabs - named for the date its data is
+ * from: 20261020_public_bodies.geojson. Each quarter's data has its own table, named for the
+ * quarter - consultee_area_2026Q4 - and the synonym consultee_area points at the dataset in use,
+ * the newest quarter with every group loaded (see the 20261022090000 migration). Loading a group
+ * replaces just its rows - its categories' - in its quarter's table.
  */
 
 // A group's rows can be whole national-scale shapes - Public bodies' 316 areas are over 200MB of
 // coastline and county boundaries - so its statements move little at a time: a few rows per
-// delete or archive, and a few megabytes of source per MERGE (a single larger shape goes alone).
+// delete, and a few megabytes of source per MERGE (a single larger shape goes alone).
 // Each is then short even on Dev's Basic tier, rather than one that runs for minutes.
 const GROUP_ROWS_PER_STATEMENT = 25;
 const GROUP_CHUNK_CHARACTERS = 4 * 1024 * 1024;
@@ -68,9 +72,9 @@ export function parseGroupBlobName(
 	return isRealDate(dataDate) ? { group, dataDate } : undefined;
 }
 
-/** The quarter a date (YYYY-MM-DD) is in: 2026-10-20 → 2026-Q4. */
+/** The quarter a date (YYYY-MM-DD) is in, as the tables name it: 2026-10-20 → 2026Q4. */
 export function quarterOf(dataDate: string): string {
-	return `${dataDate.slice(0, 4)}-Q${Math.ceil(Number(dataDate.slice(5, 7)) / 3)}`;
+	return `${dataDate.slice(0, 4)}Q${Math.ceil(Number(dataDate.slice(5, 7)) / 3)}`;
 }
 
 /** A group load refused before anything was changed - its message says why. */
@@ -79,20 +83,21 @@ export class GroupLoadError extends Error {}
 /** What loading a group did. */
 export interface GroupLoad {
 	group: ReferenceDataGroup;
+	/** The quarter it was loaded into - its table, consultee_area_2026Q4. */
 	quarter: string;
 	rowsLoaded: number;
-	/** Rows moved to consultee_area_archive, and the quarter they were from - when a new quarter's data came in. */
-	rowsArchived: number;
-	archivedQuarter?: string;
+	/** The dataset in use after the load: the load's quarter, once it's ready, else the one before. */
+	datasetInUse: string;
+	/** For a newer quarter than the one in use: the groups still to load before it's used. */
+	waitingFor: ReferenceDataGroup[];
 }
 
-/** A group's latest load, from reference_data_load. */
+/** A group's latest load into a quarter, from reference_data_load. */
 export interface LatestGroupLoad {
 	blobName: string;
 	dataDate: Date;
 	quarter: string;
 	rowsLoaded: number;
-	rowsArchived: number;
 	loadedAt: Date;
 }
 
@@ -100,47 +105,21 @@ function categoriesOf(group: ReferenceDataGroup): Prisma.Sql {
 	return Prisma.join([...group.categories]);
 }
 
-/** How many of the group's rows consultee_area holds. */
-async function groupRowCount(dbClient: PrismaClient, group: ReferenceDataGroup): Promise<number> {
+/** How many of the group's rows `table` holds. */
+async function groupRowCount(dbClient: PrismaClient, group: ReferenceDataGroup, table: string): Promise<number> {
 	const [{ count }] = await dbClient.$queryRaw<{ count: number }[]>`
-		SELECT COUNT(*) AS count FROM consultee_area WHERE consulteeCategory IN (${categoriesOf(group)})
+		SELECT COUNT(*) AS count FROM ${tableSql(table)} WHERE consulteeCategory IN (${categoriesOf(group)})
 	`;
 	return count;
 }
 
-/**
- * Move the group's rows to consultee_area_archive, labelled `quarter`, a batch at a time - each
- * batch deleted and archived in one statement, so a row is never in both tables, or neither.
- */
-async function archiveGroupRows(dbClient: PrismaClient, group: ReferenceDataGroup, quarter: string): Promise<number> {
-	let total = 0;
-	for (;;) {
-		const moved = await dbClient.$executeRaw`
-			DELETE TOP (${GROUP_ROWS_PER_STATEMENT}) FROM consultee_area
-			OUTPUT DELETED.id, ${quarter}, DELETED.geometry, DELETED.geometryType, DELETED.sourceId,
-				DELETED.consulteeCategory, DELETED.consulteeGroup, DELETED.consulteeSubcategory,
-				DELETED.consulteeSubcategoryDescription, DELETED.consultee, DELETED.region, DELETED.metadata,
-				DELETED.currentVersion, DELETED.validFrom, DELETED.validTo, DELETED.lastUpdated
-			INTO consultee_area_archive (
-				consulteeAreaId, quarter, geometry, geometryType, sourceId, consulteeCategory, consulteeGroup,
-				consulteeSubcategory, consulteeSubcategoryDescription, consultee, region, metadata,
-				currentVersion, validFrom, validTo, lastUpdated
-			)
-			WHERE consulteeCategory IN (${categoriesOf(group)})
-		`;
-		total += moved;
-		if (moved < GROUP_ROWS_PER_STATEMENT) {
-			return total;
-		}
-	}
-}
-
-/** Delete the group's rows, a batch at a time. */
-async function deleteGroupRows(dbClient: PrismaClient, group: ReferenceDataGroup): Promise<number> {
+/** Delete the group's rows from `table`, a batch at a time. */
+async function deleteGroupRows(dbClient: PrismaClient, group: ReferenceDataGroup, table: string): Promise<number> {
 	let total = 0;
 	for (;;) {
 		const deleted = await dbClient.$executeRaw`
-			DELETE TOP (${GROUP_ROWS_PER_STATEMENT}) FROM consultee_area WHERE consulteeCategory IN (${categoriesOf(group)})
+			DELETE TOP (${GROUP_ROWS_PER_STATEMENT}) FROM ${tableSql(table)}
+			WHERE consulteeCategory IN (${categoriesOf(group)})
 		`;
 		total += deleted;
 		if (deleted < GROUP_ROWS_PER_STATEMENT) {
@@ -149,39 +128,60 @@ async function deleteGroupRows(dbClient: PrismaClient, group: ReferenceDataGroup
 	}
 }
 
-/** Each group's latest load, by slug - a group never loaded has none. */
-export async function latestGroupLoads(dbClient: PrismaClient): Promise<Map<string, LatestGroupLoad>> {
+/** Each group's latest load into `quarter`, by slug - a group not loaded into it has none. */
+export async function latestGroupLoads(dbClient: PrismaClient, quarter: string): Promise<Map<string, LatestGroupLoad>> {
 	const rows = await dbClient.$queryRaw<(LatestGroupLoad & { dataGroup: string })[]>`
-		SELECT dataGroup, blobName, dataDate, quarter, rowsLoaded, rowsArchived, loadedAt
+		SELECT dataGroup, blobName, dataDate, quarter, rowsLoaded, loadedAt
 		FROM (
 			SELECT *, ROW_NUMBER() OVER (PARTITION BY dataGroup ORDER BY loadedAt DESC, id) AS latest
 			FROM reference_data_load
+			WHERE quarter = ${quarter}
 		) AS loads
 		WHERE latest = 1
 	`;
 	return new Map(rows.map(({ dataGroup, ...load }) => [dataGroup, load]));
 }
 
-/** How many consultee_area rows each group has, by slug. */
+/** How many rows each group has in a quarter's table - by default the dataset in use - by slug. */
 export async function groupRowCounts(
 	dbClient: PrismaClient,
-	config: ReferenceDataConfig = REFERENCE_DATA_CONFIG
+	config: ReferenceDataConfig = REFERENCE_DATA_CONFIG,
+	quarter?: string
 ): Promise<Map<string, number>> {
+	const table = quarter ? consulteeAreaTable(quarter) : CONSULTEE_AREA;
 	const counts = new Map<string, number>();
 	for (const group of config.groups) {
-		counts.set(group.slug, await groupRowCount(dbClient, group));
+		counts.set(group.slug, await groupRowCount(dbClient, group, table));
 	}
 	return counts;
 }
 
 /**
- * Load a group's file - `blobName`, downloaded to `filePath` - replacing the group's rows. The
- * file is read through first: a feature of a category from another group, or a file with no
- * features, or data from an earlier quarter than the group's loaded data, refuses the load with a
- * GroupLoadError before anything changes. Then, if the group holds an earlier quarter's data, its
- * rows move to consultee_area_archive; otherwise they're deleted. The load is logged before the
- * file's rows go in, so a load that fails partway replaces, rather than archives, its own rows
- * when it's run again.
+ * The groups `quarter` still needs before it's used: those with rows in the dataset in use that
+ * have none in `quarter`'s table. A group with no data (Other, today) never holds it up.
+ */
+export async function groupsStillToLoad(
+	dbClient: PrismaClient,
+	quarter: string,
+	config: ReferenceDataConfig = REFERENCE_DATA_CONFIG
+): Promise<ReferenceDataGroup[]> {
+	const inUse = await groupRowCounts(dbClient, config);
+	const loaded = await groupRowCounts(dbClient, config, quarter);
+	return config.groups.filter((group) => inUse.get(group.slug)! > 0 && loaded.get(group.slug) === 0);
+}
+
+/**
+ * Load a group's file - `blobName`, downloaded to `filePath` - into its quarter's table,
+ * consultee_area_2026Q4, made the first time one of its groups is loaded. The group's rows there
+ * are replaced, so a corrected file can be loaded again; earlier quarters' tables are left as they
+ * are, as the archive.
+ *
+ * The file is read through first: a feature of a category from another group, a file with no
+ * features, or a file from an earlier quarter than the dataset in use refuses the load with a
+ * GroupLoadError before anything changes. A newer quarter than the one in use becomes the dataset
+ * in use once every group with data in the one in use has been loaded into it - until then the
+ * tool keeps using the one before (see groupsStillToLoad). Each load is logged in
+ * reference_data_load - before its rows go in, so the import page can say what's loading.
  */
 export async function importConsulteeAreaGroup(
 	dbClient: PrismaClient,
@@ -198,8 +198,7 @@ export async function importConsulteeAreaGroup(
 	}
 	const { group, dataDate } = file;
 	const quarter = quarterOf(dataDate);
-	let rowsArchived = 0;
-	let archivedQuarter: string | undefined;
+	const table = consulteeAreaTable(quarter);
 
 	const rowsLoaded = await importFile(
 		dbClient,
@@ -218,7 +217,8 @@ export async function importConsulteeAreaGroup(
 			}
 			return row;
 		},
-		loadConsulteeAreas,
+		(client, featureCollection, loadOptions) =>
+			loadConsulteeAreas(client, featureCollection, { ...loadOptions, table }),
 		{
 			chunkCharacters: GROUP_CHUNK_CHARACTERS,
 			...options,
@@ -226,22 +226,17 @@ export async function importConsulteeAreaGroup(
 				if (featureCount === 0) {
 					throw new GroupLoadError(`${blobName} holds no consultee areas. Nothing was changed`);
 				}
-				const loaded = (await latestGroupLoads(dbClient)).get(group.slug);
-				const rows = await groupRowCount(dbClient, group);
-				if (rows > 0 && loaded && loaded.quarter > quarter) {
+				const inUse = await datasetInUse(dbClient);
+				if (quarter < inUse) {
 					throw new GroupLoadError(
-						`${group.name} holds ${loaded.quarter} data, and ${blobName} is from ${quarter} - an earlier quarter. Nothing was changed`
+						`${blobName} is from ${quarter}, earlier than the dataset in use, ${inUse}. Nothing was changed`
 					);
 				}
-				if (rows > 0 && loaded && loaded.quarter < quarter) {
-					rowsArchived = await archiveGroupRows(dbClient, group, loaded.quarter);
-					archivedQuarter = loaded.quarter;
-				} else {
-					await deleteGroupRows(dbClient, group);
-				}
+				await dbClient.$executeRaw`EXEC dbo.create_consultee_area_dataset ${quarter}`;
+				await deleteGroupRows(dbClient, group, table);
 				await dbClient.$executeRaw`
-					INSERT INTO reference_data_load (dataGroup, blobName, dataDate, quarter, rowsLoaded, rowsArchived)
-					VALUES (${group.slug}, ${blobName}, ${dataDate}, ${quarter}, 0, ${rowsArchived})
+					INSERT INTO reference_data_load (dataGroup, blobName, dataDate, quarter, rowsLoaded)
+					VALUES (${group.slug}, ${blobName}, ${dataDate}, ${quarter}, 0)
 				`;
 			}
 		}
@@ -250,13 +245,25 @@ export async function importConsulteeAreaGroup(
 	await dbClient.$executeRaw`
 		UPDATE reference_data_load SET rowsLoaded = ${rowsLoaded}
 		WHERE id = (
-			SELECT TOP 1 id FROM reference_data_load WHERE dataGroup = ${group.slug} ORDER BY loadedAt DESC, id
+			SELECT TOP 1 id FROM reference_data_load
+			WHERE dataGroup = ${group.slug} AND quarter = ${quarter}
+			ORDER BY loadedAt DESC, id
 		)
 	`;
-	return { group, quarter, rowsLoaded, rowsArchived, ...(archivedQuarter ? { archivedQuarter } : {}) };
+
+	let inUse = await datasetInUse(dbClient);
+	let waitingFor: ReferenceDataGroup[] = [];
+	if (quarter > inUse) {
+		waitingFor = await groupsStillToLoad(dbClient, quarter, config);
+		if (waitingFor.length === 0) {
+			await dbClient.$executeRaw`EXEC dbo.use_consultee_area_dataset ${quarter}`;
+			inUse = quarter;
+		}
+	}
+	return { group, quarter, rowsLoaded, datasetInUse: inUse, waitingFor };
 }
 
-/** Empty consultee_area - every group's rows - leaving the load log and the archive as they are. */
+/** Empty the dataset in use - every group's rows - leaving other quarters' tables and the load log as they are. */
 export async function clearConsulteeAreas(dbClient: PrismaClient): Promise<number> {
 	return clearExistingRows(dbClient, 'consultee-areas');
 }

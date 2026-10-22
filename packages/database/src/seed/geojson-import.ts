@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto';
 import type { CaseBoundaryFeature } from '../geospatial/case-boundaries.ts';
 import { loadCaseBoundaries } from '../geospatial/case-boundaries.ts';
 import type { ConsulteeAreaFeature, LoadOptions } from '../geospatial/consultee-areas.ts';
-import { loadConsulteeAreas } from '../geospatial/consultee-areas.ts';
+import { datasetInUse, loadConsulteeAreas } from '../geospatial/consultee-areas.ts';
 import type { Geometry } from '../geospatial/wkt.ts';
 import { streamFeatures } from './feature-stream.ts';
 import {
@@ -239,9 +239,9 @@ export async function importFile<F extends ConsulteeAreaFeature | CaseBoundaryFe
 /**
  * Replace consultee_area with a reference-data GeoJSON file (the reference data export, or the
  * small sample in apps/function-python/setup_database/sample_data/reference_data.geojson). Always
- * a replace: the table holds exactly the file, never an older export's rows alongside it. Every
- * group's rows are replaced at once, so the log of group loads (seed/consultee-area-groups.ts)
- * starts again: the quarter of what's loaded isn't known until a group is next loaded.
+ * a replace: the dataset in use (the table the consultee_area synonym points at) holds exactly the
+ * file, never an older export's rows alongside it. Every group's rows are replaced at once, so the
+ * dataset's log of group loads (seed/consultee-area-groups.ts) is cleared.
  */
 export async function importConsulteeAreas(
 	dbClient: PrismaClient,
@@ -252,7 +252,9 @@ export async function importConsulteeAreas(
 		...options,
 		beforeLoad: async (featureCount) => {
 			await clearIfReplacing(dbClient, 'consultee-areas', featureCount, true);
-			await dbClient.$executeRaw`DELETE FROM reference_data_load`;
+			// the dataset in use is replaced whole - its quarter's log of group loads no longer applies
+			const quarter = await datasetInUse(dbClient);
+			await dbClient.$executeRaw`DELETE FROM reference_data_load WHERE quarter = ${quarter}`;
 		}
 	});
 }

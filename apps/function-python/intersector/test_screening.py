@@ -6,7 +6,12 @@ import pymssql
 import pytest
 
 from intersector import queries
-from intersector.database import is_deadlock_error, with_deadlock_retry
+from intersector.database import (
+    UnknownDataset,
+    dataset_table,
+    is_deadlock_error,
+    with_deadlock_retry,
+)
 from intersector.models import (
     AreaMatch,
     ConditionReason,
@@ -515,3 +520,56 @@ def test_a_bordering_condition_on_a_bounding_box_finds_the_hosts_neighbours_in_t
     # with no host in the box, nothing borders it
     nowhere = screen(connection_params, "POINT(40 40)", rules, 20_000, bounding_box=True)
     assert _matched(nowhere.consultees) == []
+
+
+def test_dataset_table_names_a_quarters_table_or_the_one_in_use():
+    assert dataset_table(None) == "consultee_area"
+    assert dataset_table("2026Q4") == "consultee_area_2026Q4"
+    for dataset in ("2026-Q4", "2026Q5", "26Q4", "2026Q4; DROP TABLE x"):
+        with pytest.raises(UnknownDataset):
+            dataset_table(dataset)
+
+
+QUARTER_TABLE_AREA_ID = "b9999999-9999-9999-9999-999999999999"
+
+
+@pytest.fixture
+def quarter_dataset(connection_params):
+    """A dataset of its own - 2099Q4's table, made as the manage app makes one - dropped afterwards."""
+    connection = pymssql.connect(
+        server=connection_params.server,
+        port=connection_params.port,
+        database=connection_params.database,
+        user=connection_params.user,
+        password=connection_params.password,
+        autocommit=True,
+    )
+    with connection.cursor() as cursor:
+        cursor.execute("IF OBJECT_ID('dbo.consultee_area_2099Q4', 'U') IS NOT NULL DROP TABLE dbo.consultee_area_2099Q4")
+        cursor.execute("SET QUOTED_IDENTIFIER ON; EXEC dbo.create_consultee_area_dataset %s", ("2099Q4",))
+        cursor.execute(
+            """
+            INSERT INTO dbo.consultee_area_2099Q4 (id, geometryType, geometry, geometrySimplified, consulteeCategory,
+                consultee, metadata)
+            SELECT %s, 'Point', g, g, 'Hospital', 'Next Quarter Hospital', '{}'
+            FROM (SELECT geography::Point(0.001, 0.001, 4326) AS g) AS p
+            """,
+            (QUARTER_TABLE_AREA_ID,),
+        )
+    try:
+        yield "2099Q4"
+    finally:
+        with connection.cursor() as cursor:
+            cursor.execute("DROP TABLE dbo.consultee_area_2099Q4")
+        connection.close()
+
+
+def test_screens_a_quarters_dataset_when_asked_rather_than_the_one_in_use(connection_params, quarter_dataset):
+    rules = [_rule(categories=("Hospital",), buffer_metres=1_000)]
+
+    asked = screen(connection_params, "POINT(0 0)", rules, 1_000, dataset=quarter_dataset)
+    assert _ids(_matched(asked.consultees)) == [QUARTER_TABLE_AREA_ID]
+    # the dataset in use doesn't hold it
+    assert QUARTER_TABLE_AREA_ID not in _ids(run_ruleset(connection_params, "POINT(0 0)", rules, 1_000))
+    with pytest.raises(UnknownDataset, match="There is no 2098Q1 dataset"):
+        screen(connection_params, "POINT(0 0)", rules, 1_000, dataset="2098Q1")

@@ -6,6 +6,7 @@ import { after, before, describe, test } from 'node:test';
 import type { PrismaClient } from '../client/client.ts';
 import { loadConfig } from '../configuration/config.ts';
 import { acquireDbTestLock, releaseDbTestLock } from '../db-test-lock.ts';
+import { datasetInUse, listDatasets } from '../geospatial/consultee-areas.ts';
 import { newDatabaseClient } from '../index.ts';
 import {
 	clearConsulteeAreas,
@@ -13,6 +14,7 @@ import {
 	groupBlobName,
 	GroupLoadError,
 	groupRowCounts,
+	groupsStillToLoad,
 	importConsulteeAreaGroup,
 	isoDate,
 	latestGroupLoads,
@@ -63,11 +65,11 @@ describe('group files', () => {
 	});
 
 	test('give the quarter their data is from', () => {
-		assert.equal(quarterOf('2026-01-01'), '2026-Q1');
-		assert.equal(quarterOf('2026-03-31'), '2026-Q1');
-		assert.equal(quarterOf('2026-04-01'), '2026-Q2');
-		assert.equal(quarterOf('2026-09-30'), '2026-Q3');
-		assert.equal(quarterOf('2026-10-20'), '2026-Q4');
+		assert.equal(quarterOf('2026-01-01'), '2026Q1');
+		assert.equal(quarterOf('2026-03-31'), '2026Q1');
+		assert.equal(quarterOf('2026-04-01'), '2026Q2');
+		assert.equal(quarterOf('2026-09-30'), '2026Q3');
+		assert.equal(quarterOf('2026-10-20'), '2026Q4');
 	});
 });
 
@@ -80,12 +82,13 @@ groups:
   Groups Test: [Groups Test Area]
   Groups Other: [Groups Other Area]
 `);
-const CATEGORIES = ['Groups Test Area', 'Groups Other Area'];
-const SLUGS = ['groups_test', 'groups_other'];
+// a quarter of its own, far from any real one: its table is made, used, and dropped by the suite
+const NEXT = '2099Q4';
 
 let dbClient: PrismaClient;
 let dbAvailable = false;
 let dir: string;
+let inUseBefore: string;
 
 before(async () => {
 	dir = await mkdtemp(path.join(tmpdir(), 'consultee-area-groups-'));
@@ -94,6 +97,7 @@ before(async () => {
 		await dbClient.$queryRaw`SELECT 1 AS probe`;
 		dbAvailable = true;
 		await acquireDbTestLock();
+		inUseBefore = await datasetInUse(dbClient);
 	} catch {
 		dbAvailable = false;
 	}
@@ -108,10 +112,18 @@ after(async () => {
 	await rm(dir, { recursive: true, force: true });
 });
 
+/** This suite's rows, its quarter's table and its loads gone - and the dataset in use as it was. */
 async function cleanup() {
-	await dbClient.$executeRaw`DELETE FROM consultee_area WHERE consulteeCategory IN (${CATEGORIES[0]}, ${CATEGORIES[1]})`;
-	await dbClient.$executeRaw`DELETE FROM consultee_area_archive WHERE consulteeCategory IN (${CATEGORIES[0]}, ${CATEGORIES[1]})`;
-	await dbClient.$executeRaw`DELETE FROM reference_data_load WHERE dataGroup IN (${SLUGS[0]}, ${SLUGS[1]})`;
+	await dbClient.$executeRaw`EXEC dbo.use_consultee_area_dataset ${inUseBefore}`;
+	await dbClient.$executeRaw`DELETE FROM consultee_area WHERE consulteeCategory IN ('Groups Test Area', 'Groups Other Area')`;
+	await dbClient.$executeRaw`IF OBJECT_ID('dbo.consultee_area_2099Q4', 'U') IS NOT NULL DROP TABLE dbo.consultee_area_2099Q4`;
+	await dbClient.$executeRaw`DELETE FROM reference_data_load WHERE dataGroup IN ('groups_test', 'groups_other')`;
+}
+
+/** A file for `slug`'s group dated the first day of the dataset in use's quarter. */
+function inUseFile(slug: string): string {
+	const month = String((Number(inUseBefore.slice(5)) - 1) * 3 + 1).padStart(2, '0');
+	return `${inUseBefore.slice(0, 4)}${month}01_${slug}.geojson`;
 }
 
 /** A group's file of `ids`, each a point of `category` - written to the suite's folder as `name`. */
@@ -135,78 +147,98 @@ async function load(name: string, ids: string[], category?: string) {
 	return importConsulteeAreaGroup(dbClient, await groupFile(name, ids, category), name, { config: CONFIG });
 }
 
-async function rowsOf(table: 'consultee_area' | 'consultee_area_archive') {
-	return dbClient.$queryRawUnsafe<{ sourceId: string; quarter?: string }[]>(
-		`SELECT sourceId${table === 'consultee_area_archive' ? ', quarter' : ''} FROM ${table}
-		WHERE consulteeCategory = 'Groups Test Area' ORDER BY sourceId`
+/** The suite's rows in `table` - the dataset in use by default. */
+async function sourceIds(table = 'consultee_area', category = 'Groups Test Area') {
+	const rows = await dbClient.$queryRawUnsafe<{ sourceId: string }[]>(
+		`SELECT sourceId FROM ${table} WHERE consulteeCategory = '${category}' ORDER BY sourceId`
 	);
+	return rows.map((row) => row.sourceId);
 }
 
 describe('loading a group (requires a local SQL Server - see docker-compose.yml)', () => {
-	test("replaces the group's rows within a quarter, and archives them for a later one", async (t) => {
+	test("replaces the group's rows in the dataset in use, when the file is from its quarter", async (t) => {
 		if (!dbAvailable) return t.skip('SQL Server database not available');
 		await cleanup();
-
-		const first = await load('20260801_groups_test.geojson', ['groups-a', 'groups-b']);
+		const first = await load(inUseFile('groups_test'), ['groups-a', 'groups-b']);
 		assert.deepEqual(
 			{ ...first, group: first.group.slug },
-			{ group: 'groups_test', quarter: '2026-Q3', rowsLoaded: 2, rowsArchived: 0 }
+			{ group: 'groups_test', quarter: inUseBefore, rowsLoaded: 2, datasetInUse: inUseBefore, waitingFor: [] }
 		);
+		// a corrected file for the same quarter replaces it
+		const corrected = inUseFile('groups_test').replace(/01_groups/, '15_groups');
+		await load(corrected, ['groups-c']);
+		assert.deepEqual(await sourceIds(), ['groups-c']);
 
-		// the same quarter's data replaces it - nothing archived
-		await load('20260915_groups_test.geojson', ['groups-c']);
-		assert.deepEqual(await rowsOf('consultee_area'), [{ sourceId: 'groups-c' }]);
-		assert.deepEqual(await rowsOf('consultee_area_archive'), []);
-
-		// a later quarter's moves it to the archive, labelled with its quarter
-		const next = await load('20261020_groups_test.geojson', ['groups-d', 'groups-e']);
-		assert.equal(next.rowsArchived, 1);
-		assert.equal(next.archivedQuarter, '2026-Q3');
-		assert.deepEqual(await rowsOf('consultee_area'), [{ sourceId: 'groups-d' }, { sourceId: 'groups-e' }]);
-		assert.deepEqual(await rowsOf('consultee_area_archive'), [{ sourceId: 'groups-c', quarter: '2026-Q3' }]);
-
-		const loads = await latestGroupLoads(dbClient);
-		const latest = loads.get('groups_test');
-		assert.equal(latest?.blobName, '20261020_groups_test.geojson');
-		assert.equal(latest?.quarter, '2026-Q4');
-		assert.equal(latest?.rowsLoaded, 2);
-		assert.equal(latest?.rowsArchived, 1);
-		assert.deepEqual(latest?.dataDate, new Date('2026-10-20T00:00:00Z'));
-		assert.equal(loads.has('groups_other'), false);
+		const latest = (await latestGroupLoads(dbClient, inUseBefore)).get('groups_test');
+		assert.equal(latest?.blobName, corrected);
+		assert.equal(latest?.rowsLoaded, 1);
 		assert.deepEqual(
 			[...(await groupRowCounts(dbClient, CONFIG))],
 			[
-				['groups_test', 2],
+				['groups_test', 1],
 				['groups_other', 0]
 			]
 		);
 	});
 
-	test("refuses an earlier quarter, another group's category, an empty file or a name that isn't a group's - changing nothing", async (t) => {
+	test('loads a newer quarter into its own table, and uses it once every group with data is in', async (t) => {
 		if (!dbAvailable) return t.skip('SQL Server database not available');
 		await cleanup();
-		await load('20261020_groups_test.geojson', ['groups-a']);
+		try {
+			// both groups have data in the dataset in use
+			await load(inUseFile('groups_test'), ['groups-old']);
+			await load(inUseFile('groups_other'), ['other-old'], 'Groups Other Area');
+
+			// the next quarter's first group goes into its own table; the tool keeps using this one
+			const testGroup = await load('20991015_groups_test.geojson', ['groups-new']);
+			assert.equal(testGroup.quarter, NEXT);
+			assert.equal(testGroup.datasetInUse, inUseBefore);
+			assert.deepEqual(
+				testGroup.waitingFor.map((group) => group.slug),
+				['groups_other']
+			);
+			assert.deepEqual(await sourceIds(`consultee_area_${NEXT}`), ['groups-new']);
+			assert.deepEqual(await sourceIds(), ['groups-old']);
+			assert.deepEqual(
+				(await groupsStillToLoad(dbClient, NEXT, CONFIG)).map((group) => group.slug),
+				['groups_other']
+			);
+			assert.ok((await listDatasets(dbClient)).some((dataset) => dataset.quarter === NEXT && dataset.rows === 1));
+
+			// its last group: the next quarter is the dataset in use, and the last one kept as it was
+			const otherGroup = await load('20991020_groups_other.geojson', ['other-new'], 'Groups Other Area');
+			assert.equal(otherGroup.datasetInUse, NEXT);
+			assert.deepEqual(otherGroup.waitingFor, []);
+			assert.equal(await datasetInUse(dbClient), NEXT);
+			assert.deepEqual(await sourceIds(), ['groups-new']);
+			assert.deepEqual(await sourceIds(`consultee_area_${inUseBefore}`), ['groups-old']);
+		} finally {
+			await cleanup();
+		}
+		assert.equal(await datasetInUse(dbClient), inUseBefore);
+	});
+
+	test("refuses an earlier quarter than the one in use, another group's category, an empty file or a name that isn't a group's - changing nothing", async (t) => {
+		if (!dbAvailable) return t.skip('SQL Server database not available');
+		await cleanup();
+		const file = inUseFile('groups_test');
+		await load(file, ['groups-a']);
 
 		for (const [name, ids, category, message] of [
 			[
-				'20260601_groups_test.geojson',
+				'20000101_groups_test.geojson',
 				['groups-x'],
 				undefined,
-				/holds 2026-Q4 data, and 20260601_groups_test\.geojson is from 2026-Q2/
+				new RegExp(`is from 2000Q1, earlier than the dataset in use, ${inUseBefore}`)
 			],
 			[
-				'20261021_groups_test.geojson',
+				file,
 				['groups-x'],
 				'Groups Other Area',
 				/groups-x, a Groups Other Area, which belongs in Groups Other - not Groups Test/
 			],
-			[
-				'20261021_groups_test.geojson',
-				['groups-x'],
-				'Unheard Of',
-				/a Unheard Of, which config\/reference-data.yaml doesn't put in a group/
-			],
-			['20261021_groups_test.geojson', [], undefined, /holds no consultee areas/],
+			[file, ['groups-x'], 'Unheard Of', /a Unheard Of, which config\/reference-data.yaml doesn't put in a group/],
+			[file, [], undefined, /holds no consultee areas/],
 			['groups_test.geojson', ['groups-x'], undefined, /isn't a group's file/]
 		] as const) {
 			await assert.rejects(
@@ -215,24 +247,7 @@ describe('loading a group (requires a local SQL Server - see docker-compose.yml)
 				name
 			);
 		}
-		assert.deepEqual(await rowsOf('consultee_area'), [{ sourceId: 'groups-a' }]);
-		assert.equal((await latestGroupLoads(dbClient)).get('groups_test')?.blobName, '20261020_groups_test.geojson');
-	});
-
-	test('loads an earlier quarter into an empty group, and replaces rows loaded before groups were logged', async (t) => {
-		if (!dbAvailable) return t.skip('SQL Server database not available');
-		await cleanup();
-		await load('20261020_groups_test.geojson', ['groups-a']);
-		// emptied - say by Clear - so there's nothing an earlier quarter would overwrite
-		await dbClient.$executeRaw`DELETE FROM consultee_area WHERE consulteeCategory = 'Groups Test Area'`;
-		await load('20260601_groups_test.geojson', ['groups-b']);
-		assert.deepEqual(await rowsOf('consultee_area'), [{ sourceId: 'groups-b' }]);
-
-		// rows with no load logged - from a full import - are replaced, as their quarter isn't known
-		await dbClient.$executeRaw`DELETE FROM reference_data_load WHERE dataGroup = 'groups_test'`;
-		await load('20261020_groups_test.geojson', ['groups-c']);
-		assert.deepEqual(await rowsOf('consultee_area'), [{ sourceId: 'groups-c' }]);
-		assert.deepEqual(await rowsOf('consultee_area_archive'), []);
+		assert.deepEqual(await sourceIds(), ['groups-a']);
 	});
 
 	test("uses the app's own groups by default", async (t) => {
@@ -247,10 +262,10 @@ describe('loading a group (requires a local SQL Server - see docker-compose.yml)
 });
 
 describe('clearing consultee areas', () => {
-	test('empties consultee_area (runs in CI only - it would empty the shared local table)', async (t) => {
+	test('empties the dataset in use (runs in CI only - it would empty the shared local table)', async (t) => {
 		if (!process.env.CI && !process.env.TF_BUILD) return t.skip('empties every consultee area - runs in CI only');
 		if (!dbAvailable) return t.skip('SQL Server database not available');
-		await load('20261020_groups_test.geojson', ['groups-a']);
+		await load(inUseFile('groups_test'), ['groups-a']);
 		assert.ok((await clearConsulteeAreas(dbClient)) >= 1);
 		assert.equal((await groupRowCounts(dbClient, CONFIG)).get('groups_test'), 0);
 	});

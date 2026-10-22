@@ -15,6 +15,7 @@ from cbos.config import CbosNotConfigured, cbos_config_from_env
 from cbos.connection_check import check_cbos, default_credential
 from cbos.gis_files import GisFileNotFound, list_gis_files, read_gis_file
 from intersector.api import BadRequest, consultees_json, parse_run_ruleset_request
+from intersector.database import UnknownDataset
 from intersector.screening import run_ruleset
 from querying.consultee_areas import fetch_consultee_areas
 from setup_database.db import check_connection, connection_params_from_env
@@ -234,7 +235,10 @@ def run_ruleset_route(req: func.HttpRequest) -> func.HttpResponse:
             with_geometry=request.include_geometry,
             bounding_box_above_points=request.bounding_box_above_points,
             bounding_box=request.bounding_box,
+            dataset=request.dataset,
         )
+    except UnknownDataset as error:
+        return _json_response({"error": str(error)}, 400)
     except Exception:
         logger.exception("Failed to run the ruleset")
         return _json_response({"error": "Failed to run the ruleset"}, 500)

@@ -275,7 +275,9 @@ describe('importConsulteeAreas', () => {
 	// resolves exercises the whole read-file -> map -> clear -> load path without a real database
 	function loadingClient() {
 		const $executeRaw = mock.fn(async () => 1);
-		return { client: { $executeRaw } as unknown as PrismaClient, $executeRaw };
+		// the dataset in use - the table the consultee_area synonym points at
+		const $queryRaw = mock.fn(async () => [{ baseObjectName: '[dbo].[consultee_area_2026Q4]' }]);
+		return { client: { $executeRaw, $queryRaw } as unknown as PrismaClient, $executeRaw };
 	}
 	const sql = (call: { arguments: unknown[] }) => (call.arguments[0] as TemplateStringsArray).join('?');
 	const point = (properties: Record<string, unknown>) => ({
@@ -295,12 +297,21 @@ describe('importConsulteeAreas', () => {
 		await withFile(JSON.stringify(file), async (filePath) => {
 			assert.equal(await importConsulteeAreas(client, filePath), 2);
 		});
-		// one batch delete of every row that comes back short, the group load log emptied - every
-		// group was replaced - then one MERGE batch
+		// one batch delete of every row that comes back short, the dataset's group load log emptied -
+		// every group was replaced - then one MERGE batch
 		assert.equal($executeRaw.mock.callCount(), 3);
 		assert.match(sql($executeRaw.mock.calls[0]), /^DELETE TOP \(\?\) FROM consultee_area$/);
-		assert.match(sql($executeRaw.mock.calls[1]), /^DELETE FROM reference_data_load$/);
-		assert.match(sql($executeRaw.mock.calls[2]), /MERGE INTO consultee_area/);
+		// the dataset in use's log of group loads, cleared
+		assert.match(sql($executeRaw.mock.calls[1]), /^DELETE FROM reference_data_load WHERE quarter = \?$/);
+		assert.equal($executeRaw.mock.calls[1].arguments[1], '2026Q4');
+		// into the dataset in use, through its synonym
+		assert.match(sql($executeRaw.mock.calls[2]), /MERGE INTO \? AS target/);
+		assert.equal(
+			String(
+				($executeRaw.mock.calls[2].arguments[1] as { text?: string }).text ?? $executeRaw.mock.calls[2].arguments[1]
+			),
+			'consultee_area'
+		);
 	});
 
 	test('refuses to clear the table for a file with no features', async () => {
