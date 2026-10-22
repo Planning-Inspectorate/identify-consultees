@@ -55,3 +55,50 @@ resource "azurerm_virtual_network_peering" "idas_to_consultees" {
   resource_group_name       = data.azurerm_resource_group.common.name
   virtual_network_name      = data.azurerm_virtual_network.common.name
 }
+
+# CBOS's Service Bus. Its nsip-document topic says when a document changes - including when CBOS
+# converts a case's shapefile ZIP to GeoJSON. The web app subscribes, and imports that case's
+# boundaries (apps/manage/src/app/cbos/subscriber.ts). Off until cbos_subscriber_enabled.
+data "azurerm_servicebus_namespace" "idas" {
+  count               = var.cbos_subscriber_enabled ? 1 : 0
+  name                = "pins-sb-back-office-${var.environment}-ukw-001"
+  resource_group_name = data.azurerm_resource_group.idas_back_office.name
+}
+
+data "azurerm_servicebus_topic" "idas_nsip_document" {
+  count        = var.cbos_subscriber_enabled ? 1 : 0
+  name         = "nsip-document"
+  namespace_id = data.azurerm_servicebus_namespace.idas[0].id
+}
+
+resource "azurerm_servicebus_subscription" "web_nsip_document" {
+  count = var.cbos_subscriber_enabled ? 1 : 0
+
+  name     = "identify-consultees-nsip-document"
+  topic_id = data.azurerm_servicebus_topic.idas_nsip_document[0].id
+  # an import that fails (the function down, say) is tried again, then dead-lettered
+  max_delivery_count                   = 5
+  default_message_ttl                  = "P7D"
+  dead_lettering_on_message_expiration = true
+}
+
+# only Create and Update events - a converted boundary is an Update - not Delete, Publish or
+# Unpublish. The web app ignores every event but a GIS shapefile's GeoJSON, so a $Default rule,
+# should one be left on the subscription, only lets more through for it to ignore
+resource "azurerm_servicebus_subscription_rule" "web_nsip_document_changes" {
+  count = var.cbos_subscriber_enabled ? 1 : 0
+
+  name            = "create-and-update"
+  subscription_id = azurerm_servicebus_subscription.web_nsip_document[0].id
+  filter_type     = "SqlFilter"
+  sql_filter      = "type IN ('Create', 'Update')"
+}
+
+# the live web app only - the staging slot has the subscriber off (app-web.tf)
+resource "azurerm_role_assignment" "web_nsip_document_receiver" {
+  count = var.cbos_subscriber_enabled ? 1 : 0
+
+  scope                = azurerm_servicebus_subscription.web_nsip_document[0].id
+  role_definition_name = "Azure Service Bus Data Receiver"
+  principal_id         = module.app_web.principal_id
+}
