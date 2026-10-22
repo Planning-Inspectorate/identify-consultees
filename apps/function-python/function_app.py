@@ -13,7 +13,6 @@ from cbos.boundaries import (
 )
 from cbos.config import CbosNotConfigured, cbos_config_from_env
 from cbos.connection_check import check_cbos, default_credential
-from cbos.gis_files import GisFileNotFound, list_gis_files, read_gis_file
 from intersector.api import BadRequest, consultees_json, parse_run_ruleset_request
 from intersector.database import UnknownDataset
 from intersector.screening import run_ruleset
@@ -135,50 +134,6 @@ def cbos_boundary_file(req: func.HttpRequest) -> func.HttpResponse:
         return _json_response({"error": "Failed to fetch the boundary file"}, 500)
 
     return _json_response(collection)
-
-
-@app.route(route="cbos/gis-files")
-def cbos_gis_files(req: func.HttpRequest) -> func.HttpResponse:
-    """Every file in CBOS's GIS Shapefiles folders, every version - for debugging the boundary
-    import (see cbos/gis_files.py)."""
-    auth_error = _check_api_key(req)
-    if auth_error is not None:
-        return auth_error
-
-    try:
-        listing = list_gis_files(cbos_config_from_env(), default_credential())
-    except CbosNotConfigured as error:
-        return _json_response({"error": str(error)}, 500)
-    except Exception:
-        logger.exception("Failed to list CBOS GIS files")
-        return _json_response({"error": "Failed to list CBOS GIS files"}, 500)
-
-    return _json_response(listing)
-
-
-@app.route(route="cbos/gis-files/{guid}/{version:int}")
-def cbos_gis_file(req: func.HttpRequest) -> func.HttpResponse:
-    """One GIS file's details and what its blob holds, or why it couldn't be read."""
-    auth_error = _check_api_key(req)
-    if auth_error is not None:
-        return auth_error
-
-    try:
-        document_guid, version = _route_document(req)
-    except ValueError:
-        return _json_response({"error": "guid must be a UUID and version a number"}, 400)
-
-    try:
-        result = read_gis_file(cbos_config_from_env(), default_credential(), document_guid, version)
-    except CbosNotConfigured as error:
-        return _json_response({"error": str(error)}, 500)
-    except GisFileNotFound:
-        return _json_response({"error": "GIS file not found"}, 404)
-    except Exception:
-        logger.exception("Failed to read CBOS GIS file %s version %s", document_guid, version)
-        return _json_response({"error": "Failed to read the GIS file"}, 500)
-
-    return _json_response(result)
 
 
 @app.route(route="consultee-areas")

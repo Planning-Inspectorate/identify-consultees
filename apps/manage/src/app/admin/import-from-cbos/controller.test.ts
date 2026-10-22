@@ -7,7 +7,8 @@ import { buildImportFromCbosPage, buildRunImportFromCbos } from './controller.ts
 describe('admin import from CBOS', () => {
 	const nunjucks = configureNunjucks();
 	const newRes = () => ({ render: mock.fn((view, data) => nunjucks.render(view, data)) });
-	const newService = (counts: unknown = [{ total: 300, fromCbos: 120 }]) => ({
+	const LOADED = { cases: 270, boundaries: 300, casesFromCbos: 110, boundariesFromCbos: 120 };
+	const newService = (counts: unknown = [LOADED]) => ({
 		logger: mockLogger(),
 		db: {
 			$queryRaw: mock.fn(async () => {
@@ -21,14 +22,16 @@ describe('admin import from CBOS', () => {
 	const viewModel = (res: ReturnType<typeof newRes>) => res.render.mock.calls[0].arguments[1];
 	const html = (res: ReturnType<typeof newRes>) => res.render.mock.calls[0].result as string;
 
-	it('shows the loaded counts without importing', async () => {
+	it('shows how many cases and boundaries are in the database without importing', async () => {
 		const res = newRes();
 		await buildImportFromCbosPage(newService() as never)({}, res);
 
 		assert.strictEqual(res.render.mock.calls[0].arguments[0], 'admin/import-from-cbos/view.njk');
-		assert.strictEqual(viewModel(res).loadedCaseBoundaries, 300);
-		assert.strictEqual(viewModel(res).loadedFromCbos, 120);
+		assert.deepStrictEqual(viewModel(res).loaded, LOADED);
 		assert.strictEqual(viewModel(res).imported, undefined);
+		assert.match(html(res), /<h1 class="govuk-heading-l">Import cases from CBOS<\/h1>/);
+		assert.match(html(res), /Cases[\s\S]*270 \(110 from CBOS\)/);
+		assert.match(html(res), /Case boundaries[\s\S]*300 \(120 from CBOS\)/);
 	});
 
 	it('leaves the counts off when they cannot be read', async () => {
@@ -36,7 +39,7 @@ describe('admin import from CBOS', () => {
 		const res = newRes();
 		await buildImportFromCbosPage(service as never)({}, res);
 
-		assert.strictEqual(viewModel(res).loadedCaseBoundaries, undefined);
+		assert.strictEqual(viewModel(res).loaded, undefined);
 		assert.strictEqual(service.logger.warn.mock.callCount(), 1);
 	});
 
@@ -45,6 +48,7 @@ describe('admin import from CBOS', () => {
 		const runImport = mock.fn(async () => ({
 			filesFound: 3,
 			imported: 2,
+			casesImported: 1,
 			failures: [{ caseReference: 'EN010001', fileName: 'broken.geojson', reason: 'status 500' }]
 		}));
 		const res = newRes();
@@ -54,14 +58,14 @@ describe('admin import from CBOS', () => {
 			pythonFunctionUrl: 'http://localhost:7071/api/consultee-areas',
 			apiKey: 'test-key'
 		});
-		assert.match(html(res), /Imported 2 of 3 CBOS boundary files/);
+		assert.match(html(res), /Imported 2 of 3 CBOS boundary files, for 1 cases/);
 		assert.match(html(res), /broken\.geojson/);
 		assert.strictEqual(service.logger.warn.mock.callCount(), 1);
 	});
 
 	it('shows success without a failures table when every file imported', async () => {
 		const service = newService();
-		const runImport = mock.fn(async () => ({ filesFound: 1, imported: 1, failures: [] }));
+		const runImport = mock.fn(async () => ({ filesFound: 1, imported: 1, casesImported: 1, failures: [] }));
 		const res = newRes();
 		await buildRunImportFromCbos(service as never, runImport as never)({}, res);
 

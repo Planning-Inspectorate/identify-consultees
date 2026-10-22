@@ -24,20 +24,9 @@ export const ADMIN_PAGES: readonly AdminPage[] = [
 		description: 'Replace the consultee areas or case boundaries with a file uploaded to blob storage.'
 	},
 	{
-		href: '/admin/cbos-connection',
-		text: 'CBOS connection',
-		description: 'Check the Python function can reach CBOS, the case back office.'
-	},
-	{
 		href: '/admin/import-from-cbos',
-		text: 'Import from CBOS',
-		description: 'Import the case boundaries CBOS holds.'
-	},
-	{
-		href: '/admin/cbos-files',
-		text: 'CBOS files',
-		description:
-			"Every file in CBOS's GIS Shapefiles folders, where it's stored and what it holds - to see why a case's boundary isn't imported."
+		text: 'Import cases from CBOS',
+		description: 'How many cases are in the database, and import every case boundary CBOS holds.'
 	}
 ];
 

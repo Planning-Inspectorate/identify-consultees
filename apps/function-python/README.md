@@ -7,9 +7,8 @@ The `pins-func-consultees-orchestrator-*` Function App ([`infrastructure/app-fun
 | `GET /api/health` | Checks it can reach our database. No key needed |
 | `POST /api/run-ruleset` | Screens a site against a ruleset: the consultees and why each qualifies |
 | `GET /api/consultee-areas` | A sample of `consultee_area` rows. The manage app's `PYTHON_FUNCTION_URL` names this route, and the others are found beside it |
-| `GET /api/cbos/health` | Checks it can reach CBOS's database and document storage |
-| `GET /api/cbos/boundary-files[/{guid}/{version}]` | CBOS's case boundaries, and one's GeoJSON, for the boundary import |
-| `GET /api/cbos/gis-files[/{guid}/{version}]` | Every file in CBOS's GIS Shapefiles folders, for debugging the import |
+| `GET /api/cbos/health` | Checks it can reach CBOS's database and document storage, from the command line |
+| `GET /api/cbos/boundary-files[/{guid}/{version}]` | CBOS's case boundaries, every version, and one's GeoJSON, for the boundary import |
 
 Every route but `health` needs the `x-api-key` header to match `CONSULTEE_AREAS_API_KEY`, the same value as the manage app's `PYTHON_FUNCTION_API_KEY`. Without the setting, those routes refuse to serve (500). CBOS is reached as the app's managed identity, or locally as whoever is signed in to the Azure CLI; see [`cbos/config.py`](./cbos/config.py) for its settings.
 

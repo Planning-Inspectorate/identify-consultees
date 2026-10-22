@@ -110,9 +110,10 @@ The import reads the file a feature at a time and loads about 32MB of it at once
 
 CBOS (the IDAS back office) is PINS's system of record for cases. A case officer uploads a project's boundary as a shapefile ZIP to the case's "GIS Shapefiles" folder, and CBOS's own `process-shapefile` job converts it to WGS84 GeoJSON, stores it next to the ZIP and records it as the document's next version (`application/geo+json`). Each feature carries `caseReference`, `projectName`, `fileName` and `receivedDate`, the properties the file import reads.
 
-`/admin/import-from-cbos` asks the Python function (the only app with CBOS access, as its managed identity) for the latest GeoJSON version of every live file in those folders, then saves each file as one `case_boundary` row:
+`/admin/import-from-cbos` (**Import cases from CBOS**, which also shows how many cases and boundaries are in the database) asks the Python function (the only app with CBOS access, as its managed identity) for every GeoJSON version of every live file in those folders - a replaced boundary's earlier versions too - then saves each as one `case_boundary` row:
 
-- The id is the file import's (case reference and file name), so a boundary already loaded from a file is updated, not duplicated.
+- The id is the file import's (case reference and file name), so a boundary already loaded from a file is updated, not duplicated. When two of a case's files share a name (a ZIP replaced by another of the same name), the newest keeps it and each older one is named for its version, "site.geojson (version 2)" (`distinctFileNames`).
+- A case keeps every boundary it's had: its boundary page lists them all to pick from, and everywhere else (search, Nearby NSIPs) a case is its newest.
 - A file's features (a site and its access routes, say) become one MultiPolygon. The loader corrects winding and runs `MakeValid()` as for any import.
 - The project name is CBOS's current case title, not the one stamped on the GeoJSON.
 - A file whose coordinates aren't longitude and latitude is turned away. CBOS only reprojects when the ZIP has a `.prj` file, and accepts one without.
@@ -121,7 +122,7 @@ CBOS (the IDAS back office) is PINS's system of record for cases. A case officer
 
 Nothing else is done to the geometry: screening simplifies the site to 10m when it runs, as for any boundary.
 
-**When a case's boundary isn't imported**, `/admin/cbos-files` shows why. It lists every version of every file in the GIS Shapefiles folders, not just what the import reads: the ZIPs CBOS converted, the ones it marked `invalid`, and the ones never virus checked and so never sent for conversion. It also counts the cases at each step, from those with a reference down to those the import reads. Each file's page shows where it's stored and what's in it, for example a ZIP with no `.prj` or GeoJSON in grid metres. CBOS's historical boundaries migration adds its GeoJSON as version 1 of a new document, so the import reads those too, once it has run in that environment.
+**When a case's boundary isn't imported**, the usual reasons are a ZIP CBOS marked `invalid`, one never virus checked and so never sent for conversion, a ZIP with no `.prj` (GeoJSON in grid metres, turned away above), or a file outside a GIS Shapefiles folder. CBOS's historical boundaries migration adds its GeoJSON as version 1 of a new document, so the import reads those too, once it has run in that environment.
 
 1. Edit `schema.prisma`, then run `npx prisma migrate dev --create-only` in `packages/database`.
 2. Hand-add what Prisma can't express: spatial indexes, `CHECK` constraints, backfills. A new column can't be referenced in the batch that adds it, so wrap later statements in `EXEC('...')` (see the simplified-geometry migration).

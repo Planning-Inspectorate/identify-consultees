@@ -31,11 +31,12 @@ def _fake_connect(rows):
     return patch("cbos.boundaries.connect", return_value=connection), connection
 
 
-def test_the_query_reads_only_the_latest_geojson_version_in_gis_shapefiles_folders():
+def test_the_query_reads_every_geojson_version_in_gis_shapefiles_folders():
     for sql in (LIST_BOUNDARY_FILES, GET_BOUNDARY_FILE):
         assert "dv.mime = 'application/geo+json'" in sql
         assert "f.displayNameEn = 'GIS Shapefiles'" in sql
-        assert "g.newest = 1" in sql
+        # every version, not just the newest - a replaced boundary's earlier ones too
+        assert "newest" not in sql and "ROW_NUMBER" not in sql
         assert "d.isDeleted = 0" in sql and "dv.isDeleted = 0" in sql and "f.deletedAt IS NULL" in sql
 
 
