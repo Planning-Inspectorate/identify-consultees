@@ -137,6 +137,33 @@ describe('interactive-map-examples client helpers', () => {
 		assert.equal(none.length, 0);
 	});
 
+	test('buildPlugins pulls the draw plugin in for the local measure plugin', () => {
+		const { defra } = mockDefra();
+		const { plugins, draw } = buildPlugins(defra, {
+			measure: { modes: ['distance', 'path', 'area'] }
+		});
+
+		assert.equal(plugins.length, 2);
+		assert.equal(defra.drawPlugin.mock.callCount(), 1);
+		// measure doesn't configure draw itself - the plugin is instantiated with defaults
+		assert.deepEqual(defra.drawPlugin.mock.calls[0].arguments[0], {});
+		assert.equal(plugins[1].id, 'measure');
+		assert.deepEqual(plugins[1].modes, ['distance', 'path', 'area']);
+		assert.ok(draw);
+	});
+
+	test('the measure example wires its own tools - no consumer draw button', () => {
+		installDom(pageHtml({ kind: 'measure', measure: { modes: ['distance'] } }));
+		const { defra, InteractiveMap, fire } = mockDefra();
+		globalThis.defra = defra;
+		globalThis.window.defra = defra;
+
+		initInteractiveMapExample('demo-map');
+		fire('map:ready');
+		assert.equal(defra.drawPlugin.mock.callCount(), 1);
+		assert.equal(InteractiveMap.mock.calls[0].this.addButton.mock.callCount(), 0);
+	});
+
 	test('draw-tools instantiates the draw plugin and adds the polygon button at map:ready', () => {
 		installDom(pageHtml({ kind: 'draw-tools', interact: {}, draw: { snapLayers: ['field-parcels'] } }));
 		const drawInstance = { newPolygon: mock.fn() };

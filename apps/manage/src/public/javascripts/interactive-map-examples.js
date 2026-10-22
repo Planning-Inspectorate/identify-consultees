@@ -15,6 +15,7 @@
  */
 
 import { createLayersKeyPlugin } from './layers-key-plugin.mjs';
+import { createMeasurePlugin } from './measure-plugin.mjs';
 import { createStaticMapPlugin } from './static-map-plugin.mjs';
 
 /**
@@ -62,9 +63,13 @@ export function buildPlugins(defra, config) {
 		interact = defra.interactPlugin(config.interact);
 		plugins.push(interact);
 	}
-	if (config.draw && defra.drawPlugin) {
-		draw = defra.drawPlugin(config.draw);
+	// the measure plugin draws through the draw plugin, so it pulls draw in itself
+	if ((config.draw || config.measure) && defra.drawPlugin) {
+		draw = defra.drawPlugin(config.draw ?? {});
 		plugins.push(draw);
+	}
+	if (config.measure) {
+		plugins.push(createMeasurePlugin(config.measure));
 	}
 	if (config.mapStyles?.length && defra.mapStylesPlugin) {
 		plugins.push(defra.mapStylesPlugin({ mapStyles: config.mapStyles }));
@@ -115,8 +120,9 @@ function wireExampleBehaviour(map, config, interactPlugin, drawPlugin) {
 
 	// the draw plugin renders in-session controls (Done/Cancel/Menu) itself but
 	// the entry button is the consumer's job — newPolygon only works once the
-	// adapter emits draw:ready, which always precedes a user click
-	if (drawPlugin) {
+	// adapter emits draw:ready, which always precedes a user click. Only examples
+	// that configure draw tools get the button (measure registers its own).
+	if (drawPlugin && config.draw) {
 		map.on('map:ready', () => {
 			map.addButton('drawPolygon', {
 				label: 'Draw polygon',
