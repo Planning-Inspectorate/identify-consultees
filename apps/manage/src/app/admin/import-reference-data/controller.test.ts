@@ -10,7 +10,6 @@ import {
 	buildRunImportCaseBoundaries,
 	buildRunImportConsulteeAreaGroup,
 	CASE_BOUNDARIES_BLOB_NAME,
-	formatSize,
 	loadOutcome
 } from './controller.ts';
 
@@ -451,11 +450,5 @@ describe('admin import reference data', () => {
 			assert.strictEqual(runImport.mock.callCount(), 0);
 			assert.match(viewModelOf(res).error, /Could not import case boundaries/);
 		});
-	});
-
-	it('gives file sizes in KB under a megabyte, else MB', () => {
-		assert.strictEqual(formatSize(10), '1KB');
-		assert.strictEqual(formatSize(512 * 1024), '512KB');
-		assert.strictEqual(formatSize(1_500_000), '1.4MB');
 	});
 });

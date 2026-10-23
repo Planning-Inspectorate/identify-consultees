@@ -22,6 +22,7 @@ import {
 } from '@pins/identify-consultees-database/src/seed/reference-data.ts';
 import type { AsyncRequestHandler } from '@planning-inspectorate/core/util';
 import type { Request } from 'express';
+import { formatFileSize } from '../../views/consultees/report/export/report-zip.ts';
 import type { GroupStatus, ImportReferenceDataViewModel } from './view-model.ts';
 
 const VIEW = 'admin/import-reference-data/view.njk';
@@ -65,13 +66,6 @@ const formatDateTime = (date: Date) =>
 		timeZone: 'Europe/London'
 	});
 
-/** A file's size as the page gives it: 1.4MB, 512KB. */
-export function formatSize(bytes: number): string {
-	return bytes < 1024 * 1024
-		? `${Math.max(1, Math.round(bytes / 1024))}KB`
-		: `${Math.round((bytes / (1024 * 1024)) * 10) / 10}MB`;
-}
-
 function groupStatus(
 	group: ReferenceDataGroup,
 	file: (StoredBlob & { dataDate: string }) | undefined,
@@ -89,7 +83,7 @@ function groupStatus(
 						name: file.name,
 						dataDate: formatDate(new Date(`${file.dataDate}T00:00:00Z`)),
 						quarter: quarterOf(file.dataDate),
-						size: formatSize(file.size)
+						size: formatFileSize(file.size)
 					}
 				}
 			: {}),

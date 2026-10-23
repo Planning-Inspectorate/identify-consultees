@@ -54,27 +54,46 @@ export interface RemovedConsultee {
  */
 export function removedConsultees(value: unknown): RemovedConsultee[] {
 	return queryValues(value).flatMap((raw) => {
-		try {
-			const parsed: unknown = JSON.parse(decodeSelectionEntry(raw));
-			if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
-				return [{ id: raw, category: '', name: '', reason: '' }];
-			}
-			const { i, c, n, r } = parsed as { i?: unknown; c?: unknown; n?: unknown; r?: unknown };
-			if (typeof c !== 'string' || c === '' || typeof n !== 'string' || n === '') {
-				return [];
-			}
-			return [
-				{
-					...(typeof i === 'string' && i !== '' ? { id: i } : {}),
-					category: c,
-					name: n,
-					reason: typeof r === 'string' ? r : ''
-				}
-			];
-		} catch {
+		const entry = parseEntry(raw);
+		if (entry === undefined) {
 			return [{ id: raw, category: '', name: '', reason: '' }];
 		}
+		return entry ? [entry] : [];
 	});
+}
+
+/** A selection entry's fields - an add's and a removal's are the same. */
+interface SelectionEntry {
+	id?: string;
+	category: string;
+	name: string;
+	reason: string;
+}
+
+/**
+ * An `add` or `exclude` param's entry: undefined when it isn't a JSON object (a bare id), null when
+ * it is but has no category or name.
+ */
+function parseEntry(raw: string): SelectionEntry | null | undefined {
+	let parsed: unknown;
+	try {
+		parsed = JSON.parse(decodeSelectionEntry(raw));
+	} catch {
+		return undefined;
+	}
+	if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+		return undefined;
+	}
+	const { i, c, n, r } = parsed as { i?: unknown; c?: unknown; n?: unknown; r?: unknown };
+	if (typeof c !== 'string' || c === '' || typeof n !== 'string' || n === '') {
+		return null;
+	}
+	return {
+		...(typeof i === 'string' && i !== '' ? { id: i } : {}),
+		category: c,
+		name: n,
+		reason: typeof r === 'string' ? r : ''
+	};
 }
 
 /** The consultee_area ids of the nearby consultees added by hand (a typed name matched to one). */
@@ -115,46 +134,19 @@ export interface AddedConsultee {
  * incomplete entries are ignored rather than failing the page.
  */
 export function addedConsultees(value: unknown): AddedConsultee[] {
-	return queryValues(value).flatMap((raw) => {
-		try {
-			const parsed = JSON.parse(decodeSelectionEntry(raw)) as { i?: unknown; c?: unknown; n?: unknown; r?: unknown };
-			if (typeof parsed.c !== 'string' || parsed.c === '' || typeof parsed.n !== 'string' || parsed.n === '') {
-				return [];
-			}
-			return [
-				{
-					...(typeof parsed.i === 'string' && parsed.i !== '' ? { id: parsed.i } : {}),
-					category: parsed.c,
-					name: parsed.n,
-					reason: typeof parsed.r === 'string' ? parsed.r : ''
-				}
-			];
-		} catch {
-			return [];
-		}
-	});
+	return queryValues(value).flatMap((raw) => parseEntry(raw) ?? []);
 }
 
-function encodeAdd(consultee: AddedConsultee): string {
-	return encodeSelectionEntry({
-		...(consultee.id ? { i: consultee.id } : {}),
-		c: consultee.category,
-		n: consultee.name,
-		r: consultee.reason
-	});
-}
-
-function encodeRemoval(removal: RemovedConsultee): string {
-	// an id-only entry round-trips as the bare param it arrived as - a recorded removal encodes
-	// the same small JSON shape the `add` params use
-	if (!removal.name) {
-		return removal.id ?? '';
+function encodeEntry(entry: SelectionEntry): string {
+	// an id-only removal round-trips as the bare param it arrived as
+	if (!entry.name) {
+		return entry.id ?? '';
 	}
 	return encodeSelectionEntry({
-		...(removal.id ? { i: removal.id } : {}),
-		c: removal.category,
-		n: removal.name,
-		r: removal.reason
+		...(entry.id ? { i: entry.id } : {}),
+		c: entry.category,
+		n: entry.name,
+		r: entry.reason
 	});
 }
 
@@ -182,13 +174,29 @@ function appendSelection(url: string, selection: ConsulteeSelection): string {
 	// may need to open it
 	const separator = () => (url.includes('?') ? '&' : '?');
 	for (const removal of selection.removed) {
-		url += `${separator()}exclude=${encodeURIComponent(encodeRemoval(removal))}`;
+		url += `${separator()}exclude=${encodeURIComponent(encodeEntry(removal))}`;
 	}
 	for (const add of selection.adds) {
-		url += `${separator()}add=${encodeURIComponent(encodeAdd(add))}`;
+		url += `${separator()}add=${encodeURIComponent(encodeEntry(add))}`;
 	}
 	return url;
 }
+
+/** A report page's URL: the case's page at `path`, its ruleset, any `params`, then the selection. */
+function reportPageUrl(
+	caseId: string,
+	path: string,
+	rulesetId: string,
+	selection: ConsulteeSelection,
+	params = ''
+): string {
+	return appendSelection(
+		`/consultees/${encodeURIComponent(caseId)}/${path}?ruleset=${encodeURIComponent(rulesetId)}${params}`,
+		selection
+	);
+}
+
+const categoryParam = (category: string) => `&category=${encodeURIComponent(category)}`;
 
 /**
  * The ruleset picker page - where the boundary page's "Continue" and the check page's
@@ -206,10 +214,7 @@ export function rulesetUrl(caseId: string, rulesetId?: string, selection: Consul
 
 /** The report check page ("Identify consultees" destination) for a boundary/ruleset/selection. */
 export function reportUrl(caseId: string, rulesetId: string, selection: ConsulteeSelection = NO_SELECTION): string {
-	return appendSelection(
-		`/consultees/${encodeURIComponent(caseId)}/report?ruleset=${encodeURIComponent(rulesetId)}`,
-		selection
-	);
+	return reportPageUrl(caseId, 'report', rulesetId, selection);
 }
 
 /** The "Report created" confirmation page the check page's Generate report leads to. */
@@ -218,10 +223,7 @@ export function reportCreatedUrl(
 	rulesetId: string,
 	selection: ConsulteeSelection = NO_SELECTION
 ): string {
-	return appendSelection(
-		`/consultees/${encodeURIComponent(caseId)}/report/created?ruleset=${encodeURIComponent(rulesetId)}`,
-		selection
-	);
+	return reportPageUrl(caseId, 'report/created', rulesetId, selection);
 }
 
 /** The Report created page's download: the report's workbook and maps in a ZIP (see export/controller.ts). */
@@ -230,10 +232,7 @@ export function reportDownloadUrl(
 	rulesetId: string,
 	selection: ConsulteeSelection = NO_SELECTION
 ): string {
-	return appendSelection(
-		`/consultees/${encodeURIComponent(caseId)}/report/download?ruleset=${encodeURIComponent(rulesetId)}`,
-		selection
-	);
+	return reportPageUrl(caseId, 'report/download', rulesetId, selection);
 }
 
 /** A category's Change page - the identified consultees table under the map. */
@@ -243,10 +242,7 @@ export function consulteesUrl(
 	category: string,
 	selection: ConsulteeSelection = NO_SELECTION
 ): string {
-	return appendSelection(
-		`/consultees/${encodeURIComponent(caseId)}/report/consultees?ruleset=${encodeURIComponent(rulesetId)}&category=${encodeURIComponent(category)}`,
-		selection
-	);
+	return reportPageUrl(caseId, 'report/consultees', rulesetId, selection, categoryParam(category));
 }
 
 /** The "Add a consultee" page a category page's Add consultee link opens - posts back to the same URL. */
@@ -256,10 +252,7 @@ export function addConsulteeUrl(
 	category: string,
 	selection: ConsulteeSelection = NO_SELECTION
 ): string {
-	return appendSelection(
-		`/consultees/${encodeURIComponent(caseId)}/report/consultees/add?ruleset=${encodeURIComponent(rulesetId)}&category=${encodeURIComponent(category)}`,
-		selection
-	);
+	return reportPageUrl(caseId, 'report/consultees/add', rulesetId, selection, categoryParam(category));
 }
 
 /**
@@ -280,10 +273,7 @@ export function removeConsulteeUrl(
 		'matchId' in target
 			? `&match=${encodeURIComponent(target.matchId)}`
 			: `&added=${encodeURIComponent(String(target.addedIndex))}`;
-	return appendSelection(
-		`/consultees/${encodeURIComponent(caseId)}/report/consultees/remove?ruleset=${encodeURIComponent(rulesetId)}&category=${encodeURIComponent(category)}${targetParam}`,
-		selection
-	);
+	return reportPageUrl(caseId, 'report/consultees/remove', rulesetId, selection, categoryParam(category) + targetParam);
 }
 
 /**
@@ -297,7 +287,7 @@ export function categoryStaticMapUrl(
 	category: string,
 	selection: ConsulteeSelection = NO_SELECTION
 ): string {
-	let url = `/consultees/${encodeURIComponent(caseId)}/results/static-map?ruleset=${encodeURIComponent(rulesetId)}&category=${encodeURIComponent(category)}`;
+	let url = `/consultees/${encodeURIComponent(caseId)}/results/static-map?ruleset=${encodeURIComponent(rulesetId)}${categoryParam(category)}`;
 	for (const id of excludedMatchIds(selection.removed)) {
 		url += `&exclude=${encodeURIComponent(id)}`;
 	}

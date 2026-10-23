@@ -1,12 +1,12 @@
 import type { ManageService } from '#service';
 import type { Ruleset } from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
-import { getRuleset, isIdentified, RULESETS } from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
+import { isIdentified } from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
 import type { AsyncRequestHandler, AsyncRequestHandlerWithBody } from '@planning-inspectorate/core/util';
 import type { Response } from 'express';
 import { describeReasons } from '../../../reasons.ts';
 import { resolveCase, resolveCaseSummary } from '../../../resolve-case.ts';
 import type { RulesetRunStore } from '../../../run-ruleset.ts';
-import { firstQueryValue, runRulesetSafely } from '../../../run-ruleset.ts';
+import { firstQueryValue, requestedRuleset, runRulesetSafely } from '../../../run-ruleset.ts';
 import { addedConsulteeReason, consulteeName } from '../../report-consultees.ts';
 import type { ConsulteeSelection, RemovalTarget } from '../../urls.ts';
 import { consulteeSelection, consulteesUrl, excludedMatchIds, removeConsulteeUrl } from '../../urls.ts';
@@ -42,8 +42,7 @@ async function removeConsulteeContext(
 	res: Response,
 	store?: RulesetRunStore
 ): Promise<RemoveConsulteeContext | undefined> {
-	const requestedRuleset = firstQueryValue(query.ruleset);
-	const ruleset = requestedRuleset ? getRuleset(requestedRuleset) : RULESETS[0];
+	const ruleset = requestedRuleset(query.ruleset);
 	if (!ruleset) {
 		res.status(404).render('views/errors/404.njk', { pageHeading: 'Page not found' });
 		return undefined;
