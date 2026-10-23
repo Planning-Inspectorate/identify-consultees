@@ -427,9 +427,4 @@ test.describe('manage journeys', () => {
 		await page.goto('/this-page-does-not-exist');
 		await expect(page.getByRole('heading', { level: 1 })).toContainText('Page not found');
 	});
-
-	test('items list example page renders', async ({ page }) => {
-		await page.goto('/items');
-		await expect(page.locator('main')).toBeVisible();
-	});
 });

@@ -354,9 +354,6 @@ const SETTINGS_PATH = `config/rulesets/${SETTINGS_FILE}`;
 
 export const RULESET_SETTINGS = parseRulesetSettings(readFileSync(path.join(RULESETS_DIR, SETTINGS_FILE), 'utf8'));
 
-/** Categories the rulesets name that no reference data provides yet (see RulesetSettings). */
-export const CATEGORIES_AWAITING_DATA = RULESET_SETTINGS.categoriesAwaitingData;
-
 const MONTHS = [
 	'January',
 	'February',

@@ -5,7 +5,6 @@ import {
 	ageOsmTileCacheForTests,
 	basemapFrame,
 	buildGoogleStaticMapUrl,
-	buildStaticMapSvg,
 	centroidOfGeometry,
 	clearOsmTileCacheForTests,
 	consulteeColours,
@@ -237,16 +236,6 @@ describe('static-map helpers', () => {
 		);
 		// an empty geometry yields undefined rather than NaN
 		assert.equal(centroidOfGeometry({ type: 'Polygon', coordinates: [[]] }), undefined);
-	});
-
-	test('buildStaticMapSvg delegates to renderStaticMapSvg', () => {
-		const svg = buildStaticMapSvg({
-			center: [-1.75, 50.65],
-			zoom: 10,
-			projectGeojson: square,
-			consulteeGeojson: emptyCollection
-		});
-		assert.match(svg, /<svg/);
 	});
 
 	test('renderStaticMapSvg skips incomplete rings', () => {

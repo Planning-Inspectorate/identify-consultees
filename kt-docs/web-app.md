@@ -54,7 +54,6 @@ Dev pages mount only when `devPagesEnabled` is on (not production, or `ENABLE_DE
 | `/map-layers-demo`                                   | Layer toggle experiment                                                                                                |
 | `/error-test`                                        | Error-scenario index for QA: renders each error page, throws for the sanitised 500, demos CSRF and rate-limit failures |
 | `/consultee-areas-python`, `/consultee-areas-direct` | Nearby-area query through the Python function, or straight from Node                                                   |
-| `/items`                                             | Database connectivity check                                                                                            |
 
 ## The journey
 

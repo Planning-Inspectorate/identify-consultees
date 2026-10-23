@@ -33,7 +33,7 @@ export interface Config extends BaseConfig {
 	// screen a site whose simplified outline has more points than this against its bounding box -
 	// config/screening.yaml (see screening-config.ts); unset or 0 never does up front
 	boundingBoxAbovePoints?: number;
-	// whether the prototype/debug pages are mounted (/items, /map-layers-demo, /components,
+	// whether the prototype/debug pages are mounted (/map-layers-demo, /components,
 	// /consultee-areas-python, /consultee-areas-direct). On by default outside production; set
 	// ENABLE_DEV_PAGES=true to enable them on a deployed environment running NODE_ENV=production
 	// (e.g. reviewing component examples on test/training).
@@ -51,18 +51,6 @@ export interface Config extends BaseConfig {
 		signoutUrl: string;
 	};
 }
-
-export type ENVIRONMENT_NAMES = Readonly<{ PROD: string; DEV: string; TEST: string; TRAINING: string }>;
-
-/**
- * The environment names
- */
-export const ENVIRONMENT_NAME: ENVIRONMENT_NAMES = Object.freeze({
-	DEV: 'dev',
-	TEST: 'test',
-	TRAINING: 'training',
-	PROD: 'prod'
-});
 
 // cache the config
 let config: Config | undefined;
@@ -212,28 +200,4 @@ export function loadBuildConfig(): BuildConfig {
 		srcDir,
 		staticDir
 	};
-}
-
-/**
- * Load the environment the application is running in. The value should be
- * one of the ENVIRONMENT_NAME values defined at the top of the file, and matches
- * the environment variable in the infrastructure code.
- */
-export function loadEnvironmentConfig(): string {
-	// load configuration from .env file into process.env
-	// prettier-ignore
-	try {loadEnvFile()} catch {/* ignore errors*/}
-
-	// get values from the environment
-	const { ENVIRONMENT } = process.env;
-
-	if (!ENVIRONMENT) {
-		throw new Error('ENVIRONMENT is required');
-	}
-
-	if (!Object.values(ENVIRONMENT_NAME).includes(ENVIRONMENT)) {
-		throw new Error(`ENVIRONMENT must be one of: ${Object.values(ENVIRONMENT_NAME)}`);
-	}
-
-	return ENVIRONMENT;
 }

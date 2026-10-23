@@ -5,7 +5,6 @@ import path from 'node:path';
 import { describe, test } from 'node:test';
 import {
 	buildRulesetFromCsv,
-	CATEGORIES_AWAITING_DATA,
 	getRuleset,
 	isIdentified,
 	loadRulesets,
@@ -70,7 +69,6 @@ describe('parseRulesetSettings', () => {
 
 	test('reads config/rulesets/rulesets.yaml', () => {
 		assert.ok(RULESET_SETTINGS.consulteeTypes.size > 0);
-		assert.equal(CATEGORIES_AWAITING_DATA, RULESET_SETTINGS.categoriesAwaitingData);
 	});
 
 	for (const [title, text, message] of [
@@ -423,12 +421,12 @@ describe('rulesets registry', () => {
 			ruleset.rules.flatMap((rule) => [...rule.categories, ...(rule.hostCategory ? [rule.hostCategory] : [])])
 		);
 		const unknown = categories.filter(
-			(category) => !referenceCategories.has(category) && !CATEGORIES_AWAITING_DATA.has(category)
+			(category) => !referenceCategories.has(category) && !RULESET_SETTINGS.categoriesAwaitingData.has(category)
 		);
 		assert.deepEqual([...new Set(unknown)], []);
 		// and everything awaiting data is still used, so the list doesn't go stale
 		assert.deepEqual(
-			[...CATEGORIES_AWAITING_DATA].filter((category) => !categories.includes(category)),
+			[...RULESET_SETTINGS.categoriesAwaitingData].filter((category) => !categories.includes(category)),
 			[]
 		);
 	});

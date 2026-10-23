@@ -11,8 +11,9 @@ import request from 'supertest';
 import {
 	buildStaticAssetsRateLimiter,
 	createStaticAssetsMiddleware,
-	staticAssetCacheControl,
-	staticAssetRequestKey
+	FINGERPRINTED_CACHE_CONTROL,
+	staticAssetRequestKey,
+	UNFINGERPRINTED_CACHE_CONTROL
 } from './static-assets-middleware.ts';
 
 describe('static-assets-middleware', () => {
@@ -54,7 +55,7 @@ describe('static-assets-middleware', () => {
 
 		const head = await request(app).head(`/${relative}`);
 		assert.equal(head.status, 200);
-		assert.equal(head.headers['cache-control'], staticAssetCacheControl.fingerprinted);
+		assert.equal(head.headers['cache-control'], FINGERPRINTED_CACHE_CONTROL);
 
 		const post = await request(app).post(`/${relative}`);
 		assert.equal(post.status, 404);
@@ -83,14 +84,14 @@ describe('static-assets-middleware', () => {
 
 		const plain = await request(app).get(`/${fingerprinted}`);
 		assert.equal(plain.status, 200);
-		assert.equal(plain.headers['cache-control'], staticAssetCacheControl.fingerprinted);
+		assert.equal(plain.headers['cache-control'], FINGERPRINTED_CACHE_CONTROL);
 		assert.equal(plain.text, body);
 		assert.equal(plain.headers['content-encoding'], undefined);
 
 		const br = await request(app).get(`/${fingerprinted}`).set('Accept-Encoding', 'gzip, deflate, br');
 		assert.equal(br.status, 200);
 		assert.equal(br.headers['content-encoding'], 'br');
-		assert.equal(br.headers['cache-control'], staticAssetCacheControl.fingerprinted);
+		assert.equal(br.headers['cache-control'], FINGERPRINTED_CACHE_CONTROL);
 		assert.equal(br.headers['vary'], 'Accept-Encoding');
 
 		// the unencoded variant must also carry Vary so shared caches (e.g. Front
@@ -154,7 +155,7 @@ describe('static-assets-middleware', () => {
 
 		const response = await request(app).get(`/${relative}`);
 		assert.equal(response.status, 200);
-		assert.equal(response.headers['cache-control'], staticAssetCacheControl.unfingerprinted);
+		assert.equal(response.headers['cache-control'], UNFINGERPRINTED_CACHE_CONTROL);
 	});
 
 	test('does not serve path traversal requests', async () => {
@@ -230,7 +231,7 @@ describe('static-assets-middleware', () => {
 
 		const response = await request(app).get(`/${relative}`);
 		assert.equal(response.status, 200);
-		assert.equal(response.headers['cache-control'], staticAssetCacheControl.fingerprinted);
+		assert.equal(response.headers['cache-control'], FINGERPRINTED_CACHE_CONTROL);
 		assert.equal(response.text, 'body{}');
 	});
 });

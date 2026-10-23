@@ -36,7 +36,7 @@ export function isFingerprintedAssetPath(filePath: string): boolean {
 	return ASSET_HASH_PATTERN.test(withoutBr);
 }
 
-function shouldFingerprint(relativePosixPath: string): boolean {
+export function shouldFingerprint(relativePosixPath: string): boolean {
 	if (relativePosixPath.endsWith('.br')) {
 		return false;
 	}
@@ -49,7 +49,7 @@ function shouldFingerprint(relativePosixPath: string): boolean {
 	return FINGERPRINT_GLOBS.some((pattern) => pattern.test(relativePosixPath));
 }
 
-function shouldBrotli(relativePosixPath: string): boolean {
+export function shouldBrotli(relativePosixPath: string): boolean {
 	if (relativePosixPath.endsWith('.br')) {
 		return false;
 	}
@@ -104,14 +104,6 @@ async function brotliCompressFile(absolutePath: string): Promise<void> {
  * Fingerprint selected assets, write Brotli sidecars for fingerprinted compressible files,
  * and emit `asset-manifest.json` for template wiring.
  */
-export function shouldFingerprintRelativePath(relativePosixPath: string): boolean {
-	return shouldFingerprint(relativePosixPath);
-}
-
-export function shouldBrotliRelativePath(relativePosixPath: string): boolean {
-	return shouldBrotli(relativePosixPath);
-}
-
 export async function fingerprintAndCompressStaticAssets(staticDir: string): Promise<AssetManifest> {
 	const allFiles = await walkFiles(staticDir);
 	const manifest: AssetManifest = { assets: {} };

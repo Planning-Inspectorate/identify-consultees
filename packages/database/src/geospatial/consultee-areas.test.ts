@@ -11,7 +11,6 @@ import {
 	getConsulteeAreaById,
 	getConsulteeAreaDisplayGeometries,
 	listConsulteeAreas,
-	listConsulteeCategories,
 	loadConsulteeAreas
 } from './consultee-areas.ts';
 
@@ -111,15 +110,6 @@ describe('consultee areas (requires a local SQL Server - see docker-compose.yml)
 			const page = await listConsulteeAreas(dbClient, { limit: 1, offset: 0 });
 			assert.equal(page.type, 'FeatureCollection');
 			assert.equal(page.features.length, 1);
-
-			// every stored category, alphabetically as SQL Server sorts - case aside, so "ONR Site"
-			// comes after "Offshore Wind Site" - and the test row's must be in there
-			const categories = await listConsulteeCategories(dbClient);
-			assert.ok(categories.includes('Environment Agency'));
-			assert.deepEqual(
-				categories,
-				[...categories].sort((a, b) => a.localeCompare(b, 'en', { sensitivity: 'base' }))
-			);
 
 			// an area touching the window is drawn whole, not clipped to it
 			const window = {
