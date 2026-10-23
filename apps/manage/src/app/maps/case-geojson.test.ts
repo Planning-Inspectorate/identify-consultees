@@ -13,6 +13,7 @@ import {
 	NEARBY_REGIONAL_FILL_OPACITY,
 	REGIONAL_FILL_OPACITY
 } from './case-geojson.ts';
+import { UNCATEGORISED } from './category-colours.ts';
 import { computeFittedMapView } from './geometry-bounds.ts';
 import { MAP_VIEWPORT } from './sample-geojson.ts';
 
@@ -39,6 +40,13 @@ function match(id: string): ConsulteeMatch {
 }
 
 describe('buildCaseMapConfig', () => {
+	it('draws a match with no category under the uncategorised colour', () => {
+		const uncategorised = { ...match('u'), feature: { ...match('u').feature, properties: { consultee: 'Unknown' } } };
+		const config = buildCaseMapConfig(project(), [uncategorised as ConsulteeMatch], 'England Wales post 30 April 2024');
+		assert.strictEqual(config.consulteeGeojson.features[0].properties.consulteeCategory, UNCATEGORISED);
+		assert.strictEqual(config.consulteeGeojson.features[0].properties.region, '');
+	});
+
 	it('draws every match that has geometry, without a search area', () => {
 		const matches = Array.from({ length: 60 }, (_, i) => match(`${i}`));
 		const config = buildCaseMapConfig(project(), matches, 'England Wales post 30 April 2024');
