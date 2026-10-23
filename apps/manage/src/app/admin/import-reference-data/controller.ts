@@ -31,9 +31,6 @@ const PAGE_HEADING = 'Import reference data into the database';
 // (.azure/pipelines/db-seed.yml), as it does combined_reference_data_v1.geojson for a full import
 export const CASE_BOUNDARIES_BLOB_NAME = 'all-project-boundaries.geojson';
 
-// case boundaries replace the table rather than merge into it - see clearExistingRows
-const REPLACE = { replace: true } as const;
-
 /** Where the page finds, and fetches, the files it loads - blob storage, but for tests. */
 export interface BlobFiles {
 	list: () => Promise<StoredBlob[]>;
@@ -311,7 +308,8 @@ export function buildRunImportCaseBoundaries(
 		try {
 			const { filePath, cleanup } = await files.download(CASE_BOUNDARIES_BLOB_NAME);
 			try {
-				viewModel.caseBoundariesImported = await runImport(db, filePath, REPLACE);
+				// merged by id, not replacing the table: that would delete every boundary CBOS imported
+				viewModel.caseBoundariesImported = await runImport(db, filePath);
 			} finally {
 				await cleanup();
 			}
