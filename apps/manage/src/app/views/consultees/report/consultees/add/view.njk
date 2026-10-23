@@ -33,12 +33,13 @@
 			<form method="post" action="{{ formAction }}" novalidate>
 				<input type="hidden" name="_csrf" value="{{ _csrf }}">
 				{% if nearbySuggestions | length %}
-					{# typed names are matched to the consultees near the site the ruleset didn't identify - the
-					faint ones on the category page's map. The datalist suggests them as the name is typed;
-					consultee-autocomplete.js swaps it for the GOV.UK accessible autocomplete #}
+					{# typed names are matched to what the page suggests - for a consultee category the consultees
+					near the site the ruleset didn't identify (the faint ones on its map), for Nearby NSIPs the
+					other cases. The datalist suggests them as the name is typed; consultee-autocomplete.js swaps
+					it for the GOV.UK accessible autocomplete #}
 					{{ govukInput({
 						label: { text: "Name of consultee", classes: "govuk-label--m" },
-						hint: { text: "Start typing to choose a consultee near the site that the ruleset did not identify. They are shown faintly on the map. You can also enter any other " ~ pageCaption ~ " consultee by its name." },
+						hint: nameHint,
 						id: "consultee-name",
 						name: "name",
 						value: addForm.nameValue,
@@ -55,6 +56,7 @@
 				{% else %}
 					{{ govukInput({
 						label: { text: "Name of consultee", classes: "govuk-label--m" },
+						hint: nameHint,
 						id: "consultee-name",
 						name: "name",
 						value: addForm.nameValue,

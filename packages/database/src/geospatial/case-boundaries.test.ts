@@ -8,6 +8,7 @@ import { newDatabaseClient } from '../index.ts';
 import type { CaseBoundaryFeatureCollection } from './case-boundaries.ts';
 import {
 	findNearbyCases,
+	findOtherCases,
 	getCaseBoundaryById,
 	getCaseBoundaryDisplayGeometries,
 	getCaseBoundarySummaryById,
@@ -496,6 +497,20 @@ describe('case boundaries (requires a local SQL Server - see docker-compose.yml)
 				[ids.touching, ids.near, ids.far]
 			);
 			assert.deepEqual(await findNearbyCases(dbClient, '22222222-2222-2222-2222-22222222ffff', 100_000), []);
+
+			// with no radius every other case comes back, nearest first, still one per case and
+			// never the site's own - the fixture's three ahead of any seeded case
+			const others = await findOtherCases(dbClient, ids.site);
+			assert.deepEqual(
+				others.filter((other) => other.caseReference.startsWith('NN')).map((other) => [other.id, other.caseReference]),
+				[
+					[ids.touching, 'NN000003'],
+					[ids.near, 'NN000002'],
+					[ids.far, 'NN000004']
+				]
+			);
+			assert.ok(others.every((other) => other.caseReference !== 'NN000001'));
+			assert.deepEqual(await findOtherCases(dbClient, '22222222-2222-2222-2222-22222222ffff'), []);
 
 			// drawn from their simplified geometry, for those touching the map's window
 			const window = square(-35.1, 44.9);

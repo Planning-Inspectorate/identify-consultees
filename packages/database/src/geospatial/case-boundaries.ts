@@ -451,6 +451,54 @@ export async function findNearbyCases(
 }
 
 /**
+ * Every case other than `caseId`'s own, nearest first - each once, by its newest shapefile, as
+ * findNearbyCases picks it, with its distance from the site. There is no radius: this is the
+ * pool the Nearby NSIPs "Add a consultee" page suggests a typed name from, and a typed name is
+ * matched against - an add can reach a case the radius search missed. Empty when `caseId`
+ * matches no row.
+ */
+export async function findOtherCases(dbClient: PrismaClient, caseId: string): Promise<NearbyCase[]> {
+	const rows = await withDeadlockRetry(
+		() => dbClient.$queryRaw<
+			{
+				id: string;
+				caseReference: string;
+				caseName: string;
+				fileName: string | null;
+				receivedDate: Date | null;
+				distanceMetres: number;
+			}[]
+		>`
+			WITH site AS (
+				SELECT caseReference, geometrySimplified AS geometry
+				FROM case_boundary WHERE id = CAST(${caseId} AS UNIQUEIDENTIFIER)
+			),
+			newest AS (
+				SELECT id, caseReference, caseName, fileName, receivedDate, geometrySimplified AS geometry,
+					ROW_NUMBER() OVER (PARTITION BY caseReference ORDER BY receivedDate DESC, id) AS rank
+				FROM case_boundary
+			)
+			SELECT newest.id, newest.caseReference, newest.caseName, newest.fileName, newest.receivedDate,
+				distance.metres AS distanceMetres
+			FROM newest
+			CROSS JOIN site
+			CROSS APPLY (SELECT newest.geometry.STDistance(site.geometry) AS metres) AS distance
+			WHERE newest.rank = 1
+				AND newest.caseReference <> site.caseReference
+			ORDER BY distance.metres, newest.caseReference
+		`
+	);
+	return rows.map((row) => ({
+		id: row.id.toLowerCase(),
+		caseReference: row.caseReference,
+		caseName: row.caseName,
+		fileName: row.fileName,
+		receivedDate: row.receivedDate,
+		distanceMetres: row.distanceMetres
+	}));
+}
+
+/**
  * Whole geometry of specific case boundaries, for drawing them as Nearby NSIPs around a site -
  * for those that touch `window`, simplified more the larger they are, as
  * getConsulteeAreaDisplayGeometries simplifies consultee areas. Display only - never measure

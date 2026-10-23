@@ -78,15 +78,40 @@ const STORED = [
 	}
 ];
 
+// another case, as findNearbyCases and findOtherCases return its newest shapefile
+const nearbyCaseRow = (id: string, caseReference: string, caseName: string, distanceMetres: number) => ({
+	id: id.toUpperCase(),
+	caseReference,
+	caseName,
+	fileName: null,
+	receivedDate: null,
+	distanceMetres
+});
+// a case within the Nearby NSIPs distance - identified, so already listed - and one beyond it
+const identifiedNsip = nearbyCaseRow(
+	'dddddddd-dddd-dddd-dddd-dddddddddddd',
+	'EN010200',
+	'Neighbouring Solar Farm',
+	2_345
+);
+const otherCase = nearbyCaseRow('eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee', 'EN010201', 'Undated Wind Farm', 6_000);
+const NEARBY_CASES = [identifiedNsip];
+const OTHER_CASES = [identifiedNsip, otherCase];
+
 // rows[0] answers the project lookup; the ruleset run is answered by the stand-in Python
-// function (see rulesetRunnerReturning) rather than a query, and the name lookup from STORED
-function dbReturning(rows: unknown[][]) {
+// function (see rulesetRunnerReturning) rather than a query, the Nearby NSIPs case queries by
+// NEARBY_CASES (findNearbyCases, with the bounding-circle prefilter) and OTHER_CASES
+// (findOtherCases), and the consultee name lookup from STORED
+function dbReturning(rows: unknown[][], otherCases: unknown[] = OTHER_CASES) {
 	let call = 0;
 	return {
 		$queryRaw: mock.fn(async (sql: TemplateStringsArray, ...values: unknown[]) => {
 			const text = sql.join('');
 			// a query on the site alone (no table) - answer it with the site
 			if (!/\bFROM\b/.test(text)) return [realProjectRow().geometryWkt];
+			if (text.includes('PARTITION BY caseReference')) {
+				return text.includes('EnvelopeCenter') ? NEARBY_CASES : otherCases;
+			}
 			if (text.includes('LOWER(consultee)')) {
 				const [, category, name] = values as string[];
 				return STORED.filter(
@@ -118,6 +143,22 @@ const submit = async (body: unknown, query: Record<string, unknown> = parishQuer
 	const res = rendering();
 	await buildReportConsulteeAddSubmit(service(rulesetRunner) as never)(
 		{ params: { caseId: realProjectId }, query, body } as never,
+		res as never
+	);
+	return res;
+};
+
+// the Nearby NSIPs page is only offered when they're looked for - a radius over 0
+const nsipService = (rulesetRunner: unknown = rulesetRunnerReturning([])) => ({
+	...service(rulesetRunner),
+	nearbyNsipRadiusMetres: 35_000
+});
+const nsipQuery = { ruleset: 'england-wales-post-20240430', category: 'Nearby NSIPs' };
+const nsipCategoryUrl = `/consultees/${realProjectId}/report/consultees?ruleset=england-wales-post-20240430&category=Nearby%20NSIPs`;
+const submitNsip = async (body: unknown) => {
+	const res = rendering();
+	await buildReportConsulteeAddSubmit(nsipService() as never)(
+		{ params: { caseId: realProjectId }, query: nsipQuery, body } as never,
 		res as never
 	);
 	return res;
@@ -300,5 +341,86 @@ describe('add a consultee page', () => {
 			res as never
 		);
 		assert.strictEqual(res.status.mock.calls[0].arguments[0], 404);
+	});
+
+	it('renders no datalist or hint for a consultee category with nothing nearby to suggest', async () => {
+		const res = rendering();
+		await buildReportConsulteeAddPage(service(rulesetRunnerReturning([parishMatchRow()])) as never)(
+			{ params: { caseId: realProjectId }, query: parishQuery } as never,
+			res as never
+		);
+
+		assert.deepStrictEqual(viewModelOf(res).nearbySuggestions, []);
+		assert.strictEqual(viewModelOf(res).nameHint, undefined);
+		const html = res.render.mock.calls[0].result as string;
+		assert.match(html, /<input[^>]*name="name"/);
+		assert.doesNotMatch(html, /datalist|data-consultee-autocomplete|Start typing/);
+	});
+
+	it('suggests the other cases on the Nearby NSIPs page, nearest first, less any already listed', async () => {
+		const res = rendering();
+		await buildReportConsulteeAddPage(nsipService() as never)(
+			{ params: { caseId: realProjectId }, query: nsipQuery } as never,
+			res as never
+		);
+
+		// Neighbouring Solar Farm is identified by the nearby search, so already listed
+		assert.deepStrictEqual(viewModelOf(res).nearbySuggestions, [
+			{ name: 'Undated Wind Farm (EN010201)', hint: '6.0 km from the site' }
+		]);
+		const html = res.render.mock.calls[0].result as string;
+		assert.match(html, /<input[^>]*name="name"[^>]*list="nearby-consultees"[^>]*data-consultee-autocomplete/);
+		assert.match(html, /<option value="Undated Wind Farm \(EN010201\)"/);
+		assert.match(html, /Start typing to choose a national infrastructure project/);
+	});
+
+	it('adds a Nearby NSIP by its project name and reference, storing its shapefile id', async () => {
+		const res = await submitNsip({ name: ' undated wind farm (en010201) ', reason: 'Missing from the list' });
+
+		assert.strictEqual(
+			res.redirect.mock.calls[0].arguments[0],
+			`${nsipCategoryUrl}&add=${urlParam(
+				JSON.stringify({
+					i: 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee',
+					c: 'Nearby NSIPs',
+					n: 'Undated Wind Farm (EN010201)',
+					r: 'Missing from the list'
+				})
+			)}#consultees`
+		);
+	});
+
+	it('matches a Nearby NSIP by its project name or case reference alone', async () => {
+		for (const name of ['Undated Wind Farm', 'en010201']) {
+			const res = await submitNsip({ name, reason: 'r' });
+			assert.strictEqual(
+				res.redirect.mock.calls[0].arguments[0],
+				`${nsipCategoryUrl}&add=${urlParam(
+					JSON.stringify({
+						i: 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee',
+						c: 'Nearby NSIPs',
+						n: 'Undated Wind Farm (EN010201)',
+						r: 'r'
+					})
+				)}#consultees`
+			);
+		}
+	});
+
+	it('refuses a Nearby NSIP already listed, found by its project name alone', async () => {
+		const res = await submitNsip({ name: 'Neighbouring Solar Farm', reason: 'r' });
+
+		assert.strictEqual(res.redirect.mock.callCount(), 0);
+		assert.strictEqual(
+			viewModelOf(res).addForm.nameError.text,
+			'Neighbouring Solar Farm (EN010200) is already listed in Nearby NSIPs'
+		);
+	});
+
+	it('refuses a Nearby NSIP name that is no case', async () => {
+		const res = await submitNsip({ name: 'Made Up Project', reason: 'r' });
+
+		assert.strictEqual(res.redirect.mock.callCount(), 0);
+		assert.strictEqual(viewModelOf(res).addForm.nameError.text, 'Consultee not found');
 	});
 });
