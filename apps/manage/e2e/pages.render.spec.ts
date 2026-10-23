@@ -8,6 +8,8 @@ import {
 	SAMPLE_RULESET_NAME
 } from './fixtures.ts';
 
+const CATEGORY_PAGE = `/consultees/${SAMPLE_CASE_ID}/report/consultees?ruleset=${SAMPLE_RULESET_ID}&category=Parish%20Council`;
+
 /**
  * The opening tag of the element with `className`, as the server sent it. The live DOM won't do:
  * the map adds its own data-breakpoint to the container once it starts, so whether it's there
@@ -82,12 +84,6 @@ const pages = [
 		name: 'report created',
 		heading: /Report created/i,
 		mustSee: [/Consultee List report/i]
-	},
-	{
-		path: `/consultees/${SAMPLE_CASE_ID}/results?ruleset=${SAMPLE_RULESET_ID}`,
-		name: 'consultees results',
-		heading: /Consultees identified for/i,
-		mustSee: [new RegExp(`Ruleset used: ${SAMPLE_RULESET_NAME}`, 'i')]
 	},
 	{
 		path: '/map-layers-demo',
@@ -218,26 +214,18 @@ test.describe('cross-browser render completeness', () => {
 		});
 	}
 
-	test('consultees results exposes a map region', async ({ page }) => {
-		await page.goto(`/consultees/${SAMPLE_CASE_ID}/results?ruleset=${SAMPLE_RULESET_ID}`, {
-			waitUntil: 'domcontentloaded'
-		});
-		await expect(page.getByRole('heading', { level: 2, name: /Consultees identified/i })).toBeVisible();
+	test('a category page exposes a map region', async ({ page }) => {
+		await page.goto(CATEGORY_PAGE, { waitUntil: 'domcontentloaded' });
+		await expect(page.getByRole('heading', { level: 1, name: 'Parish Council' })).toBeVisible();
 
 		const mapRegion = page.locator('.app-consultee-map.app-case-map').first();
 		await expect(mapRegion).toBeAttached();
 		await expect(mapRegion).toHaveAttribute('role', 'region');
-		await expect(mapRegion).toHaveAttribute('aria-label', new RegExp(SAMPLE_RULESET_NAME, 'i'));
+		await expect(mapRegion).toHaveAttribute('aria-label', /Parish Council/);
 
 		// the static-map fallback travels in the page config - data-* attributes on the map
 		// container are JSON.parsed by the InteractiveMap constructor and must stay off it
-		expect(
-			await serverRenderedOpeningTag(
-				page,
-				`/consultees/${SAMPLE_CASE_ID}/results?ruleset=${SAMPLE_RULESET_ID}`,
-				'app-consultee-map'
-			)
-		).not.toMatch(/\sdata-/);
+		expect(await serverRenderedOpeningTag(page, CATEGORY_PAGE, 'app-consultee-map')).not.toMatch(/\sdata-/);
 		const config = JSON.parse((await page.locator('#case-map-data').textContent()) ?? '{}');
 		expect(config.fallback.src).toMatch(/\/static-map/);
 		expect(config.fallback.width).toBe(960);

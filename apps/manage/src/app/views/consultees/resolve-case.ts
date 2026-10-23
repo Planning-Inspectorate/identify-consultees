@@ -17,7 +17,7 @@ export function isCaseId(caseId: string): boolean {
 }
 
 /**
- * Look up a case by id, with its geometry - for the results page, which needs it to run a
+ * Look up a case by id, with its geometry - for the pages that run a
  * ruleset. Prefer {@link resolveCaseSummary} for anything that only displays reference/name/date.
  */
 export async function resolveCase(db: ManageService['db'], caseId: string): Promise<CaseBoundaryFeature | undefined> {

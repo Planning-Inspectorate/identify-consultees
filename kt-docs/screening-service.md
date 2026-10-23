@@ -1,6 +1,6 @@
 # Screening service
 
-The screening (which consultees a project needs) runs in the Python Function App, `apps/function-python`. The web app calls it for every page that shows a ruleset's results: the project page, the report pages, the results page and the static map. How the engine works inside is in [Screening engine](./data/screening-engine.md); the function's layout and setup are in its [README](../apps/function-python/README.md).
+The screening (which consultees a project needs) runs in the Python Function App, `apps/function-python`. The web app calls it for every page that shows a ruleset's results: the project page, the report pages and the static map. How the engine works inside is in [Screening engine](./data/screening-engine.md); the function's layout and setup are in its [README](../apps/function-python/README.md).
 
 ## The call
 

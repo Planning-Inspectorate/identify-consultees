@@ -5,7 +5,7 @@ import type { ConsulteeMatch, Ruleset } from '@pins/identify-consultees-database
 import { getRuleset, isIdentified, RULESETS } from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
 import type { AsyncRequestHandler } from '@planning-inspectorate/core/util';
 import type { Request, Response } from 'express';
-import { buildCaseMapConfig, markAddedByHand, MAX_SAMPLED_MAP_MATCHES } from '../../../../maps/case-geojson.ts';
+import { buildCaseMapConfig, markAddedByHand } from '../../../../maps/case-geojson.ts';
 import { MAP_VIEWPORT } from '../../../../maps/sample-geojson.ts';
 import { categorySettings } from '../../../../report-config.ts';
 import { NEARBY_NSIPS } from '../../nearby-nsips.ts';
@@ -183,10 +183,7 @@ async function renderCategoryPage(
 		removedOpen: firstQueryValue(req.query.removed) === 'open',
 		rulesetFailed: failed,
 		screenedBoundingBox,
-		retryUrl: consulteesUrl(project.id, ruleset.id, category, selection),
-		matchCount: map.matchCount,
-		mapIsSampled: map.isSampled,
-		mapSampleSize: MAX_SAMPLED_MAP_MATCHES
+		retryUrl: consulteesUrl(project.id, ruleset.id, category, selection)
 	};
 
 	res.render(VIEW, viewModel);

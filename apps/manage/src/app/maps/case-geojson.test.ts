@@ -6,12 +6,9 @@ import { describe, it } from 'node:test';
 import { REPORT_CONFIG } from '../report-config.ts';
 import {
 	buildCaseMapConfig,
-	buildConsulteeMatchesGeojson,
 	buildProjectGeojson,
 	LOCAL_FILL_OPACITY,
-	MAP_SAMPLING_THRESHOLD,
 	markAddedByHand,
-	MAX_SAMPLED_MAP_MATCHES,
 	NEARBY_LOCAL_FILL_OPACITY,
 	NEARBY_REGIONAL_FILL_OPACITY,
 	REGIONAL_FILL_OPACITY
@@ -41,35 +38,11 @@ function match(id: string): ConsulteeMatch {
 	} as ConsulteeMatch;
 }
 
-describe('buildConsulteeMatchesGeojson', () => {
-	it('includes every match when at or below the sampling threshold', () => {
-		const matches = Array.from({ length: MAP_SAMPLING_THRESHOLD }, (_, i) => match(`${i}`));
-		const geojson = buildConsulteeMatchesGeojson(matches);
-		assert.strictEqual(geojson.features.length, MAP_SAMPLING_THRESHOLD);
-	});
-
-	it('caps the map to a sample once matches exceed the sampling threshold', () => {
-		const matches = Array.from({ length: MAP_SAMPLING_THRESHOLD + 1 }, (_, i) => match(`${i}`));
-		const geojson = buildConsulteeMatchesGeojson(matches);
-		assert.strictEqual(geojson.features.length, MAX_SAMPLED_MAP_MATCHES);
-	});
-});
-
 describe('buildCaseMapConfig', () => {
-	it('reports the full match count and isSampled false when under the threshold', () => {
-		const matches = [match('1')];
+	it('draws every match that has geometry, without a search area', () => {
+		const matches = Array.from({ length: 60 }, (_, i) => match(`${i}`));
 		const config = buildCaseMapConfig(project(), matches, 'England Wales post 30 April 2024');
-		assert.strictEqual(config.matchCount, 1);
-		assert.strictEqual(config.isSampled, false);
-		assert.strictEqual(config.consulteeGeojson.features.length, 1);
-	});
-
-	it('reports the full match count and isSampled true, with a sampled map, once over the threshold', () => {
-		const matches = Array.from({ length: MAP_SAMPLING_THRESHOLD + 1 }, (_, i) => match(`${i}`));
-		const config = buildCaseMapConfig(project(), matches, 'England Wales post 30 April 2024');
-		assert.strictEqual(config.matchCount, MAP_SAMPLING_THRESHOLD + 1);
-		assert.strictEqual(config.isSampled, true);
-		assert.strictEqual(config.consulteeGeojson.features.length, MAX_SAMPLED_MAP_MATCHES);
+		assert.strictEqual(config.consulteeGeojson.features.length, 60);
 	});
 
 	it('carries the static-map fallback in the page config when given one', () => {
@@ -125,25 +98,23 @@ describe('buildCaseMapConfig with a search area', () => {
 		const closer = buildCaseMapConfig(project(), [], 'Parish Council', undefined, undefined, 500);
 		assert.strictEqual(closer.zoom, computeFittedMapView(buildProjectGeojson(project()), MAP_VIEWPORT, 500).zoom);
 		assert.ok(closer.zoom > config.zoom);
-		// only the match touching the area is drawn, in its display geometry - but the count is every match
+		// only the match touching the area is drawn, in its display geometry
 		assert.deepStrictEqual(
 			config.consulteeGeojson.features.map((feature) => [feature.id, feature.geometry]),
 			[['inside', { type: 'Point', coordinates: [1.12346, 52.12346] }]]
 		);
-		assert.strictEqual(config.matchCount, 2);
 		assert.strictEqual('searchAreaGeojson' in config, false);
 		assert.strictEqual('nearbyGeojson' in config, false);
 	});
 
 	it('draws every match, coloured by category', () => {
-		const matches = Array.from({ length: MAP_SAMPLING_THRESHOLD + 1 }, (_, i) => match(`${i}`));
+		const matches = Array.from({ length: 60 }, (_, i) => match(`${i}`));
 		const config = buildCaseMapConfig(project(), matches, 'England Wales post 30 April 2024', {
 			area,
 			geometries: new Map(matches.map((m) => [m.feature.id, display] as const))
 		});
 
-		assert.strictEqual(config.isSampled, false);
-		assert.strictEqual(config.consulteeGeojson.features.length, MAP_SAMPLING_THRESHOLD + 1);
+		assert.strictEqual(config.consulteeGeojson.features.length, 60);
 		assert.strictEqual(config.consulteeGeojson.features[0].properties.colour, '#1d70b8');
 	});
 

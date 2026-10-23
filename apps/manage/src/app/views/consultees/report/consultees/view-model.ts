@@ -44,7 +44,4 @@ export interface ReportConsulteesViewModel {
 	screenedBoundingBox: boolean;
 	retryUrl: string;
 	/** Total matches the ruleset found in this category - may exceed what the map draws. */
-	matchCount: number;
-	mapIsSampled: boolean;
-	mapSampleSize: number;
 }

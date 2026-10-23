@@ -30,10 +30,6 @@ const pages = [
 		name: 'report consultee remove'
 	},
 	{ path: `/consultees/${SAMPLE_CASE_ID}/report/created?ruleset=${SAMPLE_RULESET_ID}`, name: 'report created' },
-	{
-		path: `/consultees/${SAMPLE_CASE_ID}/results?ruleset=${SAMPLE_RULESET_ID}`,
-		name: 'consultees results'
-	},
 	{ path: '/map-layers-demo', name: 'map layers demo' },
 	{ path: '/components?components=true', name: 'components index' },
 	{ path: '/components/checkboxes?components=true', name: 'component detail' },
@@ -104,8 +100,10 @@ test.describe('browser accessibility landmarks and skip link', () => {
 		await expect(page.getByRole('contentinfo').first()).toBeVisible();
 	});
 
-	test('consultees results page keeps its map region labelled', async ({ page }) => {
-		await page.goto(`/consultees/${SAMPLE_CASE_ID}/results?ruleset=${SAMPLE_RULESET_ID}`);
+	test('a category page keeps its map region labelled', async ({ page }) => {
+		await page.goto(
+			`/consultees/${SAMPLE_CASE_ID}/report/consultees?ruleset=${SAMPLE_RULESET_ID}&category=Parish%20Council`
+		);
 
 		await expect(page.locator('.app-consultee-map[role="region"]').first()).toBeAttached();
 		await expect(page.locator('.app-consultee-map').first()).toHaveAttribute('aria-label', /.+/);

@@ -1,5 +1,5 @@
 /**
- * Initialise Defra Interactive Maps for each consultee section on the results page.
+ * Initialise Defra Interactive Maps for each consultee map on a page - the category pages' and the boundary page's.
  *
  * Pattern ported from PINS-data-spike `uploads-map.js` / `case-map.js`:
  * - datasetsPlugin (its own Layers menu hidden) + layers-key-plugin for a combined
