@@ -12,7 +12,7 @@ import {
 	formatFileSize,
 	rememberReportZip,
 	rememberedReportZip,
-	reportGeneratedBy,
+	reportMapView,
 	screenedSite
 } from './report-zip.ts';
 
@@ -30,14 +30,6 @@ describe('remembered report ZIPs', () => {
 		const report = { fileName: 'report.zip', contents: Buffer.from('zip bytes') };
 		rememberReportZip('/consultees/a/report/download?ruleset=rs', report);
 		assert.strictEqual(rememberedReportZip('/consultees/a/report/download?ruleset=rs'), report);
-	});
-
-	it("keeps each user's own copy - its Summary names who generated it", () => {
-		const report = { fileName: 'report.zip', contents: Buffer.from('Sam') };
-		rememberReportZip('/consultees/a/report/download?ruleset=other', report, 'Sam Officer');
-		assert.strictEqual(rememberedReportZip('/consultees/a/report/download?ruleset=other', 'Sam Officer'), report);
-		assert.strictEqual(rememberedReportZip('/consultees/a/report/download?ruleset=other', 'Alex Officer'), undefined);
-		assert.strictEqual(rememberedReportZip('/consultees/a/report/download?ruleset=other'), undefined);
 	});
 
 	it('keeps only the newest few reports - each is tens of MB of process memory', () => {
@@ -106,8 +98,8 @@ describe("a category's buffers", () => {
 	});
 
 	it('are the Nearby NSIPs distance for Nearby NSIPs, if it has one', () => {
-		assert.deepStrictEqual(categoryBufferMetres(RULESET, 'Nearby NSIPs', 5_000), [5_000]);
-		assert.deepStrictEqual(categoryBufferMetres(RULESET, 'Nearby NSIPs', 0), []);
+		assert.deepStrictEqual(categoryBufferMetres(RULESET, 'NSIPs', 5_000), [5_000]);
+		assert.deepStrictEqual(categoryBufferMetres(RULESET, 'NSIPs', 0), []);
 	});
 
 	it('read in metres under a kilometre, else kilometres', () => {
@@ -234,12 +226,56 @@ describe("the report's maps", () => {
 	});
 });
 
-describe('who generated a report', () => {
-	it("is the signed-in user's name, else no one", () => {
-		assert.strictEqual(reportGeneratedBy({ account: { name: ' Sam Officer ' } } as never), 'Sam Officer');
-		assert.strictEqual(reportGeneratedBy({ account: { name: ' ' } } as never), undefined);
-		assert.strictEqual(reportGeneratedBy({ account: {} } as never), undefined);
-		assert.strictEqual(reportGeneratedBy({} as never), undefined);
-		assert.strictEqual(reportGeneratedBy(undefined), undefined);
+describe("a report map's view", () => {
+	const box = (west: number, south: number, east: number, north: number) => ({
+		type: 'Polygon' as const,
+		coordinates: [
+			[
+				[west, south],
+				[east, south],
+				[east, north],
+				[west, north],
+				[west, south]
+			]
+		]
+	});
+	const feature = (geometry: object, fillOpacity?: string) => ({
+		type: 'Feature' as const,
+		properties: fillOpacity ? { fillOpacity } : {},
+		geometry
+	});
+	const site = { type: 'FeatureCollection' as const, features: [feature(box(-1.51, 52.49, -1.49, 52.51))] };
+	const none = { type: 'FeatureCollection' as const, features: [] };
+
+	it("frames the site, its buffers and the category's local areas - not regional ones - at an exact zoom", () => {
+		const siteOnly = reportMapView({ projectGeojson: site, consulteeGeojson: none } as never, [], 10_000);
+		const withBuffer = reportMapView(
+			{ projectGeojson: site, consulteeGeojson: none } as never,
+			[box(-1.7, 52.38, -1.3, 52.62)],
+			10_000
+		);
+		const withLocal = reportMapView(
+			{
+				projectGeojson: site,
+				consulteeGeojson: { type: 'FeatureCollection', features: [feature(box(-1.6, 52.45, -1.4, 52.55), '0.35')] }
+			} as never,
+			[],
+			10_000
+		);
+		// a county around everything isn't framed - with nothing else, it's the site and mapKm
+		const withRegional = reportMapView(
+			{
+				projectGeojson: site,
+				consulteeGeojson: { type: 'FeatureCollection', features: [feature(box(-3, 51, 0, 54), '0.06')] }
+			} as never,
+			[],
+			10_000
+		);
+		assert.deepStrictEqual(withRegional, siteOnly);
+		// a ~27km buffer zooms out further than 10km around the site; local areas ~14km wide, less far
+		assert.ok(withBuffer.zoom < siteOnly.zoom, `${withBuffer.zoom} < ${siteOnly.zoom}`);
+		assert.ok(withLocal.zoom > withBuffer.zoom);
+		// not whole zooms - the map is filled
+		assert.ok(!Number.isInteger(withBuffer.zoom) && !Number.isInteger(siteOnly.zoom));
 	});
 });

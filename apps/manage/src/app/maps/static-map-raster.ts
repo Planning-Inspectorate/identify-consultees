@@ -9,7 +9,13 @@
 
 import sharp, { type OutputInfo, type Sharp } from 'sharp';
 import { MAP_VIEWPORT } from './sample-geojson.ts';
-import { renderStaticMapOverlaySvg, type OsmBasemapTile, type StaticMapBuildOptions } from './static-map.ts';
+import {
+	basemapFrame,
+	outputSize,
+	renderStaticMapOverlaySvg,
+	type OsmBasemapTile,
+	type StaticMapBuildOptions
+} from './static-map.ts';
 
 export type StaticMapFormat = 'avif' | 'webp' | 'png';
 
@@ -59,46 +65,55 @@ export function negotiateStaticMapFormat(acceptHeader: string | undefined): Stat
  * Returns undefined when there are no tiles - the SVG's flat background suffices.
  */
 export async function renderSvgBasemapImage(
-	options: Pick<StaticMapBuildOptions, 'width' | 'height' | 'basemap'>,
+	options: BasemapOptions,
 	basemapTiles: OsmBasemapTile[]
 ): Promise<Buffer | undefined> {
 	if (basemapTiles.length === 0) {
 		return undefined;
 	}
-	const width = options.width ?? MAP_VIEWPORT.width;
-	const height = options.height ?? MAP_VIEWPORT.height;
-	return basemapInput(await renderBasemap(options, width, height, basemapTiles))
+	return basemapInput(await renderBasemap(options, basemapTiles))
 		.jpeg({ quality: 70 })
 		.toBuffer();
 }
 
-/**
- * The basemap alone, as raw pixels: `basemapPng` fitted to the map, else the tiles on a flat
- * background - in grey for a greyscale map, lightened a little so the coloured areas over it
- * stand out. A step of its own: sharp composites after its other operations, so a greyscale
- * applied with the overlay would leave the tiles in colour.
- */
+type BasemapOptions = Pick<StaticMapBuildOptions, 'zoom' | 'width' | 'height' | 'pixelRatio' | 'basemap'>;
+
 type RawImage = { data: Buffer; info: OutputInfo };
 
+/**
+ * The basemap alone, as raw pixels at the image's size: `basemapPng` fitted to it, else the tiles
+ * on a flat background - drawn at their whole zoom (basemapFrame) and scaled to the map's zoom - in
+ * grey for a greyscale map, lightened a little so the coloured areas over it stand out. Steps of
+ * their own: sharp composites after its other operations, so a resize or greyscale applied with
+ * the composite would leave the tiles as they were.
+ */
 async function renderBasemap(
-	options: Pick<StaticMapBuildOptions, 'basemap'>,
-	width: number,
-	height: number,
+	options: BasemapOptions,
 	basemapTiles: OsmBasemapTile[],
 	basemapPng?: Buffer
 ): Promise<RawImage> {
+	const output = outputSize(options);
+	const frame = basemapFrame(options);
 	// one composite() call — sharp replaces (not appends) the input list on successive calls,
 	// which would silently drop tiles
 	const base = basemapPng
-		? sharp(basemapPng).resize(width, height, { fit: 'fill' })
-		: sharp({ create: { width, height, channels: 3, background: BASEMAP_BACKGROUND } }).composite(
+		? sharp(basemapPng).resize(output.width, output.height, { fit: 'fill' })
+		: sharp({
+				create: { width: frame.width, height: frame.height, channels: 3, background: BASEMAP_BACKGROUND }
+			}).composite(
 				basemapTiles.map((tile) => ({
 					input: tile.png,
 					left: Math.round(tile.x),
 					top: Math.round(tile.y)
 				}))
 			);
-	const flattened = await base.removeAlpha().raw().toBuffer({ resolveWithObject: true });
+	let flattened = await base.removeAlpha().raw().toBuffer({ resolveWithObject: true });
+	if (flattened.info.width !== output.width || flattened.info.height !== output.height) {
+		flattened = await basemapInput(flattened)
+			.resize(output.width, output.height, { fit: 'fill' })
+			.raw()
+			.toBuffer({ resolveWithObject: true });
+	}
 	if (options.basemap !== 'greyscale') {
 		return flattened;
 	}
@@ -129,7 +144,7 @@ export async function renderStaticMapRaster(
 	const width = options.width ?? MAP_VIEWPORT.width;
 	const height = options.height ?? MAP_VIEWPORT.height;
 
-	const basemap = basemapInput(await renderBasemap(options, width, height, basemapTiles, basemapPng));
+	const basemap = basemapInput(await renderBasemap({ ...options, width, height }, basemapTiles, basemapPng));
 	const overlay = Buffer.from(renderStaticMapOverlaySvg({ ...options, width, height }));
 	const composite = basemap.composite([{ input: overlay, left: 0, top: 0 }]);
 

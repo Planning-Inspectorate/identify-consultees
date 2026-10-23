@@ -6,13 +6,7 @@ import { NEARBY_NSIPS } from '../nearby-nsips.ts';
 import { resolveCase } from '../resolve-case.ts';
 import { firstQueryValue, runRulesetSafely } from '../run-ruleset.ts';
 import { reportCategories } from './categories.ts';
-import {
-	buildReportZip,
-	formatFileSize,
-	rememberedReportZip,
-	rememberReportZip,
-	reportGeneratedBy
-} from './export/report-zip.ts';
+import { buildReportZip, formatFileSize, rememberedReportZip, rememberReportZip } from './export/report-zip.ts';
 import { GROUP_TABS, tabForCategory } from './export/workbook.ts';
 import { consulteeName } from './report-consultees.ts';
 import type { ConsulteeSelection } from './urls.ts';
@@ -167,11 +161,10 @@ export function buildReportCreatedPage(service: ManageService): AsyncRequestHand
 		let downloadSize = '';
 		if (!failed) {
 			try {
-				const generatedBy = reportGeneratedBy(req.session);
 				const report =
-					rememberedReportZip(downloadUrl, generatedBy) ??
-					(await buildReportZip({ service, project, ruleset, consultees, selection, siteScreenedAs, generatedBy }));
-				rememberReportZip(downloadUrl, report, generatedBy);
+					rememberedReportZip(downloadUrl) ??
+					(await buildReportZip({ service, project, ruleset, consultees, selection, siteScreenedAs }));
+				rememberReportZip(downloadUrl, report);
 				downloadSize = formatFileSize(report.contents.length);
 			} catch (error) {
 				logger.error({ error, caseId: project.id, rulesetId: ruleset.id }, 'Failed to build the report ZIP');

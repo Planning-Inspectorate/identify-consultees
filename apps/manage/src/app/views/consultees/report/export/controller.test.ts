@@ -138,8 +138,7 @@ describe('report download', () => {
 		await buildReportDownload(service as never)(
 			{
 				params: { caseId: realProjectId },
-				query: { ruleset, exclude: removal, add: [pickedAdd, typedAdd] },
-				session: { account: { name: 'Sam Officer' } }
+				query: { ruleset, exclude: removal, add: [pickedAdd, typedAdd] }
 			} as never,
 			res as never
 		);
@@ -166,8 +165,6 @@ describe('report download', () => {
 			.map(([, data]) => strFromU8(data))
 			.join('');
 		assert.ok(sheets.includes('Borders the site'));
-		// the Summary names who generated it
-		assert.ok(sheets.includes('Sam Officer'));
 		assert.ok(sheets.includes('Manually added'));
 		assert.ok(!sheets.includes(pickedParish) && !sheets.includes('Consultee area id'));
 
@@ -256,24 +253,26 @@ describe('report download', () => {
 		]);
 		const files = zipOf(res);
 		const names = Object.keys(files);
-		assert.deepStrictEqual(names.slice(1), ['maps/01 Parish Council.pdf', 'maps/02 Nearby NSIPs.pdf']);
+		assert.deepStrictEqual(names.slice(1), ['maps/01 Parish Council.pdf', 'maps/02 NSIPs.pdf']);
 		const workbook = unzipSync(files[names[0]]);
 		const xml = Object.entries(workbook)
 			.filter(([name]) => name.startsWith('xl/'))
 			.map(([, data]) => strFromU8(data))
 			.join('');
+		// the NSIPs tab: each one's name, number, type, sub-type and the query that found it
 		for (const text of [
-			'name="Nearby NSIPs"',
-			'Neighbouring Solar Farm (EN010200)',
-			'Another NSIP within 10km of the site',
-			'neighbour.geojson',
-			'1 September 2026',
-			'Distance from site (km)'
+			'name="NSIPs"',
+			'Neighbouring Solar Farm',
+			'EN010200',
+			'Energy',
+			'Generating Stations',
+			'10km buffer',
+			'Query'
 		]) {
 			assert.ok(xml.includes(text), text);
 		}
-		const nsips = pdfTextLines(Buffer.from(files['maps/02 Nearby NSIPs.pdf']));
-		assert.ok(nsips.includes('Nearby NSIPs: 2 in the report'));
+		const nsips = pdfTextLines(Buffer.from(files['maps/02 NSIPs.pdf']));
+		assert.ok(nsips.includes('NSIPs: 2 in the report'));
 		// with the distance they were looked for within drawn around the site
 		assert.ok(nsips.includes('Ruleset buffer (10 km)'));
 		assert.ok(nsips.includes('Neighbouring Solar Farm (EN010200)'));

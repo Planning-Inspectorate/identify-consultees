@@ -57,10 +57,15 @@ export const REPORT_TABS = [
 
 export type ReportTab = (typeof REPORT_TABS)[number];
 
-/** A line of the workbook's Summary tab: its label, and the categories it counts. */
+/**
+ * A line of the workbook's Summary tab: its label, and the categories it counts - only those a
+ * condition with this buffer found nearest, when it has one (Ambulance Trusts within 1km, and within
+ * 10km, on lines of their own).
+ */
 export interface SummaryLine {
 	label: string;
 	categories: string[];
+	bufferKm?: number;
 }
 
 export interface ReportConfig {
@@ -97,8 +102,9 @@ function onlyKeys(section: Record<string, unknown>, allowed: string[], name: str
 }
 
 function parseColumns(value: unknown, name: string): ReportColumn[] {
-	if (!Array.isArray(value) || value.length === 0) {
-		fail(`${name}.columns must list at least one column`);
+	// none is fine: a tab can be its metadata alone, as NSIPs' is
+	if (!Array.isArray(value)) {
+		fail(`${name}.columns must list the columns, [] for none`);
 	}
 	const columns: ReportColumn[] = [];
 	for (const column of value) {
@@ -171,16 +177,32 @@ function parseCategory(tab: ReportTab, category: string, value: unknown, setting
 		fail(`${name} must set metadata, mapKm or summary`);
 	}
 	onlyKeys(value, ['metadata', 'mapKm', 'summary'], name);
-	if (value.summary !== undefined && (typeof value.summary !== 'string' || value.summary.trim() === '')) {
-		fail(`${name}.summary must be the label the Summary tab gives it`);
-	}
 	return {
 		settings: {
 			metadata: value.metadata === undefined ? settings.metadata : parseMetadata(value.metadata, name),
 			mapMarginMetres: value.mapKm === undefined ? settings.mapMarginMetres : parseMapKm(value.mapKm, name)
 		},
-		summary: typeof value.summary === 'string' ? value.summary.trim() : undefined
+		summary: value.summary === undefined ? [] : parseSummary(value.summary, name)
 	};
+}
+
+function isLabel(value: unknown): value is string {
+	return typeof value === 'string' && value.trim() !== '';
+}
+
+/**
+ * A category's Summary lines: one label, or a label for each buffer its conditions find it within -
+ * `{ 1: Ambulance Trusts (1km buffer), 10: Ambulance Trusts (10km buffer) }`.
+ */
+function parseSummary(value: unknown, name: string): { label: string; bufferKm?: number }[] {
+	if (isLabel(value)) {
+		return [{ label: value.trim() }];
+	}
+	const byBuffer = isRecord(value) ? Object.entries(value) : [];
+	if (byBuffer.length === 0 || !byBuffer.every(([km, label]) => Number(km) >= 0 && isLabel(label))) {
+		fail(`${name}.summary must be the label the Summary tab gives it, or a label for each buffer in km`);
+	}
+	return byBuffer.map(([km, label]) => ({ label: (label as string).trim(), bufferKm: Number(km) }));
 }
 
 export function parseReportConfig(text: string): ReportConfig {
@@ -218,13 +240,13 @@ export function parseReportConfig(text: string): ReportConfig {
 		for (const [category, categoryValue] of Object.entries(listed)) {
 			const parsed = parseCategory(tab as ReportTab, category, categoryValue, settings);
 			categories[category] = parsed.settings;
-			if (parsed.summary) {
+			for (const { label, bufferKm } of parsed.summary) {
 				const lines = (summaryLines[tab as ReportTab] ??= []);
-				const line = lines.find((candidate) => candidate.label === parsed.summary);
+				const line = lines.find((candidate) => candidate.label === label && candidate.bufferKm === bufferKm);
 				if (line) {
 					line.categories.push(category);
 				} else {
-					lines.push({ label: parsed.summary, categories: [category] });
+					lines.push({ label, categories: [category], ...(bufferKm === undefined ? {} : { bufferKm }) });
 				}
 			}
 		}

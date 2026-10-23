@@ -423,7 +423,7 @@ describe('report consultees change page', () => {
 	});
 
 	it('should show Nearby NSIPs while they are looked for, even with none found - and 404 it otherwise', async () => {
-		const nearbyNsips = { params: { caseId: realProjectId }, query: { category: 'Nearby NSIPs' } };
+		const nearbyNsips = { params: { caseId: realProjectId }, query: { category: 'NSIPs' } };
 		const lookedFor = { status: mock.fn(() => lookedFor), render: mock.fn() };
 		// the project, then no nearby cases
 		const db = dbReturning([[realProjectRow()], []]);
@@ -437,7 +437,7 @@ describe('report consultees change page', () => {
 		assert.strictEqual(lookedFor.status.mock.callCount(), 0);
 		const [view, viewModel] = lookedFor.render.mock.calls[0].arguments as unknown as [string, { pageHeading: string }];
 		assert.strictEqual(view, 'views/consultees/report/consultees/view.njk');
-		assert.strictEqual(viewModel.pageHeading, 'Nearby NSIPs');
+		assert.strictEqual(viewModel.pageHeading, 'NSIPs');
 
 		const notLookedFor = { status: mock.fn(() => notLookedFor), render: mock.fn() };
 		await handlerFor(dbReturning([[realProjectRow()]]))(nearbyNsips, notLookedFor);

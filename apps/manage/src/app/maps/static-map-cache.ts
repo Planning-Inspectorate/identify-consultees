@@ -49,6 +49,7 @@ export type StaticMapFingerprintInput = {
 	labels?: boolean;
 	basemap?: string;
 	bufferGeojson?: unknown;
+	pixelRatio?: number;
 };
 
 export function buildStaticMapFingerprint(input: StaticMapFingerprintInput): string {
@@ -68,7 +69,8 @@ export function buildStaticMapFingerprint(input: StaticMapFingerprintInput): str
 		featureBadges: input.featureBadges,
 		labels: input.labels,
 		basemap: input.basemap,
-		bufferGeojson: input.bufferGeojson
+		bufferGeojson: input.bufferGeojson,
+		pixelRatio: input.pixelRatio
 	});
 	return createHash('sha256').update(payload).digest('hex');
 }

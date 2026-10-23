@@ -33,7 +33,8 @@ describe('static-map-cache', () => {
 		for (const extra of [
 			{ labels: true },
 			{ basemap: 'greyscale' },
-			{ bufferGeojson: { type: 'FeatureCollection', features: [{}] } }
+			{ bufferGeojson: { type: 'FeatureCollection', features: [{}] } },
+			{ pixelRatio: 1.5 }
 		]) {
 			assert.notEqual(buildStaticMapFingerprint(input), buildStaticMapFingerprint({ ...input, ...extra }));
 		}

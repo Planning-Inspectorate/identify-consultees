@@ -4,7 +4,7 @@ import type { AsyncRequestHandler } from '@planning-inspectorate/core/util';
 import { resolveCase } from '../../resolve-case.ts';
 import { firstQueryValue, runRulesetSafely } from '../../run-ruleset.ts';
 import { consulteeSelection, reportCreatedUrl, reportDownloadUrl } from '../urls.ts';
-import { buildReportZip, rememberedReportZip, reportGeneratedBy } from './report-zip.ts';
+import { buildReportZip, rememberedReportZip } from './report-zip.ts';
 
 /**
  * The Report created page's download: the ZIP the created page built (an Excel workbook and a PDF
@@ -31,8 +31,7 @@ export function buildReportDownload(service: ManageService): AsyncRequestHandler
 		const selection = consulteeSelection(req.query);
 		const downloadUrl = reportDownloadUrl(project.id, ruleset.id, selection);
 
-		const generatedBy = reportGeneratedBy(req.session);
-		const remembered = rememberedReportZip(downloadUrl, generatedBy);
+		const remembered = rememberedReportZip(downloadUrl);
 		if (remembered) {
 			logger.info({ caseId: project.id, rulesetId: ruleset.id }, 'consultee report download (as built)');
 			res.set({
@@ -51,7 +50,7 @@ export function buildReportDownload(service: ManageService): AsyncRequestHandler
 
 		let report;
 		try {
-			report = await buildReportZip({ service, project, ruleset, consultees, selection, siteScreenedAs, generatedBy });
+			report = await buildReportZip({ service, project, ruleset, consultees, selection, siteScreenedAs });
 		} catch (error) {
 			logger.error({ error, caseId: project.id, rulesetId: ruleset.id }, 'Failed to build the report ZIP for download');
 			res.redirect(`${reportCreatedUrl(project.id, ruleset.id, selection)}&download=failed`);

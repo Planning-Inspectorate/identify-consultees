@@ -55,8 +55,6 @@ export interface ReportExport {
 	/** What the run screened - the outline unless said otherwise. */
 	siteScreenedAs?: SiteScreenedAs;
 	generatedAt: Date;
-	/** Who built it - the signed-in user's name, when there is one. */
-	generatedBy?: string;
 	/** The consultees the ruleset's conditions identified, less any removed. */
 	identified: ConsulteeMatch[];
 	/**
@@ -109,6 +107,8 @@ export function tabForCategory(category: string, ruleset: Ruleset): GroupTab {
 type Cell = SheetData[number][number];
 
 const text = (value: string | null | undefined): Cell => (value ? { value } : null);
+/** An empty cell for someone to fill in: yellow, and boxed, so it stands out. */
+const TO_FILL_IN: Cell = { value: '', backgroundColor: '#FFDD00', borderStyle: 'thin', borderColor: '#0B0C0C' };
 const bold = (value: string): Cell => ({ value, fontWeight: 'bold' });
 const headerRow = (labels: readonly string[]) => labels.map(bold);
 
@@ -239,6 +239,10 @@ interface RowSource {
 	distanceMetres: number | null | undefined;
 	/** Its stored row - missing for a consultee added by name alone, or deleted mid-request. */
 	record: ConsulteeAreaRecord | undefined;
+	/** The nearest buffer a condition found it within, in km - none for one added by hand. */
+	bufferKm?: number;
+	/** An NSIP's own fields (see nsipFields) - its tab's metadata. */
+	nsip?: Metadata;
 }
 
 /** Each fixed column's cell - the columns config/report.yaml can choose from. */
@@ -280,6 +284,7 @@ export const COLUMN_WIDTHS: Record<ReportColumn, number> = {
 interface SortableRow {
 	category: string;
 	name: string;
+	bufferKm?: number;
 	cells: Cell[];
 	metadata: Map<string, unknown>;
 }
@@ -288,15 +293,21 @@ function byCategoryThenName(a: SortableRow, b: SortableRow): number {
 	return a.category.localeCompare(b.category, 'en-GB') || a.name.localeCompare(b.name, 'en-GB');
 }
 
+/** What the Summary counts a consultee by: its category, and the nearest buffer a condition found it within. */
+export interface CountedConsultee {
+	category: string;
+	bufferKm?: number;
+}
+
 /**
  * One group tab: its columns (the fixed ones, then its metadata headings), a row per consultee, and
- * how many of them are of each category - for the Summary tab.
+ * what the Summary tab counts each by.
  */
 interface GroupTabContent {
 	header: string[];
 	widths: number[];
 	rows: Cell[][];
-	categoryCounts: Map<string, number>;
+	counted: CountedConsultee[];
 }
 
 /**
@@ -323,10 +334,7 @@ function tabContent(rows: SortableRow[], columns: readonly ReportColumn[]): Grou
 			...headings.map((heading) => Math.min(40, Math.max(12, heading.length + 2)))
 		],
 		rows: sorted.map((row) => [...row.cells, ...headings.map((heading) => metadataCell(row.metadata.get(heading)))]),
-		categoryCounts: sorted.reduce(
-			(counts, row) => counts.set(row.category, (counts.get(row.category) ?? 0) + 1),
-			new Map<string, number>()
-		)
+		counted: sorted.map(({ category, bufferKm }) => ({ category, bufferKm }))
 	};
 }
 
@@ -335,9 +343,10 @@ function sortableRow(source: RowSource, tab: GroupTab, config: ReportConfig): So
 	return {
 		category: source.category ?? '',
 		name: source.name ?? '',
+		bufferKm: source.bufferKm,
 		cells: tabSettings(tab, config).columns.map((column) => COLUMN_CELLS[column](source)),
 		metadata: exportedMetadata(
-			parseMetadata(source.record?.metadata),
+			{ ...parseMetadata(source.record?.metadata), ...source.nsip },
 			categorySettings(source.category, config).metadata
 		)
 	};
@@ -360,7 +369,9 @@ function groupTabs(report: ReportExport, config: ReportConfig): Map<GroupTab, Gr
 					whyIdentified: describeReasons(match, report.ruleset, { nearby: false }).join('\n'),
 					source: 'Ruleset',
 					distanceMetres: match.distanceMetres,
-					record
+					record,
+					bufferKm: nearestBufferKm(match, report.ruleset),
+					...(tab === NEARBY_NSIPS ? { nsip: nsipFields(properties.consultee ?? '', nsipQuery(match)) } : {})
 				},
 				tab,
 				config
@@ -381,7 +392,8 @@ function groupTabs(report: ReportExport, config: ReportConfig): Map<GroupTab, Gr
 					whyIdentified: add.reason || 'Manually added',
 					source: 'Manually added',
 					distanceMetres: add.distanceMetres,
-					record
+					record,
+					...(tab === NEARBY_NSIPS ? { nsip: nsipFields(add.name, add.reason) } : {})
 				},
 				tab,
 				config
@@ -403,25 +415,34 @@ export function formatDate(date: Date): string {
 
 /**
  * A tab's lines on the Summary tab, with their counts: config/report.yaml's lines for it, in order,
- * each shown even at 0 - then any other category the tab has consultees of, under its own name, so
- * the lines add up to the tab's total.
+ * each shown even at 0 - each consultee counted on the first line for its category (and, for a line
+ * split by buffer, its nearest buffer) - then any consultee no line counts, under its category's own
+ * name, so the lines add up to the tab's total.
  */
 export function summaryCounts(
 	tab: GroupTab,
-	categoryCounts: Map<string, number>,
+	counted: CountedConsultee[],
 	config: ReportConfig = REPORT_CONFIG
 ): { label: string; count: number }[] {
-	const lines = summaryLines(tab, config);
-	const labelled = new Set(lines.flatMap((line) => line.categories));
+	const left = [...counted];
+	const take = (matches: (consultee: CountedConsultee) => boolean): CountedConsultee[] => {
+		const taken = left.filter(matches);
+		left.splice(0, left.length, ...left.filter((consultee) => !matches(consultee)));
+		return taken;
+	};
+	const lines = summaryLines(tab, config).map(({ label, categories, bufferKm }) => ({
+		label,
+		count: take(
+			(consultee) =>
+				categories.includes(consultee.category) && (bufferKm === undefined || consultee.bufferKm === bufferKm)
+		).length
+	}));
+	const rest = Map.groupBy(left, (consultee) => consultee.category);
 	return [
-		...lines.map(({ label, categories }) => ({
-			label,
-			count: categories.reduce((sum, category) => sum + (categoryCounts.get(category) ?? 0), 0)
-		})),
-		...[...categoryCounts]
-			.filter(([category]) => !labelled.has(category))
+		...lines,
+		...[...rest]
 			.toSorted(([a], [b]) => a.localeCompare(b, 'en-GB'))
-			.map(([category, count]) => ({ label: category || 'No category', count }))
+			.map(([category, consultees]) => ({ label: category || 'No category', count: consultees.length }))
 	];
 }
 
@@ -464,38 +485,70 @@ function consulteeList(heading: string, consultees: readonly { name: string; cat
 	];
 }
 
+/** An NSIP's own fields, in order - the NSIPs tab's metadata and the Summary's list's columns. */
+export const NSIP_FIELDS = ['Name', 'Number', 'Type', 'Sub-type', 'Query'] as const;
+
+/** The query that found a Nearby NSIP - the buffer it's within, "35km buffer". */
+function nsipQuery(match: ConsulteeMatch): string {
+	return match.reasons
+		.filter((reason): reason is Extract<ConsulteeReason, { type: 'nearbyNsip' }> => reason.type === 'nearbyNsip')
+		.map((reason) => `${distanceText(reason.radiusMetres)} buffer`)
+		.join('\n');
+}
+
 /**
- * The Summary's list of national infrastructure projects - the report's Nearby NSIPs: those found,
- * nearest first, with the distance they were found within, then those added by hand, with the reason
- * given - each with its project type and sub-type, from its case reference (see nsipType).
+ * An NSIP's own fields (NSIP_FIELDS): its project name and case reference from the name it's listed
+ * under, its type and sub-type from that reference (see nsipType), and `query` - how it was found,
+ * or the reason given for adding it.
+ */
+export function nsipFields(name: string, query: string): Metadata {
+	const { projectName, caseReference } = splitNsipName(name);
+	const { type, subType } = nsipType(caseReference);
+	return { Name: projectName, Number: caseReference ?? null, Type: type, 'Sub-type': subType, Query: query };
+}
+
+/**
+ * The nearest buffer, in km, of the conditions that found a consultee - none if no buffer condition
+ * did. The Summary splits a category by it where config/report.yaml says to.
+ */
+export function nearestBufferKm(match: ConsulteeMatch, ruleset: Ruleset): number | undefined {
+	const buffers = match.reasons.flatMap((reason) =>
+		reason.type === 'condition'
+			? ruleset.rules
+					.filter((rule) => rule.id === reason.conditionId && rule.logicType === 'intersection')
+					.map((rule) => (rule.bufferMetres ?? 0) / 1000)
+			: []
+	);
+	return buffers.length > 0 ? Math.min(...buffers) : undefined;
+}
+
+/**
+ * The Summary's list of national infrastructure projects - the report's NSIPs: those found, nearest
+ * first, then those added by hand - each with its own fields (see nsipFields).
  */
 function nsipList(report: ReportExport): Cell[][] {
-	const found = report.identified.filter(isNearbyNsip).map((match) => ({
-		name: match.feature.properties.consultee ?? '',
-		whyIdentified: match.reasons
-			.filter((reason): reason is Extract<ConsulteeReason, { type: 'nearbyNsip' }> => reason.type === 'nearbyNsip')
-			.map((reason) => `Within ${distanceText(reason.radiusMetres)} of the site`)
-			.join('\n')
-	}));
-	const added = report.added
-		.filter((add) => add.category === NEARBY_NSIPS)
-		.map((add) => ({ name: add.name, whyIdentified: add.reason }));
+	const nsips = [
+		...report.identified
+			.filter(isNearbyNsip)
+			.map((match) => nsipFields(match.feature.properties.consultee ?? '', nsipQuery(match))),
+		...report.added.filter((add) => add.category === NEARBY_NSIPS).map((add) => nsipFields(add.name, add.reason))
+	];
 	return [
 		[bold('List of National infrastructure projects')],
-		headerRow(['Name', 'Why identified', 'Type', 'Sub-type', 'Number']),
-		...[...found, ...added].map(({ name, whyIdentified }): Cell[] => {
-			const { projectName, caseReference } = splitNsipName(name);
-			const { type, subType } = nsipType(caseReference);
-			return [text(projectName), { value: whyIdentified, wrap: true }, text(type), text(subType), text(caseReference)];
-		})
+		headerRow(NSIP_FIELDS),
+		...nsips.map((fields): Cell[] =>
+			NSIP_FIELDS.map((field) =>
+				field === 'Query' ? { value: String(fields.Query), wrap: true } : text(fields[field] as string | null)
+			)
+		)
 	];
 }
 
 function summarySheet(report: ReportExport, tabs: Map<GroupTab, GroupTabContent>, config: ReportConfig): SheetData {
 	const detail = (label: string, value: string | null | undefined): Cell[] => [bold(label), text(value)];
 	const tabLines = GROUP_TABS.flatMap((tab): Cell[][] => {
-		const { rows, categoryCounts } = tabs.get(tab)!;
-		const lines = summaryCounts(tab, categoryCounts, config);
+		const { rows, counted } = tabs.get(tab)!;
+		const lines = summaryCounts(tab, counted, config);
 		// Nearby NSIPs are one category, so their line is their tab's total
 		if (tab === NEARBY_NSIPS) {
 			return lines.map(({ label, count: value }) => [bold(label), count(value, 'bold')]);
@@ -526,7 +579,8 @@ function summarySheet(report: ReportExport, tabs: Map<GroupTab, GroupTabContent>
 			bold('Report generated date'),
 			{ type: Date, value: ukClockTime(report.generatedAt), format: 'd mmmm yyyy hh:mm' }
 		],
-		detail('Report generated by', report.generatedBy),
+		// left for whoever sends the report to fill in - highlighted so it isn't missed
+		[bold('Report generated by'), TO_FILL_IN],
 		[],
 		headerRow(['Tab', 'Consultees']),
 		...tabLines,

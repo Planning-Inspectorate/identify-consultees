@@ -5,7 +5,7 @@
 #
 # A tab's columns are its `columns`, then the metadata its consultees export:
 #
-#   columns   the fixed columns, in order - any of:
+#   columns   the fixed columns, in order - [] for none - any of:
 #               consultee               Consultee
 #               category                Category
 #               subcategory             Subcategory              a port's Statutory or NonStatutory...
@@ -27,7 +27,9 @@
 #
 #   mapKm     how much a category's map shows around the site, in km.
 #
-#   summary   a category's line on the Summary tab - the label it gives the category's count.
+#   summary   a category's line on the Summary tab - the label it gives the category's count; or a
+#             label for each buffer its conditions find it within, as { 1: ..., 10: ... }, each
+#             consultee counted on the line of the nearest.
 #             Each tab's lines are in the order its categories are listed here; categories with the
 #             same label share a line. A line shows even when its count is 0. A category without a
 #             label that has consultees in a report gets a line of its own, under its name, after
@@ -58,7 +60,8 @@ tabs:
   Public bodies:
     columns: [consultee, category, whyIdentified, source]
     categories:
-      Ambulance Trust: { summary: Ambulance Trusts }
+      # a line for each buffer its conditions find it within, each trust on its nearest
+      Ambulance Trust: { summary: { 1: Ambulance Trusts (1km buffer), 10: Ambulance Trusts (10km buffer) } }
       Fire and Rescue Authority:
         summary: Fire and Rescue Authorities
         metadata: { ONS_CODE: Code, NAME: Official name }
@@ -143,17 +146,17 @@ tabs:
       Coal Mining Reporting Area: { summary: Coal Mining Reporting Areas }
       Cheshire Brine Area: { summary: Cheshire Brine Area }
 
-  Nearby NSIPs:
-    columns: [consultee, whyIdentified, source]
+  NSIPs:
+    # its own fields alone (see NSIP_FIELDS in workbook.ts): the project, its case reference, its
+    # type and sub-type from that reference, and the query that found it - "35km buffer"
+    columns: []
     # as far as config/nearby-consultees.yaml's nsipRadiusKm looks, so the cases found fit the map
     mapKm: 35
     metadata:
-      Case reference: Case reference
-      Project name: Project name
-      Shapefile: Shapefile
-      Received: Received
+      Name: Name
+      Number: Number
       Type: Type
       Sub-type: Sub-type
-      Distance (km): Distance from site (km)
+      Query: Query
     categories:
-      Nearby NSIPs: { summary: National infrastructure projects }
+      NSIPs: { summary: National infrastructure projects }

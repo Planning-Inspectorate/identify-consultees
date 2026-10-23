@@ -36,9 +36,11 @@ describe('report config', () => {
 		assert.ok(REPORT_CONFIG.defaults.columns.every((column) => column in REPORT_COLUMNS));
 		assert.ok(REPORT_CONFIG.defaults.mapMarginMetres > 0);
 		for (const tab of REPORT_TABS) {
-			assert.ok(tabSettings(tab).columns.length > 0, tab);
+			// every tab shows something: fixed columns, or metadata
+			assert.ok(tabSettings(tab).columns.length > 0 || tabSettings(tab).metadata !== 'none', tab);
 		}
-		assert.deepEqual(tabSettings('Nearby NSIPs').columns, ['consultee', 'whyIdentified', 'source']);
+		// NSIPs are their own fields alone - no fixed columns
+		assert.deepEqual(tabSettings('NSIPs').columns, []);
 		// the combined authorities share their metadata
 		assert.deepEqual(
 			categorySettings('Passenger Transport Executive').metadata,
@@ -87,7 +89,7 @@ describe('report config', () => {
 	test("finds a category's tab from its group, Nearby NSIPs from its own", () => {
 		assert.equal(tabForCategorySettings('Parish Council'), 'Administrative boundaries');
 		assert.equal(tabForCategorySettings('Offshore Wind Export Cable'), 'Energy');
-		assert.equal(tabForCategorySettings('Nearby NSIPs'), 'Nearby NSIPs');
+		assert.equal(tabForCategorySettings('NSIPs'), 'NSIPs');
 		assert.equal(tabForCategorySettings('Nowhere'), undefined);
 		assert.equal(tabForCategorySettings(null), undefined);
 	});
@@ -108,6 +110,20 @@ tabs:
 			{ label: 'Police and Crime Commissioners', categories: ['Police'] },
 			{ label: 'Internal Drainage Boards', categories: ['Internal Drainage Board', 'Internal Drainage District'] }
 		]);
+		// a label for each buffer: a line each, in order
+		const split = parseReportConfig(`
+version: 2
+defaults: { columns: [consultee], metadata: none, mapKm: 1 }
+tabs:
+  Public bodies:
+    categories:
+      Ambulance Trust: { summary: { 1: Within 1km, 10: Within 10km } }
+      Fire and Rescue Authority: { summary: { 10: Within 10km } }
+`);
+		assert.deepStrictEqual(summaryLines('Public bodies', split), [
+			{ label: 'Within 1km', categories: ['Ambulance Trust'], bufferKm: 1 },
+			{ label: 'Within 10km', categories: ['Ambulance Trust', 'Fire and Rescue Authority'], bufferKm: 10 }
+		]);
 		// a label leaves the category's other settings as they were
 		assert.equal(categorySettings('Police', config).metadata, 'all');
 		assert.deepStrictEqual(summaryLines('Energy', config), []);
@@ -118,8 +134,8 @@ tabs:
 		for (const category of REFERENCE_DATA_CONFIG.groups.flatMap((group) => [...group.categories])) {
 			assert.ok(labelled.has(category), `${category} has no summary label in config/report.yaml`);
 		}
-		assert.deepStrictEqual(summaryLines('Nearby NSIPs'), [
-			{ label: 'National infrastructure projects', categories: ['Nearby NSIPs'] }
+		assert.deepStrictEqual(summaryLines('NSIPs'), [
+			{ label: 'National infrastructure projects', categories: ['NSIPs'] }
 		]);
 	});
 
@@ -136,7 +152,11 @@ tabs:
 		['an unknown top-level key', `${VALID}\ncategories: {}`, /the document has "categories"/],
 		['missing defaults', 'version: 2', /defaults must set columns, metadata and mapKm/],
 		['a typo in the defaults', VALID.replace('  mapKm: 10', '  mapkm: 10'), /defaults has "mapkm"/],
-		['no columns', VALID.replace('[consultee, category, source]', '[]'), /defaults.columns must list/],
+		[
+			'columns that are not a list',
+			VALID.replace('[consultee, category, source]', 'consultee'),
+			/defaults.columns must list the columns, \[\] for none/
+		],
 		[
 			'an unknown column',
 			VALID.replace('[consultee, region]', '[consultee, place]'),
@@ -177,6 +197,21 @@ tabs:
 			'a blank summary label',
 			VALID.replace('Ambulance Trust: { mapKm: 5 }', "Ambulance Trust: { summary: ' ' }"),
 			/categories.Ambulance Trust.summary must be the label the Summary tab gives it/
+		],
+		[
+			'a buffer that is not a number',
+			VALID.replace('Ambulance Trust: { mapKm: 5 }', 'Ambulance Trust: { summary: { one: Within 1km } }'),
+			/Ambulance Trust.summary must be the label the Summary tab gives it, or a label for each buffer in km/
+		],
+		[
+			'a buffer without a label',
+			VALID.replace('Ambulance Trust: { mapKm: 5 }', "Ambulance Trust: { summary: { 1: ' ' } }"),
+			/Ambulance Trust.summary must be/
+		],
+		[
+			'no buffers',
+			VALID.replace('Ambulance Trust: { mapKm: 5 }', 'Ambulance Trust: { summary: {} }'),
+			/Ambulance Trust.summary must be/
 		],
 		[
 			'a summary label that is not text',

@@ -46,7 +46,44 @@ export type StaticMapBuildOptions = {
 	 * written on it - the ruleset's buffers around the site, in the report's map PDFs.
 	 */
 	bufferGeojson?: GeoJsonFeatureCollection;
+	/**
+	 * Raster image pixels per map pixel - 1.5 for the report's map PDFs, so they're sharp printed or
+	 * zoomed in. The map shows the same area, its lines and text drawn at this scale. 1 by default.
+	 */
+	pixelRatio?: number;
 };
+
+/** The highest zoom OpenStreetMap draws tiles at. */
+const OSM_MAX_ZOOM = 19;
+
+/** The size of the image a map renders to: its width and height times its pixel ratio. */
+export function outputSize(options: Pick<StaticMapBuildOptions, 'width' | 'height' | 'pixelRatio'>): {
+	width: number;
+	height: number;
+} {
+	const ratio = options.pixelRatio ?? 1;
+	return {
+		width: Math.round((options.width ?? MAP_VIEWPORT.width) * ratio),
+		height: Math.round((options.height ?? MAP_VIEWPORT.height) * ratio)
+	};
+}
+
+/**
+ * The tiles a map's basemap is drawn from: OpenStreetMap only has whole zooms, so a map at any other
+ * zoom (or pixel ratio) draws the nearest whole one onto a canvas as much larger or smaller, which is
+ * then scaled to the image - by at most 1.41 either way.
+ */
+export function basemapFrame(options: Pick<StaticMapBuildOptions, 'zoom' | 'width' | 'height' | 'pixelRatio'>): {
+	zoom: number;
+	width: number;
+	height: number;
+} {
+	const output = outputSize(options);
+	const exact = options.zoom + Math.log2(options.pixelRatio ?? 1);
+	const zoom = Math.min(OSM_MAX_ZOOM, Math.max(0, Math.round(exact)));
+	const scale = 2 ** (zoom - exact);
+	return { zoom, width: Math.round(output.width * scale), height: Math.round(output.height * scale) };
+}
 
 const GOOGLE_STATIC_MAP_MAX_URL_LENGTH = 16_384;
 const OSM_TILE_SIZE = 256;
@@ -191,11 +228,9 @@ function tileCacheKey(zoom: number, tileX: number, tileY: number): string {
  * Low concurrency and identifying User-Agent follow OSM tile usage policy.
  */
 export async function fetchOsmBasemapTiles(
-	options: Pick<StaticMapBuildOptions, 'center' | 'zoom' | 'width' | 'height'>
+	options: Pick<StaticMapBuildOptions, 'center' | 'zoom' | 'width' | 'height' | 'pixelRatio'>
 ): Promise<OsmBasemapTile[]> {
-	const width = options.width ?? MAP_VIEWPORT.width;
-	const height = options.height ?? MAP_VIEWPORT.height;
-	const zoom = Math.round(options.zoom);
+	const { zoom, width, height } = basemapFrame(options);
 	const { left, top } = staticMapViewportOrigin(options.center, zoom, width, height);
 	const wanted = listOsmTilesForViewport(left, top, width, height, zoom);
 	const tiles: OsmBasemapTile[] = [];
@@ -718,7 +753,9 @@ export function centroidOfGeometry(geometry: Geometry): Position | undefined {
 export function renderStaticMapOverlaySvg(options: StaticMapBuildOptions): string {
 	const width = options.width ?? MAP_VIEWPORT.width;
 	const height = options.height ?? MAP_VIEWPORT.height;
-	const zoom = Math.round(options.zoom);
+	// any zoom - the basemap is drawn to match (see basemapFrame)
+	const zoom = options.zoom;
+	const output = outputSize(options);
 	const { left, top } = staticMapViewportOrigin(options.center, zoom, width, height);
 
 	const project = (lng: number, lat: number): [number, number] => {
@@ -770,7 +807,8 @@ export function renderStaticMapOverlaySvg(options: StaticMapBuildOptions): strin
 		})
 		.join('\n');
 
-	return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
+	// drawn in map pixels, sized in image pixels - a pixel ratio scales every line and label with it
+	return `<svg xmlns="http://www.w3.org/2000/svg" width="${output.width}" height="${output.height}" viewBox="0 0 ${width} ${height}">
   ${consulteePaths}
   ${bufferPaths}
   ${projectPaths}
@@ -804,7 +842,7 @@ export function renderStaticMapSvg(options: StaticMapBuildOptions, basemapImage?
   <desc id="desc">${desc}</desc>
   <rect width="100%" height="100%" fill="#f5f5f0"/>
   ${basemapMarkup}
-  ${renderStaticMapOverlaySvg({ ...options, width, height })}
+  ${renderStaticMapOverlaySvg({ ...options, width, height, pixelRatio: 1 })}
 </svg>
 `;
 }
