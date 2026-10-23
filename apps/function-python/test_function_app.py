@@ -121,7 +121,7 @@ def test_run_ruleset_runs_the_posted_conditions_and_returns_each_consultee_with_
     reasons = [{"type": "condition", "conditionId": "hospital"}, {"type": "nearby", "radiusMetres": 20_000}]
     result = [
         Consultee(
-            ConsulteeArea("a", area["properties"], geometry_wkt="POINT (0 0)"),
+            ConsulteeArea("a", area["properties"]),
             12.5,
             [ConditionReason("hospital"), NearbyReason(20_000)],
         ),
@@ -138,7 +138,7 @@ def test_run_ruleset_runs_the_posted_conditions_and_returns_each_consultee_with_
     assert response.status_code == 200
     assert json.loads(response.get_body()) == {
         "consultees": [
-            {"feature": {**area, "geometryWkt": "POINT (0 0)"}, "distanceMetres": 12.5, "reasons": reasons},
+            {"feature": area, "distanceMetres": 12.5, "reasons": reasons},
             {
                 "feature": nearby_only,
                 "distanceMetres": 900.0,
@@ -158,28 +158,22 @@ def test_run_ruleset_runs_the_posted_conditions_and_returns_each_consultee_with_
         ],
         20_000,
         {},
-        with_geometry=True,
         bounding_box_above_points=None,
         bounding_box=False,
         dataset=None,
     )
 
 
-def test_run_ruleset_leaves_geometry_out_when_asked():
+def test_run_ruleset_ignores_an_older_apps_includegeometry():
+    # the app no longer sends it - one deployed before this still does, and it mustn't be refused
     with (
         patch.dict("os.environ", {"CONSULTEE_AREAS_API_KEY": API_KEY}),
         patch("function_app.connection_params_from_env", return_value=object()),
-        patch("function_app.run_ruleset", return_value=Screening([], "outline")) as run,
+        patch("function_app.run_ruleset", return_value=Screening([], "outline")),
     ):
         response = run_ruleset_route(_ruleset_request({**VALID_BODY, "includeGeometry": False}))
 
     assert response.status_code == 200
-    assert run.call_args.kwargs == {
-        "with_geometry": False,
-        "bounding_box_above_points": None,
-        "bounding_box": False,
-        "dataset": None,
-    }
 
 
 def test_run_ruleset_screens_a_quarters_dataset_when_asked_and_refuses_one_with_no_table():
@@ -249,8 +243,6 @@ def test_run_ruleset_passes_each_categorys_nearby_radius_on():
         {**VALID_BODY, "nearbyRadiusMetresByCategory": {"Parish Council": -1}},
         {**VALID_BODY, "nearbyRadiusMetresByCategory": {"": 5_000}},
         {**VALID_BODY, "nearbyRadiusMetresByCategory": {f"Category {i}": 1 for i in range(201)}},
-        {**VALID_BODY, "includeGeometry": "no"},
-        {**VALID_BODY, "includeGeometry": 0},
         {**VALID_BODY, "boundingBoxAbovePoints": 0},
         {**VALID_BODY, "boundingBoxAbovePoints": 2.5},
         {**VALID_BODY, "boundingBoxAbovePoints": True},

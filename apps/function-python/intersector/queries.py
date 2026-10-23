@@ -7,7 +7,6 @@ the queries and map the rows. Nothing here is user input except values passed as
 column lists and filters are developer-controlled text.
 """
 
-import json
 import math
 import re
 from collections.abc import Iterable
@@ -32,11 +31,12 @@ def _as_text(column: str) -> str:
 
 ID = _as_text("id")
 
+# what the manage app lists a consultee by - not its geometry (the app draws from its own display
+# geometry) or its metadata (the report reads each consultee's row)
 AREA_COLUMNS = f"""
     {ID} AS id, sourceId, consulteeCategory, consulteeGroup, consulteeSubcategory,
-    consulteeSubcategoryDescription, consultee, region, metadata
+    consulteeSubcategoryDescription, consultee, region
 """
-AREA_COLUMNS_WITH_GEOMETRY = f"{AREA_COLUMNS}, geometry.STAsText() AS geometryWkt"
 
 # Forces the spatial index. Found when this ran in Node: with Prisma's parameterised SQL and a
 # category filter, SQL Server sometimes read every row of the category nationally instead (~180x
@@ -64,9 +64,7 @@ def _area_from_row(row: dict) -> ConsulteeArea:
             "consulteeSubcategoryDescription": row["consulteeSubcategoryDescription"],
             "consultee": row["consultee"],
             "region": row["region"],
-            "metadata": json.loads(row["metadata"]),
         },
-        geometry_wkt=row.get("geometryWkt"),
     )
 
 
@@ -135,7 +133,6 @@ def find_areas_near(
     radius_metres: float,
     categories: Iterable[str] = (),
     excluded_categories: Iterable[str] = (),
-    with_geometry: bool = True,
 ) -> list[AreaMatch]:
     """Areas within `radius_metres` (+ DISTANCE_MARGIN_METRES) of `wkt`, nearest first, optionally
     limited to `categories` or leaving out `excluded_categories`."""
@@ -150,8 +147,7 @@ def find_areas_near(
     )
     rows = db.query(
         f"""
-        SELECT {AREA_COLUMNS_WITH_GEOMETRY if with_geometry else AREA_COLUMNS},
-            geometrySimplified.STDistance({_geography()}) AS distanceMetres
+        SELECT {AREA_COLUMNS}, geometrySimplified.STDistance({_geography()}) AS distanceMetres
         FROM {db.table} {USE_SPATIAL_INDEX}
         WHERE geometrySimplified.STDistance({_geography()}) <= %s
             {category_filter}
@@ -168,7 +164,6 @@ def find_areas_bordering(
     site_within_margin: str,
     host_category: str,
     categories: Iterable[str],
-    with_geometry: bool = True,
 ) -> list[ConsulteeArea]:
     """Areas of `categories` within BORDERING_TOLERANCE_METRES of any `host_category` area that
     intersects the site (already grown by the distance margin). Unmeasured - see AreaMatch.
@@ -198,7 +193,7 @@ def find_areas_bordering(
     for host in hosts:
         rows = db.query(
             f"""
-            SELECT {AREA_COLUMNS_WITH_GEOMETRY if with_geometry else AREA_COLUMNS}
+            SELECT {AREA_COLUMNS}
             FROM {db.table} {USE_SPATIAL_INDEX}
             WHERE consulteeCategory IN ({_placeholders(categories)})
                 AND id <> CAST(%s AS UNIQUEIDENTIFIER)
@@ -282,9 +277,3 @@ def measure_distances(db: Database, wkt: str, ids: list[str]) -> dict[str, float
         db, f"{ID} AS id, geometrySimplified.STDistance({_geography()}) AS distanceMetres", ids, (wkt,)
     )
     return {row["id"]: row["distanceMetres"] for row in rows}
-
-
-def fetch_geometries(db: Database, ids: list[str]) -> dict[str, str]:
-    """Each area's original geometry as WKT, by id. Unknown ids are absent."""
-    rows = _select_by_id(db, f"{ID} AS id, geometry.STAsText() AS geometryWkt", ids)
-    return {row["id"]: row["geometryWkt"] for row in rows}

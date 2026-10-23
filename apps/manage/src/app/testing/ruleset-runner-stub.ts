@@ -15,9 +15,6 @@ export interface ConsulteeAreaMatchRow {
 	consulteeSubcategoryDescription?: string | null;
 	consultee: string | null;
 	region: string | null;
-	metadata?: string;
-	/** Absent for a consultee only the nearby search found - the function sends those without it. */
-	geometryWkt?: string;
 	distanceMetres: number;
 	/** Defaults to one condition reason, `test-condition`. */
 	reasons?: ConsulteeReason[];
@@ -35,10 +32,8 @@ function feature(row: ConsulteeAreaMatchRow) {
 			consulteeSubcategory: row.consulteeSubcategory ?? null,
 			consulteeSubcategoryDescription: row.consulteeSubcategoryDescription ?? null,
 			consultee: row.consultee,
-			region: row.region,
-			metadata: JSON.parse(row.metadata ?? '{}')
-		},
-		...(row.geometryWkt ? { geometryWkt: row.geometryWkt } : {})
+			region: row.region
+		}
 	};
 }
 
@@ -77,10 +72,9 @@ export function buildDatabaseRulesetRunner(getDb: () => PrismaClient): RulesetRu
 		const wkt = geometryToWkt(site);
 		const rules = ruleset.rules.filter((rule) => rule.logicType === 'intersection' && rule.categories.length > 0);
 		const searchMetres = Math.max(nearbyRadiusMetres, ...rules.map((rule) => rule.bufferMetres ?? 0));
-		const rows = await db.$queryRaw<(ConsulteeAreaMatchRow & { metadata: string })[]>`
+		const rows = await db.$queryRaw<ConsulteeAreaMatchRow[]>`
 			SELECT id, sourceId, consulteeCategory, consulteeGroup, consulteeSubcategory, consulteeSubcategoryDescription,
-				consultee, region, metadata,
-				geometry.STAsText() AS geometryWkt,
+				consultee, region,
 				geometrySimplified.STDistance(geography::STGeomFromText(${wkt}, 4326)) AS distanceMetres
 			FROM consultee_area
 			WHERE geometrySimplified.STDistance(geography::STGeomFromText(${wkt}, 4326)) <= ${searchMetres}

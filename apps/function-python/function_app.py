@@ -175,10 +175,9 @@ def run_ruleset_route(req: func.HttpRequest) -> func.HttpResponse:
         return _json_response({"error": str(error)}, 400)
 
     logger.info(
-        "run-ruleset: %d conditions, nearby radius %sm, geometry %s",
+        "run-ruleset: %d conditions, nearby radius %sm",
         len(request.rules),
         request.nearby_radius_metres,
-        "included" if request.include_geometry else "left out",
     )
     try:
         screening = run_ruleset(
@@ -187,7 +186,6 @@ def run_ruleset_route(req: func.HttpRequest) -> func.HttpResponse:
             request.rules,
             request.nearby_radius_metres,
             request.nearby_radius_metres_by_category,
-            with_geometry=request.include_geometry,
             bounding_box_above_points=request.bounding_box_above_points,
             bounding_box=request.bounding_box,
             dataset=request.dataset,

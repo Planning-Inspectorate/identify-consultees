@@ -38,7 +38,8 @@ Python decides which queries to run and combines the results; the geometry maths
    - **Wider than 20km** (three 35km conditions): one query each, limited to their category.
    - **Bordering** (four): find **hosts** (host-category areas intersecting the site), grow each by 50m, and find **neighbours** (matching-category areas intersecting a grown host, excluding the host).
 4. **Merge**: each consultee once, with its smallest distance and every reason, `condition` reasons in the ruleset's order and then `nearby`. Bordering matches nothing else measured get their distance measured here.
-5. **Fetch original geometry** for condition matches only. The map normally draws display geometry instead (see [Maps](../maps.md)).
+
+No geometry or metadata is read for the matches: the maps draw from their own display geometry (see [Maps](../maps.md)), and the report reads each consultee's stored row.
 
 The report pages turn reasons into **Why identified** text (`apps/manage/src/app/views/consultees/reasons.ts`), one per line:
 

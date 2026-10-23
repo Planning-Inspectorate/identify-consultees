@@ -36,8 +36,6 @@ class RunRulesetRequest:
     nearby_radius_metres: float
     nearby_radius_metres_by_category: dict[str, float]
     """A nearby radius for particular categories, overriding nearby_radius_metres for them."""
-    include_geometry: bool = True
-    """Whether condition matches carry their original geometry (`geometryWkt`) - see run_ruleset."""
     bounding_box_above_points: int | None = None
     """Screen a site whose simplified outline has more points than this against its bounding box."""
     bounding_box: bool = False
@@ -49,9 +47,9 @@ class RunRulesetRequest:
 def parse_run_ruleset_request(body: object) -> RunRulesetRequest:
     """Validate a decoded request body: `{siteWkt, rules: [{id, logicType, categories,
     bufferMetres?, hostCategory?}], nearbyRadiusMetres, nearbyRadiusMetresByCategory?,
-    includeGeometry?, boundingBoxAbovePoints?, boundingBox?, dataset?}` (includeGeometry defaults to
-    true, boundingBox to false; with no boundingBoxAbovePoints the outline is always screened; with
-    no dataset, the dataset in use). Raises BadRequest."""
+    boundingBoxAbovePoints?, boundingBox?, dataset?}` (boundingBox defaults to false; with no
+    boundingBoxAbovePoints the outline is always screened; with no dataset, the dataset in use).
+    Other fields are ignored. Raises BadRequest."""
     if not isinstance(body, dict):
         raise BadRequest("request body must be a JSON object")
 
@@ -67,7 +65,6 @@ def parse_run_ruleset_request(body: object) -> RunRulesetRequest:
         rules=[_parse_rule(rule) for rule in rules],
         nearby_radius_metres=_distance(body.get("nearbyRadiusMetres"), "nearbyRadiusMetres"),
         nearby_radius_metres_by_category=_radius_by_category(body.get("nearbyRadiusMetresByCategory", {})),
-        include_geometry=_boolean(body.get("includeGeometry", True), "includeGeometry"),
         bounding_box_above_points=_point_limit(body.get("boundingBoxAbovePoints")),
         bounding_box=_boolean(body.get("boundingBox", False), "boundingBox"),
         dataset=_dataset(body.get("dataset")),
@@ -138,9 +135,9 @@ def _string(value: object, name: str) -> str:
 
 
 def consultees_json(consultees: list[Consultee], site_screened_as: str = "outline") -> dict:
-    """The response body: `{consultees: [{feature: {id, properties, geometryWkt?}, distanceMetres,
-    reasons}], siteScreenedAs}` - geometryWkt only for condition matches, and only when the request
-    asked for it; siteScreenedAs `outline` or `boundingBox` (see run_ruleset)."""
+    """The response body: `{consultees: [{feature: {id, properties}, distanceMetres, reasons}],
+    siteScreenedAs}` - siteScreenedAs `outline` or `boundingBox` (see run_ruleset). No geometry: the
+    manage app draws from its own display geometry."""
     return {
         "consultees": [_consultee_json(consultee) for consultee in consultees],
         "siteScreenedAs": site_screened_as,
@@ -148,11 +145,8 @@ def consultees_json(consultees: list[Consultee], site_screened_as: str = "outlin
 
 
 def _consultee_json(consultee: Consultee) -> dict:
-    feature = {"id": consultee.area.id, "properties": consultee.area.properties}
-    if consultee.area.geometry_wkt is not None:
-        feature["geometryWkt"] = consultee.area.geometry_wkt
     return {
-        "feature": feature,
+        "feature": {"id": consultee.area.id, "properties": consultee.area.properties},
         "distanceMetres": consultee.distance_metres,
         "reasons": [_reason_json(reason) for reason in consultee.reasons],
     }

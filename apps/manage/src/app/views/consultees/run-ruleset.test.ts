@@ -27,8 +27,6 @@ const MATCH = {
 	consulteeCategory: 'Parish Council',
 	consultee: 'Abbey Parish Council',
 	region: 'East',
-	metadata: '{"FID":1}',
-	geometryWkt: 'POINT(-1.5 52.5)',
 	distanceMetres: 120
 };
 
@@ -57,13 +55,11 @@ const NEARBY_CASE = {
 };
 
 describe('runRulesetSafely', () => {
-	it('keeps the run in the session, without geometry or metadata, and reuses it', async () => {
+	it('keeps the run in the session, and reuses it', async () => {
 		const runner = rulesetRunnerReturning([MATCH]);
 		const store: Record<string, unknown> = {};
 		const first = await runRulesetSafely(serviceWith(runner), project(), RULESETS[0], store);
 
-		// this request gets the run as it came - geometry and all
-		assert.ok(first.consultees[0].feature.geometry);
 		const stored = store[RULESET_RUN_SESSION_FIELD] as StoredRulesetRun;
 		assert.equal(stored.caseId, project().id);
 		assert.equal(stored.rulesetId, RULESETS[0].id);

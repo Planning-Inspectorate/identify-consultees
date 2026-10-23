@@ -5,7 +5,7 @@ import type {
 	RunRulesetResult
 } from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
 import type { Geometry } from '@pins/identify-consultees-database/src/geospatial/wkt.ts';
-import { geometryToWkt, wktToGeometry } from '@pins/identify-consultees-database/src/geospatial/wkt.ts';
+import { geometryToWkt } from '@pins/identify-consultees-database/src/geospatial/wkt.ts';
 import { fetchWithTimeout } from '@planning-inspectorate/core/util';
 
 /**
@@ -31,7 +31,6 @@ export const BOUNDING_BOX_RUN_TIMEOUT_MS = 60_000;
 interface RunRulesetResponseFeature {
 	id: string;
 	properties: ConsulteeAreaProperties;
-	geometryWkt?: string;
 }
 
 interface RunRulesetResponse {
@@ -56,11 +55,7 @@ export function toRunRulesetResult(body: RunRulesetResponse): RunRulesetResult {
 		consultees: body.consultees.map(({ feature, distanceMetres, reasons }) => ({
 			distanceMetres,
 			reasons,
-			feature: {
-				id: feature.id,
-				properties: feature.properties,
-				...(feature.geometryWkt ? { geometry: wktToGeometry(feature.geometryWkt) } : {})
-			}
+			feature: { id: feature.id, properties: feature.properties }
 		})),
 		siteScreenedAs: body.siteScreenedAs === 'boundingBox' ? 'boundingBox' : 'outline'
 	};
@@ -98,9 +93,9 @@ export function buildPythonRulesetRunner(options: {
 					siteWkt: geometryToWkt(site),
 					nearbyRadiusMetres,
 					nearbyRadiusMetresByCategory,
-					// the maps draw from their own display geometry (see buildSearchAreaSafely), so the
-					// matches' original geometry - tens of MB for a run touching whole counties or
-					// National Parks - is left out, and the function never reads it
+					// the function sends no geometry - the maps draw from their own display geometry (see
+					// buildSearchAreaSafely). One deployed before that sent it unless told not to - tens of
+					// MB for a run touching whole counties - so it's still told
 					includeGeometry: false,
 					...(boundingBoxAbovePoints > 0 ? { boundingBoxAbovePoints } : {}),
 					boundingBox,

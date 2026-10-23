@@ -1,7 +1,7 @@
 """Run a ruleset against a project site: which consultee areas it identifies, and why."""
 
 from concurrent.futures import ThreadPoolExecutor
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 from functools import partial
 from typing import Literal
 
@@ -50,7 +50,6 @@ def run_ruleset(
     rules: list[RuleCondition],
     nearby_radius_metres: float,
     nearby_radius_metres_by_category: dict[str, float] | None = None,
-    with_geometry: bool = True,
     bounding_box_above_points: int | None = None,
     bounding_box: bool = False,
     dataset: str | None = None,
@@ -62,9 +61,8 @@ def run_ruleset(
     Each consultee appears once, with every reason it qualified: a ConditionReason for each
     condition it met, in the ruleset's order, then a NearbyReason if the nearby search found it.
 
-    `with_geometry` gives condition matches their original geometry. Without it no geometry is
-    read at all - the bulk of a run's time and response when the matches include whole counties
-    or National Parks, and unneeded by a caller that draws from its own display geometry.
+    No geometry is read for the matches: some are whole counties or National Parks, and the manage
+    app draws from its own display geometry.
 
     The site is screened against its bounding box instead of its outline when asked
     (`bounding_box`), or when its outline - simplified as the reference data is - has more than
@@ -87,13 +85,10 @@ def run_ruleset(
         ):
             site = queries.bounding_box(site)
             site_screened_as = "boundingBox"
-        # one query out to the largest radius: the nearby reasons, and the answer to most
-        # conditions. No geometry - some rows are whole counties or National Parks, and most aren't drawn
-        fetched = queries.find_areas_near(
-            db, site, search_radius, excluded_categories=CATEGORIES_EXCLUDED_FROM_NEARBY, with_geometry=False
-        )
+        # one query out to the largest radius: the nearby reasons, and the answer to most conditions
+        fetched = queries.find_areas_near(db, site, search_radius, excluded_categories=CATEGORIES_EXCLUDED_FROM_NEARBY)
         matches_by_condition = _match_conditions(
-            db, site, rules, fetched, search_radius, with_geometry, boxed=site_screened_as == "boundingBox"
+            db, site, rules, fetched, search_radius, boxed=site_screened_as == "boundingBox"
         )
 
         nearby = [
@@ -103,8 +98,6 @@ def run_ruleset(
         ]
         consultees = _combine(rules, matches_by_condition, nearby)
         _measure_unmeasured(db, site, consultees)
-        if with_geometry:
-            _add_geometry_to_condition_matches(db, consultees)
         return Screening(sorted(consultees.values(), key=_nearest_first), site_screened_as)
 
 
@@ -146,7 +139,6 @@ def _match_conditions(
     rules: list[RuleCondition],
     nearby: list[AreaMatch],
     nearby_radius_metres: float,
-    with_geometry: bool,
     boxed: bool = False,
 ) -> dict[str, list[AreaMatch]]:
     """Each condition's matches, by condition id - filtered from the nearby search where it can be,
@@ -167,7 +159,7 @@ def _match_conditions(
         else None
     )
 
-    query = partial(_query_condition, db, site, site_within_margin, with_geometry, boxed)
+    query = partial(_query_condition, db, site, site_within_margin, boxed)
     with ThreadPoolExecutor(max_workers=CONDITION_CONCURRENCY) as pool:
         for rule, matches in zip(needs_query, pool.map(query, needs_query), strict=True):
             matches_by_condition[rule.id] = matches
@@ -178,22 +170,19 @@ def _query_condition(
     db: Database,
     site: str,
     site_within_margin: str | None,
-    with_geometry: bool,
     boxed: bool,
     rule: RuleCondition,
 ) -> list[AreaMatch]:
     """`rule`'s matches from its own query - a bordering condition's, for a site screened against
     its bounding box, from the rectangle around its hosts (see find_areas_bordering_box)."""
     if rule.logic_type == "intersection":
-        return queries.find_areas_near(db, site, rule.buffer_metres, rule.categories, with_geometry=with_geometry)
+        return queries.find_areas_near(db, site, rule.buffer_metres, rule.categories)
     if not rule.host_category:
         return []
     neighbours = (
         queries.find_areas_bordering_box(db, site_within_margin, rule.host_category, rule.categories)
         if boxed
-        else queries.find_areas_bordering(
-            db, site_within_margin, rule.host_category, rule.categories, with_geometry=with_geometry
-        )
+        else queries.find_areas_bordering(db, site_within_margin, rule.host_category, rule.categories)
     )
     return [AreaMatch(area, distance_metres=None) for area in neighbours]
 
@@ -203,8 +192,8 @@ def _combine(
     matches_by_condition: dict[str, list[AreaMatch]],
     nearby: list[tuple[AreaMatch, float]],
 ) -> dict[str, Consultee]:
-    """One Consultee per area, by id, with its nearest measured distance, any geometry a query
-    brought back, and its reasons: conditions in the ruleset's order, then the nearby search."""
+    """One Consultee per area, by id, with its nearest measured distance and its reasons: conditions
+    in the ruleset's order, then the nearby search."""
     consultees: dict[str, Consultee] = {}
 
     def add(match: AreaMatch, reason: Reason) -> None:
@@ -229,20 +218,6 @@ def _measure_unmeasured(db: Database, site: str, consultees: dict[str, Consultee
         else:
             # deleted between queries (a reference data reload mid-request) - nothing left to notify
             del consultees[area_id]
-
-
-def _add_geometry_to_condition_matches(db: Database, consultees: dict[str, Consultee]) -> None:
-    """Condition matches are drawn on the map from their original geometry; those answered from the
-    nearby search don't have it yet. Nearby-only consultees go without - the manage app draws them
-    from its own display geometry."""
-    missing = [
-        area_id
-        for area_id, consultee in consultees.items()
-        if consultee.matched_a_condition and consultee.area.geometry_wkt is None
-    ]
-    for area_id, geometry_wkt in queries.fetch_geometries(db, missing).items():
-        consultee = consultees[area_id]
-        consultee.area = replace(consultee.area, geometry_wkt=geometry_wkt)
 
 
 def _nearest_first(consultee: Consultee) -> tuple[float, str]:

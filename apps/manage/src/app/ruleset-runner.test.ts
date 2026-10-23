@@ -100,7 +100,7 @@ describe('buildPythonRulesetRunner', () => {
 		assert.equal((await run(site, ruleset, 20_000)).siteScreenedAs, 'outline');
 	});
 
-	it('maps each consultee with its reasons, with geometry only when the function sent it', async () => {
+	it('maps each consultee with its reasons, and no geometry - even from an older function that sent some', async () => {
 		const conditionAndNearby = [
 			{ type: 'condition', conditionId: 'hospital' },
 			{ type: 'nearby', radiusMetres: 20_000 }
@@ -126,7 +126,7 @@ describe('buildPythonRulesetRunner', () => {
 			{
 				distanceMetres: 12.5,
 				reasons: conditionAndNearby,
-				feature: { id: 'a', properties, geometry: { type: 'Point', coordinates: [-1.4, 52.6] } }
+				feature: { id: 'a', properties }
 			},
 			{ distanceMetres: 900, reasons: [conditionAndNearby[1]], feature: { id: 'b', properties } }
 		]);

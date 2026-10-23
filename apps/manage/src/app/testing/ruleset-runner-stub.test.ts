@@ -7,7 +7,7 @@ const site = { type: 'Point' as const, coordinates: [0, 0] as [number, number] }
 const emptyRuleset: Ruleset = { id: 'r', name: 'R', rules: [] };
 
 function row(id: string, consulteeCategory: string | null, distanceMetres: number) {
-	return { id, consulteeCategory, consultee: id, region: null, geometryWkt: 'POINT(0 0)', distanceMetres };
+	return { id, consulteeCategory, consultee: id, region: null, distanceMetres };
 }
 
 describe('rulesetRunnerReturning', () => {
@@ -21,16 +21,15 @@ describe('rulesetRunnerReturning', () => {
 			consulteeSubcategory: null,
 			consulteeSubcategoryDescription: null,
 			consultee: 'a',
-			region: null,
-			metadata: {}
+			region: null
 		});
 		assert.deepEqual(consultees[0].reasons, [{ type: 'condition', conditionId: 'test-condition' }]);
 	});
 
-	it('leaves out geometry for a row without any, as the function does for nearby-only consultees', async () => {
-		const { geometryWkt: _unused, ...nearbyOnly } = row('b', 'Interconnector', 5);
-		const { consultees } = await rulesetRunnerReturning([nearbyOnly])(site, emptyRuleset, 1);
+	it('gives no consultee geometry or metadata, as the function gives none', async () => {
+		const { consultees } = await rulesetRunnerReturning([row('b', 'Interconnector', 5)])(site, emptyRuleset, 1);
 		assert.equal('geometry' in consultees[0].feature, false);
+		assert.equal('metadata' in consultees[0].feature.properties, false);
 	});
 });
 
