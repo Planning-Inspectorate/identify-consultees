@@ -2,7 +2,7 @@ import type { ManageService } from '#service';
 import { stringifyForInlineScript } from '#util/inline-json.ts';
 import type { CaseBoundaryFeature } from '@pins/identify-consultees-database/src/geospatial/case-boundaries.ts';
 import type { ConsulteeMatch, Ruleset } from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
-import { getRuleset, isIdentified, RULESETS } from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
+import { isIdentified } from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
 import type { AsyncRequestHandler } from '@planning-inspectorate/core/util';
 import type { Request, Response } from 'express';
 import { buildCaseMapConfig, markAddedByHand } from '../../../../maps/case-geojson.ts';
@@ -11,7 +11,7 @@ import { categorySettings } from '../../../../report-config.ts';
 import { NEARBY_NSIPS } from '../../nearby-nsips.ts';
 import { describeReasons } from '../../reasons.ts';
 import { resolveCase } from '../../resolve-case.ts';
-import { buildSearchAreaSafely, firstQueryValue, runRulesetSafely } from '../../run-ruleset.ts';
+import { buildSearchAreaSafely, firstQueryValue, requestedRuleset, runRulesetSafely } from '../../run-ruleset.ts';
 import { rulesetCategories } from '../categories.ts';
 import { addedConsulteeReason, consulteeName } from '../report-consultees.ts';
 import type { ConsulteeSelection } from '../urls.ts';
@@ -54,9 +54,7 @@ export async function categoryContext(
 	res: Response
 ): Promise<CategoryContext | undefined> {
 	const project = await resolveCase(service.db, String(req.params.caseId ?? ''));
-	// same ruleset semantics as the map page: absent means the default, present-but-unknown 404s
-	const requestedRuleset = firstQueryValue(req.query.ruleset);
-	const ruleset = requestedRuleset ? getRuleset(requestedRuleset) : RULESETS[0];
+	const ruleset = requestedRuleset(req.query.ruleset);
 	if (!project || !ruleset) {
 		res.status(404).render('views/errors/404.njk', { pageHeading: 'Page not found' });
 		return undefined;

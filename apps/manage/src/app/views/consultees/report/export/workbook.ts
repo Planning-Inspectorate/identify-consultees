@@ -16,6 +16,7 @@ import {
 } from '../../../../report-config.ts';
 import { isNearbyNsip, NEARBY_NSIPS, nsipType, splitNsipName } from '../../nearby-nsips.ts';
 import { describeReasons, kilometres as distanceText } from '../../reasons.ts';
+import { addedConsulteeReason } from '../report-consultees.ts';
 import type { AddedConsultee, RemovedConsultee } from '../urls.ts';
 
 /**
@@ -389,7 +390,7 @@ function groupTabs(report: ReportExport, config: ReportConfig): Map<GroupTab, Gr
 					name: add.name,
 					category: add.category,
 					region: record?.region,
-					whyIdentified: add.reason || 'Manually added',
+					whyIdentified: addedConsulteeReason(add),
 					source: 'Manually added',
 					distanceMetres: add.distanceMetres,
 					record,

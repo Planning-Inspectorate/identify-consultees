@@ -1,8 +1,7 @@
 import type { ManageService } from '#service';
-import { getRuleset, RULESETS } from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
 import type { AsyncRequestHandler } from '@planning-inspectorate/core/util';
 import { resolveCase } from '../../resolve-case.ts';
-import { firstQueryValue, runRulesetSafely } from '../../run-ruleset.ts';
+import { requestedRuleset, runRulesetSafely } from '../../run-ruleset.ts';
 import { consulteeSelection, reportCreatedUrl, reportDownloadUrl } from '../urls.ts';
 import { buildReportZip, rememberedReportZip } from './report-zip.ts';
 
@@ -21,8 +20,7 @@ export function buildReportDownload(service: ManageService): AsyncRequestHandler
 	return async (req, res) => {
 		const caseId = String(req.params.caseId ?? '');
 		const project = await resolveCase(db, caseId);
-		const requestedRuleset = firstQueryValue(req.query?.ruleset);
-		const ruleset = requestedRuleset ? getRuleset(requestedRuleset) : RULESETS[0];
+		const ruleset = requestedRuleset(req.query?.ruleset);
 		if (!project || !ruleset) {
 			res.status(404).render('views/errors/404.njk', { pageHeading: 'Page not found' });
 			return;

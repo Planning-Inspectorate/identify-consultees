@@ -11,6 +11,7 @@ import type {
 	RunRulesetResult,
 	SiteScreenedAs
 } from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
+import { getRuleset, RULESETS } from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
 import type { SearchAreaDisplay } from '../../maps/case-geojson.ts';
 import { findNearbyNsips, isNearbyNsip } from './nearby-nsips.ts';
 
@@ -19,6 +20,15 @@ import { findNearbyNsips, isNearbyNsip } from './nearby-nsips.ts';
  * results/report page): normalising the ?ruleset query param, running the ruleset without
  * letting a failure take the whole page down, and building the map's search area.
  */
+
+/**
+ * The ruleset a report page's `?ruleset=` names - the default when it names none, and undefined
+ * (the page 404s) for one that isn't known.
+ */
+export function requestedRuleset(value: unknown): Ruleset | undefined {
+	const id = firstQueryValue(value);
+	return id ? getRuleset(id) : RULESETS[0];
+}
 
 /** First string from a possibly-repeated query/body param (`?a=1&a=2` parses to an array). */
 export function firstQueryValue(value: unknown): string {

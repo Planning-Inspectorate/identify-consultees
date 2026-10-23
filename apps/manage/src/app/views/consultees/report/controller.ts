@@ -1,10 +1,10 @@
 import type { ManageService } from '#service';
 import type { ConsulteeMatch, Ruleset } from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
-import { getRuleset, isIdentified, RULESETS } from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
+import { isIdentified } from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
 import type { AsyncRequestHandler } from '@planning-inspectorate/core/util';
 import { NEARBY_NSIPS } from '../nearby-nsips.ts';
 import { resolveCase } from '../resolve-case.ts';
-import { firstQueryValue, runRulesetSafely } from '../run-ruleset.ts';
+import { firstQueryValue, requestedRuleset, runRulesetSafely } from '../run-ruleset.ts';
 import { reportCategories } from './categories.ts';
 import { buildReportZip, formatFileSize, rememberedReportZip, rememberReportZip } from './export/report-zip.ts';
 import { GROUP_TABS, tabForCategory } from './export/workbook.ts';
@@ -90,9 +90,7 @@ export function buildReportCheckPage(service: ManageService): AsyncRequestHandle
 			return;
 		}
 
-		// same ruleset semantics as the map page: absent means the default, present-but-unknown 404s
-		const requestedRuleset = firstQueryValue(req.query?.ruleset);
-		const ruleset = requestedRuleset ? getRuleset(requestedRuleset) : RULESETS[0];
+		const ruleset = requestedRuleset(req.query?.ruleset);
 		if (!ruleset) {
 			res.status(404).render('views/errors/404.njk', { pageHeading: 'Page not found' });
 			return;
@@ -146,9 +144,7 @@ export function buildReportCreatedPage(service: ManageService): AsyncRequestHand
 			return;
 		}
 
-		// same ruleset semantics as the map page: absent means the default, present-but-unknown 404s
-		const requestedRuleset = firstQueryValue(req.query?.ruleset);
-		const ruleset = requestedRuleset ? getRuleset(requestedRuleset) : RULESETS[0];
+		const ruleset = requestedRuleset(req.query?.ruleset);
 		if (!ruleset) {
 			res.status(404).render('views/errors/404.njk', { pageHeading: 'Page not found' });
 			return;
