@@ -147,8 +147,8 @@ test.describe('manage journeys', () => {
 		await expect(page).toHaveURL(new RegExp(`/consultees/${SAMPLE_CASE_ID}/report\\?ruleset=${SAMPLE_RULESET_ID}`));
 		await expect(page.getByRole('heading', { level: 1 })).toContainText('Check consultees before creating the report');
 		// the other cases near the site are listed like any category, under their own heading
-		await expect(page.getByRole('heading', { level: 3, name: 'Nearby NSIPs' })).toBeVisible();
-		await expect(page.getByRole('link', { name: 'Change Nearby NSIPs' })).toBeVisible();
+		await expect(page.getByRole('heading', { level: 3, name: 'NSIPs' })).toBeVisible();
+		await expect(page.getByRole('link', { name: 'Change NSIPs' })).toBeVisible();
 
 		const parishChange = page.getByRole('link', { name: 'Change Parish Council' });
 		const parishValue = page

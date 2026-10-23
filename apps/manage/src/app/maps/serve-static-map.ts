@@ -101,7 +101,9 @@ export async function buildConsulteeStaticMapResponse(
 	const forceSvg = options.forceSvg === true;
 	const googleMapsApiKey = options.googleMapsApiKey ?? googleMapsApiKeyFromEnv();
 	const format: StaticMapFormat | 'svg' = forceSvg ? 'svg' : negotiateStaticMapFormat(options.accept);
-	const preferGoogle = !forceSvg && Boolean(googleMapsApiKey);
+	// Google's static maps draw whole zooms at one pixel ratio - any other map takes OSM tiles
+	const preferGoogle =
+		!forceSvg && Boolean(googleMapsApiKey) && Number.isInteger(options.map.zoom) && (options.map.pixelRatio ?? 1) === 1;
 	const width = options.map.width ?? 960;
 	const height = options.map.height ?? 516;
 
@@ -123,7 +125,8 @@ export async function buildConsulteeStaticMapResponse(
 		featureBadges: options.map.featureBadges,
 		labels: options.map.labels,
 		basemap: options.map.basemap,
-		bufferGeojson: options.map.bufferGeojson
+		bufferGeojson: options.map.bufferGeojson,
+		pixelRatio: options.map.pixelRatio
 	};
 	const etag = etagFromFingerprint(buildStaticMapFingerprint(fingerprintInput));
 

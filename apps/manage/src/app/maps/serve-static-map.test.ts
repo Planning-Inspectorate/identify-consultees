@@ -130,6 +130,35 @@ describe('serve-static-map', () => {
 		assert.ok(Buffer.isBuffer(response.body));
 	});
 
+	it("takes OSM tiles for a zoom or pixel ratio Google's static maps can't draw", async () => {
+		clearOsmTileCacheForTests();
+		const requested: string[] = [];
+		globalThis.fetch = (async (url: string) => {
+			requested.push(String(url));
+			return new Response(tinyPng, { status: 200, headers: { 'content-type': 'image/png' } });
+		}) as typeof fetch;
+		const map = {
+			center: [-1.78, 50.62] as const,
+			projectGeojson: buildProjectSiteGeojson('EN010024', 'Navitus'),
+			consulteeGeojson: buildConsulteeAreaGeojson('Ambulance', []),
+			width: 256,
+			height: 256
+		};
+		for (const view of [{ zoom: 10.5 }, { zoom: 10, pixelRatio: 1.5 }]) {
+			requested.length = 0;
+			await buildConsulteeStaticMapResponse({
+				geometryId: 'geo-1',
+				sectionId: 'ambulance-trusts',
+				map: { ...map, ...view },
+				googleMapsApiKey: 'test-key'
+			});
+			assert.ok(
+				requested.length > 0 && requested.every((url) => url.includes('tile.openstreetmap.org')),
+				JSON.stringify(view)
+			);
+		}
+	});
+
 	it('returns 304 with image/png when a Google Static Map was preferred', async () => {
 		clearOsmTileCacheForTests();
 		const map = {

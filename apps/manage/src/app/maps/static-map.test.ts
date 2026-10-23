@@ -3,6 +3,7 @@ import { afterEach, describe, test } from 'node:test';
 import type { GeoJsonFeatureCollection } from './sample-geojson.ts';
 import {
 	ageOsmTileCacheForTests,
+	basemapFrame,
 	buildGoogleStaticMapUrl,
 	buildStaticMapSvg,
 	centroidOfGeometry,
@@ -16,6 +17,7 @@ import {
 	listOsmTilesForViewport,
 	lngLatToWorldPixel,
 	osmTileCacheSizeForTests,
+	outputSize,
 	renderStaticMapOverlaySvg,
 	renderStaticMapSvg,
 	staticMapViewportOrigin,
@@ -954,5 +956,65 @@ describe('static-map buffers', () => {
 			['2 km', 'Abbey Parish']
 		);
 		assert.ok(Math.abs(drawn[0].y - drawn[1].y) >= 14 || Math.abs(drawn[0].x - drawn[1].x) >= 70);
+	});
+});
+
+describe('static-map zoom and pixel ratio', () => {
+	test('draws a whole zoom at one pixel ratio just as it is', () => {
+		assert.deepEqual(basemapFrame({ zoom: 10, width: 960, height: 516 }), { zoom: 10, width: 960, height: 516 });
+		assert.deepEqual(outputSize({}), { width: 960, height: 516 });
+	});
+
+	test('draws any other zoom from the nearest whole one, on a canvas scaled to match', () => {
+		// zoom 10.3: tiles at 10, on a canvas 2^-0.3 the size, scaled up to the image
+		assert.deepEqual(basemapFrame({ zoom: 10.3, width: 960, height: 516 }), {
+			zoom: 10,
+			width: Math.round(960 * 2 ** -0.3),
+			height: Math.round(516 * 2 ** -0.3)
+		});
+		// at 1.5 pixels per map pixel the image is 1.5 times the size, its tiles a zoom nearer
+		assert.deepEqual(outputSize({ width: 960, height: 516, pixelRatio: 1.5 }), { width: 1440, height: 774 });
+		const frame = basemapFrame({ zoom: 10, width: 960, height: 516, pixelRatio: 1.5 });
+		assert.equal(frame.zoom, 11);
+		assert.equal(frame.width, Math.round(1440 * 2 ** (11 - 10 - Math.log2(1.5))));
+		// never past the zooms OpenStreetMap draws
+		assert.equal(basemapFrame({ zoom: 22, width: 960, height: 516 }).zoom, 19);
+		assert.equal(basemapFrame({ zoom: -3, width: 960, height: 516 }).zoom, 0);
+	});
+
+	test('sizes the overlay by the pixel ratio, drawing it in map pixels so lines and labels scale with it', () => {
+		const svg = renderStaticMapOverlaySvg({
+			center: [-1.75, 50.65],
+			zoom: 10.4,
+			width: 400,
+			height: 300,
+			pixelRatio: 1.5,
+			projectGeojson: square,
+			consulteeGeojson: emptyCollection
+		});
+		assert.match(svg, /width="600" height="450" viewBox="0 0 400 300"/);
+		// the SVG variant embeds it at the map's size
+		assert.match(
+			renderStaticMapSvg({
+				center: [-1.75, 50.65],
+				zoom: 10,
+				width: 400,
+				height: 300,
+				pixelRatio: 2,
+				projectGeojson: square,
+				consulteeGeojson: emptyCollection
+			}),
+			/<svg xmlns="http:\/\/www.w3.org\/2000\/svg" width="400" height="300" viewBox="0 0 400 300">/
+		);
+	});
+
+	test("fetches the frame's tiles for a zoom between whole ones", async () => {
+		const requested: string[] = [];
+		globalThis.fetch = (async (url: string) => {
+			requested.push(url);
+			return new Response(tinyPng, { status: 200 });
+		}) as typeof fetch;
+		await fetchOsmBasemapTiles({ center: [-1.75, 50.65], zoom: 10.4, width: 256, height: 256 });
+		assert.ok(requested.length > 0 && requested.every((url) => url.startsWith('https://tile.openstreetmap.org/10/')));
 	});
 });

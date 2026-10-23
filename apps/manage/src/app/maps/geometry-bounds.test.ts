@@ -117,6 +117,13 @@ describe('computeFittedMapView', () => {
 		]
 	});
 
+	test('fits at the exact zoom when asked - between whole ones, filling the map', () => {
+		const whole = computeFittedMapView(square(-1.5, 52.5, 0.1), viewport, 0);
+		const exact = computeFittedMapView(square(-1.5, 52.5, 0.1), viewport, 0, { wholeZoom: false });
+		assert.deepEqual(exact.center, whole.center);
+		assert.ok(exact.zoom > whole.zoom && exact.zoom < whole.zoom + 1, String(exact.zoom));
+	});
+
 	test('falls back to England and Wales with nothing to fit', () => {
 		assert.deepEqual(computeFittedMapView({ features: [] }, viewport, 10_000), { center: [-2.5, 52.5], zoom: 6 });
 	});

@@ -153,8 +153,8 @@ const nsipService = (rulesetRunner: unknown = rulesetRunnerReturning([])) => ({
 	...service(rulesetRunner),
 	nearbyNsipRadiusMetres: 35_000
 });
-const nsipQuery = { ruleset: 'england-wales-post-20240430', category: 'Nearby NSIPs' };
-const nsipCategoryUrl = `/consultees/${realProjectId}/report/consultees?ruleset=england-wales-post-20240430&category=Nearby%20NSIPs`;
+const nsipQuery = { ruleset: 'england-wales-post-20240430', category: 'NSIPs' };
+const nsipCategoryUrl = `/consultees/${realProjectId}/report/consultees?ruleset=england-wales-post-20240430&category=NSIPs`;
 const submitNsip = async (body: unknown) => {
 	const res = rendering();
 	await buildReportConsulteeAddSubmit(nsipService() as never)(
@@ -382,7 +382,7 @@ describe('add a consultee page', () => {
 			`${nsipCategoryUrl}&add=${urlParam(
 				JSON.stringify({
 					i: 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee',
-					c: 'Nearby NSIPs',
+					c: 'NSIPs',
 					n: 'Undated Wind Farm (EN010201)',
 					r: 'Missing from the list'
 				})
@@ -398,7 +398,7 @@ describe('add a consultee page', () => {
 				`${nsipCategoryUrl}&add=${urlParam(
 					JSON.stringify({
 						i: 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee',
-						c: 'Nearby NSIPs',
+						c: 'NSIPs',
 						n: 'Undated Wind Farm (EN010201)',
 						r: 'r'
 					})
@@ -413,7 +413,7 @@ describe('add a consultee page', () => {
 		assert.strictEqual(res.redirect.mock.callCount(), 0);
 		assert.strictEqual(
 			viewModelOf(res).addForm.nameError.text,
-			'Neighbouring Solar Farm (EN010200) is already listed in Nearby NSIPs'
+			'Neighbouring Solar Farm (EN010200) is already listed in NSIPs'
 		);
 	});
 

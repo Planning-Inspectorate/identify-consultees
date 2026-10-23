@@ -36,7 +36,8 @@ interface RulesetRun extends RunRulesetResult {
 }
 
 /** The session field holding the last ruleset run - see runRulesetSafely. */
-export const RULESET_RUN_SESSION_FIELD = 'rulesetRun';
+// versioned: a run kept from before Nearby NSIPs were called NSIPs is run again, not read
+export const RULESET_RUN_SESSION_FIELD = 'rulesetRun2';
 
 // long enough for a report journey; short enough that reference data reloaded since is picked up
 export const RULESET_RUN_MAX_AGE_MS = 60 * 60 * 1000;

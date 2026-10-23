@@ -14,8 +14,8 @@ import type { ConsulteeMatch } from '@pins/identify-consultees-database/src/geos
  * consultee match (see nearbyNsipMatch) and joins the ruleset run's (see run-ruleset.ts).
  */
 
-/** The category, check-page group and report tab Nearby NSIPs go under. */
-export const NEARBY_NSIPS = 'Nearby NSIPs';
+/** The category, check-page group and report tab Nearby NSIPs go under - "NSIPs", as the team calls them. */
+export const NEARBY_NSIPS = 'NSIPs';
 
 /** True for a Nearby NSIP - a case_boundary row, not a consultee_area one. */
 export function isNearbyNsip(match: Pick<ConsulteeMatch, 'feature'>): boolean {

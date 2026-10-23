@@ -296,25 +296,25 @@ describe('consultee report check page', () => {
 			]),
 			[
 				['Administrative boundaries', [['Parish Council', []]]],
-				['Nearby NSIPs', [['Nearby NSIPs', []]]]
+				['NSIPs', [['NSIPs', []]]]
 			]
 		);
 		const nearbyNsip = {
-			feature: { id: 'n', properties: { consulteeCategory: 'Nearby NSIPs', consultee: 'Neighbour (EN010200)' } },
+			feature: { id: 'n', properties: { consulteeCategory: 'NSIPs', consultee: 'Neighbour (EN010200)' } },
 			distanceMetres: 2_000,
 			reasons: [{ type: 'nearbyNsip' as const, radiusMetres: 10_000 }]
 		};
 		const found = groupedConsultees(ruleset, realProjectId, [nearbyNsip], none, true);
 		assert.deepStrictEqual(found.at(-1)?.consultees, [
 			{
-				name: 'Nearby NSIPs',
+				name: 'NSIPs',
 				names: ['Neighbour (EN010200)'],
 				changeUrl:
-					'/consultees/44444444-4444-4444-4444-444444444444/report/consultees?ruleset=test-ruleset&category=Nearby%20NSIPs'
+					'/consultees/44444444-4444-4444-4444-444444444444/report/consultees?ruleset=test-ruleset&category=NSIPs'
 			}
 		]);
 		// not looked for, there's no row for them
-		assert.ok(!groupedConsultees(ruleset, realProjectId, [], none).some((group) => group.name === 'Nearby NSIPs'));
+		assert.ok(!groupedConsultees(ruleset, realProjectId, [], none).some((group) => group.name === 'NSIPs'));
 	});
 
 	it('should warn when the site was screened against its bounding box, so the list gets reviewed', async () => {

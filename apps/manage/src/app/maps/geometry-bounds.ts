@@ -146,14 +146,17 @@ function worldFraction(longitude: number, latitude: number): [number, number] {
 
 /**
  * A centre and zoom that show every feature with at least `marginMetres` around it on every side,
- * in a `width` x `height` map, at the closest whole zoom level that does - Web Mercator, as the maps
- * draw, so the fit holds at UK latitudes where a degree of longitude is much shorter than one of
- * latitude. An empty collection returns the England / Wales fallback view.
+ * in a `width` x `height` map, at the closest whole zoom level that does - or, with `wholeZoom`
+ * false, the exact zoom, which fills the map (the static images can draw any zoom; the interactive
+ * maps open on whole ones). Web Mercator, as the maps draw, so the fit holds at UK latitudes where a
+ * degree of longitude is much shorter than one of latitude. An empty collection returns the
+ * England / Wales fallback view.
  */
 export function computeFittedMapView(
 	featureCollection: { features: { geometry: GeometryLike }[] },
 	viewport: { width: number; height: number },
-	marginMetres: number
+	marginMetres: number,
+	{ wholeZoom = true }: { wholeZoom?: boolean } = {}
 ): MapView {
 	const bounds = computeBounds(featureCollection);
 	if (!bounds) {
@@ -169,5 +172,6 @@ export function computeFittedMapView(
 	const width = Math.max(east - west + 2 * margin, Number.EPSILON);
 	const height = Math.max(south - north + 2 * margin, Number.EPSILON);
 	const scale = Math.min(viewport.width / (width * WORLD_TILE_PIXELS), viewport.height / (height * WORLD_TILE_PIXELS));
-	return { center, zoom: Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, Math.floor(Math.log2(scale)))) };
+	const zoom = wholeZoom ? Math.floor(Math.log2(scale)) : Math.log2(scale);
+	return { center, zoom: Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, zoom)) };
 }
