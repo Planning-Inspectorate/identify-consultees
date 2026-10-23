@@ -1,4 +1,4 @@
-import { BlockBlobClient } from '@azure/storage-blob';
+import { BlobServiceClient, BlockBlobClient } from '@azure/storage-blob';
 import { mockLogger } from '@planning-inspectorate/core/testing';
 import assert from 'node:assert';
 import { describe, it, mock } from 'node:test';
@@ -317,6 +317,15 @@ describe('admin upload to blob', () => {
 			await uploads.commit('data.geojson', 2);
 			assert.deepStrictEqual(stageBlock.mock.calls[0].arguments, [blockId(1), part, part.length]);
 			assert.deepStrictEqual(commitBlockList.mock.calls[0].arguments, [[blockId(0), blockId(1)]]);
+		});
+
+		it('signs in once per container, not once per part', async (t) => {
+			const getContainerClient = t.mock.method(BlobServiceClient.prototype, 'getContainerClient');
+			const config = { host: 'https://once.blob.core.windows.net/', container: 'shared' };
+			blobBlockUploads(config);
+			blobBlockUploads(config);
+			blobBlockUploads({ ...config, container: 'other' });
+			assert.strictEqual(getContainerClient.mock.callCount(), 2);
 		});
 	});
 });
