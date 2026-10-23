@@ -213,6 +213,12 @@ describe('case boundaries (requires a local SQL Server - see docker-compose.yml)
 			const noMatch = await searchCaseBoundaries(dbClient, { query: 'no-such-project-exists-anywhere' });
 			assert.equal(noMatch.features.length, 0);
 			assert.equal(noMatch.total, 0);
+
+			// LIKE's wildcards are matched as typed: _ and % aren't any character, [ isn't a set
+			for (const query of ['Searchable_Wind', 'Searchable%Farm', 'Searchable [W]ind']) {
+				const wildcard = await searchCaseBoundaries(dbClient, { query });
+				assert.ok(!wildcard.features.some((feature) => feature.id === testBoundaryId), query);
+			}
 		} finally {
 			await cleanup();
 		}

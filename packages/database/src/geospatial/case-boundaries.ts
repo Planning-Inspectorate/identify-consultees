@@ -320,7 +320,8 @@ export interface SearchResult {
  */
 export async function searchCaseBoundaries(dbClient: PrismaClient, options: SearchOptions = {}): Promise<SearchResult> {
 	const { query, limit = 25, offset = 0 } = options;
-	const likePattern = query?.trim() ? `%${query.trim()}%` : '%';
+	// what's typed is matched as it's typed - LIKE's own wildcards (% _ [) in it are escaped
+	const likePattern = query?.trim() ? `%${query.trim().replace(/[\\%_[]/g, '\\$&')}%` : '%';
 
 	const rows = await withDeadlockRetry(
 		() => dbClient.$queryRaw<
@@ -342,7 +343,7 @@ export async function searchCaseBoundaries(dbClient: PrismaClient, options: Sear
 			FROM ranked
 			WHERE newest = 1 AND caseReference IN (
 				SELECT caseReference FROM case_boundary
-				WHERE caseName LIKE ${likePattern} OR caseReference LIKE ${likePattern}
+				WHERE caseName LIKE ${likePattern} ESCAPE '\\' OR caseReference LIKE ${likePattern} ESCAPE '\\'
 			)
 			ORDER BY caseName, caseReference
 			OFFSET ${offset} ROWS FETCH NEXT ${limit} ROWS ONLY
@@ -357,7 +358,7 @@ export async function searchCaseBoundaries(dbClient: PrismaClient, options: Sear
 		const countRows = await withDeadlockRetry(
 			() => dbClient.$queryRaw<{ total: bigint }[]>`
 				SELECT COUNT(DISTINCT caseReference) AS total FROM case_boundary
-				WHERE caseName LIKE ${likePattern} OR caseReference LIKE ${likePattern}
+				WHERE caseName LIKE ${likePattern} ESCAPE '\\' OR caseReference LIKE ${likePattern} ESCAPE '\\'
 			`
 		);
 		// an aggregate SELECT always returns exactly one row, even when it counts zero matches
