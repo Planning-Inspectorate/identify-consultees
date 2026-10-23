@@ -1,5 +1,6 @@
 import type { ManageService } from '#service';
 import { DefaultAzureCredential } from '@azure/identity';
+import type { ContainerClient } from '@azure/storage-blob';
 import { BlobServiceClient } from '@azure/storage-blob';
 import {
 	dateFromFileName,
@@ -56,11 +57,24 @@ export interface BlockUploads {
 	commit(blobName: string, blockCount: number): Promise<void>;
 }
 
-/** Real implementation - Entra/managed-identity auth only, as uploadFileToBlob. */
+// one client per container, kept: a file goes up in as many as MAX_BLOCKS requests, and a new
+// credential for each would sign in again for each part
+const containers = new Map<string, ContainerClient>();
+
+/** The app's blob container - Entra/managed-identity auth only, no connection string/key (see config.ts). */
+function containerClient({ host, container }: BlobStoreConfig): ContainerClient {
+	const key = `${host}\n${container}`;
+	let client = containers.get(key);
+	if (!client) {
+		client = new BlobServiceClient(host, new DefaultAzureCredential()).getContainerClient(container);
+		containers.set(key, client);
+	}
+	return client;
+}
+
+/** Real implementation, on the app's blob container. */
 export function blobBlockUploads(blobStoreConfig: BlobStoreConfig): BlockUploads {
-	const container = new BlobServiceClient(blobStoreConfig.host, new DefaultAzureCredential()).getContainerClient(
-		blobStoreConfig.container
-	);
+	const container = containerClient(blobStoreConfig);
 	return {
 		async stage(blobName, index, data) {
 			await container.getBlockBlobClient(blobName).stageBlock(blockId(index), data, data.length);
@@ -72,16 +86,13 @@ export function blobBlockUploads(blobStoreConfig: BlobStoreConfig): BlockUploads
 	};
 }
 
-/** Real implementation - Entra/managed-identity auth only, no connection string/key (see config.ts). */
+/** Real implementation, on the app's blob container. */
 export async function uploadFileToBlob(
 	filePath: string,
 	blobName: string,
 	blobStoreConfig: BlobStoreConfig
 ): Promise<void> {
-	const blobServiceClient = new BlobServiceClient(blobStoreConfig.host, new DefaultAzureCredential());
-	const containerClient = blobServiceClient.getContainerClient(blobStoreConfig.container);
-	const blockBlobClient = containerClient.getBlockBlobClient(blobName);
-	await blockBlobClient.uploadFile(filePath);
+	await containerClient(blobStoreConfig).getBlockBlobClient(blobName).uploadFile(filePath);
 }
 
 /**
