@@ -80,10 +80,6 @@ $font-family: arial, helvetica, sans-serif;
 	}
 }
 
-.pins-white-space-pre-wrap {
-	white-space: pre-wrap;
-}
-
 // a footer link kept routed but taken out of the list (config-middleware marks it `hidden`)
 // while its content is unaudited - hiding the whole list item leaves no gap in the inline list
 .pins-footer__item--hidden {
@@ -95,13 +91,6 @@ $font-family: arial, helvetica, sans-serif;
 	padding: index.govuk-spacing(4);
 	margin-bottom: index.govuk-spacing(6);
 	border: 1px solid index.govuk-colour('black', $variant: 'tint-80');
-}
-
-// Project map page: reference, name, sector and stage on a grey panel
-.pins-project-header {
-	padding: index.govuk-spacing(6);
-	margin-bottom: index.govuk-spacing(6);
-	background: index.govuk-colour('black', $variant: 'tint-95');
 }
 
 // Align a GOV.UK input and button on one row (search pattern)
@@ -151,33 +140,6 @@ $font-family: arial, helvetica, sans-serif;
 		font-weight: bold;
 		border-left-color: index.govuk-functional-colour(link);
 	}
-}
-
-// the admin CBOS files pages: long file names and blob paths wrap anywhere rather than widening
-// the page - other cells wrap only between words
-.pins-admin-files {
-	@include index.govuk-font($size: 16);
-
-	a,
-	code,
-	dd {
-		overflow-wrap: anywhere;
-	}
-}
-
-.pins-admin-path {
-	font-size: 14px;
-	overflow-wrap: anywhere;
-}
-
-// a wide admin table scrolls sideways on a narrow screen, rather than the whole page
-.pins-admin-scroll {
-	overflow-x: auto;
-}
-
-// a file name is often one long word
-.pins-admin-files__heading {
-	overflow-wrap: anywhere;
 }
 
 // a stored row's metadata on the admin Database pages - long, so it scrolls rather than widening the page
