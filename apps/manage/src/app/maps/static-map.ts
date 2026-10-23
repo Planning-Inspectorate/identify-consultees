@@ -846,15 +846,3 @@ export function renderStaticMapSvg(options: StaticMapBuildOptions, basemapImage?
 </svg>
 `;
 }
-
-/** @deprecated Prefer {@link renderStaticMapSvg} with OSM tiles via the static-map handler. */
-export function buildStaticMapSvg(options: {
-	center: LngLat;
-	zoom: number;
-	projectGeojson: GeoJsonFeatureCollection;
-	consulteeGeojson: GeoJsonFeatureCollection;
-	width?: number;
-	height?: number;
-}): string {
-	return renderStaticMapSvg(options);
-}

@@ -6,8 +6,8 @@ import path from 'node:path';
 import { pipeline } from 'node:stream/promises';
 import { isFingerprintedAssetPath } from './fingerprint-assets.ts';
 
-const FINGERPRINTED_CACHE_CONTROL = 'public, max-age=31536000, immutable';
-const UNFINGERPRINTED_CACHE_CONTROL = 'public, max-age=86400';
+export const FINGERPRINTED_CACHE_CONTROL = 'public, max-age=31536000, immutable';
+export const UNFINGERPRINTED_CACHE_CONTROL = 'public, max-age=86400';
 
 const CONTENT_TYPES: Record<string, string> = {
 	'.css': 'text/css; charset=utf-8',
@@ -259,8 +259,3 @@ export function createStaticAssetsMiddleware(
 
 	return router;
 }
-
-export const staticAssetCacheControl = {
-	fingerprinted: FINGERPRINTED_CACHE_CONTROL,
-	unfingerprinted: UNFINGERPRINTED_CACHE_CONTROL
-};

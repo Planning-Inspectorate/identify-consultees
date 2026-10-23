@@ -62,18 +62,6 @@ describe('manage page accessibility smoke', () => {
 		await assertNoSeriousA11yViolations(html);
 	});
 
-	test('items list page has no serious a11y violations', async () => {
-		const html = nunjucks.render('views/items/list/view.njk', {
-			...pageLocals,
-			pageHeading: 'Some Service Name',
-			items: [
-				{ task: 'Create new service', done: true },
-				{ task: 'Implement a new feature', done: false }
-			]
-		});
-		await assertNoSeriousA11yViolations(html);
-	});
-
 	test('home page has no serious a11y violations', async () => {
 		const html = nunjucks.render('views/home/view.njk', {
 			...pageLocals,

@@ -425,18 +425,6 @@ export async function getConsulteeAreaDisplayGeometries(
 	return geometries;
 }
 
-/** Every consultee category in the reference data, alphabetically. */
-export async function listConsulteeCategories(dbClient: PrismaClient): Promise<string[]> {
-	const rows = await withDeadlockRetry(
-		() => dbClient.$queryRaw<{ consulteeCategory: string }[]>`
-			SELECT DISTINCT consulteeCategory FROM consultee_area
-			WHERE consulteeCategory IS NOT NULL
-			ORDER BY consulteeCategory
-		`
-	);
-	return rows.map((row) => row.consulteeCategory);
-}
-
 /** A consultee found by its name - see findConsulteeAreaByName. */
 export interface NamedConsulteeArea {
 	/** Lowercase, as the Python function and the report's URLs give consultee_area ids. */

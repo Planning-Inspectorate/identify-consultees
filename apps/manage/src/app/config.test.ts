@@ -3,7 +3,7 @@ import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, test } from 'node:test';
-import { loadConfig, loadEnvironmentConfig, resetConfigCache } from './config.ts';
+import { loadConfig, resetConfigCache } from './config.ts';
 import { loadNearbyConsultees } from './nearby-consultees.ts';
 import { loadScreeningConfig } from './screening-config.ts';
 
@@ -233,35 +233,5 @@ describe('manage loadConfig', () => {
 		assert.equal(config.auth.clientId, 'client-id');
 		assert.equal(config.auth.clientSecret, 'client-secret');
 		assert.equal(config.auth.groups.applicationAccess, 'group-id');
-	});
-});
-
-describe('manage loadEnvironmentConfig', () => {
-	test('throws when ENVIRONMENT is missing', () => {
-		// Empty string (not delete): loadEnvFile must not restore values from a local .env
-		process.env.ENVIRONMENT = '';
-		assert.throws(() => loadEnvironmentConfig(), /ENVIRONMENT is required/);
-	});
-
-	test('throws when ENVIRONMENT is invalid', () => {
-		process.env.ENVIRONMENT = 'staging';
-		assert.throws(() => loadEnvironmentConfig(), /ENVIRONMENT must be one of/);
-	});
-
-	test('returns a valid ENVIRONMENT value', () => {
-		process.env.ENVIRONMENT = 'dev';
-		assert.equal(loadEnvironmentConfig(), 'dev');
-	});
-
-	test('continues when loadEnvFile throws', () => {
-		process.env.ENVIRONMENT = 'dev';
-		const previousCwd = process.cwd();
-		const emptyDir = mkdtempSync(join(tmpdir(), 'manage-env-'));
-		try {
-			process.chdir(emptyDir);
-			assert.equal(loadEnvironmentConfig(), 'dev');
-		} finally {
-			process.chdir(previousCwd);
-		}
 	});
 });

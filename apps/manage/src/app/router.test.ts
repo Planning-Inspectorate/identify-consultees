@@ -638,7 +638,6 @@ describe('manage router wiring', () => {
 		const app = createManageTestApp(service);
 		try {
 			for (const path of [
-				'/items',
 				'/error-test',
 				'/error-test/500',
 				'/error-test/403',

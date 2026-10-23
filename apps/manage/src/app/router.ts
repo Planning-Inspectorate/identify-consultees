@@ -15,7 +15,6 @@ import { createRoutes as createConsulteeRoutes } from './views/consultees/index.
 import { createRoutes as createErrorTestRoutes } from './views/error-test/index.ts';
 import { createFooterRoutes } from './views/footer/index.ts';
 import { createRoutes as createHomeRoutes } from './views/home/index.ts';
-import { createRoutes as createItemRoutes } from './views/items/index.ts';
 import { createRoutes as createMapLayersDemoRoutes } from './views/map-layers-demo/index.ts';
 import { createErrorRoutes } from './views/static/error/index.ts';
 
@@ -55,7 +54,6 @@ export function buildRouter(service: ManageService, options: BuildRouterOptions 
 	const mapLayersDemoRoutes = createMapLayersDemoRoutes();
 	const errorTestRoutes = createErrorTestRoutes(service);
 	const componentRoutes = createComponentRoutes();
-	const itemsRoutes = createItemRoutes(service);
 	const consulteeAreasPythonRoutes = createConsulteeAreasPythonRoutes(service);
 	const consulteeAreasDirectRoutes = createConsulteeAreasDirectRoutes(service);
 	const adminRoutes = createAdminRoutes(service);
@@ -120,7 +118,6 @@ export function buildRouter(service: ManageService, options: BuildRouterOptions 
 		router.use('/map-layers-demo', mapLayersDemoRoutes);
 		router.use('/error-test', errorTestRoutes);
 		router.use('/components', componentRoutes);
-		router.use('/items', itemsRoutes);
 		router.use('/consultee-areas-python', consulteeAreasPythonRoutes);
 		router.use('/consultee-areas-direct', consulteeAreasDirectRoutes);
 	}

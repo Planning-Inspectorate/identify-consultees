@@ -146,12 +146,6 @@ const pages = [
 		mustSee: [/General enquiries/i, /0303 444 5000/i, /Planning Inspectorate/i]
 	},
 	{
-		path: '/items',
-		name: 'items list',
-		heading: null,
-		mustSee: []
-	},
-	{
 		path: '/error-test',
 		name: 'error scenarios index',
 		heading: /Error scenarios/i,

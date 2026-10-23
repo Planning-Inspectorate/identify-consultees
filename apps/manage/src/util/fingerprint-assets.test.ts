@@ -8,8 +8,8 @@ import {
 	ensureEmptyStaticMountDir,
 	fingerprintAndCompressStaticAssets,
 	isFingerprintedAssetPath,
-	shouldBrotliRelativePath,
-	shouldFingerprintRelativePath
+	shouldBrotli,
+	shouldFingerprint
 } from './fingerprint-assets.ts';
 
 describe('fingerprint-assets', () => {
@@ -30,20 +30,20 @@ describe('fingerprint-assets', () => {
 		assert.equal(isFingerprintedAssetPath('style.css'), false);
 	});
 
-	test('shouldFingerprintRelativePath and shouldBrotliRelativePath guard sidecars', () => {
-		assert.equal(shouldFingerprintRelativePath('javascripts/app.js.br'), false);
-		assert.equal(shouldFingerprintRelativePath('javascripts/app.test.js'), false);
-		assert.equal(shouldFingerprintRelativePath('javascripts/app-aabbccdd.js'), false);
-		assert.equal(shouldFingerprintRelativePath('javascripts/app.js'), true);
+	test('shouldFingerprint and shouldBrotli guard sidecars', () => {
+		assert.equal(shouldFingerprint('javascripts/app.js.br'), false);
+		assert.equal(shouldFingerprint('javascripts/app.test.js'), false);
+		assert.equal(shouldFingerprint('javascripts/app-aabbccdd.js'), false);
+		assert.equal(shouldFingerprint('javascripts/app.js'), true);
 		// vendor bundle entry points are fingerprinted, but webpack lazy chunks
 		// keep stable names (they are referenced by literal filename at runtime)
-		assert.equal(shouldFingerprintRelativePath('vendor/datasets-plugin/js/index.js'), true);
-		assert.equal(shouldFingerprintRelativePath('vendor/datasets-plugin/css/index.css'), true);
-		assert.equal(shouldFingerprintRelativePath('vendor/datasets-plugin/js/6924.js'), false);
-		assert.equal(shouldFingerprintRelativePath('vendor/datasets-plugin/js/index-01234567.js'), false);
-		assert.equal(shouldBrotliRelativePath('style.css.br'), false);
-		assert.equal(shouldBrotliRelativePath('style.css'), true);
-		assert.equal(shouldBrotliRelativePath('image.png'), false);
+		assert.equal(shouldFingerprint('vendor/datasets-plugin/js/index.js'), true);
+		assert.equal(shouldFingerprint('vendor/datasets-plugin/css/index.css'), true);
+		assert.equal(shouldFingerprint('vendor/datasets-plugin/js/6924.js'), false);
+		assert.equal(shouldFingerprint('vendor/datasets-plugin/js/index-01234567.js'), false);
+		assert.equal(shouldBrotli('style.css.br'), false);
+		assert.equal(shouldBrotli('style.css'), true);
+		assert.equal(shouldBrotli('image.png'), false);
 	});
 
 	test('fingerprintAndCompressStaticAssets hashes JS/CSS and writes Brotli sidecars', async () => {
