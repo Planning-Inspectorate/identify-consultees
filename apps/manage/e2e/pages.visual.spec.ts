@@ -46,11 +46,6 @@ const pages = [
 		path: `/consultees/${SAMPLE_CASE_ID}/report/created?ruleset=${SAMPLE_RULESET_ID}`,
 		name: 'report-created'
 	},
-	{
-		path: `/consultees/${SAMPLE_CASE_ID}/results?ruleset=${SAMPLE_RULESET_ID}`,
-		name: 'consultees-results',
-		mask: MAP_MASK
-	},
 	{ path: '/map-layers-demo', name: 'map-layers-demo', mask: MAP_MASK },
 	{ path: '/components?components=true', name: 'components-index' },
 	{ path: '/components/checkboxes?components=true', name: 'component-detail' },

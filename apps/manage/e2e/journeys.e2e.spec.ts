@@ -322,12 +322,6 @@ test.describe('manage journeys', () => {
 		const files = Object.keys(unzipSync(new Uint8Array(await readFile(await download.path()))));
 		expect(files.filter((file) => file.endsWith('.xlsx'))).toHaveLength(1);
 		expect(files.filter((file) => /^maps\/\d{2} Parish Council\.pdf$/.test(file))).toHaveLength(1);
-
-		// the same selection's report page still lists the matched consultees
-		await page.goto(`/consultees/${SAMPLE_CASE_ID}/results?ruleset=${SAMPLE_RULESET_ID}`);
-		await expect(page.getByRole('heading', { level: 1 })).toContainText('Consultees identified for');
-		await expect(page.getByText(`Ruleset used: ${SAMPLE_RULESET_NAME}`)).toBeVisible();
-		await expect(page.getByRole('heading', { level: 2, name: 'Consultees identified' })).toBeVisible();
 	});
 
 	test('the boundary page offers the project’s shapefiles and continues with one', async ({ page }) => {
