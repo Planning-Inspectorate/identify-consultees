@@ -20,7 +20,6 @@ Request:
 	"siteWkt": "POLYGON((...))",
 	"nearbyRadiusMetres": 20000,
 	"nearbyRadiusMetresByCategory": { "Parish Council": 5000, "Hospital": 0 },
-	"includeGeometry": false,
 	"boundingBoxAbovePoints": 2000,
 	"boundingBox": false,
 	"dataset": "2026Q4",
@@ -46,8 +45,7 @@ Response (200):
 		{
 			"feature": {
 				"id": "<lowercase uuid>",
-				"properties": { "consulteeCategory": "Hospital", "consultee": "...", "region": "...", "...": "..." },
-				"geometryWkt": "POINT (...)"
+				"properties": { "consulteeCategory": "Hospital", "consultee": "...", "region": "...", "...": "..." }
 			},
 			"distanceMetres": 6512.3,
 			"reasons": [
@@ -63,8 +61,8 @@ Response (200):
 - `nearbyRadiusMetresByCategory` (optional): a category's own nearby distance, overriding `nearbyRadiusMetres`; 0 means never nearby. The web app sends [`config/nearby-consultees.yaml`](../config/nearby-consultees.yaml).
 - `consultees`: each consultee once, nearest first (ties by id). The union of every condition's matches and every area within its category's nearby distance (else `nearbyRadiusMetres`) (any category except Railway).
 - `reasons`: at least one. A `condition` for each condition met, in the ruleset's order, then `nearby` if within the radius. The web app turns them into **Why identified** text (`views/consultees/reasons.ts`).
-- `includeGeometry` (optional, default `true`): whether condition matches carry `geometryWkt`. The web app sends `false`: its maps draw every consultee from its own display geometry. Leaving geometry out means it's never read, which about halves a run (EN0110007: 3.9s and 75MB to 2.0s and 0.13MB, with the full reference data loaded locally).
-- `geometryWkt`: only for condition matches, and only when `includeGeometry` is `true`.
+- `properties`: what the web app lists a consultee by (`sourceId`, category, group, subcategory, name, region). No geometry - the maps draw from their own display geometry - and no metadata - the report reads each consultee's stored row. Reading neither about halves a run (EN0110007: 3.9s and 75MB to 2.0s and 0.13MB, with the full reference data loaded locally).
+- Other request fields are ignored - the web app still sends `includeGeometry: false`, for a function deployed before geometry was dropped.
 - `boundingBoxAbovePoints` (optional): screen a site whose outline, simplified to 10m, has more points than this against its bounding box instead: the rectangle of longitude and latitude around it, 1km wider all round (`queries.bounding_box`). The web app sends [`config/screening.yaml`](../config/screening.yaml)'s, 2,000 to start. Without it the outline is always screened.
 - `boundingBox` (optional, default `false`): screen the bounding box whatever the site's detail. The web app asks for it when a run on the outline fails or times out.
 - `dataset` (optional): a quarter's consultee areas to screen (`2026Q4`, its table `consultee_area_2026Q4`) rather than the dataset in use (the `consultee_area` synonym - see [Data model and loading](./data/data-model.md#loading)). One with no table is a 400 `{ "error": "There is no 2025Q1 dataset" }`. The web app doesn't send it yet.

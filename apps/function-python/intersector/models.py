@@ -36,8 +36,7 @@ class ConsulteeArea:
     id: str
     """Lowercase, as the manage app's own (Prisma) queries see it - see queries.py."""
     properties: dict
-    geometry_wkt: str | None = None
-    """Original geometry. Only fetched for areas a condition matched - they're the ones drawn."""
+    """What the manage app lists it by - not its metadata, which the report reads from its row."""
 
 
 @dataclass(frozen=True)
@@ -74,18 +73,12 @@ class Consultee:
     distance_metres: float | None
     reasons: list[Reason] = field(default_factory=list)
 
-    @property
-    def matched_a_condition(self) -> bool:
-        return any(isinstance(reason, ConditionReason) for reason in self.reasons)
-
     def record(self, match: AreaMatch, reason: Reason) -> None:
-        """Fold in another query's match of this area: keep the nearest measured distance, take its
-        geometry if it brought some, and add `reason` once."""
+        """Fold in another query's match of this area: keep the nearest measured distance, and add
+        `reason` once."""
         if match.distance_metres is not None and (
             self.distance_metres is None or match.distance_metres < self.distance_metres
         ):
             self.distance_metres = match.distance_metres
-        if match.area.geometry_wkt is not None:
-            self.area = match.area
         if reason not in self.reasons:
             self.reasons.append(reason)

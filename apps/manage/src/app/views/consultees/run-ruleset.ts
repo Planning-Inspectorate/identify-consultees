@@ -55,21 +55,6 @@ export interface StoredRulesetRun {
 /** Where a run is kept between requests: the request's session, if it has one. */
 export type RulesetRunStore = Record<string, unknown> | undefined;
 
-/**
- * A match as the session keeps it: no geometry (the full run is tens of MB of it - the maps draw
- * from display geometry instead, see buildSearchAreaSafely) and no metadata (the report export
- * reads each consultee's stored row).
- */
-function withoutGeometry(match: ConsulteeMatch): ConsulteeMatch {
-	const properties = { ...match.feature.properties };
-	delete properties.metadata;
-	return {
-		distanceMetres: match.distanceMetres,
-		reasons: match.reasons,
-		feature: { id: match.feature.id, properties }
-	};
-}
-
 function storedRun(
 	store: RulesetRunStore,
 	project: CaseBoundaryFeature,
@@ -120,7 +105,9 @@ export async function runRulesetSafely(
 				caseId: project.id,
 				rulesetId: ruleset.id,
 				ranAt: Date.now(),
-				consultees: consultees.map(withoutGeometry),
+				// no geometry to drop: the function sends none, and Nearby NSIPs have none - the maps
+				// draw from display geometry (see buildSearchAreaSafely)
+				consultees,
 				siteScreenedAs
 			};
 			store[RULESET_RUN_SESSION_FIELD] = run;
