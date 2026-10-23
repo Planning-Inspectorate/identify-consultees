@@ -3,6 +3,7 @@ import assert from 'node:assert';
 import { describe, it, mock } from 'node:test';
 import { configureNunjucks } from '../../../../../nunjucks.ts';
 import { failingRulesetRunner, rulesetRunnerReturning } from '../../../../../testing/ruleset-runner-stub.ts';
+import { consulteesUrl } from '../../urls.ts';
 import { buildReportConsulteeAddPage, buildReportConsulteeAddSubmit } from './controller.ts';
 
 // a selection entry as the app's URLs carry it - base64url-encoded JSON (see urls.ts's ENCODED_JSON)
@@ -211,6 +212,43 @@ describe('add a consultee page', () => {
 		assert.doesNotMatch(html, /Nearby Hospital|value="Little Snoring/);
 	});
 
+	// the identified parish, removed on the category page
+	const removal = { i: matchId, c: 'Parish Council', n: 'Little Snoring Parish Council', r: 'Dissolved' };
+	const otherRemoval = {
+		i: 'cccccccc-cccc-cccc-cccc-cccccccccccc',
+		c: 'Parish Council',
+		n: 'Gone Parish',
+		r: 'Merged'
+	};
+	const removedQuery = { ...parishQuery, exclude: [JSON.stringify(removal), JSON.stringify(otherRemoval)] };
+
+	it('suggests the consultees removed from the category first, so one can be added back', async () => {
+		const res = rendering();
+		await buildReportConsulteeAddPage(service() as never)(
+			{ params: { caseId: realProjectId }, query: removedQuery } as never,
+			res as never
+		);
+		assert.deepStrictEqual(viewModelOf(res).nearbySuggestions, [
+			{ name: 'Little Snoring Parish Council', hint: '0.0 km from the site, removed' },
+			{ name: 'Barton', hint: '1.3 km from the site' },
+			{ name: 'Christleton', hint: '7.3 km from the site' }
+		]);
+		assert.match(viewModelOf(res).nameHint.text, /a consultee you removed/);
+	});
+
+	it('adds a removed consultee back by undoing its removal - as the ruleset found it, not added by hand', async () => {
+		const res = await submit({ name: 'little snoring parish council', reason: 'Removed by mistake' }, removedQuery);
+
+		// its removal gone, the other kept, and nothing added by hand
+		assert.strictEqual(
+			res.redirect.mock.calls[0].arguments[0],
+			`${consulteesUrl(realProjectId, 'england-wales-post-20240430', 'Parish Council', {
+				removed: [{ id: otherRemoval.i, category: otherRemoval.c, name: otherRemoval.n, reason: otherRemoval.r }],
+				adds: []
+			})}#consultees`
+		);
+	});
+
 	it('stops suggesting a nearby consultee once it has been added', async () => {
 		const res = rendering();
 		const added = JSON.stringify({ i: nearbyId, c: 'Parish Council', n: 'Barton', r: 'r' });
@@ -372,6 +410,35 @@ describe('add a consultee page', () => {
 		assert.match(html, /<input[^>]*name="name"[^>]*list="nearby-consultees"[^>]*data-consultee-autocomplete/);
 		assert.match(html, /<option value="Undated Wind Farm \(EN010201\)"/);
 		assert.match(html, /Start typing to choose a national infrastructure project/);
+	});
+
+	it('suggests a removed Nearby NSIP as removed, and adds it back by undoing its removal', async () => {
+		const removedNsip = JSON.stringify({
+			i: 'dddddddd-dddd-dddd-dddd-dddddddddddd',
+			c: 'NSIPs',
+			n: 'Neighbouring Solar Farm (EN010200)',
+			r: 'Withdrawn'
+		});
+		const res = rendering();
+		await buildReportConsulteeAddPage(nsipService() as never)(
+			{ params: { caseId: realProjectId }, query: { ...nsipQuery, exclude: removedNsip } } as never,
+			res as never
+		);
+		assert.deepStrictEqual(viewModelOf(res).nearbySuggestions, [
+			{ name: 'Neighbouring Solar Farm (EN010200)', hint: '2.3 km from the site, removed' },
+			{ name: 'Undated Wind Farm (EN010201)', hint: '6.0 km from the site' }
+		]);
+
+		const added = rendering();
+		await buildReportConsulteeAddSubmit(nsipService() as never)(
+			{
+				params: { caseId: realProjectId },
+				query: { ...nsipQuery, exclude: removedNsip },
+				body: { name: 'Neighbouring Solar Farm', reason: 'Still active' }
+			} as never,
+			added as never
+		);
+		assert.strictEqual(added.redirect.mock.calls[0].arguments[0], `${nsipCategoryUrl}#consultees`);
 	});
 
 	it('adds a Nearby NSIP by its project name and reference, storing its shapefile id', async () => {

@@ -6,7 +6,6 @@ import type { AsyncRequestHandler, AsyncRequestHandlerWithBody } from '@planning
 import type { Response } from 'express';
 import { NEARBY_NSIPS, nearbyNsipName } from '../../../nearby-nsips.ts';
 import { consulteeName } from '../../report-consultees.ts';
-import type { AddedConsultee } from '../../urls.ts';
 import { addConsulteeUrl, consulteesUrl, excludedMatchIds } from '../../urls.ts';
 import type { CategoryContext } from '../controller.ts';
 import { categoryContext, comparableName, kilometresFromSite, nearbyCandidates } from '../controller.ts';
@@ -21,6 +20,8 @@ interface NameCandidate {
 	/** Every name it answers to - for a case, "Name (REF)" and each part alone. */
 	aliases: string[];
 	distanceMetres: number;
+	/** One the category page removed - adding it back undoes the removal. */
+	removed?: boolean;
 }
 
 /**
@@ -43,28 +44,48 @@ function listedNames({ consultees, category, selection }: CategoryContext): stri
 	].map(comparableName);
 }
 
+/** The category's consultees the ruleset identified and the category page removed - the ones that can be added back. */
+function removedCandidates({ consultees, category, selection }: CategoryContext): NameCandidate[] {
+	const excluded = excludedMatchIds(selection.removed);
+	return consultees
+		.filter(
+			(match) =>
+				match.feature.properties.consulteeCategory === category && isIdentified(match) && excluded.has(match.feature.id)
+		)
+		.map((match) => {
+			const name = consulteeName(match);
+			return { id: match.feature.id, name, aliases: [name], distanceMetres: match.distanceMetres, removed: true };
+		});
+}
+
 /**
- * What a typed name is matched against, nearest first. For a consultee category that's the
- * category's consultees only the nearby search found. Every nearby NSIP is already identified -
- * they're all report content - so for Nearby NSIPs the candidates are every other case instead,
- * named for its project and case reference and answering to either alone.
+ * What a typed name is matched against: for a consultee category, the ones the category page
+ * removed - so one can be added back - then its consultees only the nearby search found, nearest
+ * first. Every nearby NSIP is already identified - they're all report content - so for Nearby NSIPs
+ * the candidates are every other case instead (a removed one among them), named for its project and
+ * case reference and answering to either alone.
  */
 async function nameCandidates(service: ManageService, context: CategoryContext): Promise<NameCandidate[]> {
 	if (context.category === NEARBY_NSIPS) {
+		const excluded = excludedMatchIds(context.selection.removed);
 		return (await findOtherCases(service.db, context.project.id)).map((other) => {
 			const name = nearbyNsipName(other);
 			return {
 				id: other.id,
 				name,
 				aliases: [name, other.caseName, other.caseReference],
-				distanceMetres: other.distanceMetres
+				distanceMetres: other.distanceMetres,
+				removed: excluded.has(other.id)
 			};
 		});
 	}
-	return nearbyCandidates(context).map((match) => {
-		const name = consulteeName(match);
-		return { id: match.feature.id, name, aliases: [name], distanceMetres: match.distanceMetres };
-	});
+	return [
+		...removedCandidates(context),
+		...nearbyCandidates(context).map((match) => {
+			const name = consulteeName(match);
+			return { id: match.feature.id, name, aliases: [name], distanceMetres: match.distanceMetres };
+		})
+	];
 }
 
 /** The page, with the form's entered values and errors if a submit failed. */
@@ -84,7 +105,10 @@ async function renderAddPage(
 	for (const candidate of await nameCandidates(service, context)) {
 		const key = comparableName(candidate.name);
 		if (!suggestions.has(key) && !listed.has(key)) {
-			suggestions.set(key, { name: candidate.name, hint: kilometresFromSite(candidate.distanceMetres) });
+			suggestions.set(key, {
+				name: candidate.name,
+				hint: `${kilometresFromSite(candidate.distanceMetres)}${candidate.removed ? ', removed' : ''}`
+			});
 		}
 	}
 
@@ -103,7 +127,7 @@ async function renderAddPage(
 				? { text: 'Start typing to choose a national infrastructure project by its name or case reference.' }
 				: suggestions.size
 					? {
-							text: `Start typing to choose a consultee near the site that the ruleset did not identify. They are shown faintly on the map. You can also enter any other ${category} consultee by its name.`
+							text: `Start typing to choose a consultee you removed, or one near the site that the ruleset did not identify (shown faintly on the map). You can also enter any other ${category} consultee by its name.`
 						}
 					: undefined,
 		addForm: form,
@@ -197,9 +221,17 @@ export function buildReportConsulteeAddSubmit(
 			});
 		}
 
-		const add: AddedConsultee = { id: stored.id, category, name: stored.consultee, reason };
-		return res.redirect(
-			`${consulteesUrl(project.id, ruleset.id, category, { removed: selection.removed, adds: [...selection.adds, add] })}#consultees`
+		// one the category page removed comes back as the ruleset found it - its removal undone, not
+		// added by hand - so it's drawn and reported as identified again
+		const removal = selection.removed.find(
+			(removed) => removed.category === category && removed.id?.toLowerCase() === stored.id.toLowerCase()
 		);
+		const next = removal
+			? { removed: selection.removed.filter((removed) => removed !== removal), adds: selection.adds }
+			: {
+					removed: selection.removed,
+					adds: [...selection.adds, { id: stored.id, category, name: stored.consultee, reason }]
+				};
+		return res.redirect(`${consulteesUrl(project.id, ruleset.id, category, next)}#consultees`);
 	};
 }
