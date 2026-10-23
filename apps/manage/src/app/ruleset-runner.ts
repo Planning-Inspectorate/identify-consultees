@@ -25,8 +25,8 @@ export type RulesetRunner = (
 // conditions' worth of spatial queries), but many times that on Dev and Test's Basic database. A
 // run on the site's outline gets this long; if it doesn't finish, the page tries again on its
 // bounding box (see runRulesetSafely), which gets the longer one - both within Front Door's timeout
-export const OUTLINE_RUN_TIMEOUT_MS = 45_000;
-export const BOUNDING_BOX_RUN_TIMEOUT_MS = 60_000;
+const OUTLINE_RUN_TIMEOUT_MS = 45_000;
+const BOUNDING_BOX_RUN_TIMEOUT_MS = 60_000;
 
 interface RunRulesetResponseFeature {
 	id: string;

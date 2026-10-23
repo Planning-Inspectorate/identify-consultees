@@ -20,7 +20,7 @@ export interface NearbyConsultees {
 /** The Nearby NSIPs distance when the file doesn't set one. */
 export const DEFAULT_NSIP_RADIUS_KM = 10;
 
-export const NEARBY_CONSULTEES_FILE = path.join(CONFIG_DIR, 'nearby-consultees.yaml');
+const NEARBY_CONSULTEES_FILE = path.join(CONFIG_DIR, 'nearby-consultees.yaml');
 
 // the Python function refuses distances over 500km (MAX_DISTANCE_METRES in intersector/api.py)
 const MAX_RADIUS_KM = 500;

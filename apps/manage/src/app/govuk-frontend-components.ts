@@ -20,14 +20,14 @@ const require = createRequire(import.meta.url);
 /**
  * Resolve the GOV.UK Frontend package root used for Nunjucks templates.
  */
-export function getGovukFrontendRoot(): string {
+function getGovukFrontendRoot(): string {
 	return path.resolve(require.resolve('govuk-frontend'), '../..');
 }
 
 /**
  * Directory containing component folders and their fixtures.json files.
  */
-export function getGovukComponentsDir(): string {
+function getGovukComponentsDir(): string {
 	return path.join(getGovukFrontendRoot(), 'govuk/components');
 }
 
@@ -35,7 +35,7 @@ export function getGovukComponentsDir(): string {
  * Convert a kebab-case component name to its Nunjucks macro name.
  * e.g. "error-summary" -> "govukErrorSummary"
  */
-export function getGovukMacroName(component: string): string {
+function getGovukMacroName(component: string): string {
 	const macroSuffix = component
 		.split('-')
 		.map((part) => part.charAt(0).toUpperCase() + part.slice(1))
@@ -52,7 +52,7 @@ export function getGovukMacroName(component: string): string {
  *
  * @see https://frontend.design-system.service.gov.uk/testing-your-html/#using-the-html-test-files
  */
-export function normaliseGovukHtml(html: string): string {
+function normaliseGovukHtml(html: string): string {
 	return html.replace(/\r\n/g, '\n').trim();
 }
 

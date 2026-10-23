@@ -119,7 +119,7 @@ export const CONSULTEE_AREA = 'consultee_area';
 const QUARTER = /^\d{4}Q[1-4]$/;
 
 /** Whether `quarter` names one as the tables do: 2026Q4. */
-export function isQuarter(quarter: unknown): quarter is string {
+function isQuarter(quarter: unknown): quarter is string {
 	return typeof quarter === 'string' && QUARTER.test(quarter);
 }
 
