@@ -16,11 +16,13 @@ export interface AddConsulteeViewModel {
 	/** The form's POST target - this same URL, so the selection params ride along. */
 	formAction: string;
 	/**
-	 * The category's consultees only the nearby search found, nearest first, one per name - what a
-	 * typed name is matched against, suggested as it's typed (a datalist, enhanced by
-	 * consultee-autocomplete.js).
+	 * The names a typed name is matched against, nearest first, one per name - for a consultee
+	 * category its consultees only the nearby search found, for Nearby NSIPs the other cases -
+	 * suggested as it's typed (a datalist, enhanced by consultee-autocomplete.js).
 	 */
 	nearbySuggestions: { name: string; hint: string }[];
+	/** The name input's hint - absent for a consultee category with nothing to suggest. */
+	nameHint?: { text: string };
 	/** The form's entered values and errors - errors only after a failed submit. */
 	addForm: AddConsulteeForm;
 	/** The layout's error summary - present only after a failed submit, one entry per field. */

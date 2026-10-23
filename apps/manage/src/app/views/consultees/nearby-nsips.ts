@@ -22,6 +22,11 @@ export function isNearbyNsip(match: Pick<ConsulteeMatch, 'feature'>): boolean {
 	return match.feature.properties.consulteeCategory === NEARBY_NSIPS;
 }
 
+/** A case's name as Nearby NSIPs list it: its project name and case reference - "Project (EN010001)". */
+export function nearbyNsipName(nearbyCase: Pick<NearbyCase, 'caseName' | 'caseReference'>): string {
+	return `${nearbyCase.caseName} (${nearbyCase.caseReference})`;
+}
+
 /** A nearby case as a consultee match: named for its project and reference, its id its shapefile's. */
 export function nearbyNsipMatch(nearbyCase: NearbyCase, radiusMetres: number): ConsulteeMatch {
 	return {
@@ -31,7 +36,7 @@ export function nearbyNsipMatch(nearbyCase: NearbyCase, radiusMetres: number): C
 				sourceId: nearbyCase.caseReference,
 				consulteeCategory: NEARBY_NSIPS,
 				consulteeGroup: NEARBY_NSIPS,
-				consultee: `${nearbyCase.caseName} (${nearbyCase.caseReference})`,
+				consultee: nearbyNsipName(nearbyCase),
 				region: null
 			}
 		},
