@@ -221,9 +221,10 @@ describe('interactive-map-examples client helpers', () => {
 		assert.equal(options.behaviour, 'inline');
 		assert.equal(options.mapStyle.url, 'u');
 		assert.equal(options.containerHeight, '500px');
-		// datasets + mapKey + the always-registered static-map fallback plugin
-		assert.equal(options.plugins.length, 3);
+		// datasets + mapKey + the always-registered static-map fallback and loading plugins
+		assert.equal(options.plugins.length, 4);
 		assert.ok(options.plugins.some((plugin) => plugin.id === 'staticMap'));
+		assert.ok(options.plugins.some((plugin) => plugin.id === 'mapLoading'));
 	});
 
 	test('hasExitButton passes through to the map config, defaulting to false', () => {
@@ -234,6 +235,62 @@ describe('interactive-map-examples client helpers', () => {
 
 		initInteractiveMapExample('demo-map');
 		assert.equal(InteractiveMap.mock.calls[0].arguments[1].hasExitButton, true);
+	});
+
+	test('non-inline behaviour skips the loading overlay and its plugin', () => {
+		installDom(pageHtml({ kind: 'button-first', behaviour: 'buttonFirst' }));
+		const { defra } = mockDefra();
+		globalThis.defra = defra;
+		globalThis.window.defra = defra;
+
+		initInteractiveMapExample('demo-map');
+		const options = defra.InteractiveMap.mock.calls[0].arguments[1];
+		assert.equal(
+			options.plugins.some((plugin) => plugin.id === 'mapLoading'),
+			false
+		);
+		assert.equal(document.querySelector('.app-map-loading'), null);
+	});
+
+	test('the loading overlay covers an inline map until first idle, and clears on failure', () => {
+		installDom(pageHtml({ kind: 'basic' }));
+		const { defra, fire } = mockDefra();
+		globalThis.defra = defra;
+		globalThis.window.defra = defra;
+
+		initInteractiveMapExample('demo-map');
+		// the container was wrapped and covered while the app loads
+		assert.ok(document.querySelector('.app-map-loading-wrap .app-map-loading'));
+
+		fire('map:firstidle');
+		assert.equal(document.querySelector('.app-map-loading'), null);
+
+		// a constructor that throws still dismisses the overlay before the fallback
+		installDom(pageHtml({ kind: 'basic' }, 'broken-map'));
+		globalThis.defra = {
+			InteractiveMap: mock.fn(() => {
+				throw new Error('boom');
+			}),
+			maplibreProvider: () => ({})
+		};
+		globalThis.window.defra = globalThis.defra;
+		initInteractiveMapExample('broken-map');
+		assert.equal(document.querySelector('.app-map-loading'), null);
+		assert.ok(document.querySelector('#broken-map img.app-case-map-static'));
+	});
+
+	test('a failed non-inline init has no overlay to dismiss', () => {
+		installDom(pageHtml({ kind: 'button-first', behaviour: 'buttonFirst' }, 'broken-map'));
+		globalThis.defra = {
+			InteractiveMap: mock.fn(() => {
+				throw new Error('boom');
+			}),
+			maplibreProvider: () => ({})
+		};
+		globalThis.window.defra = globalThis.defra;
+
+		initInteractiveMapExample('broken-map');
+		assert.ok(document.querySelector('#broken-map img.app-case-map-static'));
 	});
 
 	test('style-switcher uses the first configured style', () => {
@@ -395,10 +452,10 @@ describe('interactive-map-examples client helpers', () => {
 		initInteractiveMapExample('demo-map');
 		const options = defra.InteractiveMap.mock.calls[0].arguments[1];
 		// the local layers-key plugin needs no defra factory, so it still lands
-		// alongside the static-map fallback when no factories exist
+		// alongside the static-map fallback and loading plugins when no factories exist
 		assert.deepEqual(
 			options.plugins.map((plugin) => plugin.id),
-			['layersKey', 'staticMap']
+			['layersKey', 'staticMap', 'mapLoading']
 		);
 		// mapStyles wins over mapStyle when both are present (style-switcher convention)
 		assert.equal(options.mapStyle.id, 's');

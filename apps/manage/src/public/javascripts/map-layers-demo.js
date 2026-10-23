@@ -8,6 +8,7 @@
  * the failure message (and the same `.im-c-error` watching as the real maps).
  */
 
+import { createMapLoadingPlugin } from './map-loading-plugin.mjs';
 import { createStaticMapPlugin } from './static-map-plugin.mjs';
 
 /**
@@ -131,6 +132,8 @@ export function initMapLayersDemo(mapId) {
 		return;
 	}
 
+	const loadingPlugin = createMapLoadingPlugin({ container });
+
 	container.replaceChildren();
 	container.classList.add('app-case-map-interactive');
 
@@ -138,7 +141,7 @@ export function initMapLayersDemo(mapId) {
 		const datasetsPlugin = defra.datasetsPlugin({ datasets: buildDatasets(config) });
 		const mapKeyPlugin = defra.mapKeyPlugin();
 
-		void new defra.InteractiveMap(mapId, {
+		const map = new defra.InteractiveMap(mapId, {
 			behaviour: 'inline',
 			mapProvider: defra.maplibreProvider(),
 			mapStyle: {
@@ -150,9 +153,11 @@ export function initMapLayersDemo(mapId) {
 			zoom: config.zoom,
 			containerHeight: `${config.height ?? 516}px`,
 			mapLabel: config.mapLabel,
-			plugins: [datasetsPlugin, mapKeyPlugin, staticMapPlugin]
+			plugins: [datasetsPlugin, mapKeyPlugin, staticMapPlugin, loadingPlugin]
 		});
+		map.on('map:firstidle', () => loadingPlugin.dismiss());
 	} catch {
+		loadingPlugin.dismiss();
 		staticMapPlugin.showFallback();
 	}
 }

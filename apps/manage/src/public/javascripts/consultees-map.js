@@ -12,6 +12,7 @@
  */
 
 import { createLayersKeyPlugin } from './layers-key-plugin.mjs';
+import { createMapLoadingPlugin } from './map-loading-plugin.mjs';
 import { createStaticMapPlugin } from './static-map-plugin.mjs';
 
 // consultee features carry their category colour (`colour`), assigned server-side so the static map
@@ -325,6 +326,10 @@ export function initConsulteeMap(mapId) {
 		return;
 	}
 
+	// armed before construction: covers the provider/app chunk download and the
+	// tile fetch; dismissed once the map first reports idle (or on failure)
+	const loadingPlugin = createMapLoadingPlugin({ container });
+
 	container.replaceChildren();
 	container.classList.add('app-case-map-interactive');
 
@@ -352,12 +357,20 @@ export function initConsulteeMap(mapId) {
 			zoom: interactiveZoom(config.zoom),
 			containerHeight: `${config.height ?? 516}px`,
 			mapLabel: config.mapLabel,
-			plugins: [datasetsPlugin, layersKeyPlugin, staticMapPlugin, ...(interactPlugin ? [interactPlugin] : [])]
+			plugins: [
+				datasetsPlugin,
+				layersKeyPlugin,
+				staticMapPlugin,
+				loadingPlugin,
+				...(interactPlugin ? [interactPlugin] : [])
+			]
 		});
+		map.on('map:firstidle', () => loadingPlugin.dismiss());
 		if (interactPlugin) {
 			wireFeatureDetails(map, interactPlugin);
 		}
 	} catch {
+		loadingPlugin.dismiss();
 		staticMapPlugin.showFallback();
 	}
 }

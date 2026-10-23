@@ -7,10 +7,10 @@ import type { Handler } from 'express';
 export function addLocalsConfiguration(options: { devPagesEnabled?: boolean } = {}): Handler {
 	return (req, res, next) => {
 		res.locals.config = {
-			styleFile: 'style-bcf6a659.css',
+			styleFile: 'style-9773ebc3.css',
 			govukFrontendJs: 'assets/js/govuk-frontend.min-0391e416.js',
-			consulteesMapJs: 'javascripts/consultees-map-00c638e3.js',
-			mapLayersDemoJs: 'javascripts/map-layers-demo-82b46375.js',
+			consulteesMapJs: 'javascripts/consultees-map-c135ce97.js',
+			mapLayersDemoJs: 'javascripts/map-layers-demo-3860c692.js',
 			consulteeAutocompleteJs: 'javascripts/consultee-autocomplete-8efbbdc4.js',
 			blobUploadJs: 'javascripts/blob-upload-cfe8ea96.js',
 			accessibleAutocompleteJs: 'assets/js/accessible-autocomplete.min-876870ee.js',
@@ -26,7 +26,7 @@ export function addLocalsConfiguration(options: { devPagesEnabled?: boolean } = 
 			vendorDrawPluginJs: 'vendor/draw-plugin/js/index-1f40ff7e.js',
 			vendorMapStylesPluginJs: 'vendor/map-styles-plugin/js/index-c9ffb685.js',
 			vendorMapStylesPluginCss: 'vendor/map-styles-plugin/css/index-d8fa9e70.css',
-			interactiveMapExamplesJs: 'javascripts/interactive-map-examples-df5dc723.js',
+			interactiveMapExamplesJs: 'javascripts/interactive-map-examples-96b642b3.js',
 			headerTitle: 'Identify consultees',
 			// the support links the site footer lists - generic Planning Inspectorate pages.
 			// `hidden` keeps the page routed but takes its link out of the footer (the list item
