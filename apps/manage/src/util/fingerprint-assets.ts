@@ -6,7 +6,7 @@ import { pipeline } from 'node:stream/promises';
 import { createBrotliCompress, constants as zlibConstants } from 'node:zlib';
 
 /** Content-hash segment used in fingerprinted filenames (8 hex chars). */
-export const ASSET_HASH_PATTERN = /-[0-9a-f]{8}(?=\.[^.]+$)/i;
+const ASSET_HASH_PATTERN = /-[0-9a-f]{8}(?=\.[^.]+$)/i;
 
 /** Compressible text-ish assets suitable for Brotli (sidecars or runtime compression). */
 export const BROTLI_EXTENSIONS = new Set(['.css', '.js', '.mjs', '.svg', '.json', '.map', '.txt', '.xml', '.html']);

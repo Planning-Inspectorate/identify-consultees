@@ -24,8 +24,8 @@ const VIEWS = {
 	row: 'admin/database/row.njk'
 };
 
-export const CONSULTEE_AREAS_URL = '/admin/database/consultee-areas';
-export const CASE_BOUNDARIES_URL = '/admin/database/case-boundaries';
+const CONSULTEE_AREAS_URL = '/admin/database/consultee-areas';
+const CASE_BOUNDARIES_URL = '/admin/database/case-boundaries';
 
 /** A query param as one trimmed string - a repeated or non-string param reads as empty. */
 function queryText(value: unknown): string {

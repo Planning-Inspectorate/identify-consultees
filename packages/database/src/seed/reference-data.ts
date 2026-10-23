@@ -80,7 +80,7 @@ function datasetSettings(code: string, value: unknown): { category: string; subc
 }
 
 /** A group's name as its files and URLs give it: Administrative boundaries → administrative_boundaries. */
-export function groupSlug(name: string): string {
+function groupSlug(name: string): string {
 	return name
 		.trim()
 		.toLowerCase()

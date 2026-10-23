@@ -14,8 +14,6 @@ import {
 	MAX_UPLOAD_BYTES
 } from './controller.ts';
 
-export { MAX_UPLOAD_BYTES };
-
 // disk, not memory storage - a multi-hundred-MB file shouldn't be held in process memory. The
 // temp file is removed by the controller after the blob upload completes, whether it succeeds or
 // fails. A file exceeding the limit is rejected by multer before it reaches the controller,

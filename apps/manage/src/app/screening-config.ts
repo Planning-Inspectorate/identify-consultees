@@ -11,7 +11,7 @@ export interface ScreeningConfig {
 	boundingBoxAbovePoints: number;
 }
 
-export const SCREENING_FILE = path.join(CONFIG_DIR, 'screening.yaml');
+const SCREENING_FILE = path.join(CONFIG_DIR, 'screening.yaml');
 
 function isRecord(value: unknown): value is Record<string, unknown> {
 	return typeof value === 'object' && value !== null && !Array.isArray(value);

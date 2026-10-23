@@ -265,7 +265,7 @@ const COLUMN_CELLS: Record<ReportColumn, (row: RowSource) => Cell> = {
 	lastUpdated: (row) => (row.record ? { type: Date, value: row.record.lastUpdated, format: 'yyyy-mm-dd hh:mm' } : null)
 };
 
-export const COLUMN_WIDTHS: Record<ReportColumn, number> = {
+const COLUMN_WIDTHS: Record<ReportColumn, number> = {
 	consultee: 36,
 	category: 28,
 	region: 22,
@@ -419,7 +419,7 @@ export function formatDate(date: Date): string {
  * split by buffer, its nearest buffer) - then any consultee no line counts, under its category's own
  * name, so the lines add up to the tab's total.
  */
-export function summaryCounts(
+function summaryCounts(
 	tab: GroupTab,
 	counted: CountedConsultee[],
 	config: ReportConfig = REPORT_CONFIG
@@ -486,7 +486,7 @@ function consulteeList(heading: string, consultees: readonly { name: string; cat
 }
 
 /** An NSIP's own fields, in order - the NSIPs tab's metadata and the Summary's list's columns. */
-export const NSIP_FIELDS = ['Name', 'Number', 'Type', 'Sub-type', 'Query'] as const;
+const NSIP_FIELDS = ['Name', 'Number', 'Type', 'Sub-type', 'Query'] as const;
 
 /** The query that found a Nearby NSIP - the buffer it's within, "35km buffer". */
 function nsipQuery(match: ConsulteeMatch): string {
@@ -501,7 +501,7 @@ function nsipQuery(match: ConsulteeMatch): string {
  * under, its type and sub-type from that reference (see nsipType), and `query` - how it was found,
  * or the reason given for adding it.
  */
-export function nsipFields(name: string, query: string): Metadata {
+function nsipFields(name: string, query: string): Metadata {
 	const { projectName, caseReference } = splitNsipName(name);
 	const { type, subType } = nsipType(caseReference);
 	return { Name: projectName, Number: caseReference ?? null, Type: type, 'Sub-type': subType, Query: query };

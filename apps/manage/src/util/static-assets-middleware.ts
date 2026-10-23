@@ -112,7 +112,7 @@ export function buildStaticAssetsRateLimiter(options: StaticAssetsRateLimiterOpt
  * Build a request-path → filesystem entry index from files already on disk.
  * Request handling only looks up keys in this map (no user-controlled path joins).
  */
-export function buildStaticAssetIndex(staticDir: string): ReadonlyMap<string, IndexedAsset> {
+function buildStaticAssetIndex(staticDir: string): ReadonlyMap<string, IndexedAsset> {
 	const resolvedStaticDir = path.resolve(staticDir);
 	const index = new Map<string, IndexedAsset>();
 

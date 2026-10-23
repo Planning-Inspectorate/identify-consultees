@@ -28,7 +28,7 @@ export function nearbyNsipName(nearbyCase: Pick<NearbyCase, 'caseName' | 'caseRe
 }
 
 /** A nearby case as a consultee match: named for its project and reference, its id its shapefile's. */
-export function nearbyNsipMatch(nearbyCase: NearbyCase, radiusMetres: number): ConsulteeMatch {
+function nearbyNsipMatch(nearbyCase: NearbyCase, radiusMetres: number): ConsulteeMatch {
 	return {
 		feature: {
 			id: nearbyCase.id,
