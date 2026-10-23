@@ -13,6 +13,7 @@ import type { Config } from '../config.ts';
 import { loadBuildConfig } from '../config.ts';
 import { configureNunjucks } from '../nunjucks.ts';
 import { buildAuthRateLimiter, buildRouter } from '../router.ts';
+import { buildContentSecurityPolicyDirectives } from '../security/owasp-headers.ts';
 import { buildDatabaseRulesetRunner } from './ruleset-runner-stub.ts';
 
 export type CreateManageTestAppOptions = {
@@ -78,6 +79,9 @@ export function createManageTestApp(service: ManageService, options: CreateManag
 			createStaticAssetsMiddleware(service.assetsStaticDir),
 			addLocalsConfiguration({ devPagesEnabled: service.devPagesEnabled })
 		],
+		// match the production CSP (createApp): the interactive map needs OpenFreeMap in
+		// connect/img/font-src and blob: workers - without this live-map e2e pages fail to load
+		cspDirectives: buildContentSecurityPolicyDirectives({ isProduction: service.secureSession }),
 		multiPartFormRoutes: ADMIN_MULTIPART_ROUTES
 	});
 }
