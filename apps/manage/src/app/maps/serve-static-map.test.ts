@@ -153,7 +153,7 @@ describe('serve-static-map', () => {
 				googleMapsApiKey: 'test-key'
 			});
 			assert.ok(
-				requested.length > 0 && requested.every((url) => url.includes('tile.openstreetmap.org')),
+				requested.length > 0 && requested.every((url) => requestHostname(url) === 'tile.openstreetmap.org'),
 				JSON.stringify(view)
 			);
 		}
