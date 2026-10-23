@@ -46,7 +46,7 @@
         {{ govukNotificationBanner({
             type: "success",
             titleText: "Success",
-            text: "Replaced case boundaries: imported " ~ caseBoundariesImported ~ "."
+            text: "Imported case boundaries: " ~ caseBoundariesImported ~ "."
         }) }}
     {% endif %}
 
@@ -182,9 +182,9 @@
     {% endif %}
 
     <h2 class="govuk-heading-m">Case boundaries</h2>
-    <p class="govuk-body">Replaces all case boundaries with <code>all-project-boundaries.geojson</code> from blob storage.</p>
+    <p class="govuk-body">Imports the case boundaries in <code>all-project-boundaries.geojson</code> from blob storage. Boundaries already here are updated, and nothing is deleted - including those imported from CBOS.</p>
     <form method="post" action="/admin/import-reference-data/run-case-boundaries" novalidate>
         <input type="hidden" name="_csrf" value="{{ _csrf }}">
-        {{ govukButton({ text: "Replace case boundaries", classes: "govuk-button--warning" }) }}
+        {{ govukButton({ text: "Import case boundaries" }) }}
     </form>
 {% endblock %}

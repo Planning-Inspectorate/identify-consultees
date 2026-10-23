@@ -21,7 +21,7 @@ export const ADMIN_PAGES: readonly AdminPage[] = [
 	{
 		href: '/admin/import-reference-data',
 		text: 'Import reference data',
-		description: 'Replace the consultee areas or case boundaries with a file uploaded to blob storage.'
+		description: 'Load the consultee areas, or import case boundaries, from a file uploaded to blob storage.'
 	},
 	{
 		href: '/admin/import-from-cbos',

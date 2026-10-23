@@ -118,7 +118,7 @@ describe('admin import reference data', () => {
 		assert.strictEqual(viewModelOf(res).pending, undefined);
 		assert.match(html, /11548 consultee areas in 2026Q4/);
 		assert.match(html, /Clear consultee areas/);
-		assert.match(html, /Replace case boundaries/);
+		assert.match(html, /Import case boundaries/);
 	});
 
 	it('still renders the page with what it could read, logging what it could not', async () => {
@@ -428,14 +428,12 @@ describe('admin import reference data', () => {
 			await run({}, res);
 
 			assert.strictEqual(blobFiles.download.mock.calls[0].arguments[0], CASE_BOUNDARIES_BLOB_NAME);
-			assert.deepStrictEqual(runImport.mock.calls[0].arguments.slice(1), [
-				'/tmp/case-boundaries.geojson',
-				{ replace: true }
-			]);
+			// merged, never replacing the table - that would delete the boundaries CBOS imported
+			assert.deepStrictEqual(runImport.mock.calls[0].arguments.slice(1), ['/tmp/case-boundaries.geojson']);
 			const { error, caseBoundariesImported } = viewModelOf(res);
 			assert.strictEqual(error, undefined);
 			assert.strictEqual(caseBoundariesImported, 433);
-			assert.match(htmlOf(res), /Replaced case boundaries: imported 433/);
+			assert.match(htmlOf(res), /Imported case boundaries: 433/);
 		});
 
 		it('renders an error when the download fails, without throwing', async () => {
