@@ -7,7 +7,7 @@
 | Interactive | Defra bundles from `/vendor/*`, started by `public/javascripts/consultees-map.js` from the page's inline JSON config                                                                                                                                                                                                                          |
 | Static      | `/consultees/:caseId/results/static-map` — the boundary page's variant is `/consultees/:caseId/boundary-map` (AVIF, WebP or PNG from `Accept`) or `.../static-map.svg`. Tiles are fetched and composited by the app, with ETags and long caching (`maps/serve-static-map.ts`, `static-map.ts`, `static-map-raster.ts`, `static-map-cache.ts`) |
 
-The project boundary page, a report category page and the results page all use the partial `views/partials/consultee-map-region.njk`; the boundary page serves its own `/boundary-map` route, and a category page adds `category` and `exclude` to the results route.
+The project boundary page and a report category page both use the partial `views/partials/consultee-map-region.njk`; the boundary page serves its own `/boundary-map` route, and a category page's static map is `/consultees/:caseId/results/static-map` with `category`, `exclude` and `include`.
 
 ## Building the map
 
@@ -18,7 +18,7 @@ The results and category pages' controllers do the same steps, with helpers from
 3. Builds the **search area**, the site grown by the nearby radius, and fetches display geometry for every consultee touching it (`buildSearchAreaSafely`). Areas are drawn whole and simplified by size: the larger of 25m and 1/200th of the area's width (`DISPLAY_SIMPLIFY_WIDTH_RATIO`). A parish stays at 25m and a 3,000km² county becomes about 270m, which keeps a Norwich to Tilbury page at 1.5MB rather than 3.8MB.
 4. `buildCaseMapConfig` (`maps/case-geojson.ts`) makes the config: the project, the consultees and the search area, each consultee with its category's `colour` and `fillOpacity`, so both maps colour it the same.
 
-If step 3 fails the page still renders, with the project and condition matches only (capped at `MAX_SAMPLED_MAP_MATCHES`).
+If step 3 fails the page still renders, and its tables list every consultee, but the map shows the site alone: a run's matches carry no geometry of their own.
 
 ## Layers
 

@@ -279,10 +279,7 @@ describe('manage page accessibility smoke', () => {
 			removedOpen: true,
 			rulesetFailed: false,
 			retryUrl:
-				'/consultees/11111111-1111-1111-1111-111111111111/report/consultees?ruleset=england-wales-post-20240430&category=Parish%20Council',
-			matchCount: 1,
-			mapIsSampled: false,
-			mapSampleSize: 30
+				'/consultees/11111111-1111-1111-1111-111111111111/report/consultees?ruleset=england-wales-post-20240430&category=Parish%20Council'
 		});
 		assert.match(html, /Removed consultees/);
 		assert.match(html, /Outside the search area/);
@@ -311,10 +308,7 @@ describe('manage page accessibility smoke', () => {
 			removedOpen: false,
 			rulesetFailed: false,
 			retryUrl:
-				'/consultees/11111111-1111-1111-1111-111111111111/report/consultees?ruleset=england-wales-post-20240430&category=Parish%20Council',
-			matchCount: 0,
-			mapIsSampled: false,
-			mapSampleSize: 30
+				'/consultees/11111111-1111-1111-1111-111111111111/report/consultees?ruleset=england-wales-post-20240430&category=Parish%20Council'
 		});
 		assert.match(html, /No consultees identified in this category/);
 		await assertNoSeriousA11yViolations(html);
@@ -556,100 +550,6 @@ describe('manage page accessibility smoke', () => {
 				{ label: 'Flood risk area', description: 'Polygon overlay for a constraint.' }
 			]
 		});
-		await assertNoSeriousA11yViolations(html);
-	});
-
-	test('consultees results page has no serious a11y violations', async () => {
-		const html = nunjucks.render('views/consultees/results/view.njk', {
-			...pageLocals,
-			pageHeading: 'Consultees identified for Example Project (EN01)',
-			backLinkUrl: '/consultees/11111111-1111-1111-1111-111111111111',
-			rulesetName: 'England Wales post 30 April 2024',
-			reference: 'EN01',
-			caseName: 'Example Project',
-			caseId: '11111111-1111-1111-1111-111111111111',
-			mapId: 'case-map',
-			mapRegionLabel: 'Map showing England Wales post 30 April 2024 for Example Project',
-			staticMapSrc:
-				'/consultees/11111111-1111-1111-1111-111111111111/results/static-map?ruleset=england-wales-post-20240430',
-			staticMapAlt: 'Static map showing England Wales post 30 April 2024 for Example Project',
-			mapWidth: 960,
-			mapHeight: 516,
-			mapConfigJson: '{"center":[-1.78,50.62],"zoom":11}',
-			matches: [{ consultee: 'Network Rail', consulteeCategory: 'Railway', region: 'South West', distanceMetres: 123 }],
-			matchCount: 1,
-			mapIsSampled: false,
-			mapSampleSize: 30,
-			nearbyRadiusKm: 20
-		});
-		await assertNoSeriousA11yViolations(html);
-	});
-
-	test('consultees results page with a sampled map has no serious a11y violations', async () => {
-		const html = nunjucks.render('views/consultees/results/view.njk', {
-			...pageLocals,
-			pageHeading: 'Consultees identified for Example Project (EN01)',
-			backLinkUrl: '/consultees/11111111-1111-1111-1111-111111111111',
-			rulesetName: 'England Wales post 30 April 2024',
-			reference: 'EN01',
-			caseName: 'Example Project',
-			caseId: '11111111-1111-1111-1111-111111111111',
-			mapId: 'case-map',
-			mapRegionLabel: 'Map showing England Wales post 30 April 2024 for Example Project',
-			staticMapSrc:
-				'/consultees/11111111-1111-1111-1111-111111111111/results/static-map?ruleset=england-wales-post-20240430',
-			staticMapAlt: 'Static map showing England Wales post 30 April 2024 for Example Project',
-			mapWidth: 960,
-			mapHeight: 516,
-			mapConfigJson: '{"center":[-1.78,50.62],"zoom":11}',
-			matches: [
-				{
-					consultee: 'Example Hospital',
-					consulteeCategory: 'Hospital',
-					region: 'South West',
-					reasons: ['Hospitals: within 10km of the site', 'Within 20km of the site']
-				},
-				{
-					consultee: 'NeuConnect Interconnector',
-					consulteeCategory: 'Interconnector',
-					region: null,
-					reasons: ['Within 20km of the site']
-				}
-			],
-			matchCount: 120,
-			mapIsSampled: true,
-			mapSampleSize: 30,
-			nearbyRadiusKm: 20
-		});
-		await assertNoSeriousA11yViolations(html);
-	});
-
-	test('consultees results page when the ruleset could not be run has no serious a11y violations', async () => {
-		const html = nunjucks.render('views/consultees/results/view.njk', {
-			...pageLocals,
-			pageHeading: 'Consultees identified for Example Project (EN01)',
-			backLinkUrl: '/consultees/11111111-1111-1111-1111-111111111111',
-			rulesetName: 'England Wales post 30 April 2024',
-			reference: 'EN01',
-			caseName: 'Example Project',
-			caseId: '11111111-1111-1111-1111-111111111111',
-			mapId: 'case-map',
-			mapRegionLabel: 'Map showing England Wales post 30 April 2024 for Example Project',
-			staticMapSrc:
-				'/consultees/11111111-1111-1111-1111-111111111111/results/static-map?ruleset=england-wales-post-20240430',
-			rulesetFailed: true,
-			retryUrl: '/consultees/11111111-1111-1111-1111-111111111111/results?ruleset=england-wales-post-20240430',
-			staticMapAlt: 'Static map showing England Wales post 30 April 2024 for Example Project',
-			mapWidth: 960,
-			mapHeight: 516,
-			mapConfigJson: '{"center":[-1.78,50.62],"zoom":11}',
-			matches: [],
-			matchCount: 0,
-			mapIsSampled: false,
-			mapSampleSize: 30,
-			nearbyRadiusKm: 20
-		});
-		assert.match(html, /The ruleset could not be run/);
 		await assertNoSeriousA11yViolations(html);
 	});
 

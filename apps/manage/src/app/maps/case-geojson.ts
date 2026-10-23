@@ -1,5 +1,5 @@
 /**
- * Build the GeoJSON (and derived map view) for a case's ruleset results page: the project's own
+ * Build the GeoJSON (and derived map view) for a case's maps - category pages, static images and the report's PDFs: the project's own
  * boundary, plus every consultee a ruleset run found - the same two layers the interactive map
  * and its static-map fallback both render.
  */
@@ -48,16 +48,6 @@ export function buildProjectGeojson(project: CaseBoundaryFeature): GeoJsonFeatur
 	};
 }
 
-// A ruleset is now the union of every condition it's made of (see geospatial/rulesets.ts), so a
-// single run can realistically return thousands of matches (e.g. most parish councils near a
-// large site). Rendering that many complex polygons - in the client-side interactive map, and
-// especially in the server-side static-map SVG/PNG fallback - is slow enough to be a real
-// reliability risk, not just a cosmetic one. Above MAP_SAMPLING_THRESHOLD matches, the map shows
-// only a sample; the results table (built from the full, unsampled list) is unaffected.
-// Display geometry, simplified by size, is small enough to draw every match.
-export const MAP_SAMPLING_THRESHOLD = 50;
-export const MAX_SAMPLED_MAP_MATCHES = 30;
-
 function categoryOf(match: Pick<ConsulteeMatch, 'feature'>): string {
 	return match.feature.properties.consulteeCategory || UNCATEGORISED;
 }
@@ -87,20 +77,13 @@ function isDrawable(match: MapMatch): match is DrawableMatch {
 }
 
 /**
- * The consultees that have geometry to draw - consultees found only by the nearby search come
- * without original geometry, so they're drawn only from display geometry (see buildCaseMapConfig).
+ * The consultees that have geometry to draw. A run's matches carry none (the function is never
+ * asked for it), so these are drawn from display geometry (see buildCaseMapConfig).
  */
-export function buildConsulteeMatchesGeojson(
-	matches: MapMatch[],
-	colours: Map<string, string> = assignCategoryColours(matches.map(categoryOf)),
-	sample = true
-): GeoJsonFeatureCollection {
-	const drawable = matches.filter(isDrawable);
-	const drawn =
-		sample && drawable.length > MAP_SAMPLING_THRESHOLD ? drawable.slice(0, MAX_SAMPLED_MAP_MATCHES) : drawable;
+function buildConsulteeMatchesGeojson(matches: MapMatch[], colours: Map<string, string>): GeoJsonFeatureCollection {
 	return {
 		type: 'FeatureCollection',
-		features: drawn.map((match) => ({
+		features: matches.filter(isDrawable).map((match) => ({
 			type: 'Feature',
 			id: match.feature.id,
 			properties: {
@@ -150,10 +133,6 @@ export interface CaseMapConfig {
 	consulteeLayerLabel: string;
 	projectGeojson: GeoJsonFeatureCollection;
 	consulteeGeojson: GeoJsonFeatureCollection;
-	/** Total matches the ruleset found - may be larger than consulteeGeojson.features.length. */
-	matchCount: number;
-	/** True when the map shows a sample rather than every match - see MAP_SAMPLING_THRESHOLD. Never with a search area. */
-	isSampled: boolean;
 	/**
 	 * The JS init-failure fallback's static-map image - carried in the page config because
 	 * data-* attributes on the map container are JSON.parsed by the InteractiveMap constructor.
@@ -236,9 +215,7 @@ export function buildCaseMapConfig(
 		{ type: 'Feature', properties: {}, geometry: searchArea.area }
 	];
 	const consulteeGeojson = withFillOpacity(
-		searchArea
-			? buildConsulteeMatchesGeojson(withDisplayGeometry(matches, searchArea.geometries), colours, false)
-			: buildConsulteeMatchesGeojson(matches, colours),
+		buildConsulteeMatchesGeojson(searchArea ? withDisplayGeometry(matches, searchArea.geometries) : matches, colours),
 		searchAreaFeatures
 	);
 	const view = computeFittedMapView(projectGeojson, MAP_VIEWPORT, marginMetres);
@@ -254,8 +231,6 @@ export function buildCaseMapConfig(
 		consulteeLayerLabel: rulesetName,
 		projectGeojson,
 		consulteeGeojson,
-		matchCount: matches.length,
-		isSampled: !searchArea && matches.length > MAP_SAMPLING_THRESHOLD,
 		...(fallback ? { fallback: { ...fallback, width: MAP_VIEWPORT.width, height: MAP_VIEWPORT.height } } : {})
 	};
 }

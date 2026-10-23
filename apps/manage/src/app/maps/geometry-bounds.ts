@@ -1,10 +1,6 @@
 /**
- * Compute a map centre and zoom that roughly fits a GeoJSON FeatureCollection.
- *
- * Sample case maps use a fixed, hand-picked centre per case
- * (`src/data/sample-map-polygons.ts`). `/uploads/map` shows whatever is
- * currently in the geometry database — arbitrary uploads with no
- * pre-defined centre — so it needs to derive one from the data itself.
+ * Map centres and zooms derived from the geometry a map shows - its bounds, and a view that fits
+ * them (see computeFittedMapView).
  */
 
 /** A `[longitude, latitude]` pair. */

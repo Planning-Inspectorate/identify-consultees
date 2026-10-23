@@ -166,9 +166,9 @@ describe('HTML security response headers', () => {
 		assertCspAllowsOpenFreeMap(csp, 'connect-src');
 	});
 
-	test('consultees results page keeps map-aware CSP', async () => {
+	test('a category page keeps map-aware CSP', async () => {
 		const response = await request(developmentApp).get(
-			`/consultees/${mapPageTestCaseId}/results?ruleset=england-wales-post-20240430`
+			`/consultees/${mapPageTestCaseId}/report/consultees?ruleset=england-wales-post-20240430&category=Parish%20Council`
 		);
 		assert.equal(response.status, 200);
 		const csp = response.headers['content-security-policy'];

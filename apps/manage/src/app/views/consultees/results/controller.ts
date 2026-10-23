@@ -1,93 +1,18 @@
 import type { ManageService } from '#service';
-import { stringifyForInlineScript } from '#util/inline-json.ts';
-import type { ConsulteeMatch, Ruleset } from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
 import { getRuleset } from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
 import type { AsyncRequestHandler } from '@planning-inspectorate/core/util';
-import { buildCaseMapConfig, markAddedByHand, MAX_SAMPLED_MAP_MATCHES } from '../../../maps/case-geojson.ts';
-import { MAP_VIEWPORT } from '../../../maps/sample-geojson.ts';
+import { buildCaseMapConfig, markAddedByHand } from '../../../maps/case-geojson.ts';
 import { buildConsulteeStaticMapResponse, sendStaticMapResponse } from '../../../maps/serve-static-map.ts';
 import { categorySettings } from '../../../report-config.ts';
-import { describeReasons } from '../reasons.ts';
-import { excludedIds, queryValues, reportUrl } from '../report/urls.ts';
+import { excludedIds, queryValues } from '../report/urls.ts';
 import { resolveCase } from '../resolve-case.ts';
 import { buildSearchAreaSafely, firstQueryValue, runRulesetSafely } from '../run-ruleset.ts';
-import type { ConsulteeMatchRow, ConsulteesResultsViewModel } from './view-model.ts';
-
-function resultsUrl(caseId: string, rulesetId: string): string {
-	return `/consultees/${encodeURIComponent(caseId)}/results?ruleset=${encodeURIComponent(rulesetId)}`;
-}
-
-function toMatchRow(match: ConsulteeMatch, ruleset: Ruleset): ConsulteeMatchRow {
-	return {
-		consultee: match.feature.properties.consultee ?? null,
-		consulteeCategory: match.feature.properties.consulteeCategory ?? null,
-		region: match.feature.properties.region ?? null,
-		reasons: describeReasons(match, ruleset)
-	};
-}
 
 /**
- * The consultee report for the map page's selection: the same ruleset run the map page drew, with
- * every consultee it found listed with the reasons it was identified.
+ * A category page's static map - the image its map falls back to without JavaScript, and when the
+ * interactive map can't start: the category's consultees less removals, with the nearby ones added
+ * by hand drawn as identified. Its URL sits under /results, where it began (categoryStaticMapUrl).
  */
-export function buildConsulteesResultsPage(service: ManageService): AsyncRequestHandler {
-	const { db, logger } = service;
-
-	return async (req, res) => {
-		const caseId = String(req.params.caseId ?? '');
-		const project = await resolveCase(db, caseId);
-		if (!project) {
-			res.status(404).render('views/errors/404.njk', { pageHeading: 'Page not found' });
-			return;
-		}
-
-		const ruleset = getRuleset(firstQueryValue(req.query.ruleset));
-		if (!ruleset) {
-			res.status(404).render('views/errors/404.njk', { pageHeading: 'Page not found' });
-			return;
-		}
-
-		logger.info(
-			{ caseId, reference: project.properties.caseReference, rulesetId: ruleset.id },
-			'consultees results page'
-		);
-
-		const { consultees, failed } = await runRulesetSafely(service, project, ruleset, req.session);
-		const searchArea = await buildSearchAreaSafely(db, project, consultees, service.nearbySearchRadiusMetres, logger);
-		const staticMapSrc = `/consultees/${encodeURIComponent(project.id)}/results/static-map?ruleset=${encodeURIComponent(ruleset.id)}`;
-		const staticMapAlt = `Static map showing ${ruleset.name} for ${project.properties.caseName}`;
-		const map = buildCaseMapConfig(project, consultees, ruleset.name, searchArea, {
-			src: staticMapSrc,
-			alt: staticMapAlt
-		});
-
-		const viewModel: ConsulteesResultsViewModel = {
-			pageHeading: `Consultees identified for ${project.properties.caseName} (${project.properties.caseReference})`,
-			backLinkUrl: reportUrl(project.id, ruleset.id),
-			rulesetName: ruleset.name,
-			reference: project.properties.caseReference,
-			caseName: project.properties.caseName,
-			caseId: project.id,
-			mapId: 'case-map',
-			mapRegionLabel: `Map showing ${ruleset.name} for ${project.properties.caseName}`,
-			staticMapSrc,
-			rulesetFailed: failed,
-			retryUrl: resultsUrl(project.id, ruleset.id),
-			staticMapAlt,
-			mapWidth: MAP_VIEWPORT.width,
-			mapHeight: MAP_VIEWPORT.height,
-			mapConfigJson: stringifyForInlineScript(map),
-			matches: consultees.map((match) => toMatchRow(match, ruleset)),
-			matchCount: map.matchCount,
-			mapIsSampled: map.isSampled,
-			mapSampleSize: MAX_SAMPLED_MAP_MATCHES,
-			nearbyRadiusKm: service.nearbyConsulteeRadiusMetres / 1000
-		};
-
-		return res.render('views/consultees/results/view.njk', viewModel);
-	};
-}
-
 export function buildResultsStaticMap(service: ManageService, forceSvg = false): AsyncRequestHandler {
 	const { db, logger } = service;
 

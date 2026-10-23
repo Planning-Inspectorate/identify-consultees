@@ -452,22 +452,6 @@ describe('manage router wiring', () => {
 		}
 	});
 
-	test('GET /consultees/:id/results runs the ruleset and renders the results page', async () => {
-		const response = await request(authDisabledApp).get(
-			`/consultees/${homePageTestCaseId}/results?ruleset=england-wales-post-20240430`
-		);
-		assert.equal(response.status, 200);
-		assert.match(response.text, /Consultees identified for/);
-		assert.match(response.text, /Ruleset used: England Wales post 30 April 2024/);
-	});
-
-	test('GET /consultees/:id/results 404s for an unknown ruleset', async () => {
-		const response = await request(authDisabledApp).get(
-			`/consultees/${homePageTestCaseId}/results?ruleset=not-a-real-ruleset`
-		);
-		assert.equal(response.status, 404);
-	});
-
 	test('GET /consultees/:id 404s for an unknown case', async () => {
 		const response = await request(authDisabledApp).get('/consultees/99999999-9999-9999-9999-999999999999');
 		assert.equal(response.status, 404);
