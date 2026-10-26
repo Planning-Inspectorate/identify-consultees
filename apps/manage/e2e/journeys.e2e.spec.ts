@@ -62,6 +62,12 @@ test.describe('manage journeys', () => {
 		await expect(page.getByText(SAMPLE_CASE_NAME).first()).toBeVisible();
 	});
 
+	test('home page flags a blank search', async ({ page }) => {
+		await page.goto('/?q=');
+		await expect(page.locator('.govuk-error-summary')).toContainText('Enter a search term');
+		await expect(page.locator('#q-error')).toContainText('Enter a search term');
+	});
+
 	test('home page keeps the requested page size across searches', async ({ page }) => {
 		await page.goto('/?pageSize=50');
 		// the choice rides along as a hidden input so a fresh search keeps it

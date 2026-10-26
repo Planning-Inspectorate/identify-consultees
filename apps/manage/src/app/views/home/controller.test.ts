@@ -40,6 +40,41 @@ describe('home page', () => {
 		assert.strictEqual(mockRes.render.mock.calls[0].arguments[1].geometries.length, 1);
 	});
 
+	it('should flag a blank search term as an error and not query the database', async () => {
+		const mockRes = { render: mock.fn() };
+		const db = createMockDb();
+		const homePage = buildHomePage({ logger: mockLogger(), db });
+		await homePage({ query: { q: '' } }, mockRes);
+
+		const viewModel = mockRes.render.mock.calls[0].arguments[1];
+		assert.deepStrictEqual(viewModel.searchError, { text: 'Enter a search term' });
+		assert.deepStrictEqual(viewModel.errorSummary, [{ text: 'Enter a search term', href: '#q' }]);
+		assert.strictEqual(viewModel.geometries.length, 0);
+		assert.strictEqual(viewModel.resultsTotal, 0);
+		assert.strictEqual(db.$queryRaw.mock.callCount(), 0);
+	});
+
+	it('should treat a whitespace-only search term as blank', async () => {
+		const mockRes = { render: mock.fn() };
+		const db = createMockDb();
+		const homePage = buildHomePage({ logger: mockLogger(), db });
+		await homePage({ query: { q: '   ' } }, mockRes);
+
+		const viewModel = mockRes.render.mock.calls[0].arguments[1];
+		assert.deepStrictEqual(viewModel.searchError, { text: 'Enter a search term' });
+		assert.strictEqual(db.$queryRaw.mock.callCount(), 0);
+	});
+
+	it('should not flag an error when the page loads without a search param', async () => {
+		const mockRes = { render: mock.fn() };
+		const homePage = buildHomePage({ logger: mockLogger(), db: createMockDb() });
+		await homePage({ query: {} }, mockRes);
+
+		const viewModel = mockRes.render.mock.calls[0].arguments[1];
+		assert.strictEqual(viewModel.searchError, undefined);
+		assert.strictEqual(viewModel.errorSummary, undefined);
+	});
+
 	it('should map real search results to the view model', async () => {
 		const mockRes = { render: mock.fn() };
 		const rows = [newRow({ id: 'aaaa', caseReference: 'TR010034', caseName: 'A66 Northern Trans-Pennine Project' })];

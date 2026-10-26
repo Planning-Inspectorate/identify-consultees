@@ -11,6 +11,10 @@ export interface HomeViewModel {
 	geometries: ProjectGeometry[];
 	/** govukPagination model - null when all results fit on one page. */
 	pagination: PaginationViewModel | null;
+	/** govukInput's errorMessage param - present only after a blank search submit. */
+	searchError?: { text: string };
+	/** The layout renders the summary itself - links to the search input. */
+	errorSummary?: { text: string; href: string }[];
 }
 
 export interface ProjectGeometry {
