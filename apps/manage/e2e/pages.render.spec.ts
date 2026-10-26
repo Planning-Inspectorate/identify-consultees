@@ -33,7 +33,7 @@ const pages = [
 	{
 		path: `/?q=${SAMPLE_CASE_REFERENCE}`,
 		name: 'home',
-		heading: /Identify consultees for a NSIP project/i,
+		heading: /Identify consultees for a national infrastructure project/i,
 		mustSee: [new RegExp(SAMPLE_CASE_NAME, 'i')]
 	},
 	{

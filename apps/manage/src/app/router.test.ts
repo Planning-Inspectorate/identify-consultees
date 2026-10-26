@@ -58,7 +58,7 @@ describe('manage router wiring', () => {
 	test('GET / renders the identify consultees home page', async () => {
 		const response = await request(authDisabledApp).get('/?q=Router+Test+Fixture');
 		assert.equal(response.status, 200);
-		assert.match(response.text, /Identify consultees for a NSIP project/);
+		assert.match(response.text, /Identify consultees for a national infrastructure project/);
 		assert.match(response.text, /Router Test Fixture Wind Farm/);
 		assert.match(response.text, new RegExp(`/consultees/${homePageTestCaseId}`));
 	});

@@ -22,7 +22,7 @@
 					classes: "govuk-label--m"
 				},
 				hint: {
-					text: "Enter keyword, case reference or case title"
+					text: "Enter keyword, project reference or project title"
 				},
 				classes: "pins-inline-search__input",
 				formGroup: {
@@ -59,7 +59,7 @@
 
 		{{ govukTable({
 			caption: "All projects",
-			captionClasses: "govuk-table__caption--m",
+			captionClasses: "govuk-visually-hidden",
 			firstCellIsHeader: false,
 			head: [
 				{ text: "Name" },
