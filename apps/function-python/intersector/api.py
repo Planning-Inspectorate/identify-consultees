@@ -149,7 +149,7 @@ def _string(value: object, name: str) -> str:
 
 def consultees_json(consultees: list[Consultee], site_screened_as: str = "outline") -> dict:
     """The response body: `{consultees: [{feature: {id, properties}, distanceMetres, reasons}],
-    siteScreenedAs}` - siteScreenedAs `outline` or `boundingBox` (see run_ruleset). No geometry: the
+    siteScreenedAs}` - siteScreenedAs `outline`, `simplifiedOutline` or `boundingBox` (see run_ruleset). No geometry: the
     manage app draws from its own display geometry."""
     return {
         "consultees": [_consultee_json(consultee) for consultee in consultees],

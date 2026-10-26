@@ -89,7 +89,9 @@ class Database:
 
     With `timeout_seconds`, every query gets only the time the run has left, and one still going
     when it runs out is stopped - on SQL Server too, so a run the manage app has given up on stops
-    loading the database rather than carrying on for minutes alongside whatever runs next."""
+    loading the database rather than carrying on for minutes alongside whatever runs next. That's
+    pymssql's timeout, for a wait with nothing back: a query still sending rows can run a few
+    seconds past it, but no query starts after it."""
 
     def __init__(self, params: ConnectionParams, table: str = CONSULTEE_AREA, timeout_seconds: float | None = None):
         self._params = params
