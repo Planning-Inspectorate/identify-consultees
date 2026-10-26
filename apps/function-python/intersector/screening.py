@@ -1,7 +1,9 @@
 """Run a ruleset against a project site: which consultee areas it identifies, and why."""
 
+import math
+from collections.abc import Callable, Iterable
 from concurrent.futures import ThreadPoolExecutor
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from functools import partial
 from typing import Literal
 
@@ -27,13 +29,14 @@ from intersector.tolerances import (
 )
 from setup_database.db import ConnectionParams
 
-SiteScreenedAs = Literal["outline", "boundingBox"]
+SiteScreenedAs = Literal["outline", "simplifiedOutline", "boundingBox"]
 
 
 @dataclass(frozen=True)
 class Screening:
-    """What a ruleset run found, and what it screened against: the site's outline, or - for a site
-    too detailed to screen in time - its bounding box, which finds more than the outline would."""
+    """What a ruleset run found, and what it screened against: the site's outline; for a site too
+    detailed to screen in time, a simpler outline covering it, which identifies the same consultees;
+    or its bounding box, which finds more than the outline would."""
 
     consultees: list[Consultee]
     site_screened_as: SiteScreenedAs
@@ -65,13 +68,16 @@ def run_ruleset(
     No geometry is read for the matches: some are whole counties or National Parks, and the manage
     app draws from its own display geometry.
 
-    The site is screened against its bounding box instead of its outline when asked
-    (`bounding_box`), or when its outline - simplified as the reference data is - has more than
-    `bounding_box_above_points` points: the most detailed real sites take minutes to screen on a
-    small database. Every area the outline would find, the box finds too, and more besides. That's
-    decided before anything is screened, not after the outline proves too slow: the points are
-    counted as sent, before the database simplifies them, and again after - so an outline far past
-    the limit (the largest real one has over 100,000 points) costs the database nothing to simplify.
+    A site whose outline - simplified as the reference data is - has more than
+    `bounding_box_above_points` points is too detailed to screen in time on a small database (the
+    most detailed real sites took minutes). It's searched around a simpler outline covering it
+    (queries.covering_outline) instead, and what that finds is measured from the outline itself
+    wherever a condition depends on it - so the consultees a condition identifies, and their
+    distances, are exactly the outline's. Only the nearby-only ones keep the covering outline's
+    distance, which can be up to ~875m short: there may be a few more of them. If no covering
+    outline can be made, or when asked (`bounding_box`), the site's bounding box is screened
+    instead: every area the outline would find, and more besides. All this is decided before
+    anything is screened, not after the outline proves too slow.
 
     `dataset` screens a quarter's consultee areas (2026Q4) rather than the dataset in use; one with
     no table raises UnknownDataset. A run longer than `timeout_seconds` is stopped, its queries
@@ -88,7 +94,8 @@ def run_ruleset(
         if table != CONSULTEE_AREA and not queries.table_exists(db, table):
             raise UnknownDataset(f"There is no {dataset} dataset")
         site_screened_as: SiteScreenedAs = "outline"
-        if bounding_box or too_detailed(site_wkt):
+        cover = None
+        if bounding_box:
             # the box around the outline as sent: it differs from the simplified outline's by under
             # the simplify tolerance, well inside the box's margin
             site_screened_as = "boundingBox"
@@ -96,12 +103,15 @@ def run_ruleset(
         else:
             site = queries.simplify(db, site_wkt)
             if too_detailed(site):
-                site_screened_as = "boundingBox"
-                site = queries.bounding_box(site)
+                cover = queries.covering_outline(db, site)
+                site_screened_as = "simplifiedOutline" if cover else "boundingBox"
+                if not cover:
+                    site = queries.bounding_box(site)
+        near = partial(_find_areas_near, db, site, cover)
         # one query out to the largest radius: the nearby reasons, and the answer to most conditions
-        fetched = queries.find_areas_near(db, site, search_radius, excluded_categories=CATEGORIES_EXCLUDED_FROM_NEARBY)
+        fetched = near(search_radius, excluded_categories=CATEGORIES_EXCLUDED_FROM_NEARBY, rules=rules)
         matches_by_condition = _match_conditions(
-            db, site, rules, fetched, search_radius, boxed=site_screened_as == "boundingBox"
+            db, site, near, rules, fetched, search_radius, boxed=site_screened_as == "boundingBox"
         )
 
         nearby = [
@@ -112,6 +122,45 @@ def run_ruleset(
         consultees = _combine(rules, matches_by_condition, nearby)
         _measure_unmeasured(db, site, consultees)
         return Screening(sorted(consultees.values(), key=_nearest_first), site_screened_as)
+
+
+def _find_areas_near(
+    db: Database,
+    site: str,
+    cover: str | None,
+    radius_metres: float,
+    categories: Iterable[str] = (),
+    excluded_categories: Iterable[str] = (),
+    rules: Iterable[RuleCondition] = (),
+) -> list[AreaMatch]:
+    """queries.find_areas_near around the site - or, given a covering outline, around that, then
+    measured from the site wherever one of `rules` (or the radius, with no rules) depends on it.
+
+    Measuring from the covering outline is what makes it quicker: a detailed site's outline is slow
+    to measure from, and the nearby search measures everything out to 20km. Distances from it are
+    never further than from the site, so an area a condition could match from the site, it can
+    match from the cover - those are measured again from the site (a few hundred, of about a
+    thousand) and kept only if they're in reach after all. The rest stay `approximate`."""
+    if cover is None:
+        return queries.find_areas_near(db, site, radius_metres, categories, excluded_categories)
+    found = queries.find_areas_near(db, cover, radius_metres, categories, excluded_categories)
+    rules = [rule for rule in rules if rule.logic_type == "intersection"]
+
+    depended_on = {
+        match.area.id
+        for match in found
+        if not rules or any(meets_intersection_condition(match, rule) for rule in rules)
+    }
+    distances = queries.measure_distances(db, site, list(depended_on))
+    limit = radius_metres + DISTANCE_MARGIN_METRES
+    matches: list[AreaMatch] = []
+    for match in found:
+        if match.area.id not in depended_on:
+            matches.append(replace(match, approximate=True))
+        # absent if deleted between queries (a reference data reload mid-request)
+        elif distances.get(match.area.id, math.inf) <= limit:
+            matches.append(replace(match, distance_metres=distances[match.area.id]))
+    return sorted(matches, key=lambda match: match.distance_metres)
 
 
 def nearby_radius_for(match: AreaMatch, default_metres: float, radius_by_category: dict[str, float]) -> float | None:
@@ -149,6 +198,7 @@ def meets_intersection_condition(match: AreaMatch, rule: RuleCondition) -> bool:
 def _match_conditions(
     db: Database,
     site: str,
+    near: Callable[..., list[AreaMatch]],
     rules: list[RuleCondition],
     nearby: list[AreaMatch],
     nearby_radius_metres: float,
@@ -172,7 +222,7 @@ def _match_conditions(
         else None
     )
 
-    query = partial(_query_condition, db, site, site_within_margin, boxed)
+    query = partial(_query_condition, db, near, site_within_margin, boxed)
     with ThreadPoolExecutor(max_workers=CONDITION_CONCURRENCY) as pool:
         for rule, matches in zip(needs_query, pool.map(query, needs_query), strict=True):
             matches_by_condition[rule.id] = matches
@@ -181,15 +231,16 @@ def _match_conditions(
 
 def _query_condition(
     db: Database,
-    site: str,
+    near: Callable[..., list[AreaMatch]],
     site_within_margin: str | None,
     boxed: bool,
     rule: RuleCondition,
 ) -> list[AreaMatch]:
-    """`rule`'s matches from its own query - a bordering condition's, for a site screened against
-    its bounding box, from the rectangle around its hosts (see find_areas_bordering_box)."""
+    """`rule`'s matches from its own query (`near` - see _find_areas_near) - a bordering
+    condition's, for a site screened against its bounding box, from the rectangle around its hosts
+    (see find_areas_bordering_box)."""
     if rule.logic_type == "intersection":
-        return queries.find_areas_near(db, site, rule.buffer_metres, rule.categories)
+        return near(rule.buffer_metres, rule.categories, rules=[rule])
     if not rule.host_category:
         return []
     neighbours = (
@@ -210,7 +261,7 @@ def _combine(
     consultees: dict[str, Consultee] = {}
 
     def add(match: AreaMatch, reason: Reason) -> None:
-        consultees.setdefault(match.area.id, Consultee(match.area, match.distance_metres)).record(match, reason)
+        consultees.setdefault(match.area.id, Consultee(match.area, None)).record(match, reason)
 
     for rule in rules:
         for match in matches_by_condition.get(rule.id, []):
@@ -222,15 +273,30 @@ def _combine(
 
 def _measure_unmeasured(db: Database, site: str, consultees: dict[str, Consultee]) -> None:
     """Give a distance to consultees only a bordering condition found - most were also found by a
-    query that measured them. One query for all of them, rather than one per host."""
-    unmeasured = [area_id for area_id, consultee in consultees.items() if consultee.distance_metres is None]
+    query that measured them - and measure from the site those a condition identified with only an
+    approximate distance (a bordering match, also nearby by its covering outline's): a NearbyReason
+    the site's own distance is past goes. One query for all of them, rather than one per host."""
+    unmeasured = [
+        area_id
+        for area_id, consultee in consultees.items()
+        if consultee.distance_metres is None
+        or (consultee.approximate and any(isinstance(reason, ConditionReason) for reason in consultee.reasons))
+    ]
     distances = queries.measure_distances(db, site, unmeasured)
     for area_id in unmeasured:
-        if area_id in distances:
-            consultees[area_id].distance_metres = distances[area_id]
-        else:
+        consultee = consultees[area_id]
+        if area_id not in distances:
             # deleted between queries (a reference data reload mid-request) - nothing left to notify
             del consultees[area_id]
+            continue
+        consultee.distance_metres = distances[area_id]
+        consultee.approximate = False
+        consultee.reasons = [
+            reason
+            for reason in consultee.reasons
+            if not isinstance(reason, NearbyReason)
+            or consultee.distance_metres <= reason.radius_metres + DISTANCE_MARGIN_METRES
+        ]
 
 
 def _nearest_first(consultee: Consultee) -> tuple[float, str]:

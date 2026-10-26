@@ -465,44 +465,84 @@ def test_bounding_box_is_the_rectangle_around_the_site_grown_by_its_margin():
     assert numbers[0:2] == numbers[8:10]
 
 
-def test_a_detailed_site_is_screened_against_its_bounding_box_finding_areas_off_its_outline(
+def test_a_detailed_site_is_screened_around_a_covering_outline_identifying_what_its_outline_does(
     connection_params, areas
+):
+    areas(
+        (TEST_AREA_ID, _point_at(1_015), "Hospital", "Just Past 1km"),
+        # within the covering outline's reach of 1km, but not the site's
+        (SECOND_AREA_ID, _point_at(1_400), "Hospital", "Well Past 1km"),
+    )
+    rules = [_rule(buffer_metres=1_000)]
+    site = _point_at(0)
+
+    outline = screen(connection_params, site, rules, 1_000)
+    covered = screen(connection_params, site, rules, 1_000, bounding_box_above_points=0)
+
+    assert outline.site_screened_as == "outline"
+    assert covered.site_screened_as == "simplifiedOutline"
+    identified = [(c.area.id, c.distance_metres, c.reasons) for c in _matched(covered.consultees)]
+    assert identified == [(c.area.id, c.distance_metres, c.reasons) for c in _matched(outline.consultees)]
+    assert [area_id for area_id, _, _ in identified] == [TEST_AREA_ID]
+    assert identified[0][1] == pytest.approx(1_015, abs=1)
+
+
+def test_a_bordering_match_the_covering_outline_brings_nearby_is_measured_from_the_site(connection_params, areas):
+    # the site ~20.3km from the host's eastern edge: its neighbour is past the 20km nearby radius
+    # from the site, though not from the covering outline
+    site = _point_at(METRES_PER_DEGREE - 20_300).replace(" 0)", " 0.5)")
+    areas(
+        (HOST_AREA_ID, _square(0, 1), "Parish Council", "Host Parish"),
+        (NEIGHBOUR_AREA_ID, _square(1, 2), "Parish Council", "Neighbour Parish"),
+    )
+    rules = [
+        _rule(id="parish", logic_type="bordering", categories=("Parish Council",), host_category="Parish Council"),
+        # so the nearby search measures from the site only what an intersection condition needs
+        _rule(id="hospital", categories=("Hospital",), buffer_metres=1_000),
+    ]
+
+    covered = screen(connection_params, site, rules, 20_000, bounding_box_above_points=0)
+
+    [neighbour] = [c for c in covered.consultees if c.area.id == NEIGHBOUR_AREA_ID]
+    assert covered.site_screened_as == "simplifiedOutline"
+    assert neighbour.reasons == [ConditionReason("parish")]
+    assert neighbour.distance_metres == pytest.approx(20_300, abs=50)
+
+
+def test_a_detailed_site_with_no_covering_outline_or_when_asked_is_screened_against_its_bounding_box(
+    connection_params, areas, monkeypatch
 ):
     # a long diagonal site, and an area in the corner of its bounding box, ~78km from the site itself
     areas((TEST_AREA_ID, "POINT(0.9 0.1)", "Hospital", "Off The Diagonal"))
     rules = [_rule(categories=("Hospital",), buffer_metres=1_000)]
     site = "LINESTRING(0 0, 1 1)"
 
-    outline = screen(connection_params, site, rules, 1_000)
-    assert outline.site_screened_as == "outline"
-    assert TEST_AREA_ID not in _ids(_matched(outline.consultees))
-
-    # more points than the limit - the box; within it, still the outline
-    boxed = screen(connection_params, site, rules, 1_000, bounding_box_above_points=1)
-    assert boxed.site_screened_as == "boundingBox"
-    assert TEST_AREA_ID in _ids(_matched(boxed.consultees))
-    assert screen(connection_params, site, rules, 1_000, bounding_box_above_points=2).site_screened_as == "outline"
-
-    # or because the caller asked for it
     asked = screen(connection_params, site, rules, 1_000, bounding_box=True)
     assert asked.site_screened_as == "boundingBox"
     assert TEST_AREA_ID in _ids(_matched(asked.consultees))
 
+    covered = screen(connection_params, site, rules, 1_000, bounding_box_above_points=1)
+    assert covered.site_screened_as == "simplifiedOutline"
+    assert TEST_AREA_ID not in _ids(_matched(covered.consultees))
+    assert screen(connection_params, site, rules, 1_000, bounding_box_above_points=2).site_screened_as == "outline"
 
-def test_a_site_sent_with_more_points_than_the_limit_is_boxed_without_simplifying_it(
-    connection_params, areas, monkeypatch
-):
-    areas((TEST_AREA_ID, "POINT(0.9 0.1)", "Hospital", "Off The Diagonal"))
-
-    def simplify(*_args):
-        raise AssertionError("simplified a site already past the limit")
-
-    monkeypatch.setattr(queries, "simplify", simplify)
-    rules = [_rule(categories=("Hospital",), buffer_metres=1_000)]
-    boxed = screen(connection_params, "LINESTRING(0 0, 0.5 0.5, 1 1)", rules, 1_000, bounding_box_above_points=2)
-
+    monkeypatch.setattr(queries, "covering_outline", lambda *_args: None)
+    boxed = screen(connection_params, site, rules, 1_000, bounding_box_above_points=1)
     assert boxed.site_screened_as == "boundingBox"
     assert TEST_AREA_ID in _ids(_matched(boxed.consultees))
+
+
+def test_covering_outline_contains_the_site_and_is_simpler(connection_params):
+    # a detailed zigzag, 2km long
+    zigzag = "LINESTRING(" + ", ".join(f"{i * 0.0001} {0.00005 * (i % 2)}" for i in range(181)) + ")"
+    with open_database(connection_params) as db:
+        cover = queries.covering_outline(db, zigzag)
+        [row] = db.query(
+            "SELECT geography::STGeomFromText(%s, 4326).STContains(geography::STGeomFromText(%s, 4326)) AS covers",
+            (cover, zigzag),
+        )
+    assert row["covers"] is True or row["covers"] == 1
+    assert point_count(cover) < point_count(zigzag)
 
 
 def test_a_run_past_its_time_limit_is_stopped_on_the_database_too(connection_params):

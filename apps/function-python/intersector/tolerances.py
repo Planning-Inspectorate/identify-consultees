@@ -16,6 +16,11 @@ DISTANCE_MARGIN_METRES = 2 * SIMPLIFY_TOLERANCE_METRES + 10
 """Added to every distance threshold. Simplifying both shapes can move a distance by up to twice
 the tolerance, so simplification can only add a borderline consultee, never drop one."""
 
+COVER_TOLERANCE_METRES = 500
+"""How much simpler a site too detailed to screen in time is made - see queries.covering_outline.
+Its outline is grown by this and simplified by half of it, which takes the most detailed real sites
+from 1,300-4,800 points to 100-450, and the runs of those past 1,000 points 1.8 times faster."""
+
 BORDERING_TOLERANCE_METRES = 50
 """Areas this close count as bordering: the simplification error, plus small gaps between
 boundaries drawn from different sources (e.g. 32m between Sundon parish and Luton, which really do
