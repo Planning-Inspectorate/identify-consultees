@@ -22,7 +22,7 @@ apps_config = {
   }
 
   managed_redis = {
-    sku_name                  = "Balanced_B0"
+    sku_name                  = "Balanced_B3"
     high_availability_enabled = false
     rdb_backup_frequency      = null
   }
