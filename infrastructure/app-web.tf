@@ -73,6 +73,11 @@ module "app_web" {
     # shared secret as an x-api-key header (see apps/function-python/function_app.py)
     PYTHON_FUNCTION_URL     = "https://${azurerm_linux_function_app.function_orchestrator.default_hostname}/api/consultee-areas"
     PYTHON_FUNCTION_API_KEY = local.key_vault_refs["function-api-key"]
+
+    # Inert for container-based Linux web apps like this one - the runtime comes
+    # from the Docker image (node:24-alpine in apps/manage/Dockerfile). Set to a
+    # supported value anyway so Azure Advisor stops flagging it as unconfigured.
+    WEBSITE_NODE_DEFAULT_VERSION = "~24"
   }
 
   providers = {
