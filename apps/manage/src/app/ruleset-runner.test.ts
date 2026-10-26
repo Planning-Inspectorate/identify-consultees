@@ -65,8 +65,8 @@ describe('buildPythonRulesetRunner', () => {
 			nearbyRadiusMetres: 20_000,
 			nearbyRadiusMetresByCategory: { 'Parish Council': 5_000 },
 			includeGeometry: false,
-			// no limit configured - the outline whatever its detail, unless asked
-			boundingBox: false,
+			// the function stops its run before this request gives up on it
+			timeoutSeconds: 55,
 			// the display name stays here - the function only needs what to run
 			rules: [
 				{ id: 'hospital', logicType: 'intersection', categories: ['Hospital'], bufferMetres: 10_000 },
@@ -75,7 +75,7 @@ describe('buildPythonRulesetRunner', () => {
 		});
 	});
 
-	it('asks for the bounding box past the configured detail, or when told to, and says what the function screened', async () => {
+	it('asks for the bounding box past the configured detail, and says what the function screened', async () => {
 		const fetchMock = respondWith({ consultees: [], siteScreenedAs: 'boundingBox' });
 		const run = buildPythonRulesetRunner({
 			pythonFunctionUrl: 'http://localhost:7071/api/consultee-areas',
@@ -84,11 +84,10 @@ describe('buildPythonRulesetRunner', () => {
 		});
 
 		assert.equal((await run(site, ruleset, 20_000)).siteScreenedAs, 'boundingBox');
-		assert.equal((await run(site, ruleset, 20_000, { boundingBox: true })).siteScreenedAs, 'boundingBox');
-		const [outline, boxed] = fetchMock.mock.calls.map((call) => JSON.parse(String(call.arguments[1]?.body)));
-		assert.equal(outline.boundingBoxAbovePoints, 2_000);
-		assert.equal(outline.boundingBox, false);
-		assert.equal(boxed.boundingBox, true);
+		const body = JSON.parse(String(fetchMock.mock.calls[0].arguments[1]?.body));
+		assert.equal(body.boundingBoxAbovePoints, 2_000);
+		// the function decides - the app never asks for the box itself
+		assert.equal(body.boundingBox, undefined);
 	});
 
 	it('reads a response that says nothing about what it screened as the outline', async () => {

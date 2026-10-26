@@ -140,6 +140,8 @@ describe('case boundaries (requires a local SQL Server - see docker-compose.yml)
 
 			const found = await getCaseBoundaryById(dbClient, testBoundaryId);
 			assert.equal(found?.properties.caseName, 'Findable by id');
+			// with the simplified copy a ruleset run screens - a point simplifies to itself
+			assert.deepStrictEqual(found?.simplifiedGeometry, { type: 'Point', coordinates: [0, 0] });
 
 			const missing = await getCaseBoundaryById(dbClient, '99999999-9999-9999-9999-999999999999');
 			assert.equal(missing, null);

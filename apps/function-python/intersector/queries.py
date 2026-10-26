@@ -116,13 +116,31 @@ def bounding_box(wkt: str, margin_metres: float = BOUNDING_BOX_MARGIN_METRES) ->
     return f"POLYGON(({west} {south}, {east} {south}, {east} {north}, {west} {north}, {west} {south}))"
 
 
+GROW_TOLERANCE_METRES = 1
+"""How far a grown shape's edge may be from the exact one - see grow."""
+
+
 def grow(db: Database, wkt: str, metres: float) -> str:
-    """`wkt` grown outwards by `metres` (to within 1m). "Within n metres of X" then becomes
-    "intersects X grown by n" - far cheaper against detailed shapes, because an intersects test can
-    stop at the first point of contact where a distance calculation can't."""
+    """`wkt` grown outwards by `metres` (to within GROW_TOLERANCE_METRES). "Within n metres of X"
+    then becomes "intersects X grown by n" - far cheaper against detailed shapes, because an
+    intersects test can stop at the first point of contact where a distance calculation can't."""
     [row] = db.query(
-        f"SELECT {_geography()}.BufferWithTolerance(%s, 1, 0).STAsText() AS wkt",
+        f"SELECT {_geography()}.BufferWithTolerance(%s, {GROW_TOLERANCE_METRES}, 0).STAsText() AS wkt",
         (wkt, metres),
+    )
+    return row["wkt"]
+
+
+def _reach(db: Database, wkt: str, metres: float) -> str:
+    """Somewhere covering everything within `metres` of `wkt`: its convex hull, grown by `metres`
+    (and the growing's tolerance, so it can't fall short). The hull has a handful of points, so
+    it's quick to grow - but it covers more than the site does, so what it finds must be measured.
+    Simplifying the site to grow it instead is quicker still, but can drop a small part of it
+    altogether: that lost 36 of an airport's 273 consultees."""
+    [row] = db.query(
+        f"""SELECT {_geography()}.STConvexHull()
+            .BufferWithTolerance(%s, {GROW_TOLERANCE_METRES}, 0).STAsText() AS wkt""",
+        (wkt, metres + GROW_TOLERANCE_METRES),
     )
     return row["wkt"]
 
@@ -135,7 +153,12 @@ def find_areas_near(
     excluded_categories: Iterable[str] = (),
 ) -> list[AreaMatch]:
     """Areas within `radius_metres` (+ DISTANCE_MARGIN_METRES) of `wkt`, nearest first, optionally
-    limited to `categories` or leaving out `excluded_categories`."""
+    limited to `categories` or leaving out `excluded_categories`.
+
+    Found by intersecting somewhere that covers the radius (see _reach), then measured - only
+    those - and any past the radius dropped. Filtering on the distance itself measures every area
+    the spatial index can't rule out: for a detailed site among detailed areas, that took 2-5 times
+    as long (a 0.8km² site's 20km search: 3.9s, against 0.8s)."""
     categories = list(categories)
     excluded_categories = list(excluded_categories)
     category_filter = f"AND consulteeCategory IN ({_placeholders(categories)})" if categories else ""
@@ -145,18 +168,20 @@ def find_areas_near(
         if excluded_categories
         else ""
     )
+    limit = radius_metres + DISTANCE_MARGIN_METRES
+    within_reach = _reach(db, wkt, limit)
     rows = db.query(
         f"""
         SELECT {AREA_COLUMNS}, geometrySimplified.STDistance({_geography()}) AS distanceMetres
         FROM {db.table} {USE_SPATIAL_INDEX}
-        WHERE geometrySimplified.STDistance({_geography()}) <= %s
+        WHERE geometrySimplified.STIntersects({_geography()}) = 1
             {category_filter}
             {excluded_filter}
         ORDER BY distanceMetres
         """,
-        (wkt, wkt, radius_metres + DISTANCE_MARGIN_METRES, *categories, *excluded_categories),
+        (wkt, within_reach, *categories, *excluded_categories),
     )
-    return [AreaMatch(_area_from_row(row), row["distanceMetres"]) for row in rows]
+    return [AreaMatch(_area_from_row(row), row["distanceMetres"]) for row in rows if row["distanceMetres"] <= limit]
 
 
 def find_areas_bordering(

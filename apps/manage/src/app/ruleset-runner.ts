@@ -13,20 +13,18 @@ import { fetchWithTimeout } from '@planning-inspectorate/core/util';
  * function (apps/function-python, `POST /api/run-ruleset`); this is the manage app's side of that
  * call. Injected through ManageService so tests can stand in for the function.
  */
-export type RulesetRunner = (
-	site: Geometry,
-	ruleset: Ruleset,
-	nearbyRadiusMetres: number,
-	/** `boundingBox` screens the site against the rectangle around it, whatever its detail. */
-	options?: { boundingBox?: boolean }
-) => Promise<RunRulesetResult>;
+export type RulesetRunner = (site: Geometry, ruleset: Ruleset, nearbyRadiusMetres: number) => Promise<RunRulesetResult>;
 
-// a typical run takes about a second and the largest real projects ~10s locally (several hundred
-// conditions' worth of spatial queries), but many times that on Dev and Test's Basic database. A
-// run on the site's outline gets this long; if it doesn't finish, the page tries again on its
-// bounding box (see runRulesetSafely), which gets the longer one - both within Front Door's timeout
-const OUTLINE_RUN_TIMEOUT_MS = 45_000;
-const BOUNDING_BOX_RUN_TIMEOUT_MS = 60_000;
+// a typical run takes about a second locally and the slowest real projects ~4s, but many times
+// that on the smaller Azure databases. One request, within Front Door's timeout: whether to screen
+// the outline or its bounding box is decided up front (boundingBoxAbovePoints), not by trying the
+// outline and retrying on a timeout - that left the outline's queries running on the database while
+// the box's ran too
+const RUN_TIMEOUT_MS = 60_000;
+
+// the function stops its run - its queries too - this much sooner, so it's done before the request
+// is given up on and a slow run never outlives it
+const FUNCTION_STOPS_EARLIER_MS = 5_000;
 
 interface RunRulesetResponseFeature {
 	id: string;
@@ -64,8 +62,9 @@ export function toRunRulesetResult(body: RunRulesetResponse): RunRulesetResult {
 /**
  * Call the Python function's run-ruleset route. The ruleset's conditions travel with the request:
  * the definitions (the ruleset CSV exports and their category aliases) stay here, where the report pages
- * also read them, so there's only one copy. Any failure - unconfigured, unreachable, timed out, or
- * a non-2xx response - rejects, and the page shows "The ruleset could not be run".
+ * also read them, so there's only one copy. Any failure - unconfigured, unreachable, timed out (504
+ * from the function stopping its run, or no answer in time), or a non-2xx response - rejects, and
+ * the page shows "The ruleset could not be run".
  */
 export function buildPythonRulesetRunner(options: {
 	pythonFunctionUrl: string | undefined;
@@ -76,14 +75,13 @@ export function buildPythonRulesetRunner(options: {
 	boundingBoxAbovePoints?: number;
 }): RulesetRunner {
 	const { pythonFunctionUrl, apiKey, nearbyRadiusMetresByCategory = {}, boundingBoxAbovePoints = 0 } = options;
-	return async (site, ruleset, nearbyRadiusMetres, runOptions = {}) => {
-		const boundingBox = runOptions.boundingBox === true;
+	return async (site, ruleset, nearbyRadiusMetres) => {
 		if (!pythonFunctionUrl) {
 			throw new Error('PYTHON_FUNCTION_URL is not configured');
 		}
 		const response = await fetchWithTimeout(
 			runRulesetUrl(pythonFunctionUrl),
-			{ timeoutMs: boundingBox ? BOUNDING_BOX_RUN_TIMEOUT_MS : OUTLINE_RUN_TIMEOUT_MS },
+			{ timeoutMs: RUN_TIMEOUT_MS },
 			{
 				method: 'POST',
 				// the function requires the x-api-key shared secret (see function_app.py) - a missing key
@@ -98,7 +96,7 @@ export function buildPythonRulesetRunner(options: {
 					// MB for a run touching whole counties - so it's still told
 					includeGeometry: false,
 					...(boundingBoxAbovePoints > 0 ? { boundingBoxAbovePoints } : {}),
-					boundingBox,
+					timeoutSeconds: (RUN_TIMEOUT_MS - FUNCTION_STOPS_EARLIER_MS) / 1000,
 					rules: ruleset.rules.map(({ id, logicType, categories, bufferMetres, hostCategory }) => ({
 						id,
 						logicType,

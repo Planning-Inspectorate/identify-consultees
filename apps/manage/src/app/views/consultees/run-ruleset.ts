@@ -41,7 +41,7 @@ export function firstQueryValue(value: unknown): string {
 interface RulesetRun extends RunRulesetResult {
 	// distinguishes "ran and matched nothing" from "couldn't run" - both have empty results
 	failed: boolean;
-	/** What was screened: the site's outline, or its bounding box (see runOutlineElseBoundingBox). */
+	/** What was screened: the site's outline, or - for one too detailed to screen in time - its bounding box. */
 	siteScreenedAs: SiteScreenedAs;
 }
 
@@ -86,7 +86,9 @@ export type RulesetRunService = Pick<ManageService, 'db' | 'logger' | 'rulesetRu
  * cases near the site, from case_boundary (see nearby-nsips.ts) - so every page treats them as
  * another consultee category. If either fails - the function is down, slow or errors, say - the
  * page says the ruleset couldn't be run - there's no in-app fallback, so there's one implementation
- * of the intersection logic rather than two that could quietly disagree.
+ * of the intersection logic rather than two that could quietly disagree. Nor is a failed run tried
+ * again on the site's bounding box: the function decides that up front, and a retry would only add
+ * a second run's queries to a database already struggling with the first's.
  *
  * Given the session, the run is kept there - only the last one, for an hour - so the report pages,
  * their maps and the download use one run rather than each running the ruleset again. Nothing is
@@ -105,7 +107,7 @@ export async function runRulesetSafely(
 	}
 	try {
 		const [run, nearbyNsips] = await Promise.all([
-			runOutlineElseBoundingBox(service, project, ruleset),
+			service.rulesetRunner(screenedGeometry(project), ruleset, service.nearbyConsulteeRadiusMetres),
 			findNearbyNsips(service.db, project, service.nearbyNsipRadiusMetres ?? 0)
 		]);
 		const consultees = [...run.consultees, ...nearbyNsips];
@@ -130,27 +132,14 @@ export async function runRulesetSafely(
 }
 
 /**
- * The ruleset run on the site's outline - or, if that fails or times out (a site too detailed to
- * screen in time on a small database), on its bounding box: a list to review rather than none.
- * The function screens the box up front for a site past config/screening.yaml's limit.
+ * The site's boundary as stored simplified, where it was read (see getCaseBoundaryById), else as
+ * drawn: what's sent to be screened, and grown into the map's search area. The function simplifies
+ * the site the same way, so it finds the same consultees either way - but a detailed boundary is a
+ * fraction of the size simplified (111,931 points to 4,817), and past config/screening.yaml's limit
+ * either way, the function screens its bounding box without simplifying it at all.
  */
-async function runOutlineElseBoundingBox(
-	service: RulesetRunService,
-	project: CaseBoundaryFeature,
-	ruleset: Ruleset
-): Promise<RunRulesetResult> {
-	try {
-		return await service.rulesetRunner(project.geometry, ruleset, service.nearbyConsulteeRadiusMetres);
-	} catch (error) {
-		service.logger.warn(
-			{ error, caseId: project.id, rulesetId: ruleset.id },
-			"Couldn't screen the site's outline - screening its bounding box instead"
-		);
-		const run = await service.rulesetRunner(project.geometry, ruleset, service.nearbyConsulteeRadiusMetres, {
-			boundingBox: true
-		});
-		return { ...run, siteScreenedAs: 'boundingBox' };
-	}
+function screenedGeometry(project: CaseBoundaryFeature) {
+	return project.simplifiedGeometry ?? project.geometry;
 }
 
 /**
@@ -169,7 +158,7 @@ export async function buildSearchAreaSafely(
 		return undefined;
 	}
 	try {
-		const area = await bufferGeometryForDisplay(db, project.geometry, nearbyRadiusMetres);
+		const area = await bufferGeometryForDisplay(db, screenedGeometry(project), nearbyRadiusMetres);
 		const ids = (nearbyNsips: boolean) => [
 			...new Set(matches.filter((match) => isNearbyNsip(match) === nearbyNsips).map((match) => match.feature.id))
 		];

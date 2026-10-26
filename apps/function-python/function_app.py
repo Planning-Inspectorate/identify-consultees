@@ -14,7 +14,7 @@ from cbos.boundaries import (
 from cbos.config import CbosNotConfigured, cbos_config_from_env
 from cbos.connection_check import check_cbos, default_credential
 from intersector.api import BadRequest, consultees_json, parse_run_ruleset_request
-from intersector.database import UnknownDataset
+from intersector.database import RunTimedOut, UnknownDataset
 from intersector.screening import run_ruleset
 from querying.consultee_areas import fetch_consultee_areas
 from setup_database.db import check_connection, connection_params_from_env
@@ -189,9 +189,13 @@ def run_ruleset_route(req: func.HttpRequest) -> func.HttpResponse:
             bounding_box_above_points=request.bounding_box_above_points,
             bounding_box=request.bounding_box,
             dataset=request.dataset,
+            timeout_seconds=request.timeout_seconds,
         )
     except UnknownDataset as error:
         return _json_response({"error": str(error)}, 400)
+    except RunTimedOut as error:
+        logger.warning("run-ruleset: stopped after %ss", request.timeout_seconds)
+        return _json_response({"error": str(error)}, 504)
     except Exception:
         logger.exception("Failed to run the ruleset")
         return _json_response({"error": "Failed to run the ruleset"}, 500)

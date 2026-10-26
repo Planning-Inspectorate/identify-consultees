@@ -14,7 +14,7 @@ from function_app import (
     health,
     run_ruleset_route,
 )
-from intersector.database import UnknownDataset
+from intersector.database import RunTimedOut, UnknownDataset
 from intersector.models import (
     ConditionReason,
     Consultee,
@@ -161,6 +161,7 @@ def test_run_ruleset_runs_the_posted_conditions_and_returns_each_consultee_with_
         bounding_box_above_points=None,
         bounding_box=False,
         dataset=None,
+        timeout_seconds=None,
     )
 
 
@@ -251,6 +252,10 @@ def test_run_ruleset_passes_each_categorys_nearby_radius_on():
         {**VALID_BODY, "dataset": "2026-Q4"},
         {**VALID_BODY, "dataset": "2026Q5"},
         {**VALID_BODY, "dataset": 2026},
+        {**VALID_BODY, "timeoutSeconds": 0},
+        {**VALID_BODY, "timeoutSeconds": 601},
+        {**VALID_BODY, "timeoutSeconds": True},
+        {**VALID_BODY, "timeoutSeconds": "55"},
     ],
 )
 def test_run_ruleset_rejects_a_malformed_request_before_touching_the_database(body):
@@ -263,6 +268,19 @@ def test_run_ruleset_rejects_a_malformed_request_before_touching_the_database(bo
     assert response.status_code == 400
     assert "error" in json.loads(response.get_body())
     run.assert_not_called()
+
+
+def test_run_ruleset_stops_a_run_at_its_time_limit_and_says_why():
+    with (
+        patch.dict("os.environ", {"CONSULTEE_AREAS_API_KEY": API_KEY}),
+        patch("function_app.connection_params_from_env", return_value=object()),
+        patch("function_app.run_ruleset", side_effect=RunTimedOut("The ruleset took too long to run")) as run,
+    ):
+        response = run_ruleset_route(_ruleset_request({**VALID_BODY, "timeoutSeconds": 55}))
+
+    assert run.call_args.kwargs["timeout_seconds"] == 55
+    assert response.status_code == 504
+    assert json.loads(response.get_body()) == {"error": "The ruleset took too long to run"}
 
 
 def test_run_ruleset_returns_a_generic_error_when_the_run_fails():

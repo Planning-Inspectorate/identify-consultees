@@ -53,6 +53,7 @@ def run_ruleset(
     bounding_box_above_points: int | None = None,
     bounding_box: bool = False,
     dataset: str | None = None,
+    timeout_seconds: float | None = None,
 ) -> Screening:
     """Every consultee the ruleset identifies for the site, plus every area within its category's
     nearby radius (`nearby_radius_metres_by_category`, else `nearby_radius_metres`; any category
@@ -67,24 +68,36 @@ def run_ruleset(
     The site is screened against its bounding box instead of its outline when asked
     (`bounding_box`), or when its outline - simplified as the reference data is - has more than
     `bounding_box_above_points` points: the most detailed real sites take minutes to screen on a
-    small database. Every area the outline would find, the box finds too, and more besides.
+    small database. Every area the outline would find, the box finds too, and more besides. That's
+    decided before anything is screened, not after the outline proves too slow: the points are
+    counted as sent, before the database simplifies them, and again after - so an outline far past
+    the limit (the largest real one has over 100,000 points) costs the database nothing to simplify.
 
     `dataset` screens a quarter's consultee areas (2026Q4) rather than the dataset in use; one with
-    no table raises UnknownDataset.
+    no table raises UnknownDataset. A run longer than `timeout_seconds` is stopped, its queries
+    with it, and raises RunTimedOut.
     """
     radius_by_category = nearby_radius_metres_by_category or {}
     search_radius = max([nearby_radius_metres, *radius_by_category.values()])
     table = dataset_table(dataset)
-    with open_database(params, table) as db:
+
+    def too_detailed(wkt: str) -> bool:
+        return bounding_box_above_points is not None and queries.point_count(wkt) > bounding_box_above_points
+
+    with open_database(params, table, timeout_seconds) as db:
         if table != CONSULTEE_AREA and not queries.table_exists(db, table):
             raise UnknownDataset(f"There is no {dataset} dataset")
-        site = queries.simplify(db, site_wkt)
         site_screened_as: SiteScreenedAs = "outline"
-        if bounding_box or (
-            bounding_box_above_points is not None and queries.point_count(site) > bounding_box_above_points
-        ):
-            site = queries.bounding_box(site)
+        if bounding_box or too_detailed(site_wkt):
+            # the box around the outline as sent: it differs from the simplified outline's by under
+            # the simplify tolerance, well inside the box's margin
             site_screened_as = "boundingBox"
+            site = queries.bounding_box(site_wkt)
+        else:
+            site = queries.simplify(db, site_wkt)
+            if too_detailed(site):
+                site_screened_as = "boundingBox"
+                site = queries.bounding_box(site)
         # one query out to the largest radius: the nearby reasons, and the answer to most conditions
         fetched = queries.find_areas_near(db, site, search_radius, excluded_categories=CATEGORIES_EXCLUDED_FROM_NEARBY)
         matches_by_condition = _match_conditions(

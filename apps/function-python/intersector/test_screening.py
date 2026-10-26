@@ -7,9 +7,11 @@ import pytest
 
 from intersector import queries
 from intersector.database import (
+    RunTimedOut,
     UnknownDataset,
     dataset_table,
     is_deadlock_error,
+    open_database,
     with_deadlock_retry,
 )
 from intersector.models import (
@@ -298,6 +300,21 @@ def test_includes_an_area_just_past_a_cut_off_but_not_one_well_past_it(connectio
     assert SECOND_AREA_ID not in ids
 
 
+def test_drops_an_area_within_the_sites_convex_hull_reach_but_past_the_radius(connection_params, areas):
+    # two points ~44km apart: the area between them is ~17km from the line joining them - which the
+    # search's convex hull reaches (see queries._reach) - but ~28km from either point
+    site = "MULTIPOINT((0 0), (0.4 0))"
+    areas(
+        (TEST_AREA_ID, "POINT(0 0.1)", "Hospital", "11km From One Point"),
+        (SECOND_AREA_ID, "POINT(0.2 0.15)", "Hospital", "Between The Points"),
+    )
+
+    ids = _ids(_matched(run_ruleset(connection_params, site, [_rule(buffer_metres=20_000)], 20_000)))
+
+    assert TEST_AREA_ID in ids
+    assert SECOND_AREA_ID not in ids
+
+
 def test_each_consultee_carries_every_reason_it_qualified_in_ruleset_order(connection_params, areas):
     areas(
         (TEST_AREA_ID, _point_at(500), "Hospital", "Near Hospital"),
@@ -466,10 +483,44 @@ def test_a_detailed_site_is_screened_against_its_bounding_box_finding_areas_off_
     assert TEST_AREA_ID in _ids(_matched(boxed.consultees))
     assert screen(connection_params, site, rules, 1_000, bounding_box_above_points=2).site_screened_as == "outline"
 
-    # or because the caller asked for it - its last chance after an outline run timed out
+    # or because the caller asked for it
     asked = screen(connection_params, site, rules, 1_000, bounding_box=True)
     assert asked.site_screened_as == "boundingBox"
     assert TEST_AREA_ID in _ids(_matched(asked.consultees))
+
+
+def test_a_site_sent_with_more_points_than_the_limit_is_boxed_without_simplifying_it(
+    connection_params, areas, monkeypatch
+):
+    areas((TEST_AREA_ID, "POINT(0.9 0.1)", "Hospital", "Off The Diagonal"))
+
+    def simplify(*_args):
+        raise AssertionError("simplified a site already past the limit")
+
+    monkeypatch.setattr(queries, "simplify", simplify)
+    rules = [_rule(categories=("Hospital",), buffer_metres=1_000)]
+    boxed = screen(connection_params, "LINESTRING(0 0, 0.5 0.5, 1 1)", rules, 1_000, bounding_box_above_points=2)
+
+    assert boxed.site_screened_as == "boundingBox"
+    assert TEST_AREA_ID in _ids(_matched(boxed.consultees))
+
+
+def test_a_run_past_its_time_limit_is_stopped_on_the_database_too(connection_params):
+    with open_database(connection_params, timeout_seconds=1) as db:
+        with pytest.raises(RunTimedOut):
+            db.query("WAITFOR DELAY '00:00:05'; SELECT 1 AS done")
+        # and every query after it, without reaching the database
+        with pytest.raises(RunTimedOut):
+            db.query("SELECT 1 AS done")
+
+    with open_database(connection_params) as check:
+        [row] = check.query("SELECT COUNT(*) AS waiting FROM sys.dm_exec_requests WHERE command LIKE 'WAITFOR%%'")
+    assert row["waiting"] == 0
+
+
+def test_a_run_within_its_time_limit_is_unaffected(connection_params):
+    with open_database(connection_params, timeout_seconds=30) as db:
+        assert db.query("SELECT 1 AS done") == [{"done": 1}]
 
 
 def test_a_bordering_condition_on_a_bounding_box_finds_the_hosts_neighbours_in_two_queries(connection_params, areas):
