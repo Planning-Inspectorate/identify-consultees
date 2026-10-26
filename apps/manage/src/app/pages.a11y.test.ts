@@ -65,7 +65,7 @@ describe('manage page accessibility smoke', () => {
 	test('home page has no serious a11y violations', async () => {
 		const html = nunjucks.render('views/home/view.njk', {
 			...pageLocals,
-			pageHeading: 'Identify consultees for a NSIP project',
+			pageHeading: 'Identify consultees for a national infrastructure project',
 			searchQuery: 'EN01',
 			pageSize: 25,
 			resultsFrom: 1,
@@ -102,7 +102,7 @@ describe('manage page accessibility smoke', () => {
 	test('home page with no search results has no serious a11y violations', async () => {
 		const html = nunjucks.render('views/home/view.njk', {
 			...pageLocals,
-			pageHeading: 'Identify consultees for a NSIP project',
+			pageHeading: 'Identify consultees for a national infrastructure project',
 			searchQuery: 'ZZZ-NOMATCH-XXX',
 			pageSize: 25,
 			resultsFrom: 0,

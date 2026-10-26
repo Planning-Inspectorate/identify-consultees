@@ -33,7 +33,10 @@ describe('home page', () => {
 		await assert.doesNotReject(() => homePage({ query: { q: 'EN01' } }, mockRes));
 		assert.strictEqual(mockRes.render.mock.callCount(), 1);
 		assert.strictEqual(mockRes.render.mock.calls[0].arguments[0], 'views/home/view.njk');
-		assert.strictEqual(mockRes.render.mock.calls[0].arguments[1].pageHeading, 'Identify consultees for a NSIP project');
+		assert.strictEqual(
+			mockRes.render.mock.calls[0].arguments[1].pageHeading,
+			'Identify consultees for a national infrastructure project'
+		);
 		assert.strictEqual(mockRes.render.mock.calls[0].arguments[1].geometries.length, 1);
 	});
 

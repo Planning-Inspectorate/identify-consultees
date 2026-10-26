@@ -56,7 +56,9 @@ async function deleteE2eAddedConsultees(db: ReturnType<typeof newDatabaseClient>
 test.describe('manage journeys', () => {
 	test('home page shows identify consultees search', async ({ page }) => {
 		await page.goto(`/?q=${SAMPLE_CASE_REFERENCE}`);
-		await expect(page.getByRole('heading', { level: 1 })).toContainText('Identify consultees for a NSIP project');
+		await expect(page.getByRole('heading', { level: 1 })).toContainText(
+			'Identify consultees for a national infrastructure project'
+		);
 		await expect(page.getByText(SAMPLE_CASE_NAME).first()).toBeVisible();
 	});
 

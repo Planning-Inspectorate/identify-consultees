@@ -79,7 +79,7 @@ export function buildHomePage(service: ManageService): AsyncRequestHandler {
 		}
 
 		const viewModel: HomeViewModel = {
-			pageHeading: 'Identify consultees for a NSIP project',
+			pageHeading: 'Identify consultees for a national infrastructure project',
 			searchQuery,
 			pageSize,
 			page,
