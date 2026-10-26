@@ -22,6 +22,12 @@ export interface CaseBoundaryFeature {
 	id: string;
 	type: 'Feature';
 	geometry: Geometry;
+	/**
+	 * The boundary as stored simplified (`geometrySimplified`, to within 10m) - what a ruleset run
+	 * screens and the map's search area grows. Only getCaseBoundaryById reads it: the largest real
+	 * boundary has over 100,000 points, and 4,817 simplified.
+	 */
+	simplifiedGeometry?: Geometry;
 	properties: CaseBoundaryProperties;
 }
 
@@ -40,6 +46,7 @@ interface CaseBoundaryRow {
 	acceptance: string | null;
 	metadata: string;
 	geometryWkt: string;
+	simplifiedGeometryWkt?: string;
 }
 
 function rowToFeature(row: CaseBoundaryRow): CaseBoundaryFeature {
@@ -47,6 +54,7 @@ function rowToFeature(row: CaseBoundaryRow): CaseBoundaryFeature {
 		id: row.id,
 		type: 'Feature',
 		geometry: wktToGeometry(row.geometryWkt),
+		...(row.simplifiedGeometryWkt ? { simplifiedGeometry: wktToGeometry(row.simplifiedGeometryWkt) } : {}),
 		properties: {
 			caseReference: row.caseReference,
 			caseName: row.caseName,
@@ -200,13 +208,15 @@ export async function listCaseBoundaries(
 }
 
 /**
- * Look up a single case boundary by id. Returns `null` rather than throwing when the id is
- * well-formed but doesn't match any row - a genuine "not found", not an error.
+ * Look up a single case boundary by id, with its simplified geometry. Returns `null` rather than
+ * throwing when the id is well-formed but doesn't match any row - a genuine "not found", not an
+ * error.
  */
 export async function getCaseBoundaryById(dbClient: PrismaClient, id: string): Promise<CaseBoundaryFeature | null> {
 	const rows = await withDeadlockRetry(
 		() => dbClient.$queryRaw<CaseBoundaryRow[]>`
-			SELECT ${selectColumns} FROM case_boundary WHERE id = CAST(${id} AS UNIQUEIDENTIFIER)
+			SELECT ${selectColumns}, geometrySimplified.STAsText() AS simplifiedGeometryWkt
+			FROM case_boundary WHERE id = CAST(${id} AS UNIQUEIDENTIFIER)
 		`
 	);
 	return rows[0] ? rowToFeature(rows[0]) : null;

@@ -1,5 +1,6 @@
-"""Database access for a screening run: a connection per thread, and deadlock retries."""
+"""Database access for a screening run: a connection per thread, deadlock retries, and a time limit."""
 
+import math
 import random
 import re
 import threading
@@ -24,6 +25,13 @@ _QUARTER = re.compile(r"^\d{4}Q[1-4]$")
 
 class UnknownDataset(ValueError):
     """A dataset was asked for that isn't a quarter, or has no table. The message is safe to return."""
+
+
+class RunTimedOut(Exception):
+    """A run went past its time limit, and its queries were stopped. The message is safe to return."""
+
+
+RUN_TIMED_OUT = "The ruleset took too long to run"
 
 
 def dataset_table(dataset: str | None) -> str:
@@ -59,14 +67,16 @@ def with_deadlock_retry(fn: Callable[[], T], retries: int = DEADLOCK_RETRIES) ->
 
 
 @contextmanager
-def open_database(params: ConnectionParams, table: str = CONSULTEE_AREA) -> Iterator["Database"]:
+def open_database(
+    params: ConnectionParams, table: str = CONSULTEE_AREA, timeout_seconds: float | None = None
+) -> Iterator["Database"]:
     """The database for one screening run, its connections closed when the block ends - its
-    queries against `table` (see dataset_table).
+    queries against `table` (see dataset_table), all done within `timeout_seconds` if given.
 
     with open_database(params) as db:
         rows = db.query("SELECT ...", (param,))
     """
-    db = Database(params, table)
+    db = Database(params, table, timeout_seconds)
     try:
         yield db
     finally:
@@ -75,12 +85,17 @@ def open_database(params: ConnectionParams, table: str = CONSULTEE_AREA) -> Iter
 
 class Database:
     """The connections one screening run uses: one per thread, since a pymssql connection can't be
-    shared across threads. Use open_database, which closes them."""
+    shared across threads. Use open_database, which closes them.
 
-    def __init__(self, params: ConnectionParams, table: str = CONSULTEE_AREA):
+    With `timeout_seconds`, every query gets only the time the run has left, and one still going
+    when it runs out is stopped - on SQL Server too, so a run the manage app has given up on stops
+    loading the database rather than carrying on for minutes alongside whatever runs next."""
+
+    def __init__(self, params: ConnectionParams, table: str = CONSULTEE_AREA, timeout_seconds: float | None = None):
         self._params = params
         self.table = table
         """The consultee area table the run's queries use."""
+        self._deadline = None if timeout_seconds is None else time.monotonic() + timeout_seconds
         self._local = threading.local()
         self._connections: list[pymssql.Connection] = []
         self._lock = threading.Lock()
@@ -88,18 +103,34 @@ class Database:
     def close(self) -> None:
         with self._lock:
             for connection in self._connections:
-                connection.close()
+                try:
+                    connection.close()
+                except pymssql.Error:
+                    pass  # already closed by a query timing out
             self._connections.clear()
 
     def query(self, sql: str, params: tuple = ()) -> list[dict]:
-        """Rows as dicts, retried on deadlock. `sql` uses pymssql's `%s` placeholders."""
+        """Rows as dicts, retried on deadlock. `sql` uses pymssql's `%s` placeholders. Raises
+        RunTimedOut once the run is out of time."""
 
         def run() -> list[dict]:
-            with self._connection().cursor() as cursor:
+            connection = self._connection()
+            if self._deadline is not None:
+                left = self._deadline - time.monotonic()
+                if left <= 0:
+                    raise RunTimedOut(RUN_TIMED_OUT)
+                # pymssql's per-query timeout, in whole seconds: rounding up still stops at the deadline
+                connection._conn.query_timeout = math.ceil(left)
+            with connection.cursor() as cursor:
                 cursor.execute(sql, params)
                 return cursor.fetchall()
 
-        return with_deadlock_retry(run)
+        try:
+            return with_deadlock_retry(run)
+        except pymssql.Error as error:
+            if self._deadline is not None and time.monotonic() >= self._deadline:
+                raise RunTimedOut(RUN_TIMED_OUT) from error
+            raise
 
     def _connection(self) -> pymssql.Connection:
         connection = getattr(self._local, "connection", None)

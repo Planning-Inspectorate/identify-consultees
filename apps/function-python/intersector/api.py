@@ -23,6 +23,7 @@ MAX_CATEGORIES_PER_RULE = 50
 MAX_DISTANCE_METRES = 500_000
 MAX_STRING_LENGTH = 200
 MAX_NEARBY_CATEGORIES = 200
+MAX_TIMEOUT_SECONDS = 600
 
 
 class BadRequest(ValueError):
@@ -42,14 +43,17 @@ class RunRulesetRequest:
     """Screen the site against its bounding box whatever its detail."""
     dataset: str | None = None
     """A quarter's consultee areas to screen (2026Q4), rather than the dataset in use."""
+    timeout_seconds: float | None = None
+    """How long the run may take before it's stopped - none, no limit."""
 
 
 def parse_run_ruleset_request(body: object) -> RunRulesetRequest:
     """Validate a decoded request body: `{siteWkt, rules: [{id, logicType, categories,
     bufferMetres?, hostCategory?}], nearbyRadiusMetres, nearbyRadiusMetresByCategory?,
-    boundingBoxAbovePoints?, boundingBox?, dataset?}` (boundingBox defaults to false; with no
-    boundingBoxAbovePoints the outline is always screened; with no dataset, the dataset in use).
-    Other fields are ignored. Raises BadRequest."""
+    boundingBoxAbovePoints?, boundingBox?, dataset?, timeoutSeconds?}` (boundingBox defaults to
+    false; with no boundingBoxAbovePoints the outline is always screened; with no dataset, the
+    dataset in use; with no timeoutSeconds, no time limit). Other fields are ignored. Raises
+    BadRequest."""
     if not isinstance(body, dict):
         raise BadRequest("request body must be a JSON object")
 
@@ -68,7 +72,16 @@ def parse_run_ruleset_request(body: object) -> RunRulesetRequest:
         bounding_box_above_points=_point_limit(body.get("boundingBoxAbovePoints")),
         bounding_box=_boolean(body.get("boundingBox", False), "boundingBox"),
         dataset=_dataset(body.get("dataset")),
+        timeout_seconds=_timeout(body.get("timeoutSeconds")),
     )
+
+
+def _timeout(value: object) -> float | None:
+    if value is None:
+        return None
+    if isinstance(value, bool) or not isinstance(value, int | float) or not 0 < value <= MAX_TIMEOUT_SECONDS:
+        raise BadRequest(f"timeoutSeconds must be a number of seconds, more than 0 and at most {MAX_TIMEOUT_SECONDS}")
+    return float(value)
 
 
 def _dataset(value: object) -> str | None:
