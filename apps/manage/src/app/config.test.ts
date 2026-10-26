@@ -3,7 +3,7 @@ import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, test } from 'node:test';
-import { cbosSubscriberSettings, loadConfig, resetConfigCache } from './config.ts';
+import { loadConfig, resetConfigCache } from './config.ts';
 import { loadNearbyConsultees } from './nearby-consultees.ts';
 import { loadScreeningConfig } from './screening-config.ts';
 
@@ -233,30 +233,5 @@ describe('manage loadConfig', () => {
 		assert.equal(config.auth.clientId, 'client-id');
 		assert.equal(config.auth.clientSecret, 'client-secret');
 		assert.equal(config.auth.groups.applicationAccess, 'group-id');
-	});
-});
-
-describe('the CBOS subscriber settings', () => {
-	const ON = {
-		CBOS_SUBSCRIBER_ENABLED: 'true',
-		CBOS_SERVICE_BUS_NAMESPACE: ' pins-sb-back-office-dev-ukw-001.servicebus.windows.net ',
-		CBOS_SERVICE_BUS_SUBSCRIPTION: 'identify-consultees-nsip-document'
-	};
-
-	test('are the namespace, topic and subscription when it is turned on - nsip-document by default', () => {
-		assert.deepEqual(cbosSubscriberSettings(ON), {
-			namespace: 'pins-sb-back-office-dev-ukw-001.servicebus.windows.net',
-			topic: 'nsip-document',
-			subscription: 'identify-consultees-nsip-document'
-		});
-		assert.equal(cbosSubscriberSettings({ ...ON, CBOS_SERVICE_BUS_TOPIC: 'other-topic' })?.topic, 'other-topic');
-	});
-
-	test('are none - it is off - unless it is turned on and set up', () => {
-		assert.equal(cbosSubscriberSettings({}), undefined);
-		// the staging slot sets it off (infrastructure/app-web.tf)
-		assert.equal(cbosSubscriberSettings({ ...ON, CBOS_SUBSCRIBER_ENABLED: 'false' }), undefined);
-		assert.equal(cbosSubscriberSettings({ ...ON, CBOS_SERVICE_BUS_NAMESPACE: ' ' }), undefined);
-		assert.equal(cbosSubscriberSettings({ ...ON, CBOS_SERVICE_BUS_SUBSCRIPTION: undefined }), undefined);
 	});
 });

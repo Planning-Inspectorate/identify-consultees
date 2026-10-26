@@ -36,7 +36,6 @@ WHERE dv.mime = '{GEOJSON_MIME}' AND dv.isDeleted = 0
 """
 
 LIST_BOUNDARY_FILES = _BOUNDARY_FILES + "ORDER BY c.reference, dv.documentGuid, dv.version"
-LIST_CASE_BOUNDARY_FILES = _BOUNDARY_FILES + "AND c.reference = ? ORDER BY dv.documentGuid, dv.version"
 GET_BOUNDARY_FILE = _BOUNDARY_FILES + "AND dv.documentGuid = ? AND dv.version = ?"
 
 
@@ -93,13 +92,8 @@ def _query(config: CbosConfig, credential, sql: str, params: tuple = ()) -> list
         connection.close()
 
 
-def list_boundary_files(config: CbosConfig, credential, case_reference: str | None = None) -> list[BoundaryFile]:
-    """Every boundary file CBOS holds - or, given a case reference, that case's."""
-    if case_reference:
-        rows = _query(config, credential, LIST_CASE_BOUNDARY_FILES, (case_reference,))
-    else:
-        rows = _query(config, credential, LIST_BOUNDARY_FILES)
-    return [_boundary_file(row) for row in rows]
+def list_boundary_files(config: CbosConfig, credential) -> list[BoundaryFile]:
+    return [_boundary_file(row) for row in _query(config, credential, LIST_BOUNDARY_FILES)]
 
 
 def fetch_boundary_geojson(config: CbosConfig, credential, document_guid: str, version: int) -> dict:

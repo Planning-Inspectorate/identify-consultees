@@ -140,7 +140,7 @@ The main journey is **database-backed**: there are no fixtures. Locally the data
 - Uploading a project's shapefile: the journey uses case boundaries already in the database
 - The remaining rulesets: three of the expected eight exist (see [Screening engine](./data/screening-engine.md#rulesets))
 - Redeveloped data processing (new ingest, ids and schema), being built separately
-- Keeping case boundaries in step with CBOS automatically: built (a Service Bus subscription, see [Data model and loading](./data/data-model.md#keeping-up-with-cbos)), but off until `cbos_subscriber_enabled` is turned on in an environment
+- Keeping case boundaries in step with CBOS automatically: today an admin imports them by hand (`/admin/import-from-cbos`); a Service Bus subscription is the next step
 
 ## Decisions
 
