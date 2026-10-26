@@ -23,8 +23,9 @@ export type RulesetRunner = (site: Geometry, ruleset: Ruleset, nearbyRadiusMetre
 const RUN_TIMEOUT_MS = 60_000;
 
 // the function stops its run - its queries too - this much sooner, so it's done before the request
-// is given up on and a slow run never outlives it
-const FUNCTION_STOPS_EARLIER_MS = 5_000;
+// is given up on and a slow run never outlives it. A query still sending rows can run a few seconds
+// past the function's limit (pymssql's timeout is for a wait with nothing back), so it's well ahead
+const FUNCTION_STOPS_EARLIER_MS = 10_000;
 
 interface RunRulesetResponseFeature {
 	id: string;
@@ -55,6 +56,8 @@ export function toRunRulesetResult(body: RunRulesetResponse): RunRulesetResult {
 			reasons,
 			feature: { id: feature.id, properties: feature.properties }
 		})),
+		// a covering outline (simplifiedOutline) identifies exactly what the outline does - nothing to
+		// warn about - so only the bounding box is told apart
 		siteScreenedAs: body.siteScreenedAs === 'boundingBox' ? 'boundingBox' : 'outline'
 	};
 }

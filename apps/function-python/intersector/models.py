@@ -46,6 +46,9 @@ class AreaMatch:
     area: ConsulteeArea
     distance_metres: float | None
     """None when the query doesn't measure it - bordering matches are measured afterwards."""
+    approximate: bool = False
+    """Measured from a site's covering outline, not the site: no further than it really is, and up
+    to ~1.75 x COVER_TOLERANCE_METRES nearer - see screening._find_areas_near."""
 
 
 @dataclass(frozen=True)
@@ -72,6 +75,8 @@ class Consultee:
     area: ConsulteeArea
     distance_metres: float | None
     reasons: list[Reason] = field(default_factory=list)
+    approximate: bool = False
+    """Its distance is from a covering outline - see AreaMatch.approximate."""
 
     def record(self, match: AreaMatch, reason: Reason) -> None:
         """Fold in another query's match of this area: keep the nearest measured distance, and add
@@ -80,5 +85,6 @@ class Consultee:
             self.distance_metres is None or match.distance_metres < self.distance_metres
         ):
             self.distance_metres = match.distance_metres
+            self.approximate = match.approximate
         if reason not in self.reasons:
             self.reasons.append(reason)

@@ -66,7 +66,7 @@ describe('buildPythonRulesetRunner', () => {
 			nearbyRadiusMetresByCategory: { 'Parish Council': 5_000 },
 			includeGeometry: false,
 			// the function stops its run before this request gives up on it
-			timeoutSeconds: 55,
+			timeoutSeconds: 50,
 			// the display name stays here - the function only needs what to run
 			rules: [
 				{ id: 'hospital', logicType: 'intersection', categories: ['Hospital'], bufferMetres: 10_000 },
@@ -90,12 +90,14 @@ describe('buildPythonRulesetRunner', () => {
 		assert.equal(body.boundingBox, undefined);
 	});
 
-	it('reads a response that says nothing about what it screened as the outline', async () => {
+	it('reads a response that says nothing about what it screened, or a covering outline, as the outline', async () => {
 		respondWith({ consultees: [] });
 		const run = buildPythonRulesetRunner({
 			pythonFunctionUrl: 'http://localhost:7071/api/consultee-areas',
 			apiKey: undefined
 		});
+		assert.equal((await run(site, ruleset, 20_000)).siteScreenedAs, 'outline');
+		respondWith({ consultees: [], siteScreenedAs: 'simplifiedOutline' });
 		assert.equal((await run(site, ruleset, 20_000)).siteScreenedAs, 'outline');
 	});
 

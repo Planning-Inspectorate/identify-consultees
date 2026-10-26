@@ -3,20 +3,25 @@
 # a change is checked by `npm test` and takes effect on the next deploy.
 #
 #   boundingBoxAbovePoints - a site whose outline, simplified to 10m as the reference data is, has
-#                            more points than this is screened against its bounding box - the
-#                            rectangle around it - instead. That's fast whatever the site's detail,
-#                            but finds every consultee near the rectangle: for a long, diagonal
-#                            site, many that aren't near the site itself. The check page, category
-#                            pages and report say when it happened, so the list can be reviewed.
-#                            0 never uses the box. Of the 283 real sites, 10 have over 2,000 points
-#                            and 33 over 1,000; locally the slowest outlines take ~4s to screen, and
-#                            the smaller Azure databases many times that.
+#                            more points than this is too detailed to screen in time. It's
+#                            searched around a simpler outline that covers it (500m tolerance,
+#                            100-450 points), and every consultee a condition could identify is
+#                            measured from the outline itself - so the report's list and distances
+#                            are the outline's, 1.1-3x faster. Only consultees shown faintly as
+#                            nearby can include a few up to ~875m past their distance. If no
+#                            covering outline can be made, its bounding box - the rectangle around
+#                            it - is screened instead, and the check page, category pages and report
+#                            say so. (The name is from when the box was the only option.) 0 never
+#                            does either. 1,000 is where the covering outline pays: on all 270
+#                            cases' newest boundaries, the 33 past it screened 1.8x faster (the
+#                            slowest, 3x), those of 250-1,000 points about as fast, and smaller
+#                            ones twice as slow.
 #
-# Outline or box is decided before anything is screened - never by trying the outline and retrying
-# with the box when it's too slow, which left the outline's queries running alongside the box's. A
-# run that still takes too long (55s) is stopped, its queries on the database with it, and the page
-# says the ruleset couldn't be run: lower this to screen more sites against their box.
+# This is decided before anything is screened - never by trying the outline and retrying when it's
+# too slow, which left the outline's queries running alongside the retry's. A run that still takes
+# too long (50s) is stopped, its queries on the database with it, and the page says the ruleset
+# couldn't be run: lower this to screen more sites around a covering outline.
 
 version: 1
 
-boundingBoxAbovePoints: 2000
+boundingBoxAbovePoints: 1000

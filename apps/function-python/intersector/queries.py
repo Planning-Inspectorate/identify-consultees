@@ -15,6 +15,7 @@ from intersector.database import Database
 from intersector.models import AreaMatch, ConsulteeArea
 from intersector.tolerances import (
     BORDERING_TOLERANCE_METRES,
+    COVER_TOLERANCE_METRES,
     DISTANCE_MARGIN_METRES,
     SIMPLIFY_TOLERANCE_METRES,
 )
@@ -143,6 +144,25 @@ def _reach(db: Database, wkt: str, metres: float) -> str:
         (wkt, metres + GROW_TOLERANCE_METRES),
     )
     return row["wkt"]
+
+
+def covering_outline(db: Database, wkt: str) -> str | None:
+    """A simpler outline that covers all of `wkt`, or None if one can't be made: `wkt` grown by
+    COVER_TOLERANCE_METRES (to within a quarter of it), then simplified by half of it - so its edge
+    is never inside the site, and at most ~1.75 x the tolerance outside it. Distances from it are
+    never further than from the site, so a search around it misses nothing a search around the site
+    would find. Simplifying alone could cut a corner off the site, or drop a small part of it
+    altogether, so the result is checked to contain the site."""
+    [row] = db.query(
+        f"""
+        SELECT cover.geometry.STAsText() AS wkt, cover.geometry.STContains({_geography()}) AS covers
+        FROM (
+            SELECT {_geography()}.BufferWithTolerance(%s, %s, 0).Reduce(%s).MakeValid() AS geometry
+        ) AS cover
+        """,
+        (wkt, wkt, COVER_TOLERANCE_METRES, COVER_TOLERANCE_METRES / 4, COVER_TOLERANCE_METRES / 2),
+    )
+    return row["wkt"] if row["covers"] else None
 
 
 def find_areas_near(
