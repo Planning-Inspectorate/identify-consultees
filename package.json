@@ -126,6 +126,15 @@
     },
     "@prisma/config": {
       "deepmerge-ts": "^8.0.2"
+    },
+    "@azure/identity": {
+      "@azure/msal-node": "^7.1.0"
+    },
+    "@planning-inspectorate/core": {
+      "@azure/msal-node": "^7.1.0"
+    },
+    "@redis/entraid": {
+      "@azure/msal-node": "^7.1.0"
     }
   }
 }
