@@ -57,25 +57,28 @@
 			{{ govukBackLink({ href: backLink }) }}
 		{% endif %}
 	{% endblock %}
-	{% block error_summary %}
-		{% if errorSummary %}
-			<div class="govuk-grid-row">
-				<div class="govuk-grid-column-two-thirds">
-					{{
-					govukErrorSummary({
-						titleText: "There is a problem",
-						errorList: errorSummary
-					})
-					}}
-				</div>
-			</div>
-		{% endif %}
-	{% endblock %}
 {% endblock %}
 
 	{% block before_content %}{% endblock %}
 
 	{% block content %}
+		{# the error summary belongs inside <main>, immediately before the page
+		   heading - see https://design-system.service.gov.uk/components/error-summary/ #}
+		{% block error_summary %}
+			{% if errorSummary %}
+				<div class="govuk-grid-row">
+					<div class="govuk-grid-column-two-thirds">
+						{{
+						govukErrorSummary({
+							classes: "govuk-!-margin-top-4 govuk-!-margin-bottom-6",
+							titleText: "There is a problem",
+							errorList: errorSummary
+						})
+						}}
+					</div>
+				</div>
+			{% endif %}
+		{% endblock %}
 		{% block pageHeading %}
 			<div class="govuk-grid-row">
 				<div class="govuk-grid-column-full">
