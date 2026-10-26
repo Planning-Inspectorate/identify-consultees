@@ -11,6 +11,11 @@ import { platform } from 'node:os';
 
 const BROWSERS = ['chromium', 'firefox', 'webkit'];
 /**
+ * CI runs every project headless, where the chromium headless shell is enough - skip
+ * the ~190MB full-Chrome download there. Local installs keep it for headed debugging.
+ */
+const SHELL_ONLY = Boolean(process.env.CI || process.env.TF_BUILD);
+/**
  * unattended-upgrades can hold the dpkg locks for minutes on a cold shared agent, so be patient:
  * ~2 minutes total (24 × 5s) of polite waiting before attempting install anyway - apt's own lock
  * timeout below covers the longer tail.
@@ -99,7 +104,11 @@ waitForAptLock();
 
 let status = 1;
 for (let attempt = 1; attempt <= MAX_INSTALL_ATTEMPTS; attempt += 1) {
-	const result = spawnSync('npx', ['playwright', 'install', '--with-deps', ...BROWSERS], {
+	const args = ['playwright', 'install', '--with-deps'];
+	if (SHELL_ONLY) {
+		args.push('--only-shell');
+	}
+	const result = spawnSync('npx', [...args, ...BROWSERS], {
 		stdio: 'inherit',
 		env: process.env,
 		shell: false
