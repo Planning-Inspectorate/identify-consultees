@@ -73,19 +73,6 @@ module "app_web" {
     # shared secret as an x-api-key header (see apps/function-python/function_app.py)
     PYTHON_FUNCTION_URL     = "https://${azurerm_linux_function_app.function_orchestrator.default_hostname}/api/consultee-areas"
     PYTHON_FUNCTION_API_KEY = local.key_vault_refs["function-api-key"]
-
-    # CBOS's document events (idas-back-office.tf) - a case's boundaries are imported when CBOS
-    # converts a new one. Off in the staging slot (below)
-    CBOS_SUBSCRIBER_ENABLED       = var.cbos_subscriber_enabled ? "true" : "false"
-    CBOS_SERVICE_BUS_NAMESPACE    = var.cbos_subscriber_enabled ? "${data.azurerm_servicebus_namespace.idas[0].name}.servicebus.windows.net" : ""
-    CBOS_SERVICE_BUS_TOPIC        = var.cbos_subscriber_enabled ? data.azurerm_servicebus_topic.idas_nsip_document[0].name : ""
-    CBOS_SERVICE_BUS_SUBSCRIPTION = var.cbos_subscriber_enabled ? azurerm_servicebus_subscription.web_nsip_document[0].name : ""
-  }
-
-  # sticky to its slot: only the live app takes CBOS's events - a staging slot running the next
-  # release mustn't take them too (and has no access to the subscription)
-  slot_setting_overrides = {
-    CBOS_SUBSCRIBER_ENABLED = "false"
   }
 
   providers = {

@@ -21,7 +21,6 @@
   "dependencies": {
     "@azure/identity": "*",
     "@azure/msal-node": "*",
-    "@azure/service-bus": "^7.10.0",
     "@azure/storage-blob": "*",
     "@defra/interactive-map": "*",
     "@pins/identify-consultees-database": "^0.0.0",

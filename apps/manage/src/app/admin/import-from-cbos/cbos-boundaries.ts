@@ -34,8 +34,6 @@ export interface CbosFeatureCollection {
 export interface CbosFunctionOptions {
 	pythonFunctionUrl: string | undefined;
 	apiKey: string | undefined;
-	/** Only this case's files - when CBOS says its boundary changed. Every case's when absent. */
-	caseReference?: string;
 }
 
 export interface CbosImportFailure {
@@ -80,10 +78,7 @@ async function getJson(options: CbosFunctionOptions, path: string, timeoutMs: nu
 }
 
 export async function listCbosBoundaryFiles(options: CbosFunctionOptions): Promise<CbosBoundaryFile[]> {
-	const path = options.caseReference
-		? `cbos/boundary-files?caseReference=${encodeURIComponent(options.caseReference)}`
-		: 'cbos/boundary-files';
-	const body = (await getJson(options, path, LIST_TIMEOUT_MS)) as { files?: CbosBoundaryFile[] };
+	const body = (await getJson(options, 'cbos/boundary-files', LIST_TIMEOUT_MS)) as { files?: CbosBoundaryFile[] };
 	if (!Array.isArray(body.files)) {
 		throw new Error('Python function returned an unexpected boundary file list');
 	}
@@ -232,8 +227,7 @@ const DEFAULT_DEPENDENCIES: CbosImportDependencies = {
 };
 
 /**
- * Save every CBOS boundary file - every version of each, of every case or of `options.caseReference`'s
- * - to case_boundary. It merges: rows are upserted by id and nothing is
+ * Save every CBOS boundary file - every version of each - to case_boundary. It merges: rows are upserted by id and nothing is
  * deleted, so boundaries loaded from elsewhere stay. A file that can't be fetched or read is
  * reported and skipped rather than failing the rest; failing to list the files rejects.
  */

@@ -1,4 +1,4 @@
-import type { CbosImportFailure } from '../../cbos/cbos-boundaries.ts';
+import type { CbosImportFailure } from './cbos-boundaries.ts';
 
 export interface ImportFromCbosViewModel {
 	pageHeading: string;
