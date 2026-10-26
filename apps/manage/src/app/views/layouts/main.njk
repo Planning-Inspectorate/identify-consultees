@@ -57,9 +57,10 @@
 			{{ govukBackLink({ href: backLink }) }}
 		{% endif %}
 	{% endblock %}
+	{# govuk/template.njk's beforeContent block - keep it inside containerStart so
+	   views that fill it still render (it sits in the width container, before <main>) #}
+	{% block beforeContent %}{% endblock %}
 {% endblock %}
-
-	{% block before_content %}{% endblock %}
 
 	{% block content %}
 		{# the error summary belongs inside <main>, immediately before the page
