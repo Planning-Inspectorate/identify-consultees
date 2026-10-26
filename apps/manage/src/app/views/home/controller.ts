@@ -45,6 +45,9 @@ export function buildHomePage(service: ManageService): AsyncRequestHandler {
 		logger.info('identify consultees home page');
 
 		const searchQuery = firstQueryValue(req.query.q);
+		// the GET form always submits q, so no q param means a fresh load (or a page-size link)
+		// while a present-but-blank q means Search was pressed with nothing entered
+		const blankSearch = req.query.q !== undefined && searchQuery.trim() === '';
 		const pageSize = parsePageSize(req.query.pageSize);
 		const page = parsePage(req.query.page);
 
@@ -59,16 +62,18 @@ export function buildHomePage(service: ManageService): AsyncRequestHandler {
 
 		let geometries: ProjectGeometry[] = [];
 		let resultsTotal = 0;
-		try {
-			const { features, total } = await searchCaseBoundaries(db, {
-				query: searchQuery,
-				limit: pageSize,
-				offset: (page - 1) * pageSize
-			});
-			geometries = features.map(toProjectGeometry);
-			resultsTotal = total;
-		} catch (error) {
-			logger.error({ error }, 'Failed to search case boundaries');
+		if (!blankSearch) {
+			try {
+				const { features, total } = await searchCaseBoundaries(db, {
+					query: searchQuery,
+					limit: pageSize,
+					offset: (page - 1) * pageSize
+				});
+				geometries = features.map(toProjectGeometry);
+				resultsTotal = total;
+			} catch (error) {
+				logger.error({ error }, 'Failed to search case boundaries');
+			}
 		}
 
 		// A bookmarked/shared link can point past the last page once results shrink - send it to the
@@ -87,7 +92,13 @@ export function buildHomePage(service: ManageService): AsyncRequestHandler {
 			resultsTo: (page - 1) * pageSize + geometries.length,
 			resultsTotal,
 			geometries,
-			pagination: buildPagination(page, totalPages, hrefForPage)
+			pagination: buildPagination(page, totalPages, hrefForPage),
+			...(blankSearch
+				? {
+						searchError: { text: 'Enter a search term' },
+						errorSummary: [{ text: 'Enter a search term', href: '#q' }]
+					}
+				: {})
 		};
 
 		return res.render('views/home/view.njk', viewModel);

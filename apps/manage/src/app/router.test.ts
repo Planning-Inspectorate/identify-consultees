@@ -63,6 +63,14 @@ describe('manage router wiring', () => {
 		assert.match(response.text, new RegExp(`/consultees/${homePageTestCaseId}`));
 	});
 
+	test('GET / flags a blank search as a validation error', async () => {
+		const response = await request(authDisabledApp).get('/?q=');
+		assert.equal(response.status, 200);
+		assert.match(response.text, /govuk-error-summary/);
+		assert.match(response.text, /Enter a search term/);
+		assert.match(response.text, /<title>\s*Error: /);
+	});
+
 	test('GET /signed-out renders the signed out page', async () => {
 		const response = await request(authDisabledApp).get('/signed-out');
 		assert.equal(response.status, 200);

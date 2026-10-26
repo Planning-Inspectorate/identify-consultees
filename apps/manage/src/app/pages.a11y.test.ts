@@ -99,6 +99,23 @@ describe('manage page accessibility smoke', () => {
 		await assertNoSeriousA11yViolations(html);
 	});
 
+	test('home page with a blank search error has no serious a11y violations', async () => {
+		const html = nunjucks.render('views/home/view.njk', {
+			...pageLocals,
+			pageHeading: 'Identify consultees for a national infrastructure project',
+			searchQuery: '',
+			pageSize: 25,
+			resultsFrom: 0,
+			resultsTo: 0,
+			resultsTotal: 0,
+			geometries: [],
+			pagination: null,
+			searchError: { text: 'Enter a search term' },
+			errorSummary: [{ text: 'Enter a search term', href: '#q' }]
+		});
+		await assertNoSeriousA11yViolations(html);
+	});
+
 	test('home page with no search results has no serious a11y violations', async () => {
 		const html = nunjucks.render('views/home/view.njk', {
 			...pageLocals,
