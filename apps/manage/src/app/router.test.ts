@@ -8,7 +8,11 @@ import { buildAuthRateLimiter } from './router.ts';
 import { buildManageTestConfig, createManageTestApp, createManageTestService } from './testing/create-test-app.ts';
 
 // a fixed id, rather than depending on whatever sample data may or may not be seeded (CI's
-// database is migrated but never seeded - see .azure/pipelines/pr.yml)
+// database is migrated but never seeded - see .azure/pipelines/pr.yml). The site's point must
+// stay well away from the fixtures other test files insert into the shared database (test files
+// run in parallel): a case_boundary within the nearby-NSIP radius (10km) or a consultee_area
+// within the ruleset's reach (~35km) would join the run mid-test and change the static-map etag
+// between the two requests below
 const homePageTestCaseId = '33333333-3333-3333-3333-333333333333';
 // a consultee the add form can add - it only takes names that are consultees in the reference data
 const routerTestConsulteeId = '33333333-3333-3333-3333-333333333334';
@@ -42,7 +46,8 @@ describe('manage router wiring', () => {
 				{
 					id: homePageTestCaseId,
 					type: 'Feature',
-					geometry: { type: 'Point', coordinates: [-1.5, 52.5] },
+					// mid Wales - hundreds of km from every other suite's fixtures
+					geometry: { type: 'Point', coordinates: [-4, 52] },
 					properties: { caseReference: 'ZZ000001', caseName: 'Router Test Fixture Wind Farm' }
 				}
 			]
