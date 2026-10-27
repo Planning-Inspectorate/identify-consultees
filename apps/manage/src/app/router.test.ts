@@ -1,4 +1,5 @@
 import { ManageService } from '#service';
+import { acquireDbTestLock, releaseDbTestLock } from '@pins/identify-consultees-database/src/db-test-lock.ts';
 import { loadCaseBoundaries } from '@pins/identify-consultees-database/src/geospatial/case-boundaries.ts';
 import { loadConsulteeAreas } from '@pins/identify-consultees-database/src/geospatial/consultee-areas.ts';
 import assert from 'node:assert/strict';
@@ -22,6 +23,9 @@ describe('manage router wiring', () => {
 	const authDisabledApp = createManageTestApp(authDisabledService);
 
 	before(async () => {
+		// this file's pages read the shared tables - take turns with the other suites
+		// writing them (see packages/database/src/db-test-lock.ts)
+		await acquireDbTestLock();
 		await authDisabledService.db.$executeRaw`DELETE FROM case_boundary WHERE id = ${homePageTestCaseId}`;
 		await authDisabledService.db.$executeRaw`DELETE FROM consultee_area WHERE id = ${routerTestConsulteeId}`;
 		await loadConsulteeAreas(authDisabledService.db, {
@@ -52,6 +56,7 @@ describe('manage router wiring', () => {
 	after(async () => {
 		await authDisabledService.db.$executeRaw`DELETE FROM case_boundary WHERE id = ${homePageTestCaseId}`;
 		await authDisabledService.db.$executeRaw`DELETE FROM consultee_area WHERE id = ${routerTestConsulteeId}`;
+		releaseDbTestLock();
 		await authDisabledService.db.$disconnect().catch(() => undefined);
 	});
 

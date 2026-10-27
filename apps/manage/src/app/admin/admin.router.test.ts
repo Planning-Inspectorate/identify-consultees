@@ -1,3 +1,4 @@
+import { acquireDbTestLock, releaseDbTestLock } from '@pins/identify-consultees-database/src/db-test-lock.ts';
 import { loadCaseBoundaries } from '@pins/identify-consultees-database/src/geospatial/case-boundaries.ts';
 import { loadConsulteeAreas } from '@pins/identify-consultees-database/src/geospatial/consultee-areas.ts';
 import assert from 'node:assert/strict';
@@ -19,6 +20,9 @@ describe('admin section', () => {
 	};
 
 	before(async () => {
+		// this suite writes the shared tables - take turns with the other suites
+		// using them (see packages/database/src/db-test-lock.ts)
+		await acquireDbTestLock();
 		await cleanup();
 		await loadConsulteeAreas(service.db, {
 			type: 'FeatureCollection',
@@ -50,6 +54,7 @@ describe('admin section', () => {
 
 	after(async () => {
 		await cleanup();
+		releaseDbTestLock();
 		await service.db.$disconnect().catch(() => undefined);
 	});
 

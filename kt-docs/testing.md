@@ -26,6 +26,10 @@ npm run test --workspace identify-consultees-manage -- src/app/views/home/contro
 
 The Playwright projects start a test server on port 8091 against the **real local database**: the specs deep-link to seeded rows (`SAMPLE_CASE_ID`, `SAMPLE_RULESET_ID` in `e2e/fixtures.ts`). Run `npm start` once first. In CI, `pr.yml` starts SQL Server and seeds it. The ruleset is run by a database stub there, not the function (see [Screening service](./screening-service.md#tests)).
 
+## The shared test database
+
+`node --test` runs each test file in its own process, in parallel, against the same database. A suite that writes `case_boundary` or `consultee_area` rows — or reads those tables in a way other rows could break (a Nearby NSIP appearing mid-test changes a page's map etag, for example) — must take the cross-process mutex in `packages/database/src/db-test-lock.ts`: `acquireDbTestLock()` first in `before`, `releaseDbTestLock()` in `after`, as the packages suites and the manage router, security-headers and admin suites do.
+
 ## Coverage gate
 
 `scripts/run-frontend-coverage.mjs` holds `apps/manage/src/**` at 100% line, function and branch coverage, excluding `server.ts`, `util/build.ts` and tests. Add a branch, add a test; test through handlers and `testing/create-test-app.ts` rather than private internals.
