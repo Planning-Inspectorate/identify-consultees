@@ -1,4 +1,5 @@
 import { ManageService } from '#service';
+import { acquireDbTestLock, releaseDbTestLock } from '@pins/identify-consultees-database/src/db-test-lock.ts';
 import { loadCaseBoundaries } from '@pins/identify-consultees-database/src/geospatial/case-boundaries.ts';
 import { mockLogger } from '@planning-inspectorate/core/testing';
 import assert from 'node:assert/strict';
@@ -111,6 +112,9 @@ describe('HTML security response headers', () => {
 	const mapPageTestCaseId = '66666666-6666-6666-6666-666666666666';
 
 	before(async () => {
+		// this suite writes case_boundary - take turns with the other suites using the
+		// shared tables (see packages/database/src/db-test-lock.ts)
+		await acquireDbTestLock();
 		await loadCaseBoundaries(developmentService.db, {
 			type: 'FeatureCollection',
 			features: [
@@ -126,6 +130,7 @@ describe('HTML security response headers', () => {
 
 	after(async () => {
 		await developmentService.db.$executeRaw`DELETE FROM case_boundary WHERE id = ${mapPageTestCaseId}`;
+		releaseDbTestLock();
 		await Promise.all([
 			developmentService.db.$disconnect().catch(() => undefined),
 			productionService.db.$disconnect().catch(() => undefined)
