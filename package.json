@@ -47,7 +47,7 @@
     "@azure/identity": "^4.14.0",
     "@azure/msal-node": "^7.1.0",
     "@azure/storage-blob": "^12.29.0",
-    "@defra/interactive-map": "^0.0.47-alpha",
+    "@defra/interactive-map": "^0.0.48-fmp-2",
     "@planning-inspectorate/core": "^1.15.0",
     "@prisma/adapter-mssql": "^7.10.0",
     "@prisma/client": "^7.10.0",
@@ -62,8 +62,8 @@
     "sharp": "^0.35.5"
   },
   "optionalDependencies": {
-    "react": "19.3.0",
-    "react-dom": "19.3.0",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
     "scheduler": "0.28.0"
   },
   "devDependencies": {
