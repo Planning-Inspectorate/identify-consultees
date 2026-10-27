@@ -269,7 +269,7 @@ describe('manage router wiring', () => {
 		);
 		assert.equal(response.status, 200);
 		assert.match(response.text, /Parish Council/);
-		assert.match(response.text, /Save and return/);
+		assert.match(response.text, /Back to draft report/);
 	});
 
 	test('GET /consultees/:id/report/consultees 404s for a category the ruleset doesn’t cover', async () => {

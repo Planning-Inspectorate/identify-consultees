@@ -163,9 +163,9 @@ async function renderCategoryPage(
 		pageHeading: category,
 		pageCaption: project.properties.caseName,
 		backLinkUrl: reportUrl(project.id, ruleset.id, selection),
+		backLinkText: 'Back to draft report',
 		rows,
 		addConsulteeUrl: addConsulteeUrl(project.id, ruleset.id, category, selection),
-		saveAndReturnUrl: reportUrl(project.id, ruleset.id, selection),
 		mapId: 'case-map',
 		mapRegionLabel: `Map showing ${category} consultees for ${project.properties.caseName}`,
 		staticMapSrc,
@@ -193,7 +193,7 @@ async function renderCategoryPage(
  * reason for the removal), then any added by hand. The "Add a consultee" page (see add/) adds a
  * consultee by a typed name, matched to the category's nearby consultees as it's typed.
  * The whole selection lives in the URL (see urls.ts), so the check page's counts stay in step.
- * "Save and return" goes back to the check page.
+ * "Back to draft report" goes back to the check page.
  */
 export function buildReportConsulteesPage(service: ManageService): AsyncRequestHandler {
 	return async (req, res) => {

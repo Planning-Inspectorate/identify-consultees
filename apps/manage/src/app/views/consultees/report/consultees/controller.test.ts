@@ -120,10 +120,7 @@ describe('report consultees change page', () => {
 			viewModel.backLinkUrl,
 			`/consultees/${realProjectId}/report?ruleset=england-wales-post-20240430`
 		);
-		assert.strictEqual(
-			viewModel.saveAndReturnUrl,
-			`/consultees/${realProjectId}/report?ruleset=england-wales-post-20240430`
-		);
+		assert.strictEqual(viewModel.backLinkText, 'Back to draft report');
 		assert.strictEqual(viewModel.rows.length, 1);
 		assert.strictEqual(viewModel.rows[0].name, 'Little Snoring Parish Council');
 		// the reason the function gave, as the ruleset condition's own description
@@ -148,7 +145,9 @@ describe('report consultees change page', () => {
 		assert.match(html, /href="[^"]*\/report\/consultees\/add\?[^"]*"[^>]*>\s*Add a consultee/);
 		// the add form lives on its own page now - no name input or datalist here
 		assert.doesNotMatch(html, /<datalist|data-consultee-autocomplete|name="name"/);
-		assert.match(html, /Save and return/);
+		// the way back to the check page is the "Back to draft report" link - no Save button
+		assert.match(html, /Back to draft report/);
+		assert.doesNotMatch(html, /Save and return/);
 		// nothing has been removed - the expandable Removed consultees section doesn't render
 		assert.doesNotMatch(html, /Removed consultees/);
 	});
@@ -274,7 +273,7 @@ describe('report consultees change page', () => {
 			`/consultees/${realProjectId}/report/consultees/remove?ruleset=england-wales-post-20240430&category=Parish%20Council&match=${otherMatchId}&exclude=${matchId}`
 		);
 		assert.strictEqual(
-			viewModel.saveAndReturnUrl,
+			viewModel.backLinkUrl,
 			`/consultees/${realProjectId}/report?ruleset=england-wales-post-20240430&exclude=${matchId}`
 		);
 	});
@@ -298,7 +297,7 @@ describe('report consultees change page', () => {
 		assert.strictEqual(viewModel.rows[0].name, 'Unnamed consultee');
 		// only the real exclusion is carried forward
 		assert.strictEqual(
-			viewModel.saveAndReturnUrl,
+			viewModel.backLinkUrl,
 			`/consultees/${realProjectId}/report?ruleset=england-wales-post-20240430&exclude=${matchId}`
 		);
 	});
@@ -337,7 +336,7 @@ describe('report consultees change page', () => {
 			`/consultees/${realProjectId}/report/consultees/remove?ruleset=england-wales-post-20240430&category=Parish%20Council&added=1${addsParam}`
 		);
 		// the adds ride along to the check page and the next add
-		assert.ok(viewModel.saveAndReturnUrl.includes(`add=${urlParam(firstAdd)}`));
+		assert.ok(viewModel.backLinkUrl.includes(`add=${urlParam(firstAdd)}`));
 		assert.ok(viewModel.addConsulteeUrl.includes(`add=${urlParam(firstAdd)}`));
 		// a ruleset match's remove link keeps the adds while targeting the match
 		assert.match(viewModel.rows[0].removeUrl, /match=55555555/);
@@ -389,9 +388,9 @@ describe('report consultees change page', () => {
 		// along in the page's links - it just has nothing the section can list)
 		assert.doesNotMatch(html, /A Hospital/);
 		// but every removal rides along in the page's links
-		assert.ok(viewModel.saveAndReturnUrl.includes(`exclude=${urlParam(removal)}`));
-		assert.ok(viewModel.saveAndReturnUrl.includes(`exclude=${urlParam(otherCategoryRemoval)}`));
-		assert.ok(viewModel.saveAndReturnUrl.includes('exclude=id-without-reason'));
+		assert.ok(viewModel.backLinkUrl.includes(`exclude=${urlParam(removal)}`));
+		assert.ok(viewModel.backLinkUrl.includes(`exclude=${urlParam(otherCategoryRemoval)}`));
+		assert.ok(viewModel.backLinkUrl.includes('exclude=id-without-reason'));
 	});
 
 	it('should ignore malformed add params rather than fail the page', async () => {
@@ -419,7 +418,7 @@ describe('report consultees change page', () => {
 		assert.strictEqual(viewModel.rows.length, 2);
 		assert.strictEqual(viewModel.rows[1].name, 'Kept Consultee');
 		// the dropped params aren't carried forward either
-		assert.strictEqual((viewModel.saveAndReturnUrl.match(/add=/g) ?? []).length, 1);
+		assert.strictEqual((viewModel.backLinkUrl.match(/add=/g) ?? []).length, 1);
 	});
 
 	it('should show Nearby NSIPs while they are looked for, even with none found - and 404 it otherwise', async () => {
