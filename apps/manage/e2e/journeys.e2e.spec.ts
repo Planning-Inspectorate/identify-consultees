@@ -95,6 +95,13 @@ test.describe('manage journeys', () => {
 			await page.getByRole('link', { name: 'Previous page' }).click();
 			await expect(page).toHaveURL(/page=1/);
 			await expect(page.getByText(`Showing 1 to 25 of ${E2E_PAGE_ROWS} results`)).toBeVisible();
+
+			// browsing every project, with nothing searched, pages too - not a blank-search error
+			await page.goto('/?pageSize=25');
+			await page.getByRole('link', { name: 'Page 2', exact: true }).click();
+			await expect(page).toHaveURL(/page=2/);
+			await expect(page.getByText(/Showing 26 to \d+ of \d+ results/)).toBeVisible();
+			await expect(page.locator('.govuk-error-summary')).toHaveCount(0);
 		} finally {
 			await deleteE2ePageRows(db);
 			await db.$disconnect();

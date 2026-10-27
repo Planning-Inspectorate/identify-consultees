@@ -53,7 +53,8 @@ export function buildHomePage(service: ManageService): AsyncRequestHandler {
 
 		const hrefForPage = (targetPage: number): string => {
 			const params = new URLSearchParams({
-				q: searchQuery,
+				// no q at all when nothing was searched - a blank q is a blank search, an error
+				...(searchQuery ? { q: searchQuery } : {}),
 				pageSize: String(pageSize),
 				page: String(targetPage)
 			});
