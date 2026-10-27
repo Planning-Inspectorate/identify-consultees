@@ -65,7 +65,7 @@ const pages = [
 		path: `/consultees/${SAMPLE_CASE_ID}/report/consultees?ruleset=${SAMPLE_RULESET_ID}&category=Parish%20Council`,
 		name: 'report consultees',
 		heading: /Parish Council/i,
-		mustSee: [/Consultees/i, /Add a consultee/i, /Save and return/i]
+		mustSee: [/Consultees/i, /Add a consultee/i, /Back to draft report/i]
 	},
 	{
 		path: `/consultees/${SAMPLE_CASE_ID}/report/consultees/add?ruleset=${SAMPLE_RULESET_ID}&category=Parish%20Council`,

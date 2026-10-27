@@ -290,9 +290,9 @@ test.describe('manage journeys', () => {
 		await expect(removedTable.getByRole('row', { name: /Added in error/ })).toBeVisible();
 		await expect(page.getByRole('link', { name: /Remove/ })).toHaveCount(parishCount - removed + picked + 1);
 
-		// "Save and return" lands back on the check page - the row's names matching the rows just
+		// "Back to draft report" lands back on the check page - the row's names matching the rows just
 		// listed (past the fifth the names sit behind a closed "Show more" - still in the DOM)
-		await page.getByRole('button', { name: 'Save and return' }).click();
+		await page.getByRole('link', { name: 'Back to draft report' }).click();
 		await expect(page).toHaveURL(new RegExp(`/consultees/${SAMPLE_CASE_ID}/report\\?ruleset=${SAMPLE_RULESET_ID}`));
 		await expect(page.getByRole('heading', { level: 1 })).toContainText('Check consultees before creating the report');
 		const returnedValue = page
