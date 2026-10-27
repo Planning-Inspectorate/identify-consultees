@@ -193,9 +193,25 @@ describe('home page', () => {
 		assert.strictEqual(viewModel.resultsFrom, 26);
 		assert.strictEqual(viewModel.resultsTo, 26);
 		assert.strictEqual(viewModel.resultsTotal, 50);
-		assert.deepStrictEqual(viewModel.pagination.previous, { href: '/?q=&pageSize=25&page=1' });
+		// no q when nothing was searched: following a link with a blank q would be a blank search
+		assert.deepStrictEqual(viewModel.pagination.previous, { href: '/?pageSize=25&page=1' });
 		assert.strictEqual(viewModel.pagination.next, undefined);
 		assert.strictEqual(viewModel.pagination.items.filter((item) => item.current)[0].number, 2);
+	});
+
+	it('should show the next page, not a blank-search error, when browsing every project', async () => {
+		const rows = [{ ...newRow(), totalCount: 50n }];
+		const homePage = buildHomePage({ logger: mockLogger(), db: createMockDb(rows) });
+		const first = { render: mock.fn() };
+		await homePage({ query: {} }, first);
+		const next = new URL(first.render.mock.calls[0].arguments[1].pagination.next.href, 'http://localhost');
+
+		const second = { render: mock.fn() };
+		await homePage({ query: Object.fromEntries(next.searchParams) }, second);
+
+		const viewModel = second.render.mock.calls[0].arguments[1];
+		assert.strictEqual(viewModel.errorSummary, undefined);
+		assert.strictEqual(viewModel.page, 2);
 	});
 
 	it('should keep the search query and page size in pagination links', async () => {
@@ -245,6 +261,6 @@ describe('home page', () => {
 		await homePage({ query: { page: '99' } }, mockRes);
 
 		assert.strictEqual(mockRes.render.mock.callCount(), 0);
-		assert.strictEqual(mockRes.redirect.mock.calls[0].arguments[0], '/?q=&pageSize=25&page=3');
+		assert.strictEqual(mockRes.redirect.mock.calls[0].arguments[0], '/?pageSize=25&page=3');
 	});
 });
