@@ -127,7 +127,7 @@ async function renderAddPage(
 				? { text: 'Start typing to choose a national infrastructure project by its name or case reference.' }
 				: suggestions.size
 					? {
-							text: `Start typing to choose a consultee you removed, or one near the site that the ruleset did not identify (shown faintly on the map). You can also enter any other ${category} consultee by its name.`
+							text: 'Start typing to find consultees local to the site or directly copy and paste in a consultee name'
 						}
 					: undefined,
 		addForm: form,

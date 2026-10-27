@@ -233,7 +233,7 @@ describe('add a consultee page', () => {
 			{ name: 'Barton', hint: '1.3 km from the site' },
 			{ name: 'Christleton', hint: '7.3 km from the site' }
 		]);
-		assert.match(viewModelOf(res).nameHint.text, /a consultee you removed/);
+		assert.match(viewModelOf(res).nameHint.text, /find consultees local to the site/);
 	});
 
 	it('adds a removed consultee back by undoing its removal - as the ruleset found it, not added by hand', async () => {
