@@ -132,6 +132,9 @@
     },
     "@redis/entraid": {
       "@azure/msal-node": "^7.1.0"
+    },
+    "@planning-inspectorate/core": {
+      "@azure/msal-node": "^7.1.0"
     }
   }
 }
