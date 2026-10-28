@@ -117,7 +117,7 @@
   "overrides": {
     "mysql2": "^3.22.0",
     "fast-uri": "^3.1.7",
-    "qs": "^6.16.0",
+    "qs": "^6.17.0",
     "@humanfs/node": "^0.16.8",
     "maplibre-gl": "6.6.0",
     "preact": "^10.29.8",
