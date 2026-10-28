@@ -17,8 +17,9 @@ import { testFaultMiddleware } from './test-faults.ts';
 
 export function createRoutes(service: ManageService): IRouter {
 	const router = createRouter({ mergeParams: true });
-	// the QA fault triggers - ?test-fail= on any page below stores a forced failure in the
-	// session (test-faults.ts). TEMPORARY - remove before go-live
+	// the QA fault triggers (test-faults.ts): ?test-fail=ruleset/download stores a forced
+	// failure in the session; ?test-fail=map fails the request carrying it. TEMPORARY -
+	// remove before go-live
 	router.use(testFaultMiddleware(service));
 	const projectPage = buildConsulteeProjectPage(service);
 	const boundarySubmit = buildBoundarySubmit(service);
