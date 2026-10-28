@@ -7,7 +7,7 @@ Two handlers render these pages, which is why two slightly different pages exist
 - Errors thrown inside the app's routes go through the sanitising handler (`apps/manage/src/app/error-handler.ts`): the real error is logged and `views/errors/500.njk` renders with generic copy. Internal detail - file paths, query text, the error's message - must never reach the page.
 - Unmatched routes, and failures in middleware that runs before routing (CSRF, body parsing, the session store), go through `@planning-inspectorate/core`'s default handler, which renders `views/layouts/error.njk` with a short message.
 
-All of them share `views/layouts/error.njk`, so the header, service navigation and footer should look exactly like a normal page, ending in the "Contact the Planning Inspectorate" block.
+All of them share `views/layouts/error.njk`, so the header, service navigation and footer should look exactly like a normal page, ending in the "Contact IT if you continue to have problems with this service" block.
 
 ## Error pages you can open with a URL
 
@@ -85,5 +85,5 @@ Expected: HTTP 400 and the default-handler error page showing the parser's messa
 
 - The HTTP status matches the table above - use `curl -i` or dev tools; a "Page not found" body served with a 200 is a bug.
 - The copy matches, and on the sanitised 500 nothing internal leaks: no error message, stack, file paths or query text.
-- Header, service navigation and footer render normally, and the "Contact the Planning Inspectorate" block is there.
+- Header, service navigation and footer render normally, and the "Contact IT if you continue to have problems with this service" block is there.
 - On deployed environments without `ENABLE_DEV_PAGES`, the dev-only routes 404 like any other unmatched path.
