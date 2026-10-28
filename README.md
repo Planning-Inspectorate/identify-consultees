@@ -51,7 +51,7 @@ Verify `ENABLE_DEV_PAGES` is not set on the production app — nothing in `infra
 
 ### QA fault triggers
 
-The `?test-fail=<map|ruleset|download>` triggers force the error states so QA can exercise them on a deployed environment: `map` fails only the request carrying the parameter; `ruleset` and `download` are stored in the session until `?test-fail=off` (see [`kt-docs/error-pages.md`](./kt-docs/error-pages.md)). On everywhere but prod via `Config.testFaultsEnabled` (`ENVIRONMENT !== 'prod'`). Remove:
+The `?test-fail=<map|ruleset|download>` triggers force the error states so QA can exercise them on a deployed environment: `map` and `download` fail only the request carrying the parameter; `ruleset` is stored in the session until `?test-fail=off` (see [`kt-docs/error-pages.md`](./kt-docs/error-pages.md)). On everywhere but prod via `Config.testFaultsEnabled` (`ENVIRONMENT !== 'prod'`). Remove:
 
 - `apps/manage/src/app/views/consultees/test-faults.ts` and `test-faults.test.ts`
 - the `testFaultMiddleware` mount and import in `apps/manage/src/app/views/consultees/index.ts`
