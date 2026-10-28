@@ -25,6 +25,25 @@
 
     {% if error %}
         {{ govukErrorMessage({ text: error }) }}
+        {% set checkRows = [{ key: { text: "Import" }, value: { text: cause } }] %}
+        {% if connection.error %}
+            {% set checkRows = (checkRows.push({ key: { text: "CBOS connection check" }, value: { text: connection.error } }), checkRows) %}
+        {% else %}
+            {% for name, check in { "CBOS database": connection.database, "CBOS documents": connection.storage } %}
+                {% set checkRows = (checkRows.push({
+                    key: { text: name },
+                    value: { text: (check.status == "OK" and "OK - " or "Failed - ") ~ check.detail }
+                }), checkRows) %}
+            {% endfor %}
+        {% endif %}
+        <h2 class="govuk-heading-m">What went wrong</h2>
+        {{ govukSummaryList({ rows: checkRows }) }}
+        <p class="govuk-body">
+            "Login failed" on the database means this environment's function app has no user in
+            CBOS's database - its owners need to add one. A timeout or "server was not found" means
+            the function can't reach CBOS over the network. A failed documents check means it can't
+            read CBOS's document storage.
+        </p>
     {% endif %}
 
     {% if imported != undefined %}

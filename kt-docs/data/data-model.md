@@ -123,6 +123,8 @@ CBOS (the IDAS back office) is PINS's system of record for cases. A case officer
 
 Nothing else is done to the geometry: screening simplifies the site to 10m when it runs, as for any boundary.
 
+**When the import fails altogether**, the page runs the function's CBOS connection check (`/api/cbos/health`) and shows it under **What went wrong**: whether the function could sign in to CBOS's database and read its documents, and if not, the error. "Login failed for user '<token-identified principal>'" means the environment's function app (`pins-func-consultees-orchestrator-<env>`) has no user in CBOS's database. Terraform can't make one, so CBOS's database owners create it in SQL (`CREATE USER [...] FROM EXTERNAL PROVIDER`, with read access including `CaseStatus`), once for each environment. A timeout or "server was not found" is the network (the VNet peering or private DNS in `idas-back-office.tf` and `networking.tf`). A failed documents check is the Storage Blob Data Reader role, which Terraform grants.
+
 **When a case's boundary isn't imported**, the usual reasons are a ZIP CBOS marked `invalid`, one never virus checked and so never sent for conversion, a ZIP with no `.prj` (GeoJSON in grid metres, turned away above), or a file outside a GIS Shapefiles folder. CBOS's historical boundaries migration adds its GeoJSON as version 1 of a new document, so the import reads those too, once it has run in that environment.
 
 1. Edit `schema.prisma`, then run `npx prisma migrate dev --create-only` in `packages/database`.

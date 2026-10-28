@@ -42,7 +42,12 @@ describe('admin page accessibility smoke', () => {
 			...navFor('/admin/import-from-cbos'),
 			pageHeading: 'Import cases from CBOS',
 			_csrf: 'test-csrf',
-			error: 'Could not import case boundaries from CBOS.'
+			error: 'Could not import case boundaries from CBOS.',
+			cause: 'Python function cbos/boundary-files responded with status 500',
+			connection: {
+				database: { status: 'ERROR', detail: "Error: Login failed for user '<token-identified principal>'" },
+				storage: { status: 'OK', detail: 'listed 5 blob name(s) in document-service-uploads' }
+			}
 		});
 		await assertNoSeriousA11yViolations(html);
 	});

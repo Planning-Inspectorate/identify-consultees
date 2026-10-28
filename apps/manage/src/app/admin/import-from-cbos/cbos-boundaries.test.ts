@@ -4,6 +4,7 @@ import { describe, it, mock } from 'node:test';
 import type { CbosBoundaryFile, CbosFeatureCollection } from './cbos-boundaries.ts';
 import {
 	CASE_STAGE_LABELS,
+	checkCbosConnection,
 	combineGeometries,
 	distinctFileNames,
 	fetchCbosBoundaryGeoJson,
@@ -65,6 +66,48 @@ describe('CBOS boundaries', () => {
 			await assert.rejects(listCbosBoundaryFiles(OPTIONS), /status 500/);
 
 			await assert.rejects(listCbosBoundaryFiles({ ...OPTIONS, pythonFunctionUrl: undefined }), /not configured/);
+		});
+	});
+
+	describe('checkCbosConnection', () => {
+		const LOGIN_FAILED = { status: 'ERROR', detail: "Error: Login failed for user '<token-identified principal>'" };
+		const LISTED = { status: 'OK', detail: 'listed 5 blob name(s) in document-service-uploads' };
+
+		it("returns each of the function's checks, passed or failed, with the API key sent", async (t) => {
+			const fetchMock = t.mock.method(
+				globalThis,
+				'fetch',
+				respondWith(503, { status: 'ERROR', database: LOGIN_FAILED, storage: LISTED })
+			);
+
+			assert.deepStrictEqual(await checkCbosConnection(OPTIONS), { database: LOGIN_FAILED, storage: LISTED });
+			assert.strictEqual(fetchMock.mock.calls[0].arguments[0], 'http://localhost:7071/api/cbos/health');
+			assert.strictEqual(fetchMock.mock.calls[0].arguments[1]?.headers?.['x-api-key' as keyof HeadersInit], 'test-key');
+		});
+
+		it("says why when the checks couldn't run, and never rejects", async (t) => {
+			t.mock.method(globalThis, 'fetch', respondWith(500, { status: 'ERROR', error: 'missing settings: X' }));
+			assert.deepStrictEqual(await checkCbosConnection(OPTIONS), { error: 'missing settings: X' });
+
+			t.mock.method(
+				globalThis,
+				'fetch',
+				async () => ({ status: 401, json: async () => JSON.parse('not json') }) as Response
+			);
+			assert.deepStrictEqual(await checkCbosConnection(OPTIONS), {
+				error: "The function's CBOS check responded with status 401"
+			});
+
+			t.mock.method(globalThis, 'fetch', async () => {
+				throw new Error('fetch failed');
+			});
+			assert.deepStrictEqual(await checkCbosConnection(OPTIONS), {
+				error: 'The function could not be reached: fetch failed'
+			});
+
+			assert.deepStrictEqual(await checkCbosConnection({ ...OPTIONS, pythonFunctionUrl: undefined }), {
+				error: 'The function could not be reached: PYTHON_FUNCTION_URL is not configured'
+			});
 		});
 	});
 
