@@ -302,7 +302,7 @@ describe('report consultees change page', () => {
 		);
 	});
 
-	it('should list hand-added consultees for the category after the ruleset matches', async () => {
+	it('should list the category’s consultees alphabetically, hand-added ones among the matches', async () => {
 		const mockRes = { status: mock.fn(() => mockRes), render: mock.fn() };
 		const firstAdd = addJson('First Test Consultee', 'Bordering landowner');
 		const secondAdd = addJson('Second Test Consultee');
@@ -319,8 +319,9 @@ describe('report consultees change page', () => {
 
 		const viewModel = mockRes.render.mock.calls[0].arguments[1];
 		assert.strictEqual(viewModel.rows.length, 3);
-		assert.strictEqual(viewModel.rows[1].name, 'First Test Consultee');
-		assert.deepStrictEqual(viewModel.rows[1].identified, ['Bordering landowner']);
+		// alphabetical by name: 'First Test Consultee', 'Little Snoring Parish Council', 'Second Test Consultee'
+		assert.strictEqual(viewModel.rows[0].name, 'First Test Consultee');
+		assert.deepStrictEqual(viewModel.rows[0].identified, ['Bordering landowner']);
 		assert.strictEqual(viewModel.rows[2].name, 'Second Test Consultee');
 		assert.deepStrictEqual(viewModel.rows[2].identified, ['Manually added']);
 
@@ -328,7 +329,7 @@ describe('report consultees change page', () => {
 		// adds all ride along so the page can drop the right one on submit
 		const addsParam = `&add=${urlParam(firstAdd)}&add=${urlParam(secondAdd)}&add=${urlParam(otherCategoryAdd)}`;
 		assert.strictEqual(
-			viewModel.rows[1].removeUrl,
+			viewModel.rows[0].removeUrl,
 			`/consultees/${realProjectId}/report/consultees/remove?ruleset=england-wales-post-20240430&category=Parish%20Council&added=0${addsParam}`
 		);
 		assert.strictEqual(
@@ -339,8 +340,23 @@ describe('report consultees change page', () => {
 		assert.ok(viewModel.backLinkUrl.includes(`add=${urlParam(firstAdd)}`));
 		assert.ok(viewModel.addConsulteeUrl.includes(`add=${urlParam(firstAdd)}`));
 		// a ruleset match's remove link keeps the adds while targeting the match
-		assert.match(viewModel.rows[0].removeUrl, /match=55555555/);
-		assert.ok(viewModel.rows[0].removeUrl.includes(`add=${urlParam(firstAdd)}`));
+		assert.match(viewModel.rows[1].removeUrl, /match=55555555/);
+		assert.ok(viewModel.rows[1].removeUrl.includes(`add=${urlParam(firstAdd)}`));
+	});
+
+	it('should sort the ruleset’s matches by name', async () => {
+		const mockRes = { status: mock.fn(() => mockRes), render: mock.fn() };
+		const db = dbReturning([
+			[realProjectRow()],
+			[parishMatchRow(matchId, 'Thorganby Parish Council'), parishMatchRow(otherMatchId, 'Cawood Parish Council')]
+		]);
+		await handlerFor(db)({ params: { caseId: realProjectId }, query: { category: 'Parish Council' } }, mockRes);
+
+		const viewModel = mockRes.render.mock.calls[0].arguments[1];
+		assert.deepStrictEqual(
+			viewModel.rows.map((row: { name: string }) => row.name),
+			['Cawood Parish Council', 'Thorganby Parish Council']
+		);
 	});
 
 	it('should list this category’s recorded removals in the Removed consultees section, open when asked', async () => {
@@ -416,7 +432,7 @@ describe('report consultees change page', () => {
 
 		const viewModel = mockRes.render.mock.calls[0].arguments[1];
 		assert.strictEqual(viewModel.rows.length, 2);
-		assert.strictEqual(viewModel.rows[1].name, 'Kept Consultee');
+		assert.strictEqual(viewModel.rows[0].name, 'Kept Consultee');
 		// the dropped params aren't carried forward either
 		assert.strictEqual((viewModel.backLinkUrl.match(/add=/g) ?? []).length, 1);
 	});

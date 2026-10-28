@@ -36,9 +36,9 @@ export function addedConsulteeReason(add: AddedConsultee): string {
 /**
  * The report's consultees, by category: what the ruleset's conditions identified (not consultees
  * only the nearby search found - they're map context, not report content), less anything removed on a category's
- * Change page, plus anything added by hand - each with why it's in the report. Categories follow
- * the check page's order (see reportCategories), then any category only a hand-added consultee is
- * in; a category with nothing in it is left out.
+ * Change page, plus anything added by hand - each with why it's in the report, listed alphabetically
+ * by name. Categories follow the check page's order (see reportCategories), then any category only a
+ * hand-added consultee is in; a category with nothing in it is left out.
  */
 export function reportByCategory(
 	ruleset: Ruleset,
@@ -74,7 +74,7 @@ export function reportByCategory(
 						identified: [addedConsulteeReason(add)],
 						mapped: add.id !== undefined && runIds.has(add.id)
 					}))
-			]
+			].sort((a, b) => a.name.localeCompare(b.name, 'en-GB'))
 		}))
 		.filter((section) => section.consultees.length > 0);
 }
