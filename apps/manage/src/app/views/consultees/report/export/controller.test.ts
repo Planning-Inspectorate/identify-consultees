@@ -5,7 +5,6 @@ import { after, before, describe, it, mock } from 'node:test';
 import { ONE_PIXEL_PNG, pdfTextLines } from '../../../../testing/pdf-text.ts';
 import type { ConsulteeAreaMatchRow } from '../../../../testing/ruleset-runner-stub.ts';
 import { failingRulesetRunner, rulesetRunnerReturning } from '../../../../testing/ruleset-runner-stub.ts';
-import { TEST_FAULT_SESSION_FIELD } from '../../test-faults.ts';
 import { consulteeSelection, reportDownloadUrl } from '../urls.ts';
 import { buildReportDownload } from './controller.ts';
 import { rememberReportZip } from './report-zip.ts';
@@ -373,8 +372,8 @@ describe('report download', () => {
 		await buildReportDownload(service as never)(
 			{
 				params: { caseId: realProjectId },
-				query,
-				session: { [TEST_FAULT_SESSION_FIELD]: 'download' }
+				query: { ...query, 'test-fail': 'download' },
+				session: {}
 			} as never,
 			res as never
 		);

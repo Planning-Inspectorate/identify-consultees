@@ -7,7 +7,6 @@ import { configureNunjucks } from '../../../nunjucks.ts';
 import { ONE_PIXEL_PNG } from '../../../testing/pdf-text.ts';
 import type { ConsulteeAreaMatchRow } from '../../../testing/ruleset-runner-stub.ts';
 import { failingRulesetRunner, rulesetRunnerReturning } from '../../../testing/ruleset-runner-stub.ts';
-import { TEST_FAULT_SESSION_FIELD } from '../test-faults.ts';
 import { buildReportCheckPage, buildReportCreatedPage, groupedConsultees } from './controller.ts';
 import { rememberedReportZip } from './export/report-zip.ts';
 
@@ -578,8 +577,8 @@ describe('report created page', () => {
 			{
 				params: { caseId: realProjectId },
 				// a URL no other test uses - a kept copy would hide that the build was skipped
-				query: { exclude: 'abababab-0000-0000-0000-000000000042' },
-				session: { [TEST_FAULT_SESSION_FIELD]: 'download' }
+				query: { exclude: 'abababab-0000-0000-0000-000000000042', 'test-fail': 'download' },
+				session: {}
 			},
 			mockRes
 		);
@@ -590,6 +589,7 @@ describe('report created page', () => {
 		const viewModel = mockRes.render.mock.calls[0].arguments[1];
 		assert.strictEqual(rememberedReportZip(viewModel.downloadUrl), undefined);
 		assert.strictEqual(viewModel.downloadFailed, true);
+		assert.strictEqual(viewModel.pageHeading, 'Report could not be created');
 		const html = mockRes.render.mock.calls[0].result;
 		assert.match(html, /govuk-panel--error/);
 		assert.match(html, /scoping report could not be downloaded/);

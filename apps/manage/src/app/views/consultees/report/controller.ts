@@ -5,7 +5,7 @@ import type { AsyncRequestHandler } from '@planning-inspectorate/core/util';
 import { NEARBY_NSIPS } from '../nearby-nsips.ts';
 import { resolveCase } from '../resolve-case.ts';
 import { firstQueryValue, requestedRuleset, runRulesetSafely } from '../run-ruleset.ts';
-import { activeTestFault } from '../test-faults.ts';
+import { requestTestFault } from '../test-faults.ts';
 import { reportCategories } from './categories.ts';
 import { buildReportZip, formatFileSize, rememberedReportZip, rememberReportZip } from './export/report-zip.ts';
 import { GROUP_TABS, tabForCategory } from './export/workbook.ts';
@@ -161,7 +161,7 @@ export function buildReportCreatedPage(service: ManageService): AsyncRequestHand
 		if (!failed) {
 			try {
 				// the QA fault trigger (test-faults.ts): the build fails as if generation were down
-				if (activeTestFault(service, req.session) === 'download') {
+				if (requestTestFault(service, req.query) === 'download') {
 					throw new Error('test-fail=download: forced report build failure');
 				}
 				const report =
@@ -175,8 +175,11 @@ export function buildReportCreatedPage(service: ManageService): AsyncRequestHand
 			}
 		}
 
+		// the download sends them back here with ?download=failed; a build that already
+		// failed here means there is no working report to link to either way
+		const downloadFailed = buildFailed || firstQueryValue(req.query.download) === 'failed';
 		const viewModel: ReportCreatedViewModel = {
-			pageHeading: 'Report created',
+			pageHeading: downloadFailed ? 'Report could not be created' : 'Report created',
 			backLinkUrl: reportUrl(project.id, ruleset.id, selection),
 			caseName: project.properties.caseName,
 			reference: project.properties.caseReference,
@@ -184,9 +187,7 @@ export function buildReportCreatedPage(service: ManageService): AsyncRequestHand
 			downloadText: `Download ${project.properties.caseName} Consultee List report (ZIP${downloadSize ? `, ${downloadSize}` : ''})`,
 			rulesetFailed: failed,
 			retryUrl: reportCreatedUrl(project.id, ruleset.id, selection),
-			// the download sends them back here with ?download=failed; a build that already
-			// failed here means there is no working report to link to either way
-			downloadFailed: buildFailed || firstQueryValue(req.query.download) === 'failed'
+			downloadFailed
 		};
 		return res.render('views/consultees/report/created.njk', viewModel);
 	};

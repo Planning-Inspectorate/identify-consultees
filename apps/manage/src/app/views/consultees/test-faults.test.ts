@@ -1,12 +1,7 @@
 import { mockLogger } from '@planning-inspectorate/core/testing';
 import assert from 'node:assert';
 import { describe, it, mock } from 'node:test';
-import {
-	activeTestFault,
-	mapTestFaultRequested,
-	TEST_FAULT_SESSION_FIELD,
-	testFaultMiddleware
-} from './test-faults.ts';
+import { activeTestFault, requestTestFault, TEST_FAULT_SESSION_FIELD, testFaultMiddleware } from './test-faults.ts';
 
 function middlewareRequest(query: Record<string, unknown>, session?: Record<string, unknown>) {
 	return {
@@ -25,7 +20,7 @@ describe('testFaultMiddleware', () => {
 	const enabled = testFaultMiddleware({ testFaultsEnabled: true, logger: mockLogger() });
 
 	it('stores the session faults in the session', () => {
-		for (const fault of ['ruleset', 'download'] as const) {
+		for (const fault of ['ruleset'] as const) {
 			const session: Record<string, unknown> = {};
 			const next = run(enabled, middlewareRequest({ 'test-fail': fault }, session));
 			assert.equal(session[TEST_FAULT_SESSION_FIELD], fault);
@@ -33,11 +28,13 @@ describe('testFaultMiddleware', () => {
 		}
 	});
 
-	it('does not store the one-off map fault - it fails its own request only', () => {
-		const session: Record<string, unknown> = {};
-		const next = run(enabled, middlewareRequest({ 'test-fail': 'map' }, session));
-		assert.equal(session[TEST_FAULT_SESSION_FIELD], undefined);
-		assert.equal(next.mock.callCount(), 1);
+	it('does not store the per-request faults - they fail their own request only', () => {
+		for (const fault of ['map', 'download'] as const) {
+			const session: Record<string, unknown> = {};
+			const next = run(enabled, middlewareRequest({ 'test-fail': fault }, session));
+			assert.equal(session[TEST_FAULT_SESSION_FIELD], undefined);
+			assert.equal(next.mock.callCount(), 1);
+		}
 	});
 
 	it('takes the first of repeated params', () => {
@@ -71,11 +68,11 @@ describe('activeTestFault', () => {
 
 	it('returns the stored session fault while enabled', () => {
 		assert.equal(activeTestFault(enabled, { [TEST_FAULT_SESSION_FIELD]: 'ruleset' }), 'ruleset');
-		assert.equal(activeTestFault(enabled, { [TEST_FAULT_SESSION_FIELD]: 'download' }), 'download');
 	});
 
-	it('ignores a stored map - it is per-request, never a session fault', () => {
+	it('ignores a stored per-request fault - they are never session faults', () => {
 		assert.equal(activeTestFault(enabled, { [TEST_FAULT_SESSION_FIELD]: 'map' }), undefined);
+		assert.equal(activeTestFault(enabled, { [TEST_FAULT_SESSION_FIELD]: 'download' }), undefined);
 	});
 
 	it('is undefined while disabled, without a store, or for a stored value that is no fault', () => {
@@ -86,18 +83,21 @@ describe('activeTestFault', () => {
 	});
 });
 
-describe('mapTestFaultRequested', () => {
+describe('requestTestFault', () => {
 	const enabled = { testFaultsEnabled: true };
 
-	it('is true only while ?test-fail=map is on the request', () => {
-		assert.equal(mapTestFaultRequested(enabled, { 'test-fail': 'map' }), true);
-		assert.equal(mapTestFaultRequested(enabled, { 'test-fail': ['map', 'ruleset'] }), true);
-		assert.equal(mapTestFaultRequested(enabled, { 'test-fail': 'ruleset' }), false);
-		assert.equal(mapTestFaultRequested(enabled, {}), false);
-		assert.equal(mapTestFaultRequested(enabled, undefined), false);
+	it('returns the per-request fault named on the request', () => {
+		assert.equal(requestTestFault(enabled, { 'test-fail': 'map' }), 'map');
+		assert.equal(requestTestFault(enabled, { 'test-fail': 'download' }), 'download');
+		assert.equal(requestTestFault(enabled, { 'test-fail': ['download', 'map'] }), 'download');
+		// a session fault on the query is not a request fault, nor is anything unrecognised
+		assert.equal(requestTestFault(enabled, { 'test-fail': 'ruleset' }), undefined);
+		assert.equal(requestTestFault(enabled, {}), undefined);
+		assert.equal(requestTestFault(enabled, undefined), undefined);
 	});
 
-	it('is false while the triggers are disabled', () => {
-		assert.equal(mapTestFaultRequested({ testFaultsEnabled: false }, { 'test-fail': 'map' }), false);
+	it('is undefined while the triggers are disabled', () => {
+		assert.equal(requestTestFault({ testFaultsEnabled: false }, { 'test-fail': 'map' }), undefined);
+		assert.equal(requestTestFault({ testFaultsEnabled: false }, { 'test-fail': 'download' }), undefined);
 	});
 });

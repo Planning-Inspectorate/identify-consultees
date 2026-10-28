@@ -425,7 +425,7 @@ describe('manage page accessibility smoke', () => {
 	test('report created page when the download failed has no serious a11y violations', async () => {
 		const html = nunjucks.render('views/consultees/report/created.njk', {
 			...pageLocals,
-			pageHeading: 'Report created',
+			pageHeading: 'Report could not be created',
 			backLinkUrl: '/consultees/11111111-1111-1111-1111-111111111111?ruleset=england-wales-post-20240430',
 			caseName: 'Longfield Solar Farm',
 			reference: 'EN0110007',
