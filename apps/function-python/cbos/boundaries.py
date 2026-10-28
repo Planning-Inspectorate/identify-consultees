@@ -14,7 +14,7 @@ and apps/api/src/server/applications/application/documents/shapefile-processing.
 import json
 import logging
 from dataclasses import dataclass, replace
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from cbos.config import CbosConfig
 from cbos.database import connect
@@ -81,7 +81,7 @@ def _utc_iso(value: datetime | None) -> str | None:
     # JavaScript reads the bare timestamp as local time
     if value is None:
         return None
-    return (value if value.tzinfo else value.replace(tzinfo=timezone.utc)).isoformat()
+    return (value if value.tzinfo else value.replace(tzinfo=UTC)).isoformat()
 
 
 class BoundaryFileNotFound(Exception):

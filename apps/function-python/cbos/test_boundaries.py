@@ -1,5 +1,5 @@
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -96,7 +96,7 @@ def test_the_stage_query_reads_each_cases_current_stage():
 
 
 def test_boundary_file_json_keeps_an_explicit_zone_and_allows_a_missing_date():
-    aware = datetime(2026, 5, 1, 10, 30, tzinfo=timezone.utc)
+    aware = datetime(2026, 5, 1, 10, 30, tzinfo=UTC)
     assert BoundaryFile(GUID, 1, "EN010001", None, None, aware).as_json()["createdAt"] == "2026-05-01T10:30:00+00:00"
     assert BoundaryFile(GUID, 1, "EN010001", None, None, None).as_json()["createdAt"] is None
 

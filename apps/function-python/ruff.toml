@@ -1,3 +1,4 @@
-# CI lints and tests on the agent's own Python 3.10 (see .azure/pipelines/pr.yml's Python job), while
-# the Function App runs 3.12 - so rules must not suggest syntax newer than 3.10, such as datetime.UTC
-target-version = "py310"
+# the Function App runtime and the CI test step both run Python 3.12 (infrastructure/app-function.tf
+# and .azure/pipelines/pr.yml's Python job) - linting itself uses the agent's system Python, which
+# only needs to run ruff, not the code
+target-version = "py312"

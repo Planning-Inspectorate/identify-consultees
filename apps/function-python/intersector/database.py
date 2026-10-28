@@ -7,13 +7,10 @@ import threading
 import time
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
-from typing import TypeVar
 
 import pymssql
 
 from setup_database.db import ConnectionParams, connect
-
-T = TypeVar("T")
 
 DEADLOCK_RETRIES = 3
 
@@ -49,7 +46,7 @@ def is_deadlock_error(error: BaseException) -> bool:
     return re.search("deadlock", str(error), re.IGNORECASE) is not None
 
 
-def with_deadlock_retry(fn: Callable[[], T], retries: int = DEADLOCK_RETRIES) -> T:
+def with_deadlock_retry[T](fn: Callable[[], T], retries: int = DEADLOCK_RETRIES) -> T:
     """Run `fn`, retrying it if SQL Server picks it as a deadlock victim - an expected outcome of
     concurrent reads against the same table, not a bug.
 
