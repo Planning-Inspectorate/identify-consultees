@@ -29,7 +29,12 @@ function squareAround(lng: number, lat: number, halfSizeDegrees: number): Positi
 	];
 }
 
-/** Prototype polygons near the Dorset coast (Navitus Bay area). */
+/**
+ * Prototype polygons near the Dorset coast (Navitus Bay area).
+ * TEMPORARY - demo-map builders only; remove before go-live (the MAP_VIEWPORT
+ * constant and GeoJson types above stay - the real maps use them). See
+ * README.md's "Before go-live: code to remove".
+ */
 export function buildProjectSiteGeojson(reference: string, caseName: string): GeoJsonFeatureCollection {
 	return {
 		type: 'FeatureCollection',

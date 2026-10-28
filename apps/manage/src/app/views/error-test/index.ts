@@ -1,3 +1,5 @@
+// error-scenario index for QA. TEMPORARY - remove before go-live
+// (see README.md's "Before go-live: code to remove")
 import type { ManageService } from '#service';
 import type { IRouter } from 'express';
 import { Router as createRouter } from 'express';

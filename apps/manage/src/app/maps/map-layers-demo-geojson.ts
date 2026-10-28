@@ -4,6 +4,8 @@ import { buildProjectSiteGeojson } from './sample-geojson.ts';
 /**
  * Prototype LineString / Polygon overlays near the Dorset coast project site.
  * Used only by the map-layers demo to show Defra Layers toggles — not live OSM tiles.
+ *
+ * TEMPORARY - remove before go-live (see README.md's "Before go-live: code to remove").
  */
 
 export type OverlayGeoJsonFeatureCollection = {

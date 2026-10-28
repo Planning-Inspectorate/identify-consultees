@@ -31,7 +31,8 @@ export function addLocalsConfiguration(options: { devPagesEnabled?: boolean } = 
 			// the support links the site footer lists - generic Planning Inspectorate pages.
 			// `hidden` keeps the page routed but takes its link out of the footer (the list item
 			// gets pins-footer__item--hidden): T&Cs and the accessibility statement are hidden
-			// until their content has had a proper audit
+			// until their content has had a proper audit. TEMPORARY - un-hide before go-live
+			// (see README.md's "Before go-live: code to remove")
 			footerLinks: [
 				{ text: 'Terms and conditions', link: '/terms-and-conditions', hidden: true },
 				{ text: 'Accessibility statement', link: '/accessibility-statement', hidden: true },
@@ -44,7 +45,8 @@ export function addLocalsConfiguration(options: { devPagesEnabled?: boolean } = 
 			]
 		};
 		// the "Components" nav item (component showcase) is only shown when ?components=true is in the URL,
-		// and only exists at all while the dev pages are mounted (see config.ts devPagesEnabled)
+		// and only exists at all while the dev pages are mounted (see config.ts devPagesEnabled).
+		// TEMPORARY - remove before go-live (see README.md's "Before go-live: code to remove")
 		res.locals.showComponentsNav = (options.devPagesEnabled ?? true) && req.query.components === 'true';
 		next();
 	};

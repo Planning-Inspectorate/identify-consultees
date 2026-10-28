@@ -1,3 +1,5 @@
+// nearby-area query straight from Node, for comparison during development.
+// TEMPORARY - remove before go-live (see README.md's "Before go-live: code to remove")
 import type { ManageService } from '#service';
 import { asyncHandler } from '@planning-inspectorate/core/util';
 import type { IRouter } from 'express';

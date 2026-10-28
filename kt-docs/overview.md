@@ -162,8 +162,7 @@ The main journey is **database-backed**: there are no fixtures. Locally the data
 
 ## Before go-live
 
+- [ ] Remove the temporary dev and QA code: the dev pages (`/components/*`, `/map-layers-demo`, `/error-test`, `/consultee-areas-*`), the `?test-fail=` fault triggers and the hidden footer links — the full inventory is in [README.md → Before go-live: code to remove](../README.md#before-go-live-code-to-remove), and every item is marked `TEMPORARY - remove before go-live` in the code
 - [ ] Add the visual regression tests to the PR pipeline once screens are final, with Linux baselines (see [Testing](./testing.md))
-- [ ] Remove the components showcase (`/components/*`, including the interactive map examples). The dev pages only mount when `devPagesEnabled` is on
-- [ ] Remove the `?test-fail=` QA fault triggers used to exercise the boundary-map, ruleset and report-download error states (see [Error pages](./error-pages.md)): `testFaultsEnabled` in `config.ts`/`service.ts`, `views/consultees/test-faults.ts` and its middleware mount in `views/consultees/index.ts`, and the fault branches in `run-ruleset.ts`, `project/controller.ts` and the report `controller.ts`/`export/controller.ts`
 - [ ] Get sign-off for the consultee category map colours (interim, see [Maps](./maps.md))
 - [ ] Size the Prod database for screening and load-test it (see [Screening issues](./data/screening-issues.md))

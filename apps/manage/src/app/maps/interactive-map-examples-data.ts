@@ -2,6 +2,8 @@
  * Demo GeoJSON for the interactive-map component examples page.
  * Field parcels and monument points adapted from the Defra
  * interactive-map documentation examples (Ambleside, Lake District).
+ *
+ * TEMPORARY - remove before go-live (see README.md's "Before go-live: code to remove").
  */
 
 import type { GeoJsonFeatureCollection } from './sample-geojson.ts';

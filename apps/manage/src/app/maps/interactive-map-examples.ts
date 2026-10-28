@@ -10,6 +10,8 @@
  *
  * Demo geography follows the upstream Defra documentation examples
  * (Ambleside / Windermere field parcels and monuments).
+ *
+ * TEMPORARY - remove before go-live (see README.md's "Before go-live: code to remove").
  */
 
 import { FIELD_PARCELS_GEOJSON, HISTORIC_MONUMENTS_GEOJSON } from './interactive-map-examples-data.ts';

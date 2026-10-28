@@ -2,6 +2,8 @@
  * Initialise the Defra Interactive Map examples on the hidden
  * /components/interactive-map showcase pages.
  *
+ * TEMPORARY - remove before go-live (see README.md's "Before go-live: code to remove").
+ *
  * One page = one example. The `<mapId>-data` JSON block (rendered server-side
  * from the example registry) declares which plugins to wire and any options
  * they need; `kind` selects the example-specific event wiring.
