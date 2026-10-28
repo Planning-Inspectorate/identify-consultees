@@ -31,3 +31,17 @@ updates:
       day: 'tuesday' # day after npm updates
     cooldown:
       default-days: 7
+  - package-ecosystem: 'pip'
+    directory: '/apps/function-python' # Location of requirements.txt
+    schedule:
+      interval: 'weekly'
+      day: 'tuesday' # day after npm updates
+    cooldown:
+      default-days: 7
+    groups:
+      python: # pinned requirements move together - test_requirements.py enforces ==
+        patterns:
+          - '*'
+  # no 'docker' ecosystem: the Dockerfile's FROM is the floating major-only tag
+  # node:24-alpine (see apps/manage/Dockerfile and AGENTS.md's toolchain rules), so
+  # there is no version for Dependabot to bump
