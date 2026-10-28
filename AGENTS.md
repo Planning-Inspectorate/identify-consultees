@@ -156,6 +156,17 @@ No application code imports React or Preact — the manage UI is GOV.UK Frontend
 
 Do not remove these entries as a “cleanup” — they are enforced by `scripts/check-toolchain.mjs` and removing them breaks Azure `npm ci`. They can only go if the underlying dependencies (`prisma` CLI, `@defra/interactive-map`, `accessible-autocomplete`) are removed, which is an architecture decision, not a tidy-up.
 
+### Vendored-dependency patches (revisit on every `@defra/interactive-map` bump)
+
+`postinstall` rewrites two bundles vendored inside `@defra/interactive-map`'s installed package (the browser loads its prebuilt dist files, so an `npm overrides` entry on the real dependency is not enough). Both are temporary — check them off when upstream makes them redundant:
+
+| Patch                                | Fixes                                                                                                   | Remove when                                                                |
+| ------------------------------------ | ------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| `scripts/patch-maplibre-sanitize.ts` | CVE-2026-85061 / GHSA-jrc7-96c5-q579 in the bundled `im-maplibre-framework.js` (`maplibre-gl` < 6.4.1)  | The package ships a bundle built on maplibre-gl ≥ 6.4.1                    |
+| `scripts/patch-im-aria-controls.ts`  | Viewport `aria-controls` points at the removed `#<id>-features` (axe critical; see the gotchas section) | Upstream points it at `#<id>-spatial-list` (still unfixed in 0.0.51-alpha) |
+
+Also revisit the package's pre-release pin (`0.0.48-fmp-2`) on each bump — a stable release line should replace it. Removal checklist: delete the script, its `deps:patch-*` npm script and `postinstall` entry in `package.json`, and the matching `npm run deps:patch-*` line in `apps/manage/Dockerfile`. Each patch throws when its expected pattern disappears, so a fixed upstream version fails the install loudly rather than silently no-oping.
+
 ### Switching locally
 
 ```bash
