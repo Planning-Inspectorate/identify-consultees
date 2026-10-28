@@ -26,7 +26,8 @@ export function buildContentSecurityPolicyDirectives(options: SecurityHeadersOpt
 		defaultSrc: ["'self'"],
 		baseUri: ["'self'"],
 		objectSrc: ["'none'"],
-		frameAncestors: ["'self'"],
+		// nothing frames the service - 'none', paired with X-Frame-Options: DENY below
+		frameAncestors: ["'none'"],
 		formAction: ["'self'"],
 		scriptSrc: ["'self'", (_req: unknown, res: CspNonceResponse) => `'nonce-${res.locals?.cspNonce ?? ''}'`],
 		scriptSrcAttr: ["'none'"],
@@ -55,6 +56,6 @@ export const STRICT_TRANSPORT_SECURITY_PRODUCTION = 'max-age=63072000; includeSu
 
 export const REFERRER_POLICY = 'no-referrer';
 export const X_CONTENT_TYPE_OPTIONS = 'nosniff';
-export const X_FRAME_OPTIONS = 'SAMEORIGIN';
+export const X_FRAME_OPTIONS = 'DENY';
 export const CROSS_ORIGIN_OPENER_POLICY = 'same-origin';
 export const CROSS_ORIGIN_RESOURCE_POLICY = 'same-origin';
