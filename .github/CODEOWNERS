@@ -1,0 +1,21 @@
+# any GitHub configuration
+.github @Planning-Inspectorate/pins-developer-leads
+
+# commit hook configuration
+.husky/ @Planning-Inspectorate/pins-developer-leads
+
+# Azure DevOps pipeline definitions
+.azure/ @Planning-Inspectorate/pins-devops
+
+# Terraform infrastructure
+infrastructure/ @Planning-Inspectorate/pins-devops
+
+# ESLint configuration
+eslint.config.js @Planning-Inspectorate/pins-developer-leads
+
+# Commit lint configuration
+commitlint.config.js @Planning-Inspectorate/pins-developer-leads
+
+# Prettier and stylelint configuration
+prettier.config.js @Planning-Inspectorate/pins-developer-leads
+stylelint.config.js @Planning-Inspectorate/pins-developer-leads
