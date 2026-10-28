@@ -86,7 +86,8 @@ $font-family: arial, helvetica, sans-serif;
 	display: none;
 }
 
-// Component showcase (/components): box around each rendered fixture example
+// Component showcase (/components): box around each rendered fixture example.
+// TEMPORARY - remove before go-live (see README.md's "Before go-live: code to remove")
 .pins-component-example {
 	padding: index.govuk-spacing(4);
 	margin-bottom: index.govuk-spacing(6);

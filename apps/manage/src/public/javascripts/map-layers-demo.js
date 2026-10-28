@@ -6,6 +6,8 @@
  *
  * The demo has no static image, so the static-map plugin's no-src path provides
  * the failure message (and the same `.im-c-error` watching as the real maps).
+ *
+ * TEMPORARY - remove before go-live (see README.md's "Before go-live: code to remove").
  */
 
 import { createStaticMapPlugin } from './static-map-plugin.mjs';

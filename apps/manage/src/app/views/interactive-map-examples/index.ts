@@ -1,3 +1,5 @@
+// worked Defra map examples, mounted at /components/interactive-map.
+// TEMPORARY - remove before go-live (see README.md's "Before go-live: code to remove")
 import { asyncHandler } from '@planning-inspectorate/core/util';
 import type { IRouter } from 'express';
 import { Router as createRouter } from 'express';

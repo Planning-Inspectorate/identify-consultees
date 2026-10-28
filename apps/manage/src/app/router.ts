@@ -113,7 +113,8 @@ export function buildRouter(service: ManageService, options: BuildRouterOptions 
 	router.use('/', homeRoutes);
 	router.use('/consultees', consulteeRoutes);
 	// prototype/debug pages - not part of the service; only mounted when enabled
-	// (dev builds by default, deployed envs via ENABLE_DEV_PAGES - see config.ts)
+	// (dev builds by default, deployed envs via ENABLE_DEV_PAGES - see config.ts).
+	// TEMPORARY - remove before go-live (see README.md's "Before go-live: code to remove")
 	if (service.devPagesEnabled) {
 		router.use('/map-layers-demo', mapLayersDemoRoutes);
 		router.use('/error-test', errorTestRoutes);
