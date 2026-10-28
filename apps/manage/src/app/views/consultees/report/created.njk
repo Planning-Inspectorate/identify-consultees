@@ -1,5 +1,6 @@
 {% extends "views/layouts/main.njk" %}
 
+{% from "govuk/components/error-message/macro.njk" import govukErrorMessage %}
 {% from "govuk/components/panel/macro.njk" import govukPanel %}
 {% from "govuk/components/notification-banner/macro.njk" import govukNotificationBanner %}
 
@@ -13,14 +14,21 @@
 {% block pageContent %}
 	<div class="govuk-grid-row">
 		<div class="govuk-grid-column-two-thirds">
-			{{ govukPanel({
+			{% call govukPanel({
 				titleText: pageHeading,
-				html: "Project: " ~ caseName ~ "<br>Reference: " ~ reference
-			}) }}
+				classes: "govuk-panel--error" if downloadFailed
+			}) %}
+				Project: {{ caseName }}<br>Reference: {{ reference }}
+				{% if downloadFailed %}
+					{{ govukErrorMessage({ text: "The scoping report could not be downloaded - try again" }) }}
+				{% endif %}
+			{% endcall %}
 
-			<p class="govuk-body govuk-!-margin-top-6">
-				<a class="govuk-link" href="{{ downloadUrl }}">{{ downloadText }}</a>
-			</p>
+			{% if not downloadFailed %}
+				<p class="govuk-body govuk-!-margin-top-6">
+					<a class="govuk-link" href="{{ downloadUrl }}">{{ downloadText }}</a>
+				</p>
+			{% endif %}
 
 			{% if rulesetFailed %}
 				{% set failureHtml %}
@@ -28,14 +36,6 @@
 					<p class="govuk-body">The report could not be created because the search did not finish. <a class="govuk-notification-banner__link" href="{{ retryUrl }}">Try again</a>.</p>
 				{% endset %}
 				{{ govukNotificationBanner({ html: failureHtml }) }}
-			{% endif %}
-
-			{% if downloadFailed %}
-				{% set downloadFailedHtml %}
-					<h3 class="govuk-notification-banner__heading">The scoping report could not be downloaded – try again</h3>
-					<p class="govuk-body"><a class="govuk-notification-banner__link" href="{{ downloadUrl }}">Retry download</a>.</p>
-				{% endset %}
-				{{ govukNotificationBanner({ html: downloadFailedHtml }) }}
 			{% endif %}
 		</div>
 	</div>
