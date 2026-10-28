@@ -54,7 +54,7 @@ async function mapFiles(
  * file visible first), and the radios below ask the user to confirm which single file is carried
  * into the report - never pre-selected, so `shapefileError` marks them invalid after an
  * unanswered submit. A map that can't be built - a file's geometry failed to load - is replaced
- * by a notification banner offering to try again; the radios still render, so the page works
+ * by a GOV.UK error message offering to try again; the radios still render, so the page works
  * without the map.
  */
 async function boundaryPageViewModel(
