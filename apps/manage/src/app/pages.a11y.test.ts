@@ -9,6 +9,7 @@ import {
 } from './govuk-frontend-components.ts';
 import { configureNunjucks } from './nunjucks.ts';
 import { assertNoSeriousA11yViolations, pageLocals } from './testing/a11y.ts';
+import { helpViewModel } from './views/help/index.ts';
 
 describe('manage page accessibility smoke', () => {
 	const nunjucks = configureNunjucks();
@@ -460,6 +461,11 @@ describe('manage page accessibility smoke', () => {
 			await assertNoSeriousA11yViolations(html);
 		});
 	}
+
+	test('help page has no serious a11y violations', async () => {
+		const html = nunjucks.render('views/help/view.njk', { ...pageLocals, ...helpViewModel() });
+		await assertNoSeriousA11yViolations(html);
+	});
 
 	test('components index page has no serious a11y violations', async () => {
 		const html = nunjucks.render('views/components/view.njk', {

@@ -73,6 +73,8 @@ export interface RulesetSettings {
 	/** Display names, by file name less `_ruleset.csv` - any other is named from its file name. */
 	names: Record<string, string>;
 	consulteeTypes: Map<string, ConsulteeTypeMapping>;
+	/** The Consultee Type(s) wordings as rulesets.yaml spells them - consulteeTypes keys them normalised. */
+	consulteeTypeWordings: string[];
 	logic: Map<string, RuleLogic>;
 	/**
 	 * Categories the rulesets name that no reference data provides yet. Their conditions match
@@ -183,9 +185,31 @@ export function parseRulesetSettings(text: string): RulesetSettings {
 		default: document.default.trim(),
 		names: parseRulesetFileNames(document.names ?? {}, 'names'),
 		consulteeTypes: parseWordings(document.consulteeTypes, 'consulteeTypes', parseConsulteeType),
+		// parseWordings has checked it's a record
+		consulteeTypeWordings: Object.keys(document.consulteeTypes as Record<string, unknown>).map((wording) =>
+			wording.trim()
+		),
 		logic: parseWordings(document.logic, 'logic', parseLogic),
 		categoriesAwaitingData: new Set(awaiting.map((category) => category.trim()))
 	};
+}
+
+/**
+ * The Consultee Type(s) wordings a ruleset can use, as rulesets.yaml spells them, each saying
+ * whether it awaits data - every category it matches is in categoriesAwaitingData, so its
+ * conditions find nothing yet. The help page lists them for whoever edits the workbook.
+ */
+export function acceptedConsulteeTypes(
+	settings: RulesetSettings = RULESET_SETTINGS
+): { wording: string; awaitingData: boolean }[] {
+	return settings.consulteeTypeWordings.map((wording) => {
+		const categories = settings.consulteeTypes.get(normalise(wording))?.categories ?? [];
+		return {
+			wording,
+			awaitingData:
+				categories.length > 0 && categories.every((category) => settings.categoriesAwaitingData.has(category))
+		};
+	});
 }
 
 const RULESET_CSV_COLUMNS = [

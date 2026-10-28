@@ -14,6 +14,7 @@ import { createRoutes as createConsulteeAreasPythonRoutes } from './views/consul
 import { createRoutes as createConsulteeRoutes } from './views/consultees/index.ts';
 import { createRoutes as createErrorTestRoutes } from './views/error-test/index.ts';
 import { createFooterRoutes } from './views/footer/index.ts';
+import { createRoutes as createHelpRoutes } from './views/help/index.ts';
 import { createRoutes as createHomeRoutes } from './views/home/index.ts';
 import { createRoutes as createMapLayersDemoRoutes } from './views/map-layers-demo/index.ts';
 import { createErrorRoutes } from './views/static/error/index.ts';
@@ -112,6 +113,8 @@ export function buildRouter(service: ManageService, options: BuildRouterOptions 
 	router.use(adminHeaderLink);
 	router.use('/', homeRoutes);
 	router.use('/consultees', consulteeRoutes);
+	// the user guide - behind sign-in, as it describes how rulesets are changed
+	router.use('/help', createHelpRoutes());
 	// prototype/debug pages - not part of the service; only mounted when enabled
 	// (dev builds by default, deployed envs via ENABLE_DEV_PAGES - see config.ts).
 	// TEMPORARY - remove before go-live (see README.md's "Before go-live: code to remove")

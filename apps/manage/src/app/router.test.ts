@@ -120,6 +120,7 @@ describe('manage router wiring', () => {
 		}
 		assert.equal(response.text.match(/pins-footer__item--hidden/g)?.length, 2);
 		for (const [text, href] of [
+			['Help', '/help'],
 			['Terms and conditions', '/terms-and-conditions'],
 			['Accessibility statement', '/accessibility-statement'],
 			[
@@ -145,6 +146,16 @@ describe('manage router wiring', () => {
 			assert.match(response.text, expected);
 		});
 	}
+
+	test('GET /help renders the user guide, listing the accepted consultee type wordings', async () => {
+		const response = await request(authDisabledApp).get('/help');
+		assert.equal(response.status, 200);
+		assert.match(response.text, /How to use Identify consultees/);
+		assert.match(response.text, /Formatting a ruleset change/);
+		assert.match(response.text, /<li>Ambulance Trusts<\/li>/);
+		assert.match(response.text, /Cheshire Brine Area have no map data yet/);
+		assert.match(response.text, /role="img"/);
+	});
 
 	test('GET /?pageSize=50 honours the requested page size', async () => {
 		const response = await request(authDisabledApp).get('/?q=Router+Test+Fixture&pageSize=50');
@@ -846,6 +857,18 @@ describe('manage router wiring', () => {
 			const response = await request(app).get('/error-test/rate-limited');
 			assert.equal(response.status, 429);
 			assert.match(response.text, /Too many requests/);
+		} finally {
+			await service.db.$disconnect().catch(() => undefined);
+		}
+	});
+
+	test('GET /help needs signing in, unlike the footer policy pages', async () => {
+		const service = new ManageService(buildManageTestConfig(false));
+		const app = createManageTestApp(service);
+		try {
+			const help = await request(app).get('/help');
+			assert.equal(help.status, 302);
+			assert.equal((await request(app).get('/cookies')).status, 200);
 		} finally {
 			await service.db.$disconnect().catch(() => undefined);
 		}
