@@ -524,7 +524,7 @@ describe('report created page', () => {
 		assert.strictEqual(mockRes.render.mock.calls[1].arguments[1].downloadText, downloadText);
 	});
 
-	it('should render without the size when the report cannot be built - the download builds it on click', async () => {
+	it('should show the download error and no link when the report cannot be built', async () => {
 		const db = dbReturning([[realProjectRow()]]);
 		db.consulteeArea.findMany = mock.fn(async () => {
 			throw new Error('db down');
@@ -539,8 +539,12 @@ describe('report created page', () => {
 			mockRes
 		);
 
+		const viewModel = mockRes.render.mock.calls[0].arguments[1];
+		assert.strictEqual(viewModel.downloadFailed, true);
 		const html = mockRes.render.mock.calls[0].result;
-		assert.match(html, /Download Real Test Project Consultee List report \(ZIP\)/);
+		assert.match(html, /govuk-panel--error/);
+		assert.match(html, /scoping report could not be downloaded/);
+		assert.doesNotMatch(html, /report\/download/);
 	});
 
 	it('should show the size even when no consultees are in the report', async () => {
@@ -580,11 +584,16 @@ describe('report created page', () => {
 			mockRes
 		);
 
-		// the build never ran, so the link can't give a size and nothing is kept for the download
+		// the build never ran, so nothing is kept for the download, and the page shows the
+		// failure state straight away - red panel, error, no download link
 		assert.strictEqual(db.consulteeArea.findMany.mock.callCount(), 0);
 		const viewModel = mockRes.render.mock.calls[0].arguments[1];
 		assert.strictEqual(rememberedReportZip(viewModel.downloadUrl), undefined);
-		assert.match(mockRes.render.mock.calls[0].result, /Download Real Test Project Consultee List report \(ZIP\)/);
+		assert.strictEqual(viewModel.downloadFailed, true);
+		const html = mockRes.render.mock.calls[0].result;
+		assert.match(html, /govuk-panel--error/);
+		assert.match(html, /scoping report could not be downloaded/);
+		assert.doesNotMatch(html, /report\/download/);
 	});
 
 	it('should show a govuk error message in a red panel, and no download link, when the download itself failed', async () => {
