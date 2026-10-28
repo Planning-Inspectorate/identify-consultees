@@ -72,6 +72,8 @@ export interface CbosImportResult {
 }
 
 const LIST_TIMEOUT_MS = 60_000;
+// a sign-in to CBOS's database and a first page of its blob names
+const CHECK_TIMEOUT_MS = 30_000;
 // the largest boundaries are tens of megabytes of coordinates
 const FILE_TIMEOUT_MS = 120_000;
 // enough to overlap the function's database and blob round trips without crowding it
@@ -83,15 +85,19 @@ function functionUrl(pythonFunctionUrl: string, path: string): string {
 	return new URL(path, pythonFunctionUrl).toString();
 }
 
-async function getJson(options: CbosFunctionOptions, path: string, timeoutMs: number): Promise<unknown> {
+async function get(options: CbosFunctionOptions, path: string, timeoutMs: number): Promise<Response> {
 	if (!options.pythonFunctionUrl) {
 		throw new Error('PYTHON_FUNCTION_URL is not configured');
 	}
-	const response = await fetchWithTimeout(
+	return fetchWithTimeout(
 		functionUrl(options.pythonFunctionUrl, path),
 		{ timeoutMs },
 		{ headers: options.apiKey ? { 'x-api-key': options.apiKey } : undefined }
 	);
+}
+
+async function getJson(options: CbosFunctionOptions, path: string, timeoutMs: number): Promise<unknown> {
+	const response = await get(options, path, timeoutMs);
 	if (!response.ok) {
 		throw new Error(`Python function ${path} responded with status ${response.status}`);
 	}
@@ -116,6 +122,36 @@ export async function fetchCbosBoundaryGeoJson(
 		throw new Error('Python function returned something other than a GeoJSON FeatureCollection');
 	}
 	return body;
+}
+
+export interface CbosCheck {
+	status: 'OK' | 'ERROR';
+	detail: string;
+}
+
+/** What the function's CBOS connection check found - each check, or why it couldn't be run. */
+export interface CbosConnectionCheck {
+	database?: CbosCheck;
+	storage?: CbosCheck;
+	error?: string;
+}
+
+/**
+ * Whether the function can sign in to CBOS's database and read its document storage, as its own
+ * identity (apps/function-python/cbos/connection_check.py) - why an import failed, where the
+ * import's own error only says the function's listing did. Never rejects.
+ */
+export async function checkCbosConnection(options: CbosFunctionOptions): Promise<CbosConnectionCheck> {
+	try {
+		const response = await get(options, 'cbos/health', CHECK_TIMEOUT_MS);
+		const body = (await response.json().catch(() => null)) as (CbosConnectionCheck & { status?: string }) | null;
+		if (body?.database && body.storage) {
+			return { database: body.database, storage: body.storage };
+		}
+		return { error: body?.error ?? `The function's CBOS check responded with status ${response.status}` };
+	} catch (error) {
+		return { error: `The function could not be reached: ${describe(error)}` };
+	}
 }
 
 /**

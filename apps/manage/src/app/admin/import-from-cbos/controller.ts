@@ -1,6 +1,6 @@
 import type { ManageService } from '#service';
 import type { AsyncRequestHandler } from '@planning-inspectorate/core/util';
-import { importCaseBoundariesFromCbos } from './cbos-boundaries.ts';
+import { checkCbosConnection, importCaseBoundariesFromCbos } from './cbos-boundaries.ts';
 import type { ImportFromCbosViewModel } from './view-model.ts';
 
 const VIEW = 'admin/import-from-cbos/view.njk';
@@ -38,27 +38,33 @@ export function buildImportFromCbosPage(service: ManageService): AsyncRequestHan
 	};
 }
 
+/**
+ * Import every CBOS boundary. If it fails, the function's CBOS connection check says why - no
+ * sign-in to CBOS's database (each environment's function app needs a user there, made in SQL),
+ * no route to it, or no access to its documents - so the page can, rather than just that it did.
+ */
 export function buildRunImportFromCbos(
 	service: ManageService,
-	runImport: typeof importCaseBoundariesFromCbos = importCaseBoundariesFromCbos
+	runImport: typeof importCaseBoundariesFromCbos = importCaseBoundariesFromCbos,
+	checkConnection: typeof checkCbosConnection = checkCbosConnection
 ): AsyncRequestHandler {
 	const { db, logger } = service;
 
 	return async (req, res) => {
 		const viewModel: ImportFromCbosViewModel = { pageHeading: PAGE_HEADING };
+		const options = { pythonFunctionUrl: service.pythonFunctionUrl, apiKey: service.pythonFunctionApiKey };
 
 		try {
-			const result = await runImport(db, {
-				pythonFunctionUrl: service.pythonFunctionUrl,
-				apiKey: service.pythonFunctionApiKey
-			});
+			const result = await runImport(db, options);
 			Object.assign(viewModel, result);
 			if (result.failures.length > 0) {
 				logger.warn({ failures: result.failures }, 'Some CBOS boundary files could not be imported');
 			}
 		} catch (error) {
-			logger.error({ error }, 'Failed to import case boundaries from CBOS');
 			viewModel.error = 'Could not import case boundaries from CBOS.';
+			viewModel.cause = error instanceof Error ? error.message : String(error);
+			viewModel.connection = await checkConnection(options);
+			logger.error({ error, connection: viewModel.connection }, 'Failed to import case boundaries from CBOS');
 		}
 
 		return res.render(VIEW, await withLoadedCounts(service, viewModel));

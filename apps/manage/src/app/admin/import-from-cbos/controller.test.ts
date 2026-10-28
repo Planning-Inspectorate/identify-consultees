@@ -73,15 +73,41 @@ describe('admin import from CBOS', () => {
 		assert.strictEqual(service.logger.warn.mock.callCount(), 0);
 	});
 
-	it('shows an error when the import fails', async () => {
+	it("shows an error when the import fails, with the function's CBOS connection check", async () => {
 		const service = newService();
 		const runImport = mock.fn(async () => {
-			throw new Error('status 500');
+			throw new Error('Python function cbos/boundary-files responded with status 500');
 		});
+		const connection = {
+			database: { status: 'ERROR', detail: "Error: Login failed for user '<token-identified principal>'" },
+			storage: { status: 'OK', detail: 'listed 5 blob name(s) in document-service-uploads' }
+		};
+		const checkConnection = mock.fn(async () => connection);
 		const res = newRes();
-		await buildRunImportFromCbos(service as never, runImport as never)({}, res);
+		await buildRunImportFromCbos(service as never, runImport as never, checkConnection as never)({}, res);
 
 		assert.strictEqual(viewModel(res).error, 'Could not import case boundaries from CBOS.');
+		assert.deepStrictEqual(checkConnection.mock.calls[0].arguments[0], {
+			pythonFunctionUrl: 'http://localhost:7071/api/consultee-areas',
+			apiKey: 'test-key'
+		});
+		assert.match(html(res), /What went wrong/);
+		assert.match(html(res), /Import[\s\S]*cbos\/boundary-files responded with status 500/);
+		assert.match(html(res), /CBOS database[\s\S]*Failed - Error: Login failed for user/);
+		assert.match(html(res), /CBOS documents[\s\S]*OK - listed 5 blob name/);
 		assert.strictEqual(service.logger.error.mock.callCount(), 1);
+	});
+
+	it("shows why the connection check couldn't run, and a non-Error failure", async () => {
+		const runImport = mock.fn(async () => {
+			throw 'boom';
+		});
+		const checkConnection = mock.fn(async () => ({ error: 'The function could not be reached: fetch failed' }));
+		const res = newRes();
+		await buildRunImportFromCbos(newService() as never, runImport as never, checkConnection as never)({}, res);
+
+		assert.strictEqual(viewModel(res).cause, 'boom');
+		assert.match(html(res), /CBOS connection check[\s\S]*The function could not be reached: fetch failed/);
+		assert.doesNotMatch(html(res), /CBOS database/);
 	});
 });

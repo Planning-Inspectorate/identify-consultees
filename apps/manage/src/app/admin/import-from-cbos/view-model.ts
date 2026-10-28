@@ -1,4 +1,4 @@
-import type { CbosImportFailure } from './cbos-boundaries.ts';
+import type { CbosConnectionCheck, CbosImportFailure } from './cbos-boundaries.ts';
 
 export interface ImportFromCbosViewModel {
 	pageHeading: string;
@@ -10,4 +10,8 @@ export interface ImportFromCbosViewModel {
 	imported?: number;
 	failures?: CbosImportFailure[];
 	error?: string;
+	/** Why the import failed, as it said. */
+	cause?: string;
+	/** After a failed import: whether the function can reach CBOS at all, and if not, why. */
+	connection?: CbosConnectionCheck;
 }
