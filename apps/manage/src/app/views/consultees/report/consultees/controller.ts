@@ -137,8 +137,9 @@ async function renderCategoryPage(
 		categorySettings(category).mapMarginMetres
 	);
 
-	// ruleset matches first, then hand-added consultees - every Remove link opens the "Remove
-	// consultee" page, which records the reason before excluding the match or dropping the add
+	// consultees alphabetically by name, ruleset matches and hand-added ones together - every
+	// Remove link opens the "Remove consultee" page, which records the reason before excluding
+	// the match or dropping the add
 	const rows: ConsulteeRow[] = [
 		...identified.map((match) => ({
 			name: consulteeName(match),
@@ -157,7 +158,7 @@ async function renderCategoryPage(
 				}
 			];
 		})
-	];
+	].sort((a, b) => a.name.localeCompare(b.name, 'en-GB'));
 
 	const viewModel: ReportConsulteesViewModel = {
 		pageHeading: category,
