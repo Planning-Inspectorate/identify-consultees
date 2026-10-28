@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { after, before, describe, test } from 'node:test';
+import { after, before, describe, mock, test } from 'node:test';
 import type { PrismaClient } from '../client/client.ts';
 import { loadConfig } from '../configuration/config.ts';
 import { acquireDbTestLock, releaseDbTestLock } from '../db-test-lock.ts';
@@ -21,6 +21,7 @@ import {
 	parseGroupBlobName,
 	quarterOf
 } from './consultee-area-groups.ts';
+import { CLEAR_BATCH_SIZE } from './geojson-import.ts';
 import { groupBySlug, parseReferenceDataConfig, REFERENCE_DATA_CONFIG } from './reference-data.ts';
 
 describe('group files', () => {
@@ -159,10 +160,14 @@ describe('loading a group (requires a local SQL Server - see docker-compose.yml)
 	test("replaces the group's rows in the dataset in use, when the file is from its quarter", async (t) => {
 		if (!dbAvailable) return t.skip('SQL Server database not available');
 		await cleanup();
-		const first = await load(inUseFile('groups_test'), ['groups-a', 'groups-b']);
+		// a row over a statement's batch, so the replace's deletes take a second pass
+		const first = await load(
+			inUseFile('groups_test'),
+			Array.from({ length: 26 }, (_, i) => `groups-${i}`)
+		);
 		assert.deepEqual(
 			{ ...first, group: first.group.slug },
-			{ group: 'groups_test', quarter: inUseBefore, rowsLoaded: 2, datasetInUse: inUseBefore, waitingFor: [] }
+			{ group: 'groups_test', quarter: inUseBefore, rowsLoaded: 26, datasetInUse: inUseBefore, waitingFor: [] }
 		);
 		// a corrected file for the same quarter replaces it
 		const corrected = inUseFile('groups_test').replace(/01_groups/, '15_groups');
@@ -217,6 +222,13 @@ describe('loading a group (requires a local SQL Server - see docker-compose.yml)
 			assert.equal(await clearConsulteeAreas(dbClient, NEXT), 2);
 			assert.deepEqual(await sourceIds(`consultee_area_${NEXT}`), []);
 			assert.deepEqual(await sourceIds(`consultee_area_${inUseBefore}`), ['groups-old']);
+
+			// and with no quarter it clears the dataset in use - the suite's own table right
+			// now, so the shared local one still isn't touched
+			await load('20991021_groups_test.geojson', ['groups-again']);
+			assert.equal(await clearConsulteeAreas(dbClient), 1);
+			assert.deepEqual(await sourceIds(), []);
+			assert.deepEqual(await sourceIds(`consultee_area_${inUseBefore}`), ['groups-old']);
 		} finally {
 			await cleanup();
 		}
@@ -255,6 +267,25 @@ describe('loading a group (requires a local SQL Server - see docker-compose.yml)
 		assert.deepEqual(await sourceIds(), ['groups-a']);
 	});
 
+	test('refuses a feature with no category or id, naming it a feature with no category', async () => {
+		// needs no database - the feature is refused while the file is read, before its table is touched
+		const name = '20260101_groups_test.geojson';
+		const filePath = path.join(dir, name);
+		await writeFile(
+			filePath,
+			JSON.stringify({
+				type: 'FeatureCollection',
+				features: [{ type: 'Feature', geometry: { type: 'Point', coordinates: [-30.5, 45.5] }, properties: {} }]
+			})
+		);
+		await assert.rejects(
+			() => importConsulteeAreaGroup(dbClient, filePath, name, { config: CONFIG }),
+			(error: Error) =>
+				error instanceof GroupLoadError &&
+				/a feature with no category, which config\/reference-data.yaml doesn't put in a group/.test(error.message)
+		);
+	});
+
 	test("uses the app's own groups by default", async (t) => {
 		if (!dbAvailable) return t.skip('SQL Server database not available');
 		await assert.rejects(
@@ -267,6 +298,28 @@ describe('loading a group (requires a local SQL Server - see docker-compose.yml)
 });
 
 describe('clearing consultee areas', () => {
+	test('deletes a batch at a time until a batch comes back short', async () => {
+		// a stubbed client, so no quarter table has to really fill a batch to prove the loop
+		const batches = [CLEAR_BATCH_SIZE, 0];
+		const $executeRaw = mock.fn(async () => batches.shift() ?? 0);
+		const client = { $executeRaw } as unknown as PrismaClient;
+		assert.equal(await clearConsulteeAreas(client, '2026Q4'), CLEAR_BATCH_SIZE);
+		assert.equal($executeRaw.mock.callCount(), 2);
+		const table = $executeRaw.mock.calls[0].arguments[2] as { text: string };
+		assert.equal(table.text, 'consultee_area_2026Q4');
+	});
+
+	test('with no quarter given, clears the dataset in use through the synonym', async () => {
+		const statements: string[] = [];
+		const $executeRaw = mock.fn(async (sql: TemplateStringsArray) => {
+			statements.push(sql.join('?'));
+			return 0;
+		});
+		const client = { $executeRaw } as unknown as PrismaClient;
+		assert.equal(await clearConsulteeAreas(client), 0);
+		assert.match(statements[0], /FROM consultee_area$/);
+	});
+
 	test('empties the dataset in use (runs in CI only - it would empty the shared local table)', async (t) => {
 		if (!process.env.CI && !process.env.TF_BUILD) return t.skip('empties every consultee area - runs in CI only');
 		if (!dbAvailable) return t.skip('SQL Server database not available');
