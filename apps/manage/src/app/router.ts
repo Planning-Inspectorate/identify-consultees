@@ -4,10 +4,10 @@ import { createMonitoringRoutes } from '@planning-inspectorate/core/controllers'
 import { cacheNoCacheMiddleware } from '@planning-inspectorate/core/middleware';
 import type { IRouter, RequestHandler } from 'express';
 import { Router as createRouter } from 'express';
-import rateLimit from 'express-rate-limit';
 import { adminHeaderLink, createAdminRoutes } from './admin/index.ts';
 import { buildSanitisingErrorHandler } from './error-handler.ts';
 import { createDefraVendorRouter } from './maps/vendor.ts';
+import { buildAuthRateLimiter } from './rate-limit.ts';
 import { createRoutes as createComponentRoutes } from './views/components/index.ts';
 import { createRoutes as createConsulteeAreasDirectRoutes } from './views/consultee-areas-direct/index.ts';
 import { createRoutes as createConsulteeAreasPythonRoutes } from './views/consultee-areas-python/index.ts';
@@ -19,25 +19,8 @@ import { createRoutes as createHomeRoutes } from './views/home/index.ts';
 import { createRoutes as createMapLayersDemoRoutes } from './views/map-layers-demo/index.ts';
 import { createErrorRoutes } from './views/static/error/index.ts';
 
-export type AuthRateLimiterOptions = {
-	windowMs?: number;
-	limit?: number;
-};
-
-/**
- * Limit auth endpoints to reduce abuse of MSAL sign-in and redirect handlers.
- * @see https://codeql.github.com/codeql-query-help/javascript/js-missing-rate-limiting/
- */
-export function buildAuthRateLimiter(options: AuthRateLimiterOptions = {}): RequestHandler {
-	return rateLimit({
-		windowMs: options.windowMs ?? 15 * 60 * 1000,
-		limit: options.limit ?? 100,
-		standardHeaders: 'draft-8',
-		legacyHeaders: false,
-		// Tests and local setups often omit X-Forwarded-For
-		validate: { xForwardedForHeader: false }
-	});
-}
+export type { RateLimiterOptions as AuthRateLimiterOptions } from './rate-limit.ts';
+export { buildAuthRateLimiter };
 
 export type BuildRouterOptions = {
 	authRateLimiter?: RequestHandler;

@@ -1,7 +1,8 @@
 import type { ManageService } from '#service';
 import { asyncHandler } from '@planning-inspectorate/core/util';
-import type { IRouter } from 'express';
+import type { IRouter, RequestHandler } from 'express';
 import { Router as createRouter } from 'express';
+import { buildReportDownloadRateLimiter, buildStaticMapRateLimiter } from '../../rate-limit.ts';
 import { buildBoundaryStaticMap, buildBoundarySubmit, buildConsulteeProjectPage } from './project/controller.ts';
 import { buildReportConsulteeAddPage, buildReportConsulteeAddSubmit } from './report/consultees/add/controller.ts';
 import { buildReportConsulteesPage } from './report/consultees/controller.ts';
@@ -15,8 +16,16 @@ import { buildResultsStaticMap } from './results/controller.ts';
 import { buildRulesetPickerPage, buildRulesetPickerSubmit } from './ruleset/controller.ts';
 import { testFaultMiddleware } from './test-faults.ts';
 
-export function createRoutes(service: ManageService): IRouter {
+export type CreateRoutesOptions = {
+	/** Injectable so tests can use a tiny limit - see rate-limit.ts for the real values. */
+	reportDownloadRateLimiter?: RequestHandler;
+	staticMapRateLimiter?: RequestHandler;
+};
+
+export function createRoutes(service: ManageService, options: CreateRoutesOptions = {}): IRouter {
 	const router = createRouter({ mergeParams: true });
+	const reportDownloadRateLimiter = options.reportDownloadRateLimiter ?? buildReportDownloadRateLimiter();
+	const staticMapRateLimiter = options.staticMapRateLimiter ?? buildStaticMapRateLimiter();
 	// the QA fault triggers (test-faults.ts): ?test-fail=ruleset stores a forced failure in
 	// the session; ?test-fail=map/download fails the request carrying it. TEMPORARY -
 	// remove before go-live
@@ -40,8 +49,8 @@ export function createRoutes(service: ManageService): IRouter {
 
 	// the project boundary page - where the home page's project links land; its map draws every
 	// shapefile the case holds, and its radios confirm the one carried into the report
-	router.get('/:caseId/boundary-map.svg', asyncHandler(boundaryStaticMapSvg));
-	router.get('/:caseId/boundary-map', asyncHandler(boundaryStaticMap));
+	router.get('/:caseId/boundary-map.svg', staticMapRateLimiter, asyncHandler(boundaryStaticMapSvg));
+	router.get('/:caseId/boundary-map', staticMapRateLimiter, asyncHandler(boundaryStaticMap));
 	router.get('/:caseId', asyncHandler(projectPage));
 	router.post('/:caseId', asyncHandler(boundarySubmit));
 	// pick the ruleset the report is generated with, then on to the check page
@@ -59,10 +68,10 @@ export function createRoutes(service: ManageService): IRouter {
 	router.post('/:caseId/report/consultees/remove', asyncHandler(reportConsulteeRemoveSubmit));
 	// "Create report": confirmation page with the report download link
 	router.get('/:caseId/report/created', asyncHandler(reportCreatedPage));
-	router.get('/:caseId/report/download', asyncHandler(reportDownload));
+	router.get('/:caseId/report/download', reportDownloadRateLimiter, asyncHandler(reportDownload));
 	// a category page's static map (see categoryStaticMapUrl)
-	router.get('/:caseId/results/static-map.svg', asyncHandler(resultsStaticMapSvg));
-	router.get('/:caseId/results/static-map', asyncHandler(resultsStaticMap));
+	router.get('/:caseId/results/static-map.svg', staticMapRateLimiter, asyncHandler(resultsStaticMapSvg));
+	router.get('/:caseId/results/static-map', staticMapRateLimiter, asyncHandler(resultsStaticMap));
 
 	return router;
 }
