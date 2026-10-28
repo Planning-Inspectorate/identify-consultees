@@ -80,6 +80,68 @@ resource "azurerm_monitor_metric_alert" "web_availability" {
   }
 }
 
+# /health answers 200 even when the database is down - the real signal is the
+# body's "database":"OK" field - so availability alone can't catch a dead
+# database. This test requires the healthy body verbatim.
+resource "azurerm_application_insights_standard_web_test" "web_health" {
+  count = var.monitoring_config.app_insights_web_test_enabled ? 1 : 0
+
+  name                    = "${local.org}-ai-swt-health-${local.resource_suffix}"
+  resource_group_name     = azurerm_resource_group.primary.name
+  location                = module.primary_region.location
+  application_insights_id = azurerm_application_insights.main.id
+  geo_locations = [
+    "emea-se-sto-edge", # UK West
+    "emea-ru-msa-edge", # UK South
+    "emea-gb-db3-azr",  # North Europe
+    "emea-nl-ams-azr"   # West Europe
+  ]
+  retry_enabled = true
+  enabled       = true
+
+  request {
+    url = "https://${var.web_domains.web}/health"
+  }
+  validation_rules {
+    content {
+      content_match          = "\"database\":\"OK\""
+      content_case_sensitive = true
+    }
+  }
+
+  tags = local.tags
+}
+
+resource "azurerm_monitor_metric_alert" "web_health" {
+  count = var.monitoring_config.app_insights_web_test_enabled ? 1 : 0
+
+  name                = "web Database Health - ${local.resource_suffix}"
+  resource_group_name = azurerm_resource_group.primary.name
+  scopes = [
+    azurerm_application_insights_standard_web_test.web_health[0].id,
+    azurerm_application_insights.main.id
+  ]
+  description = "Metric alert for the /health web test - fires when the web app's database check stops returning OK"
+
+  application_insights_web_test_location_availability_criteria {
+    web_test_id           = azurerm_application_insights_standard_web_test.web_health[0].id
+    component_id          = azurerm_application_insights.main.id
+    failed_location_count = 1
+  }
+
+  action {
+    action_group_id = local.action_group_ids.tech
+  }
+
+  action {
+    action_group_id = local.action_group_ids.service_manager
+  }
+
+  action {
+    action_group_id = local.action_group_ids.its
+  }
+}
+
 # Log cap alert using scheduled query rules
 resource "azurerm_monitor_scheduled_query_rules_alert_v2" "log_cap" {
   count = var.environment == "prod" ? 1 : 0
