@@ -18,7 +18,7 @@ import { buildConsulteeStaticMapResponse, sendStaticMapResponse } from '../../..
 import { resolveCase } from '../resolve-case.ts';
 import { firstQueryValue } from '../run-ruleset.ts';
 import type { TestFault } from '../test-faults.ts';
-import { activeTestFault } from '../test-faults.ts';
+import { mapTestFaultRequested } from '../test-faults.ts';
 import type { BoundaryFileOption } from './boundary-files.ts';
 import { boundaryFileOptions } from './boundary-files.ts';
 import { formatUploadedAt } from './format-uploaded.ts';
@@ -143,7 +143,7 @@ export function buildConsulteeProjectPage(service: ManageService): AsyncRequestH
 			project,
 			options,
 			undefined,
-			activeTestFault(service, req.session)
+			mapTestFaultRequested(service, req.query) ? 'map' : undefined
 		);
 
 		return res.render('views/consultees/project/view.njk', viewModel);
@@ -178,7 +178,7 @@ export function buildBoundarySubmit(service: ManageService): AsyncRequestHandler
 					project,
 					options,
 					'Select a shapefile',
-					activeTestFault(service, req.session)
+					mapTestFaultRequested(service, req.query) ? 'map' : undefined
 				)
 			);
 			return;

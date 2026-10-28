@@ -42,19 +42,19 @@ On an environment without `ENABLE_DEV_PAGES`, `/error-test` and `/components` sh
 
 The `?test-fail=` triggers (`apps/manage/src/app/views/consultees/test-faults.ts`) force the in-journey error states that would otherwise need a real backend outage. They are on everywhere except the prod deployment (`ENVIRONMENT !== 'prod'` - `Config.testFaultsEnabled`; test and training run `NODE_ENV=production`, so that alone couldn't gate them).
 
-Add `?test-fail=<fault>` - `&test-fail=<fault>` where the URL already has parameters - to any `/consultees/...` page. The fault is stored in the session, so the failure persists as the journey is clicked through, like a real outage, until `?test-fail=off` on any `/consultees/...` page clears it (or the session ends). On prod the parameter does nothing.
+Add `?test-fail=<fault>` - `&test-fail=<fault>` where the URL already has parameters - to any `/consultees/...` page. `map` is a one-off: it fails only the request carrying the parameter, nothing is stored, and the next load draws the map again. `ruleset` and `download` are stored in the session, so the failure persists as the journey is clicked through, like a real outage, until `?test-fail=off` on any `/consultees/...` page clears it (or the session ends). On prod the parameter does nothing.
 
-| Fault      | What fails                              | What shows                                                                                                                                                            |
-| ---------- | --------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `map`      | The boundary page's map can't be loaded | `/consultees/<case-id>` - "There's a problem loading the map - try again later" as a GOV.UK error message, with a "Try again" link; the shapefile radios still render |
-| `ruleset`  | Every ruleset run fails                 | The report check page, category pages and the Report created page - "The ruleset could not be run" with a "Try again" link                                            |
-| `download` | The report ZIP can't be built           | `/consultees/<case-id>/report/created` - the panel turns red with "The scoping report could not be downloaded - try again" and no download link                       |
+| Fault      | What fails                              | What shows                                                                                                                                                                                                   |
+| ---------- | --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `map`      | The boundary page's map can't be loaded | `/consultees/<case-id>` - "There's a problem loading the map - try again later" as a GOV.UK error message, with a "Try again" link; the shapefile radios still render. That request only - nothing is stored |
+| `ruleset`  | Every ruleset run fails                 | The report check page, category pages and the Report created page - "The ruleset could not be run" with a "Try again" link                                                                                   |
+| `download` | The report ZIP can't be built           | `/consultees/<case-id>/report/created` - the panel turns red with "The scoping report could not be downloaded - try again" and no download link                                                              |
 
 ### Boundary map failure (AC5)
 
-1. Sign in and open a project's boundary page with the fault set: `/consultees/<case-id>?test-fail=map`
+1. Sign in and open a project's boundary page with the fault: `/consultees/<case-id>?test-fail=map`
    - Expected: the "There's a problem loading the map - try again later" GOV.UK error message in place of the map; the "Confirm shapefile for report" radios still render.
-2. "Try again" reloads the page and fails again while the fault is set - a real retry. Clear the fault with `/consultees/<case-id>?test-fail=off`, then try again - the map loads.
+2. The fault is per-request - nothing is stored. Reload the page (or click "Try again", which is the page URL without the parameter) and the map loads again.
 3. For the ruleset-run variant (the intersector itself failing for the selected ruleset): `/consultees/<case-id>/report?ruleset=england-wales-post-20240430&test-fail=ruleset`
    - Expected: "The ruleset could not be run" banner; the "Try again" link keeps the selected project and ruleset parameters. The same fault also fails the category pages, the Report created page and the report's static maps, as a real screening outage would.
 
