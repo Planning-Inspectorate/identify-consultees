@@ -132,7 +132,8 @@ export function buildReportCheckPage(service: ManageService): AsyncRequestHandle
  * "Create report" lands here: a confirmation naming the case and a link to download the report -
  * an Excel workbook and a PDF of each category's map, in a ZIP. The ZIP is built here so the link
  * can give its size, and kept for the download to serve (see export/report-zip.ts); if it can't be
- * built the page still renders, the link just says "(ZIP)" and the download builds it when clicked.
+ * built there is no working report to link to, so the page shows the download-failure state - the
+ * same one the download itself sends the user back to with `download=failed`.
  */
 export function buildReportCreatedPage(service: ManageService): AsyncRequestHandler {
 	const { db, logger } = service;
@@ -156,6 +157,7 @@ export function buildReportCreatedPage(service: ManageService): AsyncRequestHand
 		const { consultees, failed, siteScreenedAs } = await runRulesetSafely(service, project, ruleset, req.session);
 
 		let downloadSize = '';
+		let buildFailed = false;
 		if (!failed) {
 			try {
 				// the QA fault trigger (test-faults.ts): the build fails as if generation were down
@@ -169,6 +171,7 @@ export function buildReportCreatedPage(service: ManageService): AsyncRequestHand
 				downloadSize = formatFileSize(report.contents.length);
 			} catch (error) {
 				logger.error({ error, caseId: project.id, rulesetId: ruleset.id }, 'Failed to build the report ZIP');
+				buildFailed = true;
 			}
 		}
 
@@ -181,8 +184,9 @@ export function buildReportCreatedPage(service: ManageService): AsyncRequestHand
 			downloadText: `Download ${project.properties.caseName} Consultee List report (ZIP${downloadSize ? `, ${downloadSize}` : ''})`,
 			rulesetFailed: failed,
 			retryUrl: reportCreatedUrl(project.id, ruleset.id, selection),
-			// the download sends them back here with ?download=failed when the report can't be built
-			downloadFailed: firstQueryValue(req.query.download) === 'failed'
+			// the download sends them back here with ?download=failed; a build that already
+			// failed here means there is no working report to link to either way
+			downloadFailed: buildFailed || firstQueryValue(req.query.download) === 'failed'
 		};
 		return res.render('views/consultees/report/created.njk', viewModel);
 	};
