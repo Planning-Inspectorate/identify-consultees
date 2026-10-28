@@ -3,7 +3,9 @@ import { asyncHandler } from '@planning-inspectorate/core/util';
 import type { IRouter } from 'express';
 import express, { Router as createRouter } from 'express';
 import multer from 'multer';
+import { mkdirSync, readdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import type { BlobStoreConfig, BlobUploader, BlockUploads } from './controller.ts';
 import {
 	buildCommitBlocks,
@@ -18,8 +20,12 @@ import {
 // temp file is removed by the controller after the blob upload completes, whether it succeeds or
 // fails. A file exceeding the limit is rejected by multer before it reaches the controller,
 // surfacing as the app's generic error page - acceptable for this internal, low-traffic tool.
+// The dedicated directory (rather than the shared os tmpdir) means a crash mid-upload only ever
+// orphans files in here - createRoutes empties it when the app boots.
+export const UPLOAD_TMP_DIR = join(tmpdir(), 'identify-consultees-uploads');
+mkdirSync(UPLOAD_TMP_DIR, { recursive: true });
 const upload = multer({
-	storage: multer.diskStorage({ destination: tmpdir() }),
+	storage: multer.diskStorage({ destination: UPLOAD_TMP_DIR }),
 	limits: { fileSize: MAX_UPLOAD_BYTES }
 });
 
@@ -32,6 +38,10 @@ export function createRoutes(
 	uploadsFor?: (blobStoreConfig: BlobStoreConfig) => BlockUploads
 ): IRouter {
 	const router = createRouter({ mergeParams: true });
+	// sweep anything a previous process left mid-upload - its unlink in the controller never ran
+	for (const leftover of readdirSync(UPLOAD_TMP_DIR)) {
+		rmSync(join(UPLOAD_TMP_DIR, leftover), { force: true, recursive: true });
+	}
 	const uploadToBlobPage = buildUploadToBlobPage();
 	const runUploadToBlob = buildRunUploadToBlob(service, uploadFile);
 
