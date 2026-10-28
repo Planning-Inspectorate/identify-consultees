@@ -12,6 +12,7 @@ import {
 	RULESET_RUN_SESSION_FIELD,
 	runRulesetSafely
 } from './run-ruleset.ts';
+import { TEST_FAULT_SESSION_FIELD } from './test-faults.ts';
 
 function project(id = '44444444-4444-4444-4444-444444444444'): CaseBoundaryFeature {
 	return {
@@ -123,6 +124,35 @@ describe('runRulesetSafely', () => {
 		// once - not again on the bounding box, adding its queries to a struggling database
 		assert.equal(failing.mock.callCount(), 1);
 		assert.equal((logger.error as ReturnType<typeof mock.fn>).mock.callCount(), 1);
+	});
+
+	it('fails the run while the test-fail=ruleset fault is set - over a kept run, and never kept', async () => {
+		const runner = rulesetRunnerReturning([MATCH]);
+		const store: Record<string, unknown> = { [TEST_FAULT_SESSION_FIELD]: 'ruleset' };
+		const enabled = serviceWith(runner, mockLogger(), { testFaultsEnabled: true });
+		const disabled = serviceWith(runner, mockLogger(), { testFaultsEnabled: false });
+
+		// while set: the run fails without the function being called, and nothing is kept
+		assert.deepStrictEqual(await runRulesetSafely(enabled, project(), RULESETS[0], store), {
+			consultees: [],
+			failed: true,
+			siteScreenedAs: 'outline'
+		});
+		assert.equal(runner.mock.callCount(), 0);
+		assert.equal(store[RULESET_RUN_SESSION_FIELD], undefined);
+
+		// a real run goes into the session as normal once the flag is off
+		assert.equal((await runRulesetSafely(disabled, project(), RULESETS[0], store)).failed, false);
+		assert.equal(runner.mock.callCount(), 1);
+
+		// the fault still fails, over the run the session just kept
+		assert.equal((await runRulesetSafely(enabled, project(), RULESETS[0], store)).failed, true);
+		assert.equal(runner.mock.callCount(), 1);
+
+		// and clearing it serves the kept run without calling the function again
+		delete store[TEST_FAULT_SESSION_FIELD];
+		assert.equal((await runRulesetSafely(enabled, project(), RULESETS[0], store)).failed, false);
+		assert.equal(runner.mock.callCount(), 1);
 	});
 
 	it('screens the boundary as stored simplified, where the case was read with it', async () => {

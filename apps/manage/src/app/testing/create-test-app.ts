@@ -30,6 +30,7 @@ export function buildManageTestConfig(authDisabled = true, overrides: Partial<Co
 		nearbyConsulteeRadiusMetres: 20_000,
 		nearbyNsipRadiusMetres: 10_000,
 		devPagesEnabled: true,
+		testFaultsEnabled: true,
 		auth: {
 			authority: 'https://login.microsoftonline.com/tenant-id',
 			clientId: 'client-id',

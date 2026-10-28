@@ -5,6 +5,7 @@ import { after, before, describe, it, mock } from 'node:test';
 import { ONE_PIXEL_PNG, pdfTextLines } from '../../../../testing/pdf-text.ts';
 import type { ConsulteeAreaMatchRow } from '../../../../testing/ruleset-runner-stub.ts';
 import { failingRulesetRunner, rulesetRunnerReturning } from '../../../../testing/ruleset-runner-stub.ts';
+import { TEST_FAULT_SESSION_FIELD } from '../../test-faults.ts';
 import { consulteeSelection, reportDownloadUrl } from '../urls.ts';
 import { buildReportDownload } from './controller.ts';
 import { rememberReportZip } from './report-zip.ts';
@@ -358,6 +359,31 @@ describe('report download', () => {
 		const [location] = res.redirect.mock.calls[0].arguments as unknown as [string];
 		assert.match(location, new RegExp(`^/consultees/${realProjectId}/report/created\\?ruleset=${ruleset}&add=`));
 		assert.equal(res.send.mock.callCount(), 0);
+	});
+
+	it('fails the download while the test-fail=download fault is set, even with a kept report', async () => {
+		// a kept copy would normally serve without a build - the fault fails it like a real outage
+		const query = { ruleset, exclude: 'dddddddd-9999-0000-0000-000000000042' };
+		const downloadUrl = reportDownloadUrl(realProjectId, ruleset, consulteeSelection(query));
+		rememberReportZip(downloadUrl, { fileName: 'kept.zip', contents: Buffer.from('the kept report') });
+
+		const runner = rulesetRunnerReturning([]);
+		const service = { ...serviceWith(runner), testFaultsEnabled: true };
+		const res = response();
+		await buildReportDownload(service as never)(
+			{
+				params: { caseId: realProjectId },
+				query,
+				session: { [TEST_FAULT_SESSION_FIELD]: 'download' }
+			} as never,
+			res as never
+		);
+
+		assert.equal(runner.mock.callCount(), 0);
+		assert.equal(res.send.mock.callCount(), 0);
+		const [location] = res.redirect.mock.calls[0].arguments as unknown as [string];
+		assert.match(location, new RegExp(`^/consultees/${realProjectId}/report/created\\?ruleset=${ruleset}`));
+		assert.match(location, /download=failed/);
 	});
 
 	it('goes back to the Report created page with a download-failed flag when the report cannot be built', async () => {

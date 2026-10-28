@@ -3,6 +3,7 @@ import assert from 'node:assert';
 import { describe, it, mock } from 'node:test';
 import { BOUNDARY_MAP_STYLES } from '../../../maps/boundary-map-styles.ts';
 import { configureNunjucks } from '../../../nunjucks.ts';
+import { TEST_FAULT_SESSION_FIELD } from '../test-faults.ts';
 import { buildBoundaryStaticMap, buildBoundarySubmit, buildConsulteeProjectPage } from './controller.ts';
 
 const realProjectId = '44444444-4444-4444-4444-444444444444';
@@ -164,6 +165,26 @@ describe('consultee project boundary page', () => {
 		assert.match(html, /problem loading the map/);
 		assert.match(html, /try again later/);
 		assert.match(html, />Try again</);
+		assert.doesNotMatch(html, /app-consultee-map/);
+	});
+
+	it('should force the map failure while the test-fail=map fault is set', async () => {
+		const nunjucks = configureNunjucks();
+		const mockRes = {
+			status: mock.fn(() => mockRes),
+			render: mock.fn((view, data) => nunjucks.render(view, data))
+		};
+		const db = dbReturning([[realProjectRow()], [boundaryFile(realProjectRow())]]);
+		const handler = buildConsulteeProjectPage({ db, logger: mockLogger(), testFaultsEnabled: true });
+		await handler(
+			{ params: { caseId: realProjectId }, query: {}, session: { [TEST_FAULT_SESSION_FIELD]: 'map' } },
+			mockRes
+		);
+
+		const viewModel = mockRes.render.mock.calls[0].arguments[1];
+		assert.strictEqual(viewModel.mapFailed, true);
+		const html = mockRes.render.mock.calls[0].result;
+		assert.match(html, /problem loading the map/);
 		assert.doesNotMatch(html, /app-consultee-map/);
 	});
 

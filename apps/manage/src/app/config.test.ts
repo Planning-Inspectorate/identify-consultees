@@ -167,6 +167,20 @@ describe('manage loadConfig', () => {
 		assert.equal(loadConfig().devPagesEnabled, true);
 	});
 
+	test('enables the test-fault triggers everywhere but the prod deployment', () => {
+		setBaseEnv({ AUTH_DISABLED: 'true', ENVIRONMENT: 'test' });
+		assert.equal(loadConfig().testFaultsEnabled, true);
+
+		resetConfigCache();
+		setBaseEnv({ AUTH_DISABLED: 'true', ENVIRONMENT: 'prod' });
+		assert.equal(loadConfig().testFaultsEnabled, false);
+
+		resetConfigCache();
+		// unset/empty where there is no deployment environment (local runs)
+		setBaseEnv({ AUTH_DISABLED: 'true', ENVIRONMENT: '' });
+		assert.equal(loadConfig().testFaultsEnabled, true);
+	});
+
 	test('returns cached config on subsequent calls', () => {
 		setBaseEnv({ AUTH_DISABLED: 'true', PORT: '8111' });
 		const first = loadConfig();

@@ -7,6 +7,7 @@ import { configureNunjucks } from '../../../nunjucks.ts';
 import { ONE_PIXEL_PNG } from '../../../testing/pdf-text.ts';
 import type { ConsulteeAreaMatchRow } from '../../../testing/ruleset-runner-stub.ts';
 import { failingRulesetRunner, rulesetRunnerReturning } from '../../../testing/ruleset-runner-stub.ts';
+import { TEST_FAULT_SESSION_FIELD } from '../test-faults.ts';
 import { buildReportCheckPage, buildReportCreatedPage, groupedConsultees } from './controller.ts';
 import { rememberedReportZip } from './export/report-zip.ts';
 
@@ -552,6 +553,38 @@ describe('report created page', () => {
 			mockRes
 		);
 		assert.match(mockRes.render.mock.calls[0].result, /\(ZIP, [\d.]+[KM]B\)/);
+	});
+
+	it('should fail to build the report while the test-fail=download fault is set', async () => {
+		const db = dbReturning([[realProjectRow()]]);
+		const nunjucks = configureNunjucks();
+		const mockRes = {
+			status: mock.fn(() => mockRes),
+			render: mock.fn((view, data) => nunjucks.render(view, data))
+		};
+		const handler = buildReportCreatedPage({
+			db,
+			logger: mockLogger(),
+			nearbyConsulteeRadiusMetres: 20_000,
+			nearbySearchRadiusMetres: 20_000,
+			rulesetRunner: rulesetRunnerReturning([parishRow()]),
+			testFaultsEnabled: true
+		});
+		await handler(
+			{
+				params: { caseId: realProjectId },
+				// a URL no other test uses - a kept copy would hide that the build was skipped
+				query: { exclude: 'abababab-0000-0000-0000-000000000042' },
+				session: { [TEST_FAULT_SESSION_FIELD]: 'download' }
+			},
+			mockRes
+		);
+
+		// the build never ran, so the link can't give a size and nothing is kept for the download
+		assert.strictEqual(db.consulteeArea.findMany.mock.callCount(), 0);
+		const viewModel = mockRes.render.mock.calls[0].arguments[1];
+		assert.strictEqual(rememberedReportZip(viewModel.downloadUrl), undefined);
+		assert.match(mockRes.render.mock.calls[0].result, /Download Real Test Project Consultee List report \(ZIP\)/);
 	});
 
 	it('should show a retry download banner when the download itself failed', async () => {

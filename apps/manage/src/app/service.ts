@@ -103,6 +103,11 @@ export class ManageService extends BaseService<PrismaClient> {
 		return this.#config.devPagesEnabled;
 	}
 
+	/** Whether the ?test-fail= fault triggers are honoured - see Config.testFaultsEnabled. */
+	get testFaultsEnabled(): boolean {
+		return this.#config.testFaultsEnabled;
+	}
+
 	/**
 	 * Built asset root (fingerprinted + Brotli sidecars). Used by our static middleware.
 	 */

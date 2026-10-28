@@ -13,9 +13,13 @@ import { buildReportCheckPage, buildReportCreatedPage } from './report/controlle
 import { buildReportDownload } from './report/export/controller.ts';
 import { buildResultsStaticMap } from './results/controller.ts';
 import { buildRulesetPickerPage, buildRulesetPickerSubmit } from './ruleset/controller.ts';
+import { testFaultMiddleware } from './test-faults.ts';
 
 export function createRoutes(service: ManageService): IRouter {
 	const router = createRouter({ mergeParams: true });
+	// the QA fault triggers - ?test-fail= on any page below stores a forced failure in the
+	// session (test-faults.ts). TEMPORARY - remove before go-live
+	router.use(testFaultMiddleware(service));
 	const projectPage = buildConsulteeProjectPage(service);
 	const boundarySubmit = buildBoundarySubmit(service);
 	const boundaryStaticMap = buildBoundaryStaticMap(service);
