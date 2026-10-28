@@ -104,8 +104,9 @@ resource "azurerm_application_insights_standard_web_test" "web_health" {
   }
   validation_rules {
     content {
-      content_match          = "\"database\":\"OK\""
-      content_case_sensitive = true
+      # content_match only - the azurerm v5.x schema has no case-sensitivity
+      # argument, and the healthy body is unambiguous either way
+      content_match = "\"database\":\"OK\""
     }
   }
 
