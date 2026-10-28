@@ -85,6 +85,8 @@ Response (200):
 
 Both data routes fail closed: with `CONSULTEE_AREAS_API_KEY` unset they return 500, and a wrong or missing `x-api-key` gets 401. In Azure, Terraform generates the key, stores it in Key Vault and gives it to both apps; the function sits behind a private endpoint (`infrastructure/app-function.tf`). Locally `npm start` gives both apps the same key. The browser never calls the function.
 
+The shared key is a pragmatic stand-in (`function_app.py` explains the deploy-ordering problem it works around), not the end state: managed-identity authentication - the web app's identity calling the function, no shared secret to rotate - is the cleaner shape when the wiring question is next revisited.
+
 ## Tests
 
 CI doesn't run the function, so the web app's tests stand in for it: controller tests inject `rulesetRunnerReturning` or `failingRulesetRunner`, and the Playwright test server uses `buildDatabaseRulesetRunner` (`apps/manage/src/app/testing/ruleset-runner-stub.ts`), a deliberately simple database query. The real logic is tested with pytest in `apps/function-python`.

@@ -53,7 +53,12 @@ export const RULESET_RUN_SESSION_FIELD = 'rulesetRun2';
 // long enough for a report journey; short enough that reference data reloaded since is picked up
 export const RULESET_RUN_MAX_AGE_MS = 60 * 60 * 1000;
 
-/** A ruleset run as the session keeps it: who it was for, when, and its matches without geometry. */
+/**
+ * A ruleset run as the session keeps it: who it was for, when, and its matches without geometry.
+ * The list (a consultee per identified match, with name and reasons) is the biggest payload the
+ * session holds - Redis in deployed environments. Worth watching as the reference data grows; if
+ * it ever dominates Redis memory, keep a compact run reference and re-derive the list instead.
+ */
 export interface StoredRulesetRun {
 	caseId: string;
 	rulesetId: string;

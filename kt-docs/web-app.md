@@ -24,6 +24,8 @@ apps/manage/
 
 A request goes: `server.ts` → `createApp` → `buildRouter` (monitoring, `/vendor/*`, auth, then features) → a controller that queries `packages/database` or the Python function through `service`, builds a view model and renders Nunjucks. Map page config goes into the page as `<script type="application/json">` (`util/inline-json.ts`) and the client JS finds its containers by class.
 
+Production runs the TypeScript directly - the Docker image's entrypoint is `node src/server.ts`, relying on Node 24's type stripping rather than a compile step (`npm run build` only produces `.static` assets). That makes `npm run check-types` the only compile gate: a future syntax feature that needs transforming rather than stripping would fail at container start, not in the build.
+
 ## Routes
 
 | Path                                                                        | Page                                                                                                                                                                                                                                                                                                                                            |
