@@ -12,6 +12,7 @@ How the service works and how to work on it. Plain Markdown, so each file can be
 | Add or fix tests | [Testing](./testing.md) |
 | Check the error pages | [Error pages](./error-pages.md) |
 | Deploy, or load data into an environment | [Deployment](./deployment.md), then [Data model and loading](./data/data-model.md) |
+| Respond to an alert, rotate a secret, roll back | [Runbook](./runbook.md) |
 | Work on the data | [Data model and loading](./data/data-model.md), [Reference data](./data/reference-data.md), [Screening issues](./data/screening-issues.md) |
 | Change a ruleset, the report or a distance | [`config/README.md`](../config/README.md) |
 
