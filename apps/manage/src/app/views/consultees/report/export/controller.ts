@@ -13,7 +13,7 @@ import { buildReportZip, rememberedReportZip } from './report-zip.ts';
  * no page visit first, builds it here instead - from the run the report pages kept in the session
  * (see runRulesetSafely), so the ruleset only runs again if that has gone; nothing is written to
  * disk or the session. If the ruleset can't be run, or the report can't be built, it goes back to
- * the Report created page, which says so and offers to retry the download.
+ * the Report created page, which says so - the error replaces the download link.
  */
 export function buildReportDownload(service: ManageService): AsyncRequestHandler {
 	const { db, logger } = service;

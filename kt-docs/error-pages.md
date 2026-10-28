@@ -44,11 +44,11 @@ The `?test-fail=` triggers (`apps/manage/src/app/views/consultees/test-faults.ts
 
 Add `?test-fail=<fault>` - `&test-fail=<fault>` where the URL already has parameters - to any `/consultees/...` page. The fault is stored in the session, so the failure persists as the journey is clicked through, like a real outage, until `?test-fail=off` on any `/consultees/...` page clears it (or the session ends). On prod the parameter does nothing.
 
-| Fault      | What fails                              | What shows                                                                                                                                                            |
-| ---------- | --------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `map`      | The boundary page's map can't be loaded | `/consultees/<case-id>` - "There's a problem loading the map - try again later" as a GOV.UK error message, with a "Try again" link; the shapefile radios still render |
-| `ruleset`  | Every ruleset run fails                 | The report check page, category pages and the Report created page - "The ruleset could not be run" with a "Try again" link                                            |
-| `download` | The report ZIP can't be built           | `/consultees/<case-id>/report/created` - "The scoping report could not be downloaded – try again" with a "Retry download" link, once a download is attempted          |
+| Fault      | What fails                              | What shows                                                                                                                                                                    |
+| ---------- | --------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `map`      | The boundary page's map can't be loaded | `/consultees/<case-id>` - "There's a problem loading the map - try again later" as a GOV.UK error message, with a "Try again" link; the shapefile radios still render         |
+| `ruleset`  | Every ruleset run fails                 | The report check page, category pages and the Report created page - "The ruleset could not be run" with a "Try again" link                                                    |
+| `download` | The report ZIP can't be built           | `/consultees/<case-id>/report/created` - the panel turns red with "The scoping report could not be downloaded - try again" and no download link, once a download is attempted |
 
 ### Boundary map failure (AC5)
 
@@ -63,8 +63,8 @@ Add `?test-fail=<fault>` - `&test-fail=<fault>` where the URL already has parame
 1. Walk the journey to the Report created page and add the fault: `/consultees/<case-id>/report/created?ruleset=england-wales-post-20240430&test-fail=download`
    - Expected: the download link reads "(ZIP)" with no size - the report could not be generated.
 2. Click the download link.
-   - Expected: back on the Report created page with "The scoping report could not be downloaded – try again" and a "Retry download" link.
-3. "Retry download" fails again while the fault is set. Clear it with `/consultees/<case-id>/report/created?ruleset=england-wales-post-20240430&test-fail=off`, then retry - the ZIP downloads.
+   - Expected: back on the Report created page, the panel red with "The scoping report could not be downloaded - try again" and no download link.
+3. Clear the fault with `/consultees/<case-id>/report/created?ruleset=england-wales-post-20240430&test-fail=off`, then reload the created page without `download=failed` - the link returns and the ZIP downloads.
 
 Expected on prod: `?test-fail=` parameters are ignored and every page behaves normally.
 

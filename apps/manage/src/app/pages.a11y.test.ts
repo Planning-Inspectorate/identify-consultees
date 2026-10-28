@@ -422,6 +422,25 @@ describe('manage page accessibility smoke', () => {
 		await assertNoSeriousA11yViolations(html);
 	});
 
+	test('report created page when the download failed has no serious a11y violations', async () => {
+		const html = nunjucks.render('views/consultees/report/created.njk', {
+			...pageLocals,
+			pageHeading: 'Report created',
+			backLinkUrl: '/consultees/11111111-1111-1111-1111-111111111111?ruleset=england-wales-post-20240430',
+			caseName: 'Longfield Solar Farm',
+			reference: 'EN0110007',
+			downloadUrl:
+				'/consultees/11111111-1111-1111-1111-111111111111/report/download?ruleset=england-wales-post-20240430',
+			downloadText: 'Download Longfield Solar Farm Consultee List report (ZIP)',
+			rulesetFailed: false,
+			retryUrl: '/consultees/11111111-1111-1111-1111-111111111111/report/created?ruleset=england-wales-post-20240430',
+			downloadFailed: true
+		});
+		assert.match(html, /govuk-panel--error/);
+		assert.match(html, /govuk-error-message/);
+		await assertNoSeriousA11yViolations(html);
+	});
+
 	test('report created page when the ruleset could not be run has no serious a11y violations', async () => {
 		const html = nunjucks.render('views/consultees/report/created.njk', {
 			...pageLocals,

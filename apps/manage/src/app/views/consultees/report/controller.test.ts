@@ -587,7 +587,7 @@ describe('report created page', () => {
 		assert.match(mockRes.render.mock.calls[0].result, /Download Real Test Project Consultee List report \(ZIP\)/);
 	});
 
-	it('should show a retry download banner when the download itself failed', async () => {
+	it('should show a govuk error message in a red panel, and no download link, when the download itself failed', async () => {
 		const { handler, mockRes } = createdPage([parishRow()]);
 		await handler(
 			{
@@ -600,11 +600,13 @@ describe('report created page', () => {
 		const viewModel = mockRes.render.mock.calls[0].arguments[1];
 		assert.strictEqual(viewModel.downloadFailed, true);
 		const html = mockRes.render.mock.calls[0].result;
+		assert.match(html, /govuk-panel--error/);
+		assert.match(html, /govuk-error-message/);
 		assert.match(html, /scoping report could not be downloaded/);
 		assert.match(html, /try again/);
-		// the retry is the download itself - the report builds again on click
-		assert.match(html, />Retry download</);
-		assert.match(html, new RegExp(`href="/consultees/${realProjectId}/report/download\\?ruleset=`));
+		// no way back to the download while it's failing
+		assert.doesNotMatch(html, /report\/download/);
+		assert.doesNotMatch(html, /Retry download/);
 	});
 
 	it('should say the ruleset could not be run rather than build a report', async () => {

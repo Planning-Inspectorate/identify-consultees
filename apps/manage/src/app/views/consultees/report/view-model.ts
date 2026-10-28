@@ -49,6 +49,6 @@ export interface ReportCreatedViewModel {
 	/** True when the ruleset couldn't be run - the report couldn't be created. */
 	rulesetFailed: boolean;
 	retryUrl: string;
-	/** True when a download failed to build - the banner offers "Retry download" (the same download link). */
+	/** True when a download failed to build - the panel turns red with a GOV.UK error message and no download link. */
 	downloadFailed?: boolean;
 }
