@@ -7,11 +7,14 @@ import { newDatabaseClient } from '../index.ts';
 import type { ConsulteeAreaFeatureCollection } from './consultee-areas.ts';
 import {
 	bufferGeometryForDisplay,
+	consulteeAreaTable,
+	datasetInUse,
 	findConsulteeAreaByName,
 	getConsulteeAreaById,
 	getConsulteeAreaDisplayGeometries,
 	listConsulteeAreas,
-	loadConsulteeAreas
+	loadConsulteeAreas,
+	tableSql
 } from './consultee-areas.ts';
 
 // fixed ids, rather than a wholesale table truncate, so this suite can't wipe out other data in
@@ -313,5 +316,51 @@ describe('consultee areas (requires a local SQL Server - see docker-compose.yml)
 		} finally {
 			await cleanup();
 		}
+	});
+});
+
+// the quarter/table guards and the synonym check need no database - they run whether or not a
+// local SQL Server is up
+describe('dataset table names', () => {
+	test('consulteeAreaTable maps a quarter onto its table', () => {
+		assert.equal(consulteeAreaTable('2026Q4'), 'consultee_area_2026Q4');
+	});
+
+	test('consulteeAreaTable refuses anything that is not a quarter', () => {
+		for (const quarter of ['latest', '2026', '2026Q0', '2026Q5', '2026q4', 'consultee_area_2026Q4']) {
+			assert.throws(() => consulteeAreaTable(quarter), new RegExp(`"${quarter}" isn't a quarter`), quarter);
+		}
+	});
+
+	test('tableSql passes the synonym and a quarter table through as raw SQL', () => {
+		assert.equal(tableSql('consultee_area').text, 'consultee_area');
+		assert.equal(tableSql('consultee_area_2026Q4').text, 'consultee_area_2026Q4');
+	});
+
+	test('tableSql refuses any other table name', () => {
+		for (const table of ['case_boundary', 'consultee_areas', 'consultee_area_2026', 'consultee_area_2026Q5']) {
+			assert.throws(() => tableSql(table), new RegExp(`${table} isn't a consultee area table`), table);
+		}
+	});
+});
+
+describe('datasetInUse', () => {
+	test('reads the quarter the consultee_area synonym points at', async () => {
+		const client = {
+			$queryRaw: async () => [{ baseObjectName: '[dbo].[consultee_area_2026Q4]' }]
+		} as unknown as PrismaClient;
+		assert.equal(await datasetInUse(client), '2026Q4');
+	});
+
+	test('throws when no consultee_area synonym exists', async () => {
+		const client = { $queryRaw: async () => [] } as unknown as PrismaClient;
+		await assert.rejects(() => datasetInUse(client), /doesn't point at a quarter's table/);
+	});
+
+	test('throws when the synonym points at something that is not a quarter table', async () => {
+		const client = {
+			$queryRaw: async () => [{ baseObjectName: '[dbo].[consultee_area_archive]' }]
+		} as unknown as PrismaClient;
+		await assert.rejects(() => datasetInUse(client), /doesn't point at a quarter's table/);
 	});
 });
