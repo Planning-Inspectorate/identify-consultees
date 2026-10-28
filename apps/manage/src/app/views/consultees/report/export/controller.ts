@@ -2,6 +2,7 @@ import type { ManageService } from '#service';
 import type { AsyncRequestHandler } from '@planning-inspectorate/core/util';
 import { resolveCase } from '../../resolve-case.ts';
 import { requestedRuleset, runRulesetSafely } from '../../run-ruleset.ts';
+import { activeTestFault } from '../../test-faults.ts';
 import { consulteeSelection, reportCreatedUrl, reportDownloadUrl } from '../urls.ts';
 import { buildReportZip, rememberedReportZip } from './report-zip.ts';
 
@@ -28,6 +29,13 @@ export function buildReportDownload(service: ManageService): AsyncRequestHandler
 
 		const selection = consulteeSelection(req.query);
 		const downloadUrl = reportDownloadUrl(project.id, ruleset.id, selection);
+
+		// the QA fault trigger (test-faults.ts) fails even a remembered report, like a real outage
+		if (activeTestFault(service, req.session) === 'download') {
+			logger.error({ caseId: project.id, rulesetId: ruleset.id }, 'test-fail=download: forced report download failure');
+			res.redirect(`${reportCreatedUrl(project.id, ruleset.id, selection)}&download=failed`);
+			return;
+		}
 
 		const remembered = rememberedReportZip(downloadUrl);
 		if (remembered) {

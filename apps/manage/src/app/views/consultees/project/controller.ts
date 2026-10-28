@@ -17,6 +17,8 @@ import { MAP_VIEWPORT } from '../../../maps/sample-geojson.ts';
 import { buildConsulteeStaticMapResponse, sendStaticMapResponse } from '../../../maps/serve-static-map.ts';
 import { resolveCase } from '../resolve-case.ts';
 import { firstQueryValue } from '../run-ruleset.ts';
+import type { TestFault } from '../test-faults.ts';
+import { activeTestFault } from '../test-faults.ts';
 import type { BoundaryFileOption } from './boundary-files.ts';
 import { boundaryFileOptions } from './boundary-files.ts';
 import { formatUploadedAt } from './format-uploaded.ts';
@@ -60,13 +62,19 @@ async function boundaryPageViewModel(
 	logger: ManageService['logger'],
 	project: CaseBoundaryFeature,
 	options: BoundaryFileOption[],
-	shapefileError?: string
+	shapefileError?: string,
+	fault?: TestFault
 ): Promise<ConsulteeProjectViewModel> {
 	const fallback = {
 		src: `/consultees/${encodeURIComponent(project.id)}/boundary-map`,
 		alt: `Static map showing the project boundary for ${project.properties.caseName}`
 	};
-	const map = await mapFiles(db, project, options)
+	// the QA fault trigger (test-faults.ts): the map load fails as if the geometry store were down
+	const map = await (
+		fault === 'map'
+			? Promise.reject(new Error('test-fail=map: forced boundary map failure'))
+			: mapFiles(db, project, options)
+	)
 		.then((files) =>
 			buildBoundaryMapConfig(project.properties.caseName, project.properties.caseReference, files, fallback)
 		)
@@ -129,7 +137,14 @@ export function buildConsulteeProjectPage(service: ManageService): AsyncRequestH
 
 		const files = await listCaseBoundaryFiles(db, project.properties.caseReference);
 		const options = boundaryFileOptions(files, project.id);
-		const viewModel = await boundaryPageViewModel(db, logger, project, options);
+		const viewModel = await boundaryPageViewModel(
+			db,
+			logger,
+			project,
+			options,
+			undefined,
+			activeTestFault(service, req.session)
+		);
 
 		return res.render('views/consultees/project/view.njk', viewModel);
 	};
@@ -157,7 +172,14 @@ export function buildBoundarySubmit(service: ManageService): AsyncRequestHandler
 		if (!chosen) {
 			res.render(
 				'views/consultees/project/view.njk',
-				await boundaryPageViewModel(db, logger, project, options, 'Select a shapefile')
+				await boundaryPageViewModel(
+					db,
+					logger,
+					project,
+					options,
+					'Select a shapefile',
+					activeTestFault(service, req.session)
+				)
 			);
 			return;
 		}

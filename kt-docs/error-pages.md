@@ -38,6 +38,36 @@ The dev pages mount only while `devPagesEnabled` is on - always locally (`NODE_E
 
 On an environment without `ENABLE_DEV_PAGES`, `/error-test` and `/components` should themselves 404 - worth checking once on a deployed environment to prove the flag works.
 
+## Forced failure triggers (temporary, for QA)
+
+The `?test-fail=` triggers (`apps/manage/src/app/views/consultees/test-faults.ts`) force the in-journey error states that would otherwise need a real backend outage. They are on everywhere except the prod deployment (`ENVIRONMENT !== 'prod'` - `Config.testFaultsEnabled`; test and training run `NODE_ENV=production`, so that alone couldn't gate them).
+
+Add `?test-fail=<fault>` - `&test-fail=<fault>` where the URL already has parameters - to any `/consultees/...` page. The fault is stored in the session, so the failure persists as the journey is clicked through, like a real outage, until `?test-fail=off` on any `/consultees/...` page clears it (or the session ends). On prod the parameter does nothing.
+
+| Fault      | What fails                              | What shows                                                                                                                                                   |
+| ---------- | --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `map`      | The boundary page's map can't be loaded | `/consultees/<case-id>` - "There's a problem loading the map – try again later" with a "Try again" link; the shapefile radios still render                   |
+| `ruleset`  | Every ruleset run fails                 | The report check page, category pages and the Report created page - "The ruleset could not be run" with a "Try again" link                                   |
+| `download` | The report ZIP can't be built           | `/consultees/<case-id>/report/created` - "The scoping report could not be downloaded – try again" with a "Retry download" link, once a download is attempted |
+
+### Boundary map failure (AC5)
+
+1. Sign in and open a project's boundary page with the fault set: `/consultees/<case-id>?test-fail=map`
+   - Expected: the "There's a problem loading the map – try again later" notification banner in place of the map; the "Confirm shapefile for report" radios still render.
+2. "Try again" reloads the page and fails again while the fault is set - a real retry. Clear the fault with `/consultees/<case-id>?test-fail=off`, then try again - the map loads.
+3. For the ruleset-run variant (the intersector itself failing for the selected ruleset): `/consultees/<case-id>/report?ruleset=england-wales-post-20240430&test-fail=ruleset`
+   - Expected: "The ruleset could not be run" banner; the "Try again" link keeps the selected project and ruleset parameters. The same fault also fails the category pages, the Report created page and the report's static maps, as a real screening outage would.
+
+### Report download failure (AC6)
+
+1. Walk the journey to the Report created page and add the fault: `/consultees/<case-id>/report/created?ruleset=england-wales-post-20240430&test-fail=download`
+   - Expected: the download link reads "(ZIP)" with no size - the report could not be generated.
+2. Click the download link.
+   - Expected: back on the Report created page with "The scoping report could not be downloaded – try again" and a "Retry download" link.
+3. "Retry download" fails again while the fault is set. Clear it with `/consultees/<case-id>/report/created?ruleset=england-wales-post-20240430&test-fail=off`, then retry - the ZIP downloads.
+
+Expected on prod: `?test-fail=` parameters are ignored and every page behaves normally.
+
 ## Errors that need a request, not just a URL
 
 ### CSRF failure

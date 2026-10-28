@@ -38,6 +38,12 @@ export interface Config extends BaseConfig {
 	// ENABLE_DEV_PAGES=true to enable them on a deployed environment running NODE_ENV=production
 	// (e.g. reviewing component examples on test/training).
 	devPagesEnabled: boolean;
+	// whether the ?test-fail= triggers (views/consultees/test-faults.ts) are honoured, for QA
+	// exercising the service's error states. On everywhere but the prod deployment (the
+	// ENVIRONMENT app setting - infrastructure/app-web.tf); test and training run
+	// NODE_ENV=production, so that alone can't gate them. TEMPORARY - remove before go-live
+	// (see kt-docs/overview.md's "Before go-live").
+	testFaultsEnabled: boolean;
 	auth: {
 		authority: string;
 		clientId: string;
@@ -85,6 +91,7 @@ export function loadConfig(): Config {
 		BLOB_STORE_CONTAINER,
 		CACHE_CONTROL_MAX_AGE,
 		ENABLE_DEV_PAGES,
+		ENVIRONMENT,
 		GIT_SHA,
 		LOG_LEVEL,
 		PORT,
@@ -145,6 +152,7 @@ export function loadConfig(): Config {
 		nearbyNsipRadiusMetres: nearbyConsultees.nsipRadiusMetres,
 		boundingBoxAbovePoints: screening.boundingBoxAbovePoints,
 		devPagesEnabled: !isProduction || ENABLE_DEV_PAGES === 'true',
+		testFaultsEnabled: ENVIRONMENT !== 'prod',
 		auth: {
 			authority: `https://login.microsoftonline.com/${AUTH_TENANT_ID}`,
 			clientId: AUTH_CLIENT_ID || '',

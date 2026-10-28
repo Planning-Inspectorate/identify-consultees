@@ -167,6 +167,22 @@ describe('manage router wiring', () => {
 		assert.doesNotMatch(response.text, /:placeholder/);
 	});
 
+	test('GET /consultees/:id?test-fail=map forces the boundary map failure until cleared', async () => {
+		const agent = request.agent(authDisabledApp);
+		const forced = await agent.get(`/consultees/${homePageTestCaseId}?test-fail=map`);
+		assert.equal(forced.status, 200);
+		assert.match(forced.text, /problem loading the map/);
+
+		// the fault stays set for the session - the page fails again without the param
+		const again = await agent.get(`/consultees/${homePageTestCaseId}`);
+		assert.match(again.text, /problem loading the map/);
+
+		// and clearing it brings the map back
+		await agent.get(`/consultees/${homePageTestCaseId}?test-fail=off`);
+		const cleared = await agent.get(`/consultees/${homePageTestCaseId}`);
+		assert.match(cleared.text, /app-consultee-map/);
+	});
+
 	test('GET /consultees/:id/ruleset renders the ruleset radios, none pre-selected', async () => {
 		const response = await request(authDisabledApp).get(`/consultees/${homePageTestCaseId}/ruleset`);
 		assert.equal(response.status, 200);
