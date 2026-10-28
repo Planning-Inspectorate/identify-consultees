@@ -1,0 +1,330 @@
+{% extends "views/layouts/main.njk" %}
+
+{% from "govuk/components/details/macro.njk" import govukDetails %}
+{% from "govuk/components/inset-text/macro.njk" import govukInsetText %}
+
+{% block pageTitle %}
+	{{ pageHeading }} - {{ config.headerTitle }}
+{% endblock %}
+
+{#
+	The user guide, as the team's "Identify Consultees user guide" doc has it. Contacts and
+	timescales not agreed yet read "to be confirmed" - fill them in before go-live (README.md).
+#}
+{% set toBeConfirmed = "to be confirmed" %}
+
+{% block pageContent %}
+	<div class="govuk-grid-row">
+		<div class="govuk-grid-column-two-thirds">
+			<p class="govuk-body-l">
+				Identify consultees finds the bodies to consult for a national infrastructure project: you pick the
+				project, confirm its boundary, choose a ruleset, review the consultees it finds, and download a report pack.
+			</p>
+
+			<nav aria-label="Contents">
+				<h2 class="govuk-heading-s">Contents</h2>
+				<ul class="govuk-list">
+					<li><a class="govuk-link" href="#before-you-start">Before you start</a></li>
+					<li><a class="govuk-link" href="#step-by-step">Step by step</a></li>
+					<li><a class="govuk-link" href="#report-pack">The report pack</a></li>
+					<li><a class="govuk-link" href="#formatting-a-ruleset-change">Formatting a ruleset change</a></li>
+					<li><a class="govuk-link" href="#requesting-a-ruleset-change">Requesting a ruleset change</a></li>
+					<li><a class="govuk-link" href="#getting-help">Getting help</a></li>
+				</ul>
+			</nav>
+
+			<h2 class="govuk-heading-l" id="before-you-start">Before you start</h2>
+			<p class="govuk-body">
+				You sign in with your Planning Inspectorate Microsoft account, and your account must be in the
+				service's access group.
+			</p>
+			<ul class="govuk-list govuk-list--bullet">
+				<li>
+					<strong>Getting access:</strong> ask to be added to the Identify consultees access group (who to ask is
+					{{ toBeConfirmed }}). Without it, signing in ends on a page saying you do not have access.
+				</li>
+				<li>
+					<strong>Browser:</strong> any up-to-date browser. The maps need JavaScript; without it you see a still
+					image of each map instead.
+				</li>
+				<li>
+					<strong>Projects:</strong> come from CBOS. A project appears once a case officer has uploaded its boundary
+					shapefile to the case's GIS Shapefiles folder in CBOS and the cases have been imported since.
+				</li>
+			</ul>
+
+			<h2 class="govuk-heading-l" id="step-by-step">Step by step</h2>
+			<p class="govuk-body">A report takes 6 steps, from finding the project to downloading its pack.</p>
+			<ol class="govuk-list govuk-list--number">
+				<li>
+					<strong>Find the project.</strong> On the <a class="govuk-link" href="/">search page</a>, search by keyword,
+					project reference or project title, or page through every project. Each row shows the project's stage in
+					CBOS. Select the project's name.
+				</li>
+				<li>
+					<strong>Confirm the boundary.</strong> The project boundary page shows the site on a map. Under
+					"Confirm shapefile for report", choose the boundary file to use - a project can have several, newest
+					first - then select Continue.
+				</li>
+				<li>
+					<strong>Choose a ruleset.</strong> Pick the ruleset that applies to the project, then select Continue.
+					England Wales post 30 April 2024 is selected unless you choose another.
+				</li>
+				<li>
+					<strong>Check the consultees.</strong> "Check consultees before creating the report" lists the report
+					details - project, reference, shapefile and ruleset, each with a Change link - and every category of
+					consultee found, with how many. The first run can take up to a minute for a large or detailed site.
+				</li>
+				<li>
+					<strong>Review each category.</strong> Select Change beside a category to see its consultees on a map
+					and in a table, with why each was identified.
+					<ul class="govuk-list govuk-list--bullet">
+						<li>To take one out, select Remove and give a reason. It moves to "Removed consultees" with your reason.</li>
+						<li>
+							To add one the ruleset missed, select "Add a consultee", start typing its name, pick it from the
+							suggestions and give a reason. Adding back a consultee you removed restores it.
+						</li>
+					</ul>
+				</li>
+				<li>
+					<strong>Create the report.</strong> On the check page, select Create report. On "Report created",
+					download the report pack, a ZIP file.
+				</li>
+			</ol>
+			<p class="govuk-body">
+				Your additions and removals are kept in the page's web address, so a copied link to the check page brings
+				them back. A ruleset run is reused for an hour; after that, the next page runs it again so newly loaded
+				data is picked up.
+			</p>
+			{{ govukInsetText({
+				text: "If a page says \"The ruleset could not be run\", no consultees are shown because the search did not finish. That is not the same as finding none - select Try again. A warning that the site was screened using its bounding box means the list can include consultees that are not near the site, so check each one."
+			}) }}
+
+			<h2 class="govuk-heading-l" id="report-pack">The report pack</h2>
+			<p class="govuk-body">
+				The ZIP holds one Excel workbook and a PDF map for each category of consultee in the report. Before
+				sending it, fill in "Report generated by" on the workbook's Summary tab - it is left blank and highlighted
+				yellow for you.
+			</p>
+			<table class="govuk-table">
+				<caption class="govuk-table__caption govuk-visually-hidden">What the report pack holds</caption>
+				<thead class="govuk-table__head">
+					<tr class="govuk-table__row">
+						<th scope="col" class="govuk-table__header">Part</th>
+						<th scope="col" class="govuk-table__header">What it holds</th>
+					</tr>
+				</thead>
+				<tbody class="govuk-table__body">
+					<tr class="govuk-table__row">
+						<th scope="row" class="govuk-table__header">Summary tab</th>
+						<td class="govuk-table__cell">
+							The project, case reference, boundary file and when it was received, the ruleset, when the report was
+							generated, "Report generated by" for you to fill in, a count per category, totals, the consultees added
+							and removed with their reasons, and the national infrastructure projects (NSIPs) near the site
+						</td>
+					</tr>
+					<tr class="govuk-table__row">
+						<th scope="row" class="govuk-table__header">A tab per group</th>
+						<td class="govuk-table__cell">
+							Administrative boundaries, Public bodies, Energy, Transport and Other: each consultee with its category,
+							why it was identified and its source. Energy and Transport also show subcategory and distance from the site
+						</td>
+					</tr>
+					<tr class="govuk-table__row">
+						<th scope="row" class="govuk-table__header">NSIPs tab</th>
+						<td class="govuk-table__cell">
+							Other projects within 35km of the site: name, number, type, sub-type and how each was found
+						</td>
+					</tr>
+					<tr class="govuk-table__row">
+						<th scope="row" class="govuk-table__header">A PDF map per category</th>
+						<td class="govuk-table__cell">
+							The site, the category's consultees labelled on a grey basemap, and the ruleset's distances drawn dashed
+							around the site, with a key and the consultees listed
+						</td>
+					</tr>
+				</tbody>
+			</table>
+			<p class="govuk-body">
+				Consultees you added show "Manually added", or your reason, in the workbook. Removed consultees are left out
+				of the tabs and listed, with your reason, on the Summary tab. If the site was screened using its bounding
+				box, the Summary says so.
+			</p>
+
+			<h2 class="govuk-heading-l" id="formatting-a-ruleset-change">Formatting a ruleset change</h2>
+			<p class="govuk-body">
+				Each ruleset is one sheet of the rulesets workbook (Rulesets.xlsx), one row per condition, with exactly these
+				6 columns in this order. Send the whole sheet with your change, not just the rows that changed.
+			</p>
+			<table class="govuk-table">
+				<caption class="govuk-table__caption govuk-visually-hidden">The ruleset sheet's columns</caption>
+				<thead class="govuk-table__head">
+					<tr class="govuk-table__row">
+						<th scope="col" class="govuk-table__header">Column</th>
+						<th scope="col" class="govuk-table__header">What to put</th>
+						<th scope="col" class="govuk-table__header">Allowed values</th>
+					</tr>
+				</thead>
+				<tbody class="govuk-table__body">
+					<tr class="govuk-table__row">
+						<th scope="row" class="govuk-table__header">Group hierarchy</th>
+						<td class="govuk-table__cell">The order of the group in the workbook</td>
+						<td class="govuk-table__cell">A whole number (1, 2, 3 and so on)</td>
+					</tr>
+					<tr class="govuk-table__row">
+						<th scope="row" class="govuk-table__header">Group</th>
+						<td class="govuk-table__cell">Which report tab the consultee goes on</td>
+						<td class="govuk-table__cell">Administrative boundaries, Public bodies, Energy, Transport or Other - anything else goes on Other</td>
+					</tr>
+					<tr class="govuk-table__row">
+						<th scope="row" class="govuk-table__header">Category</th>
+						<td class="govuk-table__cell">For administrative boundaries, the authority's role; blank otherwise</td>
+						<td class="govuk-table__cell">A Bordering Authority, B Host Authority, C Host Authority, D Bordering Authority or Greater London Authority</td>
+					</tr>
+					<tr class="govuk-table__row">
+						<th scope="row" class="govuk-table__header">Consultee Type(s)</th>
+						<td class="govuk-table__cell">Which consultees, in words</td>
+						<td class="govuk-table__cell">One of the accepted wordings, below</td>
+					</tr>
+					<tr class="govuk-table__row">
+						<th scope="row" class="govuk-table__header">Logic</th>
+						<td class="govuk-table__cell">How the consultee relates to the site</td>
+						<td class="govuk-table__cell">Intersects application site, Intersects application site buffer or Borders host authority</td>
+					</tr>
+					<tr class="govuk-table__row">
+						<th scope="row" class="govuk-table__header">Buffer (km)</th>
+						<td class="govuk-table__cell">How far from the site, in kilometres</td>
+						<td class="govuk-table__cell">0, unless Logic is Intersects application site buffer; then a number such as 1, 10 or 35</td>
+					</tr>
+				</tbody>
+			</table>
+			<p class="govuk-body">
+				Wording is matched ignoring capitals and extra spaces, but otherwise must match exactly. A Consultee Type(s)
+				wording not in the list needs a developer to map it to the data before the ruleset can go live, so say so in
+				your request. The service will not start with an unrecognised wording, logic or buffer, so a mistake is caught
+				before release rather than silently matching nothing.
+			</p>
+			{% set wordingsHtml %}
+				<ul class="govuk-list govuk-list--bullet">
+					{% for wording in consulteeTypeWordings %}
+						<li>{{ wording }}</li>
+					{% endfor %}
+				</ul>
+				<p class="govuk-body">
+					{{ awaitingDataWordings | join(", ") }} have no map data yet, so their conditions find nothing until it is loaded.
+				</p>
+			{% endset %}
+			{{ govukDetails({
+				summaryText: "Consultee Type(s) wordings accepted today (" ~ consulteeTypeWordings.length ~ ")",
+				html: wordingsHtml
+			}) }}
+			<p class="govuk-body">
+				A new ruleset is a new sheet. Give it a name with any date it applies from, such as "England Wales post 30
+				April 2024", and say whether it should become the default.
+			</p>
+
+			<h2 class="govuk-heading-l" id="requesting-a-ruleset-change">Requesting a ruleset change</h2>
+			<p class="govuk-body">
+				Ruleset changes are made by D&amp;D, and a change reaches the live service only after you have checked it on
+				the test environment.
+			</p>
+			{% include "views/help/change-flow.svg.njk" %}
+			<ol class="govuk-list govuk-list--number">
+				<li>
+					<strong>You edit the sheet.</strong> Change the ruleset's sheet in Rulesets.xlsx following the formatting
+					rules above. Note what changed, why, and the date it should apply from.
+				</li>
+				<li>
+					<strong>You send the request</strong> to D&amp;D (contact details {{ toBeConfirmed }}), with the sheet attached. Mark it
+					urgent only if a live report would otherwise be wrong.
+				</li>
+				<li>
+					<strong>D&amp;D triages it.</strong> They check the wording against the accepted list. A new Consultee
+					Type(s) wording, or a consultee type with no map data yet, takes longer: the data has to be found and
+					loaded first.
+				</li>
+				<li><strong>D&amp;D makes and tests the change</strong>, then deploys it to the test environment.</li>
+				<li>
+					<strong>You check it on test.</strong> Run 1 or 2 projects you know well through the changed ruleset and
+					confirm the consultees are as expected. Reply "approved", or say what needs changing.
+				</li>
+				<li>
+					<strong>D&amp;D releases it</strong> to the training and live services, and tells you when it is live.
+				</li>
+			</ol>
+			<table class="govuk-table">
+				<caption class="govuk-table__caption govuk-table__caption--s">How long a change takes</caption>
+				<thead class="govuk-table__head">
+					<tr class="govuk-table__row">
+						<th scope="col" class="govuk-table__header">Kind of change</th>
+						<th scope="col" class="govuk-table__header">Example</th>
+						<th scope="col" class="govuk-table__header">Timescale</th>
+					</tr>
+				</thead>
+				<tbody class="govuk-table__body">
+					{% for change in [
+						["Acknowledging a request", "Any request"],
+						["A wording or distance change using accepted wordings", "Hospitals within 10km becomes 15km"],
+						["A new ruleset sheet", "A ruleset for a new legislative date"],
+						["A new Consultee Type(s) wording for existing data", "A new name for an existing type"],
+						["A new consultee type needing new data", "MoD safeguarding areas"],
+						["An urgent fix to a live ruleset", "A condition matching the wrong bodies"]
+					] %}
+						<tr class="govuk-table__row">
+							<th scope="row" class="govuk-table__header">{{ change[0] }}</th>
+							<td class="govuk-table__cell">{{ change[1] }}</td>
+							<td class="govuk-table__cell">{{ toBeConfirmed | capitalize }}</td>
+						</tr>
+					{% endfor %}
+				</tbody>
+			</table>
+
+			<h2 class="govuk-heading-l" id="getting-help">Getting help</h2>
+			<p class="govuk-body">
+				Most problems clear with Try again. If one does not, contact the service team (contact details
+				{{ toBeConfirmed }}) with the project reference and what the page said.
+			</p>
+			<table class="govuk-table">
+				<caption class="govuk-table__caption govuk-visually-hidden">Common problems and what to do</caption>
+				<thead class="govuk-table__head">
+					<tr class="govuk-table__row">
+						<th scope="col" class="govuk-table__header">What you see</th>
+						<th scope="col" class="govuk-table__header">What to do</th>
+					</tr>
+				</thead>
+				<tbody class="govuk-table__body">
+					<tr class="govuk-table__row">
+						<th scope="row" class="govuk-table__header">The project is not in the search</th>
+						<td class="govuk-table__cell">
+							Check its boundary shapefile is uploaded to the case's GIS Shapefiles folder in CBOS, then ask an admin to
+							import cases from CBOS
+						</td>
+					</tr>
+					<tr class="govuk-table__row">
+						<th scope="row" class="govuk-table__header">No stage beside a project</th>
+						<td class="govuk-table__cell">Ask an admin to import cases from CBOS again</td>
+					</tr>
+					<tr class="govuk-table__row">
+						<th scope="row" class="govuk-table__header">The ruleset could not be run</th>
+						<td class="govuk-table__cell">Select Try again. A very large site can take up to a minute</td>
+					</tr>
+					<tr class="govuk-table__row">
+						<th scope="row" class="govuk-table__header">A bounding box warning</th>
+						<td class="govuk-table__cell">Check each consultee, and remove any that do not apply</td>
+					</tr>
+					<tr class="govuk-table__row">
+						<th scope="row" class="govuk-table__header">A consultee you expected is missing</th>
+						<td class="govuk-table__cell">
+							Add it by hand with a reason, and request a ruleset change if it should always be found. Some types
+							have no data yet: MoD areas, coal mining areas and the Cheshire brine area
+						</td>
+					</tr>
+					<tr class="govuk-table__row">
+						<th scope="row" class="govuk-table__header">The report pack will not download</th>
+						<td class="govuk-table__cell">Select Retry download</td>
+					</tr>
+				</tbody>
+			</table>
+		</div>
+	</div>
+{% endblock %}

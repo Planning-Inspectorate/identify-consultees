@@ -44,6 +44,7 @@ const pages = [
 	{ path: '/signed-out', name: 'signed out' },
 	{ path: '/terms-and-conditions', name: 'terms and conditions' },
 	{ path: '/accessibility-statement', name: 'accessibility statement' },
+	{ path: '/help', name: 'help' },
 	{ path: '/cookies', name: 'cookies' },
 	{ path: '/contact', name: 'contact' },
 	{ path: '/error-test', name: 'error scenarios index' },

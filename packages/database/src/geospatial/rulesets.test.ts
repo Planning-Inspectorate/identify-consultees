@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { describe, test } from 'node:test';
 import {
+	acceptedConsulteeTypes,
 	buildRulesetFromCsv,
 	getRuleset,
 	isIdentified,
@@ -57,6 +58,22 @@ describe('parseRulesetSettings', () => {
 		);
 		assert.equal(settings.logic.get('intersects application site buffer'), 'buffer');
 		assert.deepEqual([...settings.categoriesAwaitingData], ['Canal']);
+	});
+
+	test('lists the accepted consultee type wordings as written, and which await data', () => {
+		const settings = parseRulesetSettings(
+			SETTINGS.replace('consulteeTypes:\n', 'consulteeTypes:\n  Canals  England:\n    categories: [Canal]\n')
+		);
+		assert.deepEqual(acceptedConsulteeTypes(settings), [
+			{ wording: 'Canals  England', awaitingData: true },
+			{ wording: 'Railways', awaitingData: false },
+			{ wording: 'Parish Councils bordering Host Parish Councils', awaitingData: false }
+		]);
+		// the real settings: every wording, the ones with no data yet among them
+		const real = acceptedConsulteeTypes();
+		assert.ok(real.length > 30);
+		assert.ok(real.some(({ wording, awaitingData }) => wording === 'Cheshire Brine Area' && awaitingData));
+		assert.ok(real.some(({ wording, awaitingData }) => wording === 'Ambulance Trusts' && !awaitingData));
 	});
 
 	test('treats names and categoriesAwaitingData as optional', () => {

@@ -1,0 +1,38 @@
+{#
+	How a ruleset change request moves between the requester and D&D - the numbered steps under it
+	say the same in words. Drawn as the user guide doc draws it, in GOV.UK colours.
+#}
+{% set w = 150 %}{% set h = 48 %}{% set rowA = 40 %}{% set rowB = 150 %}
+{% set c1 = 130 %}{% set c2 = 300 %}{% set c3 = 470 %}{% set c4 = 640 %}
+{# a macro can't see the variables above, so it's given the box size #}
+{% macro box(cx, cy, label, main = false, w = 150, h = 48) %}
+	<rect x="{{ cx - w / 2 }}" y="{{ cy - h / 2 }}" width="{{ w }}" height="{{ h }}" rx="4"
+		fill="{{ '#e8f1f8' if main else '#ffffff' }}" stroke="{{ '#1d70b8' if main else '#505a5f' }}" stroke-width="{{ 3 if main else 1.5 }}"/>
+	<text x="{{ cx }}" y="{{ cy + 6 }}" text-anchor="middle" font-size="16" font-weight="{{ 700 if main else 400 }}" fill="#0b0c0c">{{ label }}</text>
+{% endmacro %}
+<svg class="pins-help-flow govuk-!-margin-bottom-6" viewBox="0 0 740 190" width="100%" role="img"
+	aria-label="A ruleset change: you edit the sheet, D&D triage it, make and test the change and deploy it to test, you check it on test, and D&D release it to the live service once you approve it, or change it again if not">
+	<defs>
+		<marker id="help-flow-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+			<path d="M0 0L10 5L0 10z" fill="#505a5f"/>
+		</marker>
+	</defs>
+	<text x="0" y="{{ rowA + 6 }}" font-size="16" font-weight="700" fill="#505a5f">You</text>
+	<text x="0" y="{{ rowB + 6 }}" font-size="16" font-weight="700" fill="#505a5f">D&amp;D</text>
+	<g fill="none" stroke="#505a5f" stroke-width="1.5" marker-end="url(#help-flow-arrow)">
+		<path d="M{{ c1 }} {{ rowA + h / 2 }}V{{ rowB - h / 2 }}"/>
+		<path d="M{{ c1 + w / 2 }} {{ rowB }}H{{ c2 - w / 2 }}"/>
+		<path d="M{{ c2 + w / 2 }} {{ rowB }}H{{ c3 - w / 2 }}"/>
+		<path d="M{{ c3 }} {{ rowB - h / 2 }}V{{ rowA + h / 2 }}"/>
+		<path d="M{{ c3 + w / 2 }} {{ rowA }}H{{ c4 }}V{{ rowB - h / 2 }}"/>
+		<path d="M{{ c3 - w / 2 }} {{ rowA }}H{{ c2 }}V{{ rowB - h / 2 }}"/>
+	</g>
+	{{ box(c1, rowA, "Edit the sheet") }}
+	{{ box(c1, rowB, "Triage request") }}
+	{{ box(c2, rowB, "Change and test") }}
+	{{ box(c3, rowB, "Deploy to test") }}
+	{{ box(c3, rowA, "Check on test", true) }}
+	{{ box(c4, rowB, "Release to live") }}
+	<text x="{{ c3 + w / 2 + 12 }}" y="{{ rowA - 8 }}" font-size="14" fill="#505a5f">approved</text>
+	<text x="{{ c3 - w / 2 - 12 }}" y="{{ rowA - 8 }}" text-anchor="end" font-size="14" fill="#505a5f">changes needed</text>
+</svg>

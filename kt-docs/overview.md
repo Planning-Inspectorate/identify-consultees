@@ -166,3 +166,4 @@ The main journey is **database-backed**: there are no fixtures. Locally the data
 - [ ] Add the visual regression tests to the PR pipeline once screens are final, with Linux baselines (see [Testing](./testing.md))
 - [ ] Get sign-off for the consultee category map colours (interim, see [Maps](./maps.md))
 - [ ] Size the Prod database for screening and load-test it (see [Screening issues](./data/screening-issues.md))
+- [ ] Fill in the help page's "to be confirmed" contacts and ruleset change timescales (`apps/manage/src/app/views/help/view.njk`), agreed with D&D

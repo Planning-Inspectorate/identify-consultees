@@ -80,6 +80,18 @@ $font-family: arial, helvetica, sans-serif;
 	}
 }
 
+// the help page's drawing of a ruleset change: in the service's font, and left out on a phone,
+// where it would be too small to read - the numbered steps under it say the same
+.pins-help-flow {
+	display: none;
+	font-family: $font-family;
+
+	// GOV.UK Frontend's tablet breakpoint
+	@media (width >= 40.0625em) {
+		display: block;
+	}
+}
+
 // a footer link kept routed but taken out of the list (config-middleware marks it `hidden`)
 // while its content is unaudited - hiding the whole list item leaves no gap in the inline list
 .pins-footer__item--hidden {

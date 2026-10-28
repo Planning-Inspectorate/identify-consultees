@@ -134,6 +134,12 @@ const pages = [
 		mustSee: [/How accessible this website is/i, /Enforcement procedure/i]
 	},
 	{
+		path: '/help',
+		name: 'help',
+		heading: /How to use Identify consultees/i,
+		mustSee: [/Formatting a ruleset change/i, /Requesting a ruleset change/i]
+	},
+	{
 		path: '/cookies',
 		name: 'cookies',
 		heading: /Cookies/i,
