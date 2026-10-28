@@ -19,6 +19,27 @@ export interface CbosBoundaryFile {
 	caseTitle: string | null;
 	fileName: string | null;
 	createdAt: string | null;
+	/** The case's stage now, as CBOS stores it (pre_examination) - absent from an older function. */
+	caseStage?: string | null;
+}
+
+/**
+ * CBOS's case stages - its state machine's - labelled as its own pages label them. Any other (a
+ * draft case's) shows none.
+ */
+export const CASE_STAGE_LABELS: ReadonlyMap<string, string> = new Map([
+	['pre_application', 'Pre-Application'],
+	['acceptance', 'Acceptance'],
+	['pre_examination', 'Pre-Examination'],
+	['examination', 'Examination'],
+	['recommendation', 'Recommendation'],
+	['decision', 'Decision'],
+	['post_decision', 'Post-Decision'],
+	['withdrawn', 'Withdrawn']
+]);
+
+function caseStageLabel(stage: string | null | undefined): string | null {
+	return (stage && CASE_STAGE_LABELS.get(stage)) ?? null;
 }
 
 interface CbosFeature {
@@ -152,7 +173,8 @@ function assertLongitudeLatitude(geometry: Geometry): void {
  * The case_boundary row for one CBOS boundary file. Its id comes from the case reference and file
  * name, as the file import's does (toCaseBoundary), so a boundary already loaded from a file is
  * updated rather than duplicated. The project name is CBOS's current case title, not the one
- * stamped on the GeoJSON when it was converted, so a renamed case is picked up.
+ * stamped on the GeoJSON when it was converted, so a renamed case is picked up - and its stage,
+ * the case's stage now, so each import brings it up to date.
  */
 export function toCaseBoundaryFromCbos(file: CbosBoundaryFile, collection: CbosFeatureCollection): CaseBoundaryFeature {
 	const geometries = collection.features.flatMap((feature) => (feature.geometry ? [feature.geometry] : []));
@@ -175,6 +197,7 @@ export function toCaseBoundaryFromCbos(file: CbosBoundaryFile, collection: CbosF
 		...boundary,
 		properties: {
 			...boundary.properties,
+			acceptance: caseStageLabel(file.caseStage),
 			metadata: { source: 'cbos', cbosDocumentGuid: file.documentGuid, cbosVersion: file.version }
 		}
 	};

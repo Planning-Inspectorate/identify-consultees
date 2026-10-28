@@ -5,6 +5,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from cbos.boundaries import (
+    CASE_STAGES,
     GET_BOUNDARY_FILE,
     LIST_BOUNDARY_FILES,
     BoundaryFile,
@@ -40,15 +41,34 @@ def test_the_query_reads_every_geojson_version_in_gis_shapefiles_folders():
         assert "d.isDeleted = 0" in sql and "dv.isDeleted = 0" in sql and "f.deletedAt IS NULL" in sql
 
 
-def test_list_boundary_files_maps_rows_and_closes_the_connection():
-    patcher, connection = _fake_connect([_row()])
+def _fake_listing(stages):
+    """A CBOS whose boundary file query returns one row, and whose stage query returns `stages` -
+    or raises it, if it's an exception."""
+    connection = MagicMock()
+    cursor = connection.cursor.return_value
+    results = []
+
+    def execute(sql, params):
+        if sql == CASE_STAGES and isinstance(stages, Exception):
+            raise stages
+        results.append(stages if sql == CASE_STAGES else [_row()])
+
+    cursor.execute.side_effect = execute
+    cursor.fetchall.side_effect = lambda: results.pop(0)
+    return patch("cbos.boundaries.connect", return_value=connection), connection
+
+
+def test_list_boundary_files_maps_rows_with_each_cases_stage_and_closes_the_connection():
+    patcher, connection = _fake_listing([("EN010001", "pre_application"), ("EN010001", "acceptance")])
     with patcher as connect:
         files = list_boundary_files(CONFIG, CREDENTIAL)
 
-    connect.assert_called_once_with(CONFIG, CREDENTIAL)
-    connection.cursor.return_value.execute.assert_called_once_with(LIST_BOUNDARY_FILES, ())
-    connection.close.assert_called_once()
-    assert files == [BoundaryFile(GUID, 2, "EN010001", "Example Solar Farm", "site.geojson", CREATED)]
+    connect.assert_called_with(CONFIG, CREDENTIAL)
+    executed = [call.args[0] for call in connection.cursor.return_value.execute.call_args_list]
+    assert executed == [LIST_BOUNDARY_FILES, CASE_STAGES]
+    assert connection.close.call_count == 2
+    # the stage query is oldest first - were two rows valid, the newest wins
+    assert files == [BoundaryFile(GUID, 2, "EN010001", "Example Solar Farm", "site.geojson", CREATED, "acceptance")]
     assert files[0].as_json() == {
         "documentGuid": GUID,
         "version": 2,
@@ -56,7 +76,23 @@ def test_list_boundary_files_maps_rows_and_closes_the_connection():
         "caseTitle": "Example Solar Farm",
         "fileName": "site.geojson",
         "createdAt": "2026-05-01T09:30:00+00:00",
+        "caseStage": "acceptance",
     }
+
+
+def test_list_boundary_files_lists_without_stages_when_cbos_case_status_cant_be_read(caplog):
+    patcher, _ = _fake_listing(PermissionError("The SELECT permission was denied on the object 'CaseStatus'"))
+    with patcher:
+        files = list_boundary_files(CONFIG, CREDENTIAL)
+
+    assert [file.case_stage for file in files] == [None]
+    assert files[0].as_json()["caseStage"] is None
+    assert "Couldn't read case stages from CBOS: PermissionError" in caplog.text
+
+
+def test_the_stage_query_reads_each_cases_current_stage():
+    assert "cs.valid = 1" in CASE_STAGES
+    assert "ORDER BY cs.createdAt" in CASE_STAGES
 
 
 def test_boundary_file_json_keeps_an_explicit_zone_and_allows_a_missing_date():

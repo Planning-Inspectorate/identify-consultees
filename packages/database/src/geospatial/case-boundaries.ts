@@ -14,6 +14,7 @@ export interface CaseBoundaryProperties {
 	caseName: string;
 	fileName?: string | null;
 	receivedDate?: Date | null;
+	/** The case's stage (Pre-Examination) - a CBOS import sets it each time; the column's name is older. */
 	acceptance?: string | null;
 	metadata?: Record<string, unknown>;
 }
