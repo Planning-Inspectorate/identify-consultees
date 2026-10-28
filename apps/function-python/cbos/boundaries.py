@@ -12,11 +12,14 @@ and apps/api/src/server/applications/application/documents/shapefile-processing.
 """
 
 import json
-from dataclasses import dataclass
+import logging
+from dataclasses import dataclass, replace
 from datetime import datetime, timezone
 
 from cbos.config import CbosConfig
 from cbos.database import connect
+
+logger = logging.getLogger(__name__)
 
 GIS_SHAPEFILES_FOLDER_NAME = "GIS Shapefiles"
 GEOJSON_MIME = "application/geo+json"
@@ -36,6 +39,17 @@ WHERE dv.mime = '{GEOJSON_MIME}' AND dv.isDeleted = 0
 """
 
 LIST_BOUNDARY_FILES = _BOUNDARY_FILES + "ORDER BY c.reference, dv.documentGuid, dv.version"
+
+# Each case's stage now. CBOS keeps a row for every stage a case has been in, the current one
+# valid - oldest first, so were two valid the newest wins. Its values are its state machine's
+# (pre_application, acceptance, ... post_decision, withdrawn); the manage app labels them.
+CASE_STAGES = """
+SELECT c.reference, cs.status
+FROM [Case] c
+JOIN CaseStatus cs ON cs.caseId = c.id AND cs.valid = 1
+WHERE c.reference IS NOT NULL
+ORDER BY cs.createdAt, cs.id
+"""
 GET_BOUNDARY_FILE = _BOUNDARY_FILES + "AND dv.documentGuid = ? AND dv.version = ?"
 
 
@@ -47,6 +61,8 @@ class BoundaryFile:
     case_title: str | None
     file_name: str | None
     created_at: datetime | None
+    case_stage: str | None = None
+    """The case's stage now, as CBOS stores it (pre_examination) - not when the file was added."""
 
     def as_json(self) -> dict:
         return {
@@ -56,6 +72,7 @@ class BoundaryFile:
             "caseTitle": self.case_title,
             "fileName": self.file_name,
             "createdAt": _utc_iso(self.created_at),
+            "caseStage": self.case_stage,
         }
 
 
@@ -93,7 +110,21 @@ def _query(config: CbosConfig, credential, sql: str, params: tuple = ()) -> list
 
 
 def list_boundary_files(config: CbosConfig, credential) -> list[BoundaryFile]:
-    return [_boundary_file(row) for row in _query(config, credential, LIST_BOUNDARY_FILES)]
+    """Every boundary file, each with its case's stage now (see case_stages)."""
+    files = [_boundary_file(row) for row in _query(config, credential, LIST_BOUNDARY_FILES)]
+    stages = case_stages(config, credential)
+    return [replace(file, case_stage=stages.get(file.case_reference)) for file in files]
+
+
+def case_stages(config: CbosConfig, credential) -> dict[str, str]:
+    """Each case's stage now, by reference. A stage is only shown, so if CBOS's CaseStatus can't be
+    read - its database permissions are granted in SQL, outside this repo - the files are listed
+    without one rather than not at all."""
+    try:
+        return {reference: status for reference, status in _query(config, credential, CASE_STAGES)}
+    except Exception as error:  # noqa: BLE001 - any failure leaves the stage out, nothing more
+        logger.warning("Couldn't read case stages from CBOS: %s", type(error).__name__)
+        return {}
 
 
 def fetch_boundary_geojson(config: CbosConfig, credential, document_guid: str, version: int) -> dict:

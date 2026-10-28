@@ -3,6 +3,7 @@ import assert from 'node:assert';
 import { describe, it, mock } from 'node:test';
 import type { CbosBoundaryFile, CbosFeatureCollection } from './cbos-boundaries.ts';
 import {
+	CASE_STAGE_LABELS,
 	combineGeometries,
 	distinctFileNames,
 	fetchCbosBoundaryGeoJson,
@@ -18,7 +19,8 @@ const FILE: CbosBoundaryFile = {
 	caseReference: 'EN010001',
 	caseTitle: 'Example Solar Farm',
 	fileName: 'site.geojson',
-	createdAt: '2026-05-01T09:30:00+00:00'
+	createdAt: '2026-05-01T09:30:00+00:00',
+	caseStage: 'pre_examination'
 };
 const SQUARE = {
 	type: 'Polygon' as const,
@@ -133,8 +135,29 @@ describe('CBOS boundaries', () => {
 				caseName: 'Example Solar Farm',
 				fileName: 'site.geojson',
 				receivedDate: new Date('2026-04-30T12:00:00.000Z'),
+				acceptance: 'Pre-Examination',
 				metadata: { source: 'cbos', cbosDocumentGuid: FILE.documentGuid, cbosVersion: 2 }
 			});
+		});
+
+		it("labels the case's stage as CBOS does, and leaves out one it doesn't list", () => {
+			const stage = (caseStage: string | null | undefined) =>
+				toCaseBoundaryFromCbos({ ...FILE, caseStage }, collection({ geometry: SQUARE })).properties.acceptance;
+			assert.deepStrictEqual([...CASE_STAGE_LABELS.keys()].map(stage), [
+				'Pre-Application',
+				'Acceptance',
+				'Pre-Examination',
+				'Examination',
+				'Recommendation',
+				'Decision',
+				'Post-Decision',
+				'Withdrawn'
+			]);
+			// a draft case, an inherited property name, none read (CBOS's CaseStatus unreadable), an older function
+			assert.deepStrictEqual(
+				[stage('draft'), stage('toString'), stage(null), stage(undefined)],
+				[null, null, null, null]
+			);
 		});
 
 		it('falls back to the stamped properties, then the reference, guid and CBOS date', () => {

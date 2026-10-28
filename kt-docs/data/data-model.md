@@ -58,7 +58,7 @@ Defined in `packages/database/src/schema.prisma`; spatial indexes, `CHECK` const
 | `geometrySimplified`                    | `geometry.Reduce(10).MakeValid()`: Nearby NSIPs are measured, and drawn, from it |
 | `caseReference`, `caseName`             | e.g. `EN010102`, project name                                                    |
 | `fileName`, `receivedDate`              | Which submission                                                                 |
-| `acceptance`, `metadata`, `lastUpdated` | `acceptance` not populated                                                       |
+| `acceptance`, `metadata`, `lastUpdated` | `acceptance`: the case's stage (Pre-Examination), from CBOS - the name is older  |
 
 Spatial indexes (`GEOGRAPHY_AUTO_GRID`): `consultee_area_geometry_simplified_sidx` (every screening query, forced by hint), `consultee_area_geometry_sidx`, `case_boundary_geometry_sidx`. B-tree indexes on `consulteeCategory` and `caseReference`.
 
@@ -116,6 +116,7 @@ CBOS (the IDAS back office) is PINS's system of record for cases. A case officer
 - A case keeps every boundary it's had: its boundary page lists them all to pick from, and everywhere else (search, Nearby NSIPs) a case is its newest.
 - A file's features (a site and its access routes, say) become one MultiPolygon. The loader corrects winding and runs `MakeValid()` as for any import.
 - The project name is CBOS's current case title, not the one stamped on the GeoJSON.
+- `acceptance` is the case's stage now, labelled as CBOS labels it: Pre-Application, Acceptance, Pre-Examination, Examination, Recommendation, Decision, Post-Decision or Withdrawn (the `CaseStatus` row that's `valid`; any other value, such as a draft case's, is left blank). The search page shows it as a tag. It's the stage when the import last ran, so run it again to bring stages up to date. If the function can't read `CaseStatus`, the files are still imported, without stages, and the function logs a warning.
 - A file whose coordinates aren't longitude and latitude is turned away. CBOS only reprojects when the ZIP has a `.prj` file, and accepts one without.
 - `metadata` records `source: "cbos"` and the CBOS document id and version.
 - It merges and never deletes. A file that can't be read is listed on the page and skipped.
