@@ -68,7 +68,6 @@
 		<h2 class="govuk-heading-m">Identified consultees</h2>
 		{# the exported workbook's tab groupings (see the controller's tabForCategory) #}
 		{% for group in groups %}
-			<h3 class="govuk-heading-s">{{ group.name }}</h3>
 			{% set consulteeRows = [] %}
 			{% for consultee in group.consultees %}
 				{% set valueHtml %}
@@ -114,7 +113,15 @@
 					}
 				}), consulteeRows) %}
 			{% endfor %}
-			{{ govukSummaryList({ rows: consulteeRows }) }}
+			{{ govukSummaryList({
+				card: {
+					title: {
+						text: group.name,
+						headingLevel: 3
+					}
+				},
+				rows: consulteeRows
+			}) }}
 		{% endfor %}
 	{% endif %}
 
