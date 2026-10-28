@@ -1,7 +1,7 @@
 {% extends "views/layouts/main.njk" %}
 
 {% from "govuk/components/button/macro.njk" import govukButton %}
-{% from "govuk/components/notification-banner/macro.njk" import govukNotificationBanner %}
+{% from "govuk/components/error-message/macro.njk" import govukErrorMessage %}
 {% from "govuk/components/radios/macro.njk" import govukRadios %}
 
 {% block pageTitle %}
@@ -16,11 +16,8 @@
 
 {% block pageContent %}
 	{% if mapFailed %}
-		{% set failureHtml %}
-			<h3 class="govuk-notification-banner__heading">There's a problem loading the map – try again later</h3>
-			<p class="govuk-body">The boundary map could not be retrieved. <a class="govuk-notification-banner__link" href="{{ retryUrl }}">Try again</a>.</p>
-		{% endset %}
-		{{ govukNotificationBanner({ html: failureHtml }) }}
+		{{ govukErrorMessage({ text: "There's a problem loading the map - try again later" }) }}
+		<p class="govuk-body"><a class="govuk-link" href="{{ retryUrl }}">Try again</a></p>
 	{% else %}
 		{% set mapRegionLabel = mapRegionLabel %}
 		{% set staticMapSrc = staticMapSrc %}

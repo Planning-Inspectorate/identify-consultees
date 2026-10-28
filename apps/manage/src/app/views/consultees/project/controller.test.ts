@@ -137,7 +137,7 @@ describe('consultee project boundary page', () => {
 		assert.strictEqual(mapConfig.shapefileDatasets[0].id, `shapefile-${realProjectId}`);
 	});
 
-	it('should show an error banner with a retry link when the map cannot be loaded', async () => {
+	it('should show a govuk error message with a retry link when the map cannot be loaded', async () => {
 		const nunjucks = configureNunjucks();
 		const mockRes = {
 			status: mock.fn(() => mockRes),
@@ -162,6 +162,7 @@ describe('consultee project boundary page', () => {
 		assert.strictEqual(viewModel.files.length, 2);
 
 		const html = mockRes.render.mock.calls[0].result;
+		assert.match(html, /govuk-error-message/);
 		assert.match(html, /problem loading the map/);
 		assert.match(html, /try again later/);
 		assert.match(html, />Try again</);
@@ -184,6 +185,7 @@ describe('consultee project boundary page', () => {
 		const viewModel = mockRes.render.mock.calls[0].arguments[1];
 		assert.strictEqual(viewModel.mapFailed, true);
 		const html = mockRes.render.mock.calls[0].result;
+		assert.match(html, /govuk-error-message/);
 		assert.match(html, /problem loading the map/);
 		assert.doesNotMatch(html, /app-consultee-map/);
 	});
