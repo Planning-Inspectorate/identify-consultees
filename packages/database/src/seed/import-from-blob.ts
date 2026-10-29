@@ -75,7 +75,7 @@ export function parseArgs(argv: string[]): ParsedArgs {
 }
 
 /** The container, by BLOB_STORE_HOST and BLOB_STORE_CONTAINER. */
-function referenceDataContainer() {
+export function referenceDataContainer() {
 	const blobStoreHost = process.env.BLOB_STORE_HOST;
 	const blobStoreContainer = process.env.BLOB_STORE_CONTAINER;
 	if (!blobStoreHost || !blobStoreContainer) {

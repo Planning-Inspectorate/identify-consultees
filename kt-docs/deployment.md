@@ -27,6 +27,7 @@ Azure DevOps project [identify-consultees](https://dev.azure.com/planninginspect
 | Rollback                 | `rollback.yml`                                                     | By hand                                                                                                                  |
 | Infrastructure CI and CD | `infrastructure/pipelines/terraform-ci*.yaml`, `terraform-cd.yaml` | Plan on PR; plan and apply per environment on merge                                                                      |
 | DB Seed                  | `db-seed.yml`                                                      | By hand: sample data, or the full reference data                                                                         |
+| Promote reference data   | `promote-reference-data.yml`                                       | By hand: a checked quarter's consultee areas, Test to Training or Training to Prod (Prod's approval gates it)            |
 
 Merges close together start overlapping Deploy and Infrastructure CD runs. Both use `lockBehavior: runLatest`, which works once each environment has an Exclusive lock check. See "Overlapping deploys" in [AGENTS.md](../AGENTS.md). After a burst of merges, check the commit on Dev's `/health`.
 
