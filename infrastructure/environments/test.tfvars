@@ -58,6 +58,9 @@ monitoring_config = {
 # no SQL geo-replica or secondary region outside prod - see variables.tf
 secondary_region_enabled = false
 
+# import a case's boundaries when CBOS converts a new one (idas-back-office.tf)
+cbos_subscriber_enabled = true
+
 sql_config = {
   admin = {
     login_username = "pins-consultees-sql-test"

@@ -27,9 +27,10 @@ from intersector.screening import Screening
 API_KEY = "test-shared-key"
 
 
-def _request(headers: dict | None = None) -> MagicMock:
+def _request(headers: dict | None = None, params: dict | None = None) -> MagicMock:
     req = MagicMock(spec=func.HttpRequest)
     req.headers = headers or {}
+    req.params = params or {}
     return req
 
 
@@ -376,11 +377,21 @@ def test_cbos_boundary_files_lists_each_file():
     file = MagicMock()
     file.as_json.return_value = {"documentGuid": "abc"}
     env, config, credential, listing = _cbos_patches(list_boundary_files={"return_value": [file]})
-    with env, config, credential, listing:
+    with env, config, credential, listing as list_files:
         response = cbos_boundary_files(_request({"x-api-key": API_KEY}))
 
     assert response.status_code == 200
     assert json.loads(response.get_body()) == {"files": [{"documentGuid": "abc"}]}
+    # every case's, unless one is asked for
+    assert list_files.call_args.args[2] is None
+
+
+def test_cbos_boundary_files_lists_one_case_when_asked():
+    env, config, credential, listing = _cbos_patches(list_boundary_files={"return_value": []})
+    with env, config, credential, listing as list_files:
+        cbos_boundary_files(_request({"x-api-key": API_KEY}, {"caseReference": " EN010001 "}))
+
+    assert list_files.call_args.args[2] == "EN010001"
 
 
 @pytest.mark.parametrize(
