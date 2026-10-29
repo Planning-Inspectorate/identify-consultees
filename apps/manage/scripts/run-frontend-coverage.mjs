@@ -24,7 +24,11 @@ const args = [
 	`--test-coverage-exclude=${path.join(manageRoot, '**/*.test.*')}`,
 	`--test-coverage-exclude=${path.join(manageRoot, '**/server.ts')}`,
 	`--test-coverage-exclude=${path.join(manageRoot, '**/util/build.ts')}`,
-	`--test-coverage-exclude=${path.join(manageRoot, '**/e2e/**')}`
+	`--test-coverage-exclude=${path.join(manageRoot, '**/e2e/**')}`,
+	// src/lib is vendored library code (ported from @planning-inspectorate/core - see
+	// src/lib/README.md) and keeps third-party status: excluded from the gate like
+	// node_modules code was when it was a package dependency
+	`--test-coverage-exclude=${path.join(manageRoot, 'src/lib/**')}`
 ];
 
 const result = spawnSync(process.execPath, args, {

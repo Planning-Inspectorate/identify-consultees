@@ -1,6 +1,6 @@
+import { mockLogger } from '#lib/testing/index.ts';
 import { GroupLoadError } from '@pins/identify-consultees-database/src/seed/consultee-area-groups.ts';
 import { UnknownDatasetError } from '@pins/identify-consultees-database/src/seed/reference-data.ts';
-import { mockLogger } from '@planning-inspectorate/core/testing';
 import assert from 'node:assert';
 import { describe, it, mock } from 'node:test';
 import { configureNunjucks } from '../../nunjucks.ts';

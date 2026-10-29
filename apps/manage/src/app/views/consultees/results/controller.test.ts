@@ -1,4 +1,4 @@
-import { mockLogger } from '@planning-inspectorate/core/testing';
+import { mockLogger } from '#lib/testing/index.ts';
 import assert from 'node:assert';
 import { describe, it, mock } from 'node:test';
 import { NEARBY_REGIONAL_FILL_OPACITY, REGIONAL_FILL_OPACITY } from '../../../maps/case-geojson.ts';

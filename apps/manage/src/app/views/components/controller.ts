@@ -1,4 +1,4 @@
-import type { AsyncRequestHandler } from '@planning-inspectorate/core/util';
+import type { AsyncRequestHandler } from '#lib/util/index.ts';
 import type { Request } from 'express';
 import {
 	createGovukNunjucksEnvironment,

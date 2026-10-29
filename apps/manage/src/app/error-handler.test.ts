@@ -1,4 +1,4 @@
-import { mockLogger } from '@planning-inspectorate/core/testing';
+import { mockLogger } from '#lib/testing/index.ts';
 import assert from 'node:assert/strict';
 import { describe, it, mock } from 'node:test';
 import { buildSanitisingErrorHandler } from './error-handler.ts';

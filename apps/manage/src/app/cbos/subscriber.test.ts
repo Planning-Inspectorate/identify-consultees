@@ -1,5 +1,5 @@
+import { mockLogger } from '#lib/testing/index.ts';
 import { ServiceBusClient } from '@azure/service-bus';
-import { mockLogger } from '@planning-inspectorate/core/testing';
 import assert from 'node:assert/strict';
 import { describe, it, mock } from 'node:test';
 import {

@@ -1,8 +1,8 @@
+import { createBaseApp } from '#lib/app/index.ts';
 import type { ManageService } from '#service';
 import { addLocalsConfiguration } from '#util/config-middleware.ts';
 import { ensureEmptyStaticMountDir } from '#util/fingerprint-assets.ts';
 import { createStaticAssetsMiddleware } from '#util/static-assets-middleware.ts';
-import { createBaseApp } from '@planning-inspectorate/core/app';
 import type { Express } from 'express';
 import { Router as createRouter } from 'express';
 import { ADMIN_MULTIPART_ROUTES } from './admin/index.ts';
@@ -17,7 +17,7 @@ export async function prepareStaticAssetServing(service: ManageService): Promise
 
 export function createApp(service: ManageService): Express {
 	const isProduction = service.secureSession;
-	// @planning-inspectorate/core >= 1.14 mounts consumer `middlewares` before its
+	// createBaseApp mounts consumer `middlewares` before its
 	// helmet stack, which would then overwrite these headers (e.g. helmet's default
 	// HSTS replaces the OWASP values). An outer router runs after helmet while still
 	// preceding the app's routes, matching the pre-1.14 ordering.
@@ -35,7 +35,7 @@ export function createApp(service: ManageService): Express {
 		],
 		cspDirectives: buildContentSecurityPolicyDirectives({ isProduction }),
 		// multer needs the raw multipart body before lusca CSRF can read a token from it - see
-		// node_modules/@planning-inspectorate/core/dist/app/csrf.js
+		// src/lib/app/csrf.ts
 		multiPartFormRoutes: ADMIN_MULTIPART_ROUTES
 	});
 }

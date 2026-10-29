@@ -1,5 +1,5 @@
+import type { AsyncRequestHandler } from '#lib/util/index.ts';
 import { stringifyForInlineScript } from '#util/inline-json.ts';
-import type { AsyncRequestHandler } from '@planning-inspectorate/core/util';
 import { buildMapLayersDemoCollections } from '../../maps/map-layers-demo-geojson.ts';
 import { MAP_VIEWPORT } from '../../maps/sample-geojson.ts';
 import type { MapLayersDemoViewModel } from './view-model.ts';

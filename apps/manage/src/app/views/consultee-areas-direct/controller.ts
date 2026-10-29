@@ -1,6 +1,6 @@
+import type { AsyncRequestHandler } from '#lib/util/index.ts';
 import type { ManageService } from '#service';
 import { listConsulteeAreas } from '@pins/identify-consultees-database/src/geospatial/consultee-areas.ts';
-import type { AsyncRequestHandler } from '@planning-inspectorate/core/util';
 import type { ConsulteeAreasDirectViewModel } from './view-model.ts';
 
 const VIEW = 'views/consultee-areas-direct/view.njk';

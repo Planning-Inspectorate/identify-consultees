@@ -5,7 +5,7 @@ The rules are in [AGENTS.md](../AGENTS.md) (GDS section) and [ACCESSIBILITY.md](
 ## Principles
 
 1. Components come from GOV.UK Frontend Nunjucks macros (`govuk/components/*/macro.njk`). Don't hand-write markup for buttons, inputs, radios, tables or error summaries.
-2. PINS chrome comes from `@planning-inspectorate/core`: `pinsHeader` and `pinsFooter`, not `govukHeader` and `govukFooter`, which GOV.UK Frontend 6 keeps for services hosted on GOV.UK.
+2. PINS chrome comes from the vendored `src/lib/ui`: `pinsHeader` and the footer markup, not `govukHeader` and `govukFooter`, which GOV.UK Frontend 6 keeps for services hosted on GOV.UK.
 3. Progressive enhancement: the journey works without JavaScript, and maps fall back to a static image.
 4. No SPA framework and no custom design system. Change that only through an explicit architecture decision.
 
@@ -26,21 +26,24 @@ The rules are in [AGENTS.md](../AGENTS.md) (GDS section) and [ACCESSIBILITY.md](
 
 Forms: `govukErrorSummary` at the top, `errorMessage` on each field, keep the user's input on re-render. Titles follow `Page - Service`.
 
-## `@planning-inspectorate/core`
+## `src/lib` — vendored PINS core
 
-PINS's shared Node and Nunjucks toolkit ([repo](https://github.com/Planning-Inspectorate/core); [template-service](https://github.com/Planning-Inspectorate/template-service) shows intended use). Using it is much of what makes a service PINS-compliant rather than just GOV.UK-styled. Import subpaths:
+The PINS shared Node and Nunjucks toolkit was ported into `apps/manage/src/lib` when the
+`@planning-inspectorate/core` package stopped being maintained (see `src/lib/README.md` for what
+was ported and what was deliberately left out). It keeps the package's module layout and is
+imported via the `#lib/*` alias:
 
-| Export             | Used for                                                                                                                                                                   |
-| ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `core/app`         | `createBaseApp` (logging, security headers, sessions, Redis when `MANAGED_REDIS_URL` is set), `BaseService`, `BaseConfig`: the base of `app.ts`, `service.ts`, `config.ts` |
-| `core/auth`        | Entra (MSAL) sign-in routes and guards, mounted in `router.ts`                                                                                                             |
-| `core/controllers` | Health and monitoring routes                                                                                                                                               |
-| `core/middleware`  | `cacheNoCacheMiddleware`, CSP, error handling                                                                                                                              |
-| `core/testing`     | `mockLogger`, `TestServer`, used by `testing/create-test-app.ts`                                                                                                           |
-| `core/ui`          | `pinsHeader`, `pinsFooter`, brand SCSS, pulled into `sass/govuk-overrides.scss`                                                                                            |
-| `core/util`        | `asyncHandler` (wrap every async controller so rejections reach the error handler), `runBuild`, logger, fetch helpers                                                      |
+| Module            | Used for                                                                                                                                                                   |
+| ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `lib/app`         | `createBaseApp` (logging, security headers, sessions, Redis when `MANAGED_REDIS_URL` is set), `BaseService`, `BaseConfig`: the base of `app.ts`, `service.ts`, `config.ts` |
+| `lib/auth`        | Entra (MSAL) sign-in routes and guards, mounted in `router.ts`                                                                                                             |
+| `lib/controllers` | Health and monitoring routes                                                                                                                                               |
+| `lib/middleware`  | `cacheNoCacheMiddleware`, CSP, error handling                                                                                                                              |
+| `lib/testing`     | `mockLogger`, used by `testing/create-test-app.ts` and controller tests                                                                                                    |
+| `lib/ui`          | `pinsHeader`, brand SCSS, pulled into `sass/govuk-overrides.scss`                                                                                                          |
+| `lib/util`        | `asyncHandler` (wrap every async controller so rejections reach the error handler), `runBuild`, logger, fetch helpers                                                      |
 
-`nunjucks.ts` registers the package's `dist` as a template root, so templates import its macros directly. Dependabot bumps it in the `deps` group; read the changelog when the major moves.
+`nunjucks.ts` registers `src/lib` as a template root, so templates import its `ui/` macros directly.
 
 ## Progressive enhancement
 

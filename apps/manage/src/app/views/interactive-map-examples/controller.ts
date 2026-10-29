@@ -1,5 +1,5 @@
+import type { AsyncRequestHandler } from '#lib/util/index.ts';
 import { stringifyForInlineScript } from '#util/inline-json.ts';
-import type { AsyncRequestHandler } from '@planning-inspectorate/core/util';
 import type { Request } from 'express';
 import {
 	getInteractiveMapExample,

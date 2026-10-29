@@ -8,8 +8,8 @@
  * Tile and static-image upstreams must be used sparingly — see AGENTS.md.
  */
 
+import { fetchWithTimeout, MapCache } from '#lib/util/index.ts';
 import type { Geometry, Position } from '@pins/identify-consultees-database/src/geospatial/wkt.ts';
-import { fetchWithTimeout, MapCache } from '@planning-inspectorate/core/util';
 import type { GeoJsonFeature, GeoJsonFeatureCollection } from './sample-geojson.ts';
 import { MAP_VIEWPORT } from './sample-geojson.ts';
 

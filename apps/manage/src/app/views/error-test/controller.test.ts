@@ -1,5 +1,5 @@
+import { mockLogger } from '#lib/testing/index.ts';
 import type { ManageService } from '#service';
-import { mockLogger } from '@planning-inspectorate/core/testing';
 import assert from 'node:assert/strict';
 import { describe, mock, test } from 'node:test';
 import {

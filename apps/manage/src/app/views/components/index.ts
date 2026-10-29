@@ -1,6 +1,6 @@
 // GOV.UK component showcase (plus Defra map examples under /interactive-map).
 // TEMPORARY - remove before go-live (see README.md's "Before go-live: code to remove")
-import { asyncHandler } from '@planning-inspectorate/core/util';
+import { asyncHandler } from '#lib/util/index.ts';
 import type { IRouter } from 'express';
 import { Router as createRouter } from 'express';
 import { createRoutes as createInteractiveMapExamplesRoutes } from '../interactive-map-examples/index.ts';

@@ -1,5 +1,5 @@
+import { fetchWithTimeout, type AsyncRequestHandler } from '#lib/util/index.ts';
 import type { ManageService } from '#service';
-import { fetchWithTimeout, type AsyncRequestHandler } from '@planning-inspectorate/core/util';
 import type { ConsulteeAreasPythonViewModel } from './view-model.ts';
 
 const VIEW = 'views/consultee-areas-python/view.njk';

@@ -1,7 +1,7 @@
+import type { AsyncRequestHandler, AsyncRequestHandlerWithBody } from '#lib/util/index.ts';
 import type { ManageService } from '#service';
 import type { Ruleset } from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
 import { isIdentified } from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
-import type { AsyncRequestHandler, AsyncRequestHandlerWithBody } from '@planning-inspectorate/core/util';
 import type { Response } from 'express';
 import { describeReasons } from '../../../reasons.ts';
 import { resolveCase, resolveCaseSummary } from '../../../resolve-case.ts';

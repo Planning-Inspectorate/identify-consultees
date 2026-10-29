@@ -1,9 +1,9 @@
+import { fetchWithTimeout } from '#lib/util/index.ts';
 import type { PrismaClient } from '@pins/identify-consultees-database/src/client/client.ts';
 import type { CaseBoundaryFeature } from '@pins/identify-consultees-database/src/geospatial/case-boundaries.ts';
 import { loadCaseBoundaries } from '@pins/identify-consultees-database/src/geospatial/case-boundaries.ts';
 import type { Geometry, PolygonGeometry, Position } from '@pins/identify-consultees-database/src/geospatial/wkt.ts';
 import { toCaseBoundary } from '@pins/identify-consultees-database/src/seed/geojson-import.ts';
-import { fetchWithTimeout } from '@planning-inspectorate/core/util';
 
 /**
  * Case boundaries from CBOS (the IDAS back office). Only the Python function can reach CBOS

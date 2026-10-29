@@ -1,8 +1,10 @@
 import type { Prisma } from '@pins/identify-consultees-database/src/client/client.d.ts';
 import { PrismaClient } from '@pins/identify-consultees-database/src/client/client.ts';
-import type { DatabaseConfig } from '@planning-inspectorate/core/app';
 import { PrismaMssql } from '@prisma/adapter-mssql';
 import type { Logger } from 'pino';
+interface DatabaseConfig {
+	connectionString?: string;
+}
 
 // A ruleset run does ~34 real geography (STDistance/STIntersects) queries, not one - on a
 // compute-constrained SQL tier (e.g. Dev's Basic/5-DTU database) that's comfortably enough to push

@@ -3,6 +3,7 @@
 	"exclude": ["src/.static"],
 	"compilerOptions": {
 		"paths": {
+			"#lib/*": ["./src/lib/*"],
 			"#service": ["./src/app/service.ts"],
 			"#util/*": ["./src/util/*"]
 		}
