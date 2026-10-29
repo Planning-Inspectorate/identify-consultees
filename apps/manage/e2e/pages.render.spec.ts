@@ -92,6 +92,12 @@ const pages = [
 		mustSee: [/Railway lines/i, /Road network/i]
 	},
 	{
+		path: '/map-external-controls-demo',
+		name: 'map external controls demo',
+		heading: /External controls demo/i,
+		mustSee: [/Arrow Valley Solar/i, /Confirm shapefile for report/i, /How this map is configured/i]
+	},
+	{
 		path: '/components?components=true',
 		name: 'components index',
 		heading: /GOV.UK Frontend components/i,
@@ -256,5 +262,57 @@ test.describe('cross-browser render completeness', () => {
 		await expect(host).toHaveAttribute('aria-label', /overlay layers/i);
 		expect(await serverRenderedOpeningTag(page, '/map-layers-demo', 'app-map-layers-demo')).not.toMatch(/\sdata-/);
 		await expect(page.locator('#map-layers-demo-data')).toBeAttached();
+	});
+
+	test('external controls demo serves one bound map per page, switchable by ?mode=', async ({ page }) => {
+		await page.goto('/map-external-controls-demo', { waitUntil: 'domcontentloaded' });
+		const hosts = page.locator('.app-consultee-map.app-case-map');
+		await expect(hosts).toHaveCount(1);
+
+		// the radios are ordinary form fields in the page, one group per file
+		const radios = page.locator('input[type="radio"][name="shapefile"]');
+		await expect(radios).toHaveCount(3);
+		expect(await radios.all().then((all) => Promise.all(all.map((r) => r.getAttribute('value'))))).toEqual([
+			'demo-cable-corridor',
+			'demo-red-line-boundary',
+			'demo-earlier-boundary'
+		]);
+
+		// the default (select/shared) demo's third radio starts checked server-side - the plugin replays it
+		await expect(page.locator('#shapefile-select-shared-3')).toBeChecked();
+
+		// the switcher links every configuration
+		const soloLink = page.getByRole('link', { name: 'Solo emphasis, external radios as the primary control' });
+		const dimLink = page.getByRole('link', { name: 'Dim the rest, zoom to the pick' });
+		await expect(soloLink).toBeAttached();
+		await expect(dimLink).toBeAttached();
+		await expect(soloLink).toHaveAttribute('href', '/map-external-controls-demo?mode=solo-external');
+		await expect(dimLink).toHaveAttribute('href', '/map-external-controls-demo?mode=dim-zoom');
+
+		// ?mode= swaps the configuration - the map's page config carries its externalControls block
+		await page.goto('/map-external-controls-demo?mode=solo-external', { waitUntil: 'domcontentloaded' });
+		const configJson = await page.locator('#map-external-controls-demo-solo-external-data').textContent();
+		const externalControls = JSON.parse(configJson ?? '{}').externalControls;
+		expect(externalControls.control).toBe('#form-solo-external input[name="shapefile"]');
+		expect(externalControls.emphasis).toBe('solo');
+		expect(externalControls.primaryControl).toBe('external');
+		expect(externalControls.bindings.map((b: { datasetId: string }) => b.datasetId)).toEqual([
+			'shapefile-demo-cable-corridor',
+			'shapefile-demo-red-line-boundary',
+			'shapefile-demo-earlier-boundary'
+		]);
+
+		// the noscript fallback points at the shared static-map route
+		const html = await (await page.request.get('/map-external-controls-demo')).text();
+		expect(html.match(/src="\/map-external-controls-demo\/static-map"/g)?.length).toBe(1);
+
+		// a posted form round-trips: the banner proves the radios submit normally
+		await page.goto('/map-external-controls-demo', { waitUntil: 'domcontentloaded' });
+		const csrf = await page.locator('#form-select-shared input[name="_csrf"]').getAttribute('value');
+		const response = await page.request.post('/map-external-controls-demo', {
+			form: { _csrf: csrf ?? '', demo: 'select-shared', shapefile: 'demo-cable-corridor' }
+		});
+		expect(response.ok()).toBeTruthy();
+		expect(await response.text()).toContain('Form submitted');
 	});
 });

@@ -31,6 +31,7 @@ const pages = [
 	},
 	{ path: `/consultees/${SAMPLE_CASE_ID}/report/created?ruleset=${SAMPLE_RULESET_ID}`, name: 'report created' },
 	{ path: '/map-layers-demo', name: 'map layers demo' },
+	{ path: '/map-external-controls-demo', name: 'map external controls demo' },
 	{ path: '/components?components=true', name: 'components index' },
 	{ path: '/components/checkboxes?components=true', name: 'component detail' },
 	{
@@ -129,6 +130,18 @@ test.describe('browser accessibility landmarks and skip link', () => {
 		await expect(host).toHaveAttribute('aria-label', /.+/);
 
 		await expectNoSeriousAxeViolations(page);
+	});
+
+	test('external controls demo keeps the map region labelled in every mode', async ({ page }) => {
+		for (const mode of ['select-shared', 'solo-external', 'dim-zoom']) {
+			await page.goto(`/map-external-controls-demo?mode=${mode}`);
+
+			const host = page.locator('.app-consultee-map[role="region"]');
+			await expect(host).toHaveCount(1);
+			await expect(host).toHaveAttribute('aria-label', /.+/);
+
+			await expectNoSeriousAxeViolations(page);
+		}
 	});
 });
 
