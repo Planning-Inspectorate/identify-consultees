@@ -8,6 +8,7 @@ from cbos.boundaries import (
     CASE_STAGES,
     GET_BOUNDARY_FILE,
     LIST_BOUNDARY_FILES,
+    LIST_CASE_BOUNDARY_FILES,
     BoundaryFile,
     BoundaryFileNotFound,
     fetch_boundary_geojson,
@@ -56,6 +57,17 @@ def _fake_listing(stages):
     cursor.execute.side_effect = execute
     cursor.fetchall.side_effect = lambda: results.pop(0)
     return patch("cbos.boundaries.connect", return_value=connection), connection
+
+
+def test_list_boundary_files_for_one_case_asks_for_its_reference():
+    patcher, connection = _fake_listing([("EN010001", "examination")])
+    with patcher:
+        files = list_boundary_files(CONFIG, CREDENTIAL, "EN010001")
+
+    sql, params = connection.cursor.return_value.execute.call_args_list[0].args
+    assert sql == LIST_CASE_BOUNDARY_FILES and "c.reference = ?" in sql
+    assert params == ("EN010001",)
+    assert [(file.case_reference, file.case_stage) for file in files] == [("EN010001", "examination")]
 
 
 def test_list_boundary_files_maps_rows_with_each_cases_stage_and_closes_the_connection():

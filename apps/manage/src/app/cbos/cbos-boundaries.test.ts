@@ -51,6 +51,16 @@ describe('CBOS boundaries', () => {
 			assert.strictEqual(fetchMock.mock.calls[0].arguments[1]?.headers?.['x-api-key' as keyof HeadersInit], 'test-key');
 		});
 
+		it("lists one case's files when asked", async (t) => {
+			const fetchMock = t.mock.method(globalThis, 'fetch', respondWith(200, { files: [FILE] }));
+
+			await listCbosBoundaryFiles({ ...OPTIONS, caseReference: 'EN010001 A' });
+			assert.strictEqual(
+				fetchMock.mock.calls[0].arguments[0],
+				'http://localhost:7071/api/cbos/boundary-files?caseReference=EN010001%20A'
+			);
+		});
+
 		it('sends no key header when none is configured', async (t) => {
 			const fetchMock = t.mock.method(globalThis, 'fetch', respondWith(200, { files: [] }));
 

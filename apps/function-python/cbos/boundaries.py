@@ -39,6 +39,7 @@ WHERE dv.mime = '{GEOJSON_MIME}' AND dv.isDeleted = 0
 """
 
 LIST_BOUNDARY_FILES = _BOUNDARY_FILES + "ORDER BY c.reference, dv.documentGuid, dv.version"
+LIST_CASE_BOUNDARY_FILES = _BOUNDARY_FILES + "AND c.reference = ? ORDER BY dv.documentGuid, dv.version"
 
 # Each case's stage now. CBOS keeps a row for every stage a case has been in, the current one
 # valid - oldest first, so were two valid the newest wins. Its values are its state machine's
@@ -109,9 +110,14 @@ def _query(config: CbosConfig, credential, sql: str, params: tuple = ()) -> list
         connection.close()
 
 
-def list_boundary_files(config: CbosConfig, credential) -> list[BoundaryFile]:
-    """Every boundary file, each with its case's stage now (see case_stages)."""
-    files = [_boundary_file(row) for row in _query(config, credential, LIST_BOUNDARY_FILES)]
+def list_boundary_files(config: CbosConfig, credential, case_reference: str | None = None) -> list[BoundaryFile]:
+    """Every boundary file CBOS holds - or, given a case reference, that case's - each with its
+    case's stage now (see case_stages)."""
+    if case_reference:
+        rows = _query(config, credential, LIST_CASE_BOUNDARY_FILES, (case_reference,))
+    else:
+        rows = _query(config, credential, LIST_BOUNDARY_FILES)
+    files = [_boundary_file(row) for row in rows]
     stages = case_stages(config, credential)
     return [replace(file, case_stage=stages.get(file.case_reference)) for file in files]
 
