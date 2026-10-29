@@ -143,6 +143,7 @@ export function buildInteractiveMapExamplePage(): AsyncRequestHandler {
 			behaviourLabel: BEHAVIOUR_LABELS[clientConfig.behaviour],
 			pluginsLabel: pluginsLabel(example.plugins),
 			isButtonFirst: clientConfig.behaviour === 'buttonFirst',
+			isInline: clientConfig.behaviour === 'inline',
 			featureLegend: example.staticMap.legend
 				? {
 						heading: example.staticMap.legend.heading,

@@ -345,6 +345,8 @@ describe('consultees-map client helpers', () => {
 		assert.ok(staticMap);
 		assert.equal(typeof staticMap.load, 'function');
 		assert.ok(plugins.some((plugin) => plugin.id === 'layersKey'));
+		// so is the loading overlay, dismissed at map:firstidle
+		assert.ok(plugins.find((plugin) => plugin.id === 'mapLoading'));
 	});
 
 	test('buildSelectableLayers lists the MapLibre layers of each consultee sublayer and the project site', () => {
@@ -424,6 +426,11 @@ describe('consultees-map client helpers', () => {
 
 		initConsulteeMap('map-4');
 		assert.deepEqual(interactPlugin.mock.calls[0].arguments[0].interactionModes, ['selectFeature']);
+
+		// the loading overlay covers the container until the map first idles
+		assert.ok(document.querySelector('.app-map-loading'));
+		fire('map:firstidle');
+		assert.equal(document.querySelector('.app-map-loading'), null);
 
 		fire('map:ready');
 		assert.equal(interact.enable.mock.callCount(), 1);

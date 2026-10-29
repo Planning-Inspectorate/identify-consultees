@@ -110,7 +110,7 @@ export function showStaticMapFallback(container, options = {}) {
  * @param {() => void} show
  * @returns {() => void}
  */
-function watchForMapError(container, show) {
+export function watchForMapError(container, show) {
 	const showIfErrored = () => {
 		if (container.querySelector(ERROR_MARKER_SELECTOR)) {
 			show();

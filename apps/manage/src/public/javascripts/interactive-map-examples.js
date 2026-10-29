@@ -15,6 +15,7 @@
  */
 
 import { createLayersKeyPlugin } from './layers-key-plugin.mjs';
+import { createMapLoadingPlugin } from './map-loading-plugin.mjs';
 import { createStaticMapPlugin } from './static-map-plugin.mjs';
 
 /**
@@ -216,12 +217,19 @@ export function initInteractiveMapExample(mapId) {
 		return;
 	}
 
+	// the sibling overlay can't cover buttonFirst's collapsed launcher or a
+	// fullscreen app, so only inline maps get it
+	const loadingPlugin = (config.behaviour ?? 'inline') === 'inline' ? createMapLoadingPlugin({ container }) : undefined;
+
 	container.replaceChildren();
 	container.classList.add('app-case-map-interactive');
 
 	try {
 		const { plugins, interact: interactPlugin, draw: drawPlugin } = buildPlugins(defra, config);
 		plugins.push(staticMapPlugin);
+		if (loadingPlugin) {
+			plugins.push(loadingPlugin);
+		}
 
 		const mapStyle = config.mapStyles?.length ? config.mapStyles[0] : config.mapStyle;
 
@@ -249,8 +257,13 @@ export function initInteractiveMapExample(mapId) {
 				: {})
 		});
 
+		if (loadingPlugin) {
+			map.on('map:firstidle', () => loadingPlugin.dismiss());
+		}
+
 		wireExampleBehaviour(map, config, interactPlugin, drawPlugin);
 	} catch {
+		loadingPlugin?.dismiss();
 		staticMapPlugin.showFallback();
 	}
 }
