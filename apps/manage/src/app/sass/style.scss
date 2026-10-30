@@ -186,19 +186,6 @@ $font-family: arial, helvetica, sans-serif;
 	background: index.govuk-colour('black', $variant: 'tint-95');
 }
 
-// the report created page's failure variant: the Design System ships only a green
-// (confirmation) and a blue (interruption) panel, so a failed outcome takes the standard
-// error red - the govukErrorMessage inside it goes inverse to stay readable
-/* stylelint-disable-next-line selector-class-pattern */
-.govuk-panel--error {
-	background: index.govuk-functional-colour(error);
-
-	/* stylelint-disable-next-line selector-class-pattern */
-	.govuk-error-message {
-		color: index.govuk-colour('white');
-	}
-}
-
 // the report check page's "Show more" details: a plain link with no triangle;
 // open, the summary moves below the list and reads "Show less" (the control
 // stays the native summary, so the toggle keeps working for keyboard/AT and
