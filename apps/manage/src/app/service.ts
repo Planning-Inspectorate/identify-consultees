@@ -1,3 +1,4 @@
+import { BaseService } from '#lib/app/index.ts';
 import {
 	BULK_REQUEST_TIMEOUT_MS,
 	initDatabaseClient,
@@ -5,7 +6,6 @@ import {
 	withExtendedTimeout
 } from '@pins/identify-consultees-database';
 import type { PrismaClient } from '@pins/identify-consultees-database/src/client/client.ts';
-import { BaseService } from '@planning-inspectorate/core/app';
 import path from 'node:path';
 import type { Config } from './config.ts';
 import { searchRadiusMetres } from './nearby-consultees.ts';
@@ -116,7 +116,7 @@ export class ManageService extends BaseService<PrismaClient> {
 	}
 
 	/**
-	 * Empty mount used by `@planning-inspectorate/core` `createBaseApp` `express.static`
+	 * Empty mount used by `createBaseApp`'s `express.static`
 	 * so asset responses are owned by {@link createStaticAssetsMiddleware} instead.
 	 */
 	override get staticDir(): string {

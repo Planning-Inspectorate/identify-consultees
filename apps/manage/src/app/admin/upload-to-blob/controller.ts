@@ -1,3 +1,4 @@
+import type { AsyncRequestHandler } from '#lib/util/index.ts';
 import type { ManageService } from '#service';
 import { DefaultAzureCredential } from '@azure/identity';
 import type { ContainerClient } from '@azure/storage-blob';
@@ -8,7 +9,6 @@ import {
 	isoDate
 } from '@pins/identify-consultees-database/src/seed/consultee-area-groups.ts';
 import { groupBySlug, REFERENCE_DATA_CONFIG } from '@pins/identify-consultees-database/src/seed/reference-data.ts';
-import type { AsyncRequestHandler } from '@planning-inspectorate/core/util';
 import { unlink } from 'node:fs/promises';
 import type { UploadToBlobViewModel } from './view-model.ts';
 

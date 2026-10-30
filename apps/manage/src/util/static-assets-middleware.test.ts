@@ -1,5 +1,5 @@
-import { createBaseApp } from '@planning-inspectorate/core/app';
-import { mockLogger } from '@planning-inspectorate/core/testing';
+import { createBaseApp } from '#lib/app/index.ts';
+import { mockLogger } from '#lib/testing/index.ts';
 import express from 'express';
 import assert from 'node:assert/strict';
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';

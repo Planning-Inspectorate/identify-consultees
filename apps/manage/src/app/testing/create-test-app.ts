@@ -2,11 +2,11 @@
  * Shared Express app factory for HTTP integration and Playwright e2e tests.
  * Auth is disabled so journeys can run without Entra.
  */
+import { createBaseApp } from '#lib/app/index.ts';
+import { mockLogger } from '#lib/testing/index.ts';
 import { ManageService } from '#service';
 import { addLocalsConfiguration } from '#util/config-middleware.ts';
 import { createStaticAssetsMiddleware } from '#util/static-assets-middleware.ts';
-import { createBaseApp } from '@planning-inspectorate/core/app';
-import { mockLogger } from '@planning-inspectorate/core/testing';
 import type { Express } from 'express';
 import { ADMIN_MULTIPART_ROUTES } from '../admin/index.ts';
 import type { Config } from '../config.ts';

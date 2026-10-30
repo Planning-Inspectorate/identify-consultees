@@ -1,5 +1,5 @@
+import { sleep } from '#lib/util/index.ts';
 import { ManageService } from '#service';
-import { sleep } from '@planning-inspectorate/core/util';
 import { createApp, prepareStaticAssetServing } from './app/app.ts';
 import { startCbosSubscriber } from './app/cbos/subscriber.ts';
 import { loadConfig } from './app/config.ts';
@@ -7,7 +7,7 @@ import { loadConfig } from './app/config.ts';
 const config = loadConfig();
 const service = new ManageService(config);
 
-// @planning-inspectorate/core's RedisClient kicks off client.connect() in the background
+// src/lib/redis's RedisClient kicks off client.connect() in the background
 // without awaiting it (see its constructor) - accepting traffic before that resolves lets the
 // first request needing a session (e.g. the auth redirect on /, since auth can't be disabled in
 // production) call session.save() while the client is still "offline", which throws in a spot

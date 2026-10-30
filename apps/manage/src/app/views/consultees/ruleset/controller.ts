@@ -1,7 +1,7 @@
+import type { AsyncRequestHandler, AsyncRequestHandlerWithBody } from '#lib/util/index.ts';
 import type { ManageService } from '#service';
 import type { CaseBoundarySummary } from '@pins/identify-consultees-database/src/geospatial/case-boundaries.ts';
 import { getRuleset, RULESETS } from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
-import type { AsyncRequestHandler, AsyncRequestHandlerWithBody } from '@planning-inspectorate/core/util';
 import type { ConsulteeSelection } from '../report/urls.ts';
 import { consulteeSelection, reportUrl, rulesetUrl } from '../report/urls.ts';
 import { isCaseId, resolveCaseSummary } from '../resolve-case.ts';

@@ -1,0 +1,85 @@
+import {
+	PrismaClientInitializationError,
+	PrismaClientKnownRequestError,
+	PrismaClientUnknownRequestError,
+	PrismaClientValidationError
+} from '@prisma/client-runtime-utils';
+import type { ErrorRequestHandler, Request, Response } from 'express';
+import type { Logger } from 'pino';
+import { ClientClosedError, ClientOfflineError } from 'redis';
+
+/**
+ * A catch-all error handler to use as express middleware
+ */
+export function buildDefaultErrorHandlerMiddleware(logger: Logger): ErrorRequestHandler {
+	return (error, req, res, next) => {
+		let wrappedError = wrapPrismaErrors(error);
+		wrappedError = wrapRedisErrors(wrappedError);
+		const message = wrappedError.message || 'unknown error';
+		logger.error(error, message); // log the original error to include full details
+
+		if (res.headersSent) {
+			next(error);
+			return;
+		}
+
+		// make sure we don't use an invalid code
+		const code = error.statusCode && error.statusCode > 399 ? error.statusCode : 500;
+		res.status(code);
+		res.render(`views/layouts/error`, {
+			pageTitle: 'Sorry, there was an error',
+			messages: [message, 'Try again later']
+		});
+	};
+}
+
+/**
+ * Wrap prisma errors so they are not shown directly to users.
+ * This is a fallback, controllers should handle Prisma validation errors directly so that error messages can be specific
+ */
+export function wrapPrismaErrors(error: Error): Error {
+	// match errors by name to avoid issues with references to different @prisma package versions
+	if (error.name === PrismaClientKnownRequestError.name) {
+		const code = (error as InstanceType<typeof PrismaClientKnownRequestError>).code;
+		return new Error(`Request could not be handled (code: ${code})`);
+	}
+	if (error.name === PrismaClientUnknownRequestError.name) {
+		return new Error(`Request could not be handled (code: unknown)`);
+	}
+	if (error.name === PrismaClientValidationError.name) {
+		return new Error(`Request could not be handled (code: validation)`);
+	}
+	if (error.name === PrismaClientInitializationError.name) {
+		let code = (error as InstanceType<typeof PrismaClientInitializationError>).errorCode;
+		if (!code && error.message.toLowerCase().includes(`can't reach database server`)) {
+			code = 'P1001';
+		}
+		return new Error(`Connection error (code: ${code || 'unknown'})`);
+	}
+	return error;
+}
+
+/**
+ * Wrap Redis errors so they are not shown directly to users.
+ */
+export function wrapRedisErrors(error: Error): Error {
+	// these errors will throw if a request to session is made before the Redis cluster has connected
+	if (error instanceof ClientClosedError || error instanceof ClientOfflineError) {
+		return new Error(`The service is not ready. Please try again in a moment.`);
+	}
+	return error;
+}
+
+/**
+ * A catch-all handler to serve a 404 page
+ */
+export function notFoundHandler(req: Request, res: Response): void {
+	res.status(404);
+	res.render(`views/layouts/error`, {
+		pageTitle: 'Page not found',
+		messages: [
+			'If you typed the web address, check it is correct.',
+			'If you pasted the web address, check you copied the entire address.'
+		]
+	});
+}

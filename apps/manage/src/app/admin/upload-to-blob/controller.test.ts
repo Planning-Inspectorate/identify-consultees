@@ -1,5 +1,5 @@
+import { mockLogger } from '#lib/testing/index.ts';
 import { BlobServiceClient, BlockBlobClient } from '@azure/storage-blob';
-import { mockLogger } from '@planning-inspectorate/core/testing';
 import assert from 'node:assert';
 import { describe, it, mock } from 'node:test';
 import { configureNunjucks } from '../../nunjucks.ts';

@@ -1,3 +1,4 @@
+import { MapCache } from '#lib/util/index.ts';
 import type { ManageService } from '#service';
 import type { CaseBoundaryFeature } from '@pins/identify-consultees-database/src/geospatial/case-boundaries.ts';
 import { bufferGeometryForDisplay } from '@pins/identify-consultees-database/src/geospatial/consultee-areas.ts';
@@ -8,7 +9,6 @@ import type {
 } from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
 import { isIdentified } from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
 import type { Geometry } from '@pins/identify-consultees-database/src/geospatial/wkt.ts';
-import { MapCache } from '@planning-inspectorate/core/util';
 import { strToU8, zipSync } from 'fflate';
 import writeExcelFile from 'write-excel-file/node';
 import type { CaseMapConfig } from '../../../../maps/case-geojson.ts';

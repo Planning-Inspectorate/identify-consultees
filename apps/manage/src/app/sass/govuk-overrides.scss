@@ -1,6 +1,6 @@
-// PINS branding for page chrome, pulled in from @planning-inspectorate/core.
+// PINS branding for page chrome, vendored in src/lib/ui (see src/lib/README.md).
 // Keep this file @use'd AFTER the govuk index in style.scss: later source order
 // means equal-specificity rules here win without needing !important.
 // (pins-header also carries the .govuk-service-navigation.pins-service-navigation styles.)
-@use 'node_modules/@planning-inspectorate/core/dist/ui/header/pins-header';
-@use 'node_modules/@planning-inspectorate/core/dist/ui/footer/pins-footer';
+@use 'apps/manage/src/lib/ui/header/pins-header';
+@use 'apps/manage/src/lib/ui/footer/pins-footer';

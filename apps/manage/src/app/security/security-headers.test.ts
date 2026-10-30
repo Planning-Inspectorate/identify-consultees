@@ -1,7 +1,7 @@
+import { mockLogger } from '#lib/testing/index.ts';
 import { ManageService } from '#service';
 import { acquireDbTestLock, releaseDbTestLock } from '@pins/identify-consultees-database/src/db-test-lock.ts';
 import { loadCaseBoundaries } from '@pins/identify-consultees-database/src/geospatial/case-boundaries.ts';
-import { mockLogger } from '@planning-inspectorate/core/testing';
 import assert from 'node:assert/strict';
 import { after, before, describe, test } from 'node:test';
 import request from 'supertest';

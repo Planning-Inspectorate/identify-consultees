@@ -1,4 +1,4 @@
-import type { BaseConfig } from '@planning-inspectorate/core/app';
+import type { BaseConfig } from '#lib/app/index.ts';
 import path from 'node:path';
 import { loadEnvFile } from 'node:process';
 import { loadNearbyConsultees } from './nearby-consultees.ts';

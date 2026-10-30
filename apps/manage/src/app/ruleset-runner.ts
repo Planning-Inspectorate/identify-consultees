@@ -1,3 +1,4 @@
+import { fetchWithTimeout } from '#lib/util/index.ts';
 import type { ConsulteeAreaProperties } from '@pins/identify-consultees-database/src/geospatial/consultee-areas.ts';
 import type {
 	ConsulteeReason,
@@ -6,7 +7,6 @@ import type {
 } from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
 import type { Geometry } from '@pins/identify-consultees-database/src/geospatial/wkt.ts';
 import { geometryToWkt } from '@pins/identify-consultees-database/src/geospatial/wkt.ts';
-import { fetchWithTimeout } from '@planning-inspectorate/core/util';
 
 /**
  * Runs a ruleset against a project site - the consultee intersection logic. It lives in the Python

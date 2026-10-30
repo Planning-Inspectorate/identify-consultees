@@ -1,3 +1,4 @@
+import type { AsyncRequestHandler } from '#lib/util/index.ts';
 import type { ManageService } from '#service';
 import { datasetInUse, listDatasets } from '@pins/identify-consultees-database/src/geospatial/consultee-areas.ts';
 import type { GroupLoad, LatestGroupLoad } from '@pins/identify-consultees-database/src/seed/consultee-area-groups.ts';
@@ -20,7 +21,6 @@ import {
 	REFERENCE_DATA_CONFIG,
 	UnknownDatasetError
 } from '@pins/identify-consultees-database/src/seed/reference-data.ts';
-import type { AsyncRequestHandler } from '@planning-inspectorate/core/util';
 import type { Request } from 'express';
 import { formatFileSize } from '../../views/consultees/report/export/report-zip.ts';
 import type { GroupStatus, ImportReferenceDataViewModel } from './view-model.ts';

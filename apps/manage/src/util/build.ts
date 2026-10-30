@@ -1,4 +1,4 @@
-import { runBuild } from '@planning-inspectorate/core/util';
+import { runBuild } from '#lib/util/build.ts';
 import { cp, mkdir, rm } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import path from 'node:path';

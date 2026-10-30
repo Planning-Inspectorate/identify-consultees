@@ -1,5 +1,5 @@
+import { mockLogger } from '#lib/testing/index.ts';
 import type { Ruleset } from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
-import { mockLogger } from '@planning-inspectorate/core/testing';
 import { unzipSync } from 'fflate';
 import assert from 'node:assert';
 import { after, before, describe, it, mock } from 'node:test';

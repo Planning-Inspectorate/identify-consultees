@@ -5,7 +5,7 @@ Every error the manage app can put in front of a user, what correct looks like, 
 Two handlers render these pages, which is why two slightly different pages exist:
 
 - Errors thrown inside the app's routes go through the sanitising handler (`apps/manage/src/app/error-handler.ts`): the real error is logged and `views/errors/500.njk` renders with generic copy. Internal detail - file paths, query text, the error's message - must never reach the page.
-- Unmatched routes, and failures in middleware that runs before routing (CSRF, body parsing, the session store), go through `@planning-inspectorate/core`'s default handler, which renders `views/layouts/error.njk` with a short message.
+- Unmatched routes, and failures in middleware that runs before routing (CSRF, body parsing, the session store), go through `createBaseApp`'s default handler (`src/lib/middleware/errors.ts`), which renders `views/layouts/error.njk` with a short message.
 
 All of them share `views/layouts/error.njk`, so the header, service navigation and footer should look exactly like a normal page, ending in the "Contact IT if you continue to have problems with this service" block.
 

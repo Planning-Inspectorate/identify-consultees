@@ -1,7 +1,7 @@
+import { createRoutesAndGuards as createAuthRoutesAndGuards } from '#lib/auth/index.ts';
+import { createMonitoringRoutes } from '#lib/controllers/index.ts';
+import { cacheNoCacheMiddleware } from '#lib/middleware/index.ts';
 import type { ManageService } from '#service';
-import { createRoutesAndGuards as createAuthRoutesAndGuards } from '@planning-inspectorate/core/auth';
-import { createMonitoringRoutes } from '@planning-inspectorate/core/controllers';
-import { cacheNoCacheMiddleware } from '@planning-inspectorate/core/middleware';
 import type { IRouter, RequestHandler } from 'express';
 import { Router as createRouter } from 'express';
 import rateLimit from 'express-rate-limit';

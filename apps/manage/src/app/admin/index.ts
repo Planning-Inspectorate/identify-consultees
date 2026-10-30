@@ -1,5 +1,5 @@
+import { asyncHandler } from '#lib/util/index.ts';
 import type { ManageService } from '#service';
-import { asyncHandler } from '@planning-inspectorate/core/util';
 import type { IRouter, RequestHandler } from 'express';
 import { Router as createRouter } from 'express';
 import {

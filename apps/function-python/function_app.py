@@ -62,7 +62,7 @@ def _route_document(req: func.HttpRequest) -> tuple[str, int]:
 def health(req: func.HttpRequest) -> func.HttpResponse:
     """Always returns 200 - the database field reports whether it's actually
     reachable, matching the Node app's own /health convention (see
-    @planning-inspectorate/core's monitoring controller).
+    apps/manage/src/lib/controllers/monitoring.ts).
     """
     try:
         check_connection(connection_params_from_env())

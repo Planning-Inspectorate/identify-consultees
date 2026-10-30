@@ -6,7 +6,7 @@
  * `forceSvg` keeps the SVG+embedded-basemap output for the explicit `.svg` route.
  */
 
-import { fetchWithTimeout } from '@planning-inspectorate/core/util';
+import { fetchWithTimeout } from '#lib/util/index.ts';
 import type { Response } from 'express';
 import {
 	STATIC_MAP_CACHE_CONTROL,

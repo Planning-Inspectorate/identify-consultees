@@ -21,11 +21,11 @@
 
 {#
   Header chrome:
-  - `pinsHeader` from @planning-inspectorate/core (via pinsServiceHeader)
+  - `pinsHeader` from src/lib/ui (via pinsServiceHeader)
   - `govukServiceNavigation` (via pinsServiceNavigation)
 
   Footer chrome:
-  - `pinsFooter` from @planning-inspectorate/core (raw HTML macro).
+  - `pinsFooter` markup (raw HTML macro, vendored in src/lib/ui).
     There is no GOV.UK generic footer; `govukFooter` is only for services on GOV.UK.
 #}
 {% block govukHeader %}

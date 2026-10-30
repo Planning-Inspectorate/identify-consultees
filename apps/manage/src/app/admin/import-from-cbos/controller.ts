@@ -1,5 +1,5 @@
+import type { AsyncRequestHandler } from '#lib/util/index.ts';
 import type { ManageService } from '#service';
-import type { AsyncRequestHandler } from '@planning-inspectorate/core/util';
 import { checkCbosConnection, importCaseBoundariesFromCbos } from '../../cbos/cbos-boundaries.ts';
 import type { ImportFromCbosViewModel } from './view-model.ts';
 

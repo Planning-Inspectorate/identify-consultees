@@ -1,7 +1,7 @@
+import type { AsyncRequestHandler } from '#lib/util/index.ts';
 import type { ManageService } from '#service';
 import type { CaseBoundarySummary } from '@pins/identify-consultees-database/src/geospatial/case-boundaries.ts';
 import { searchCaseBoundaries } from '@pins/identify-consultees-database/src/geospatial/case-boundaries.ts';
-import type { AsyncRequestHandler } from '@planning-inspectorate/core/util';
 import { buildPagination } from './pagination.ts';
 import type { HomeViewModel, ProjectGeometry } from './view-model.ts';
 

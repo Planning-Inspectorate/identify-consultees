@@ -1,6 +1,6 @@
+import { mockLogger } from '#lib/testing/index.ts';
 import type { CaseBoundaryFeature } from '@pins/identify-consultees-database/src/geospatial/case-boundaries.ts';
 import { RULESETS } from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
-import { mockLogger } from '@planning-inspectorate/core/testing';
 import assert from 'node:assert';
 import { describe, it, mock } from 'node:test';
 import { failingRulesetRunner, rulesetRunnerReturning } from '../../testing/ruleset-runner-stub.ts';

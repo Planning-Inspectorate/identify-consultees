@@ -25,18 +25,25 @@
     "@azure/storage-blob": "*",
     "@defra/interactive-map": "*",
     "@pins/identify-consultees-database": "^0.0.0",
-    "@planning-inspectorate/core": "*",
+    "@prisma/client-runtime-utils": "*",
+    "@redis/entraid": "*",
     "accessible-autocomplete": "*",
+    "body-parser": "*",
+    "connect-redis": "*",
     "express": "*",
     "express-rate-limit": "*",
+    "express-session": "*",
     "fflate": "^0.8.3",
     "govuk-frontend": "*",
+    "helmet": "*",
     "js-yaml": "^5.5.0",
+    "lusca": "*",
     "multer": "*",
     "nunjucks": "*",
     "pdfkit": "^0.20.2",
     "pino": "*",
     "pino-pretty": "*",
+    "redis": "*",
     "sharp": "*",
     "write-excel-file": "^4.1.1"
   },
@@ -47,6 +54,7 @@
     "sass": "*"
   },
   "imports": {
+    "#lib/*": "./src/lib/*",
     "#service": "./src/app/service.ts",
     "#util/*": "./src/util/*"
   }

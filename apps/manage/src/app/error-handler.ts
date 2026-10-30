@@ -3,7 +3,7 @@ import type { ErrorRequestHandler } from 'express';
 
 /**
  * Catch-all error handler for this app's routes, registered last in the router so
- * route errors are handled here rather than reaching @planning-inspectorate/core's
+ * route errors are handled here rather than reaching the vendored `createBaseApp`
  * default handler - which renders `error.message` to the page. That's fine for the
  * Prisma/Redis errors it deliberately wraps, but an unrecognised error (a render
  * failure, an upstream fetch error, a bug) can carry internal detail - file paths,

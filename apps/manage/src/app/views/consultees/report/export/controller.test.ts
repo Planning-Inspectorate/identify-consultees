@@ -1,4 +1,4 @@
-import { mockLogger } from '@planning-inspectorate/core/testing';
+import { mockLogger } from '#lib/testing/index.ts';
 import { strFromU8, unzipSync } from 'fflate';
 import assert from 'node:assert';
 import { after, before, describe, it, mock } from 'node:test';

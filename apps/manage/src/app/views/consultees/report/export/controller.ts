@@ -1,5 +1,5 @@
+import type { AsyncRequestHandler } from '#lib/util/index.ts';
 import type { ManageService } from '#service';
-import type { AsyncRequestHandler } from '@planning-inspectorate/core/util';
 import { resolveCase } from '../../resolve-case.ts';
 import { requestedRuleset, runRulesetSafely } from '../../run-ruleset.ts';
 import { requestTestFault } from '../../test-faults.ts';

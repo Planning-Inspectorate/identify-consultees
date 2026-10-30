@@ -1,9 +1,9 @@
+import type { AsyncRequestHandler } from '#lib/util/index.ts';
 import type { ManageService } from '#service';
 import { stringifyForInlineScript } from '#util/inline-json.ts';
 import type { CaseBoundaryFeature } from '@pins/identify-consultees-database/src/geospatial/case-boundaries.ts';
 import type { ConsulteeMatch, Ruleset } from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
 import { isIdentified } from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
-import type { AsyncRequestHandler } from '@planning-inspectorate/core/util';
 import type { Request, Response } from 'express';
 import { buildCaseMapConfig, markAddedByHand } from '../../../../maps/case-geojson.ts';
 import { MAP_VIEWPORT } from '../../../../maps/sample-geojson.ts';

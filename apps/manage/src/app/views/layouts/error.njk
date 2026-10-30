@@ -3,7 +3,7 @@
 {#
   Generic full-page error page, following the GOV.UK Design System "there is a problem with the
   service" pattern (offline support variant). Every status-specific template under views/errors/
-  extends this, and @planning-inspectorate/core's catch-all handlers render it directly for
+  extends this, and createBaseApp's catch-all handlers render it directly for
   unmatched routes and unhandled errors - so there is one consistent error page for 404s, 500s
   and anything in between.
 

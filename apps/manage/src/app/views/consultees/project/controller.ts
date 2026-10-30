@@ -1,3 +1,4 @@
+import type { AsyncRequestHandler, AsyncRequestHandlerWithBody } from '#lib/util/index.ts';
 import type { ManageService } from '#service';
 import { stringifyForInlineScript } from '#util/inline-json.ts';
 import type { CaseBoundaryFeature } from '@pins/identify-consultees-database/src/geospatial/case-boundaries.ts';
@@ -5,7 +6,6 @@ import {
 	getCaseBoundaryById,
 	listCaseBoundaryFiles
 } from '@pins/identify-consultees-database/src/geospatial/case-boundaries.ts';
-import type { AsyncRequestHandler, AsyncRequestHandlerWithBody } from '@planning-inspectorate/core/util';
 import { recencyRanks, styleForRank } from '../../../maps/boundary-map-styles.ts';
 import type { BoundaryMapFile } from '../../../maps/boundary-map.ts';
 import { buildBoundaryMapConfig } from '../../../maps/boundary-map.ts';

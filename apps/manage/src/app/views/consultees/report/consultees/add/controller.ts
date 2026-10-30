@@ -1,8 +1,8 @@
+import type { AsyncRequestHandler, AsyncRequestHandlerWithBody } from '#lib/util/index.ts';
 import type { ManageService } from '#service';
 import { findOtherCases } from '@pins/identify-consultees-database/src/geospatial/case-boundaries.ts';
 import { findConsulteeAreaByName } from '@pins/identify-consultees-database/src/geospatial/consultee-areas.ts';
 import { isIdentified } from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
-import type { AsyncRequestHandler, AsyncRequestHandlerWithBody } from '@planning-inspectorate/core/util';
 import type { Response } from 'express';
 import { NEARBY_NSIPS, nearbyNsipName } from '../../../nearby-nsips.ts';
 import { consulteeName } from '../../report-consultees.ts';
