@@ -114,3 +114,6 @@ packages/database/src/client
 
 # Azure Function
 local.settings.json
+# ECC (Everything Claude Code) — local developer checkout and .agents symlink, not committed
+/.devin/ecc
+/.agents
