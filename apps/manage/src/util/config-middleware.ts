@@ -7,7 +7,7 @@ import type { Handler } from 'express';
 export function addLocalsConfiguration(options: { devPagesEnabled?: boolean } = {}): Handler {
 	return (req, res, next) => {
 		res.locals.config = {
-			styleFile: 'style-41000a50.css',
+			styleFile: 'style-f3c78a07.css',
 			govukFrontendJs: 'assets/js/govuk-frontend.min-0391e416.js',
 			consulteesMapJs: 'javascripts/consultees-map-f8d8cfae.js',
 			mapLayersDemoJs: 'javascripts/map-layers-demo-c45988a4.js',
@@ -20,7 +20,7 @@ export function addLocalsConfiguration(options: { devPagesEnabled?: boolean } = 
 			vendorMaplibreProviderJs: 'vendor/maplibre-provider/js/index-4bb864af.js',
 			vendorDatasetsPluginJs: 'vendor/datasets-plugin/js/index-c4efa38e.js',
 			vendorDatasetsPluginCss: 'vendor/datasets-plugin/css/index-1a74fe4f.css',
-			vendorMapKeyPluginJs: 'vendor/map-key-plugin/js/index-8b2d2494.js',
+			vendorMapKeyPluginJs: 'vendor/map-key-plugin/js/index-4e840312.js',
 			vendorMapKeyPluginCss: 'vendor/map-key-plugin/css/index-aa93b682.css',
 			vendorInteractPluginJs: 'vendor/interact-plugin/js/index-8932494c.js',
 			vendorDrawPluginJs: 'vendor/draw-plugin/js/index-1f40ff7e.js',

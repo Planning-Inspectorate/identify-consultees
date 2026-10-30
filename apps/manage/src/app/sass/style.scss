@@ -92,6 +92,25 @@ $font-family: arial, helvetica, sans-serif;
 	}
 }
 
+// footer link colours from the PINS design system's footer component: core's
+// pins-footer stylesheet sets these on the lone .govuk-footer__link class, which
+// GOV.UK Frontend's .govuk-footer__link:link/:visited rules outrank - so real
+// links took --govuk-link-colour (#1a65a6) and visited ones went purple.
+// Restating the colours with the same pseudo-classes (later source order wins at
+// equal specificity) makes the documented blue actually apply; hover #003078 has
+// no govuk-frontend 6 palette name ('dark-blue' now maps to blue shade-50)
+.govuk-footer__link {
+	&:link,
+	&:visited {
+		color: index.govuk-colour('blue');
+	}
+
+	&:hover {
+		/* stylelint-disable-next-line color-no-hex */
+		color: #003078;
+	}
+}
+
 // a footer link kept routed but taken out of the list (config-middleware marks it `hidden`)
 // while its content is unaudited - hiding the whole list item leaves no gap in the inline list
 .pins-footer__item--hidden {
