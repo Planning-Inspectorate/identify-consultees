@@ -11,8 +11,8 @@ import type { RequestHandler } from 'express';
  *   - `map`      - the project boundary page's map fails to load ("There's a problem loading
  *                  the map - try again later")
  *   - `ruleset`  - every ruleset run fails ("The ruleset could not be run")
- *   - `download` - the report ZIP fails to build ("The scoping report could not be downloaded
- *                  - try again")
+ *   - `download` - the report ZIP fails to build ("The report could not be created –
+ *                  try again")
  *
  * `ruleset` is stored in the session - a real outage fails every page until it's fixed, and it
  * has to survive the journey's navigation - until `?test-fail=off` on any /consultees page

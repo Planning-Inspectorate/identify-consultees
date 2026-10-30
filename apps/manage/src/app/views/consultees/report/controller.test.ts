@@ -540,9 +540,13 @@ describe('report created page', () => {
 
 		const viewModel = mockRes.render.mock.calls[0].arguments[1];
 		assert.strictEqual(viewModel.downloadFailed, true);
+		assert.deepStrictEqual(viewModel.errorSummary, [
+			{ text: 'The report could not be created – try again', href: viewModel.retryUrl }
+		]);
 		const html = mockRes.render.mock.calls[0].result;
-		assert.match(html, /govuk-panel--error/);
-		assert.match(html, /scoping report could not be downloaded/);
+		assert.match(html, /govuk-error-summary/);
+		assert.match(html, /The report could not be created – try again/);
+		assert.doesNotMatch(html, /govuk-panel/);
 		assert.doesNotMatch(html, /report\/download/);
 	});
 
@@ -584,19 +588,20 @@ describe('report created page', () => {
 		);
 
 		// the build never ran, so nothing is kept for the download, and the page shows the
-		// failure state straight away - red panel, error, no download link
+		// failure state straight away - error summary, error, no download link
 		assert.strictEqual(db.consulteeArea.findMany.mock.callCount(), 0);
 		const viewModel = mockRes.render.mock.calls[0].arguments[1];
 		assert.strictEqual(rememberedReportZip(viewModel.downloadUrl), undefined);
 		assert.strictEqual(viewModel.downloadFailed, true);
 		assert.strictEqual(viewModel.pageHeading, 'Report could not be created');
 		const html = mockRes.render.mock.calls[0].result;
-		assert.match(html, /govuk-panel--error/);
-		assert.match(html, /scoping report could not be downloaded/);
+		assert.match(html, /govuk-error-summary/);
+		assert.match(html, /The report could not be created – try again/);
+		assert.doesNotMatch(html, /govuk-panel/);
 		assert.doesNotMatch(html, /report\/download/);
 	});
 
-	it('should show a govuk error message in a red panel, and no download link, when the download itself failed', async () => {
+	it('should show a govuk error summary, and no download link, when the download itself failed', async () => {
 		const { handler, mockRes } = createdPage([parishRow()]);
 		await handler(
 			{
@@ -608,11 +613,14 @@ describe('report created page', () => {
 
 		const viewModel = mockRes.render.mock.calls[0].arguments[1];
 		assert.strictEqual(viewModel.downloadFailed, true);
+		// the error summary's entry retries creating the report
+		assert.deepStrictEqual(viewModel.errorSummary, [
+			{ text: 'The report could not be created – try again', href: viewModel.retryUrl }
+		]);
 		const html = mockRes.render.mock.calls[0].result;
-		assert.match(html, /govuk-panel--error/);
-		assert.match(html, /govuk-error-message/);
-		assert.match(html, /scoping report could not be downloaded/);
-		assert.match(html, /try again/);
+		assert.match(html, /govuk-error-summary/);
+		assert.match(html, /The report could not be created – try again/);
+		assert.doesNotMatch(html, /govuk-panel/);
 		// no way back to the download while it's failing
 		assert.doesNotMatch(html, /report\/download/);
 		assert.doesNotMatch(html, /Retry download/);
