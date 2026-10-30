@@ -41,6 +41,10 @@ const pages = [
 		path: '/components/interactive-map/polygons?components=true',
 		name: 'interactive map example'
 	},
+	{
+		path: '/components/interactive-map/measure?components=true',
+		name: 'interactive map measure example'
+	},
 	{ path: '/signed-out', name: 'signed out' },
 	{ path: '/terms-and-conditions', name: 'terms and conditions' },
 	{ path: '/accessibility-statement', name: 'accessibility statement' },
