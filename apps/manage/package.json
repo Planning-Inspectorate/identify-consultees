@@ -7,6 +7,7 @@
   "scripts": {
     "dev": "node scripts/run-dev.mjs",
     "build": "node src/util/build.ts",
+    "prestart": "node ../../scripts/kill-port.ts",
     "start": "npm run build && node src/server.ts",
     "test": "node --test",
     "test:unit": "node --test",
