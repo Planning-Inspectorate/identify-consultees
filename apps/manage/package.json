@@ -5,9 +5,9 @@
   "main": "index.ts",
   "type": "module",
   "scripts": {
-    "dev": "npm run build && node scripts/run-dev.mjs",
+    "dev": "node scripts/run-dev.mjs",
     "build": "node src/util/build.ts",
-    "start": "node src/server.ts",
+    "start": "npm run build && node src/server.ts",
     "test": "node --test",
     "test:unit": "node --test",
     "test:coverage": "node scripts/run-frontend-coverage.mjs",
