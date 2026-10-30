@@ -13,11 +13,30 @@ function isCleanShutdown(code, signal) {
 	return signal === 'SIGINT' || signal === 'SIGTERM' || code === 130 || code === 143;
 }
 
-const child = spawn('npx', ['nodemon', '--watch', 'src', '--ext', 'js,ts,scss,html,njk', '--exec', 'npm run start'], {
-	cwd: appRoot,
-	stdio: 'inherit',
-	shell: process.platform === 'win32'
-});
+// start builds the assets on every restart, so the build outputs it writes —
+// src/.static and the fingerprinted names in src/util/config-middleware.ts —
+// must not count as source changes or every restart would trigger another
+const child = spawn(
+	'npx',
+	[
+		'nodemon',
+		'--watch',
+		'src',
+		'--ext',
+		'js,ts,scss,html,njk',
+		'--ignore',
+		'src/.static',
+		'--ignore',
+		'src/util/config-middleware.ts',
+		'--exec',
+		'npm run start'
+	],
+	{
+		cwd: appRoot,
+		stdio: 'inherit',
+		shell: process.platform === 'win32'
+	}
+);
 
 const forwardSignal = (signal) => {
 	if (!child.killed) {
