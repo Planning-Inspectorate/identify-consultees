@@ -3,7 +3,7 @@ import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, test } from 'node:test';
-import { cbosSubscriberSettings, loadConfig, resetConfigCache } from './config.ts';
+import { loadConfig, parseImportHours, resetConfigCache } from './config.ts';
 import { loadNearbyConsultees } from './nearby-consultees.ts';
 import { loadScreeningConfig } from './screening-config.ts';
 
@@ -24,6 +24,7 @@ const managedKeys = [
 	'AUTH_TENANT_ID',
 	'BLOB_STORE_CONTAINER',
 	'BLOB_STORE_HOST',
+	'CBOS_IMPORT_HOURS',
 	'ENABLE_DEV_PAGES',
 	'ENVIRONMENT',
 	'LOG_LEVEL',
@@ -181,6 +182,20 @@ describe('manage loadConfig', () => {
 		assert.equal(loadConfig().testFaultsEnabled, true);
 	});
 
+	test('reads the hours CBOS is imported at, off unless they are set', () => {
+		setBaseEnv({ AUTH_DISABLED: 'true', CBOS_IMPORT_HOURS: '' });
+		assert.deepEqual(loadConfig().cbosImportHours, []);
+
+		resetConfigCache();
+		setBaseEnv({ AUTH_DISABLED: 'true', CBOS_IMPORT_HOURS: ' 19,7, 13,7 ' });
+		assert.deepEqual(loadConfig().cbosImportHours, [7, 13, 19]);
+
+		resetConfigCache();
+		setBaseEnv({ AUTH_DISABLED: 'true', CBOS_IMPORT_HOURS: '7,24' });
+		assert.throws(() => loadConfig(), /CBOS_IMPORT_HOURS must be whole hours from 0 to 23/);
+		assert.throws(() => parseImportHours('7am'), /not "7am"/);
+	});
+
 	test('returns cached config on subsequent calls', () => {
 		setBaseEnv({ AUTH_DISABLED: 'true', PORT: '8111' });
 		const first = loadConfig();
@@ -247,30 +262,5 @@ describe('manage loadConfig', () => {
 		assert.equal(config.auth.clientId, 'client-id');
 		assert.equal(config.auth.clientSecret, 'client-secret');
 		assert.equal(config.auth.groups.applicationAccess, 'group-id');
-	});
-});
-
-describe('the CBOS subscriber settings', () => {
-	const ON = {
-		CBOS_SUBSCRIBER_ENABLED: 'true',
-		CBOS_SERVICE_BUS_NAMESPACE: ' pins-sb-back-office-dev-ukw-001.servicebus.windows.net ',
-		CBOS_SERVICE_BUS_SUBSCRIPTION: 'identify-consultees-nsip-document'
-	};
-
-	test('are the namespace, topic and subscription when it is turned on - nsip-document by default', () => {
-		assert.deepEqual(cbosSubscriberSettings(ON), {
-			namespace: 'pins-sb-back-office-dev-ukw-001.servicebus.windows.net',
-			topic: 'nsip-document',
-			subscription: 'identify-consultees-nsip-document'
-		});
-		assert.equal(cbosSubscriberSettings({ ...ON, CBOS_SERVICE_BUS_TOPIC: 'other-topic' })?.topic, 'other-topic');
-	});
-
-	test('are none - it is off - unless it is turned on and set up', () => {
-		assert.equal(cbosSubscriberSettings({}), undefined);
-		// the staging slot sets it off (infrastructure/app-web.tf)
-		assert.equal(cbosSubscriberSettings({ ...ON, CBOS_SUBSCRIBER_ENABLED: 'false' }), undefined);
-		assert.equal(cbosSubscriberSettings({ ...ON, CBOS_SERVICE_BUS_NAMESPACE: ' ' }), undefined);
-		assert.equal(cbosSubscriberSettings({ ...ON, CBOS_SERVICE_BUS_SUBSCRIPTION: undefined }), undefined);
 	});
 });

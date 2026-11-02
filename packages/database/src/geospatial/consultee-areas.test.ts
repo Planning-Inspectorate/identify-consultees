@@ -154,6 +154,8 @@ describe('consultee areas (requires a local SQL Server - see docker-compose.yml)
 				] as [number, number][][]
 			};
 			assert.equal((await getConsulteeAreaDisplayGeometries(dbClient, [testAreaId], farWindow)).size, 0);
+			// with no window - a consultee added by hand from anywhere - it's drawn wherever it is
+			assert.equal((await getConsulteeAreaDisplayGeometries(dbClient, [testAreaId])).get(testAreaId)?.type, 'Polygon');
 
 			// a well-formed id with no row behind it is a genuine not-found, not an error
 			assert.equal(await getConsulteeAreaById(dbClient, '99999999-9999-9999-9999-999999999999'), null);

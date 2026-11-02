@@ -67,6 +67,11 @@ export class ManageService extends BaseService<PrismaClient> {
 		return this.#config.pythonFunctionApiKey;
 	}
 
+	/** The hours, UK time, CBOS is imported on its own - none unless it's turned on (config.ts). */
+	get cbosImportHours(): number[] {
+		return this.#config.cbosImportHours;
+	}
+
 	/** Runs a ruleset's intersection logic - in the Python function (see ruleset-runner.ts). */
 	get rulesetRunner(): RulesetRunner {
 		return this.#rulesetRunner;

@@ -5,9 +5,10 @@
   "main": "index.ts",
   "type": "module",
   "scripts": {
-    "dev": "npm run build && node scripts/run-dev.mjs",
+    "dev": "node scripts/run-dev.mjs",
     "build": "node src/util/build.ts",
-    "start": "node src/server.ts",
+    "prestart": "node ../../scripts/kill-port.ts",
+    "start": "npm run build && node src/server.ts",
     "test": "node --test",
     "test:unit": "node --test",
     "test:coverage": "node scripts/run-frontend-coverage.mjs",
@@ -21,7 +22,6 @@
   "dependencies": {
     "@azure/identity": "*",
     "@azure/msal-node": "*",
-    "@azure/service-bus": "^7.10.0",
     "@azure/storage-blob": "*",
     "@defra/interactive-map": "*",
     "@pins/identify-consultees-database": "^0.0.0",

@@ -43,10 +43,10 @@ variable "apps_config" {
   })
 }
 
-variable "cbos_subscriber_enabled" {
-  description = "Subscribe the web app to CBOS's nsip-document Service Bus topic, so a case's boundaries are imported when CBOS converts a new one (see idas-back-office.tf)"
-  type        = bool
-  default     = false
+variable "cbos_import_hours" {
+  description = "The hours of the day, UK time, the web app imports every case boundary from CBOS - comma separated, or empty for none"
+  type        = string
+  default     = "7,10,13,16,19"
 }
 
 variable "common_config" {

@@ -434,10 +434,16 @@ describe('manage page accessibility smoke', () => {
 			downloadText: 'Download Longfield Solar Farm Consultee List report (ZIP)',
 			rulesetFailed: false,
 			retryUrl: '/consultees/11111111-1111-1111-1111-111111111111/report/created?ruleset=england-wales-post-20240430',
-			downloadFailed: true
+			downloadFailed: true,
+			errorSummary: [
+				{
+					text: 'The report could not be created – try again',
+					href: '/consultees/11111111-1111-1111-1111-111111111111/report/created?ruleset=england-wales-post-20240430'
+				}
+			]
 		});
-		assert.match(html, /govuk-panel--error/);
-		assert.match(html, /govuk-error-message/);
+		assert.match(html, /govuk-error-summary/);
+		assert.doesNotMatch(html, /govuk-panel/);
 		await assertNoSeriousA11yViolations(html);
 	});
 

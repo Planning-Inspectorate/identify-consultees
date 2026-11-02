@@ -136,7 +136,7 @@ The main journey is **database-backed**: there are no fixtures. Locally the data
 - Uploading a project's shapefile: the journey uses case boundaries already in the database
 - The remaining rulesets: three of the expected eight exist (see [Screening engine](./data/screening-engine.md#rulesets))
 - Redeveloped data processing (new ingest, ids and schema), being built separately
-- Keeping case boundaries in step with CBOS automatically: built (a Service Bus subscription, see [Data model and loading](./data/data-model.md#keeping-up-with-cbos)), on in Dev and Test; Training and Prod once it's seen working (`cbos_subscriber_enabled`)
+- Importing a case from CBOS as soon as its boundary is converted: the web app imports everything five times a day (see [Data model](./data/data-model.md#case-boundaries-from-cbos)); a Service Bus subscription on CBOS's `nsip-document` topic would make it immediate, once DevOps grant the access it needs
 
 ## Decisions
 

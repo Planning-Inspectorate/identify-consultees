@@ -44,11 +44,11 @@ The `?test-fail=` triggers (`apps/manage/src/app/views/consultees/test-faults.ts
 
 Add `?test-fail=<fault>` - `&test-fail=<fault>` where the URL already has parameters - to any `/consultees/...` page. `map` and `download` are one-offs: they fail only the request carrying the parameter and nothing is stored. `ruleset` is stored in the session, so the failure persists as the journey is clicked through, like a real outage, until `?test-fail=off` on any `/consultees/...` page clears it (or the session ends). On prod the parameter does nothing.
 
-| Fault      | What fails                              | What shows                                                                                                                                                                                                      |
-| ---------- | --------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `map`      | The boundary page's map can't be loaded | `/consultees/<case-id>` - "There's a problem loading the map - try again later" as a GOV.UK error message, with a "Try again" link; the shapefile radios still render. That request only - nothing is stored    |
-| `ruleset`  | Every ruleset run fails                 | The report check page, category pages and the Report created page - "The ruleset could not be run" with a "Try again" link                                                                                      |
-| `download` | The report ZIP can't be built           | `/consultees/<case-id>/report/created` - "Report could not be created" on a red panel with "The scoping report could not be downloaded - try again" and no download link. That request only - nothing is stored |
+| Fault      | What fails                              | What shows                                                                                                                                                                                                   |
+| ---------- | --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `map`      | The boundary page's map can't be loaded | `/consultees/<case-id>` - "There's a problem loading the map - try again later" as a GOV.UK error message, with a "Try again" link; the shapefile radios still render. That request only - nothing is stored |
+| `ruleset`  | Every ruleset run fails                 | The report check page, category pages and the Report created page - "The ruleset could not be run" with a "Try again" link                                                                                   |
+| `download` | The report ZIP can't be built           | `/consultees/<case-id>/report/created` - "Report could not be created" with a "The report could not be created – try again" error summary and no download link. That request only - nothing is stored        |
 
 ### Boundary map failure (AC5)
 
@@ -61,9 +61,9 @@ Add `?test-fail=<fault>` - `&test-fail=<fault>` where the URL already has parame
 ### Report download failure (AC6)
 
 1. Walk the journey to the Report created page and add the fault: `/consultees/<case-id>/report/created?ruleset=england-wales-post-20240430&test-fail=download`
-   - Expected: the panel is red, titled "Report could not be created", with "The scoping report could not be downloaded - try again" and no download link.
+   - Expected: the heading is "Report could not be created", with a "The report could not be created – try again" GOV.UK error summary and no download link.
 2. The fault is per-request - nothing is stored. Reload the created page without the parameter and the link returns; the ZIP downloads.
-3. The real-world equivalent: the link only appears once the page has built the ZIP successfully; a download that fails on click sends the user back here with `download=failed`, which shows the same red-panel error.
+3. The real-world equivalent: the link only appears once the page has built the ZIP successfully; a download that fails on click sends the user back here with `download=failed`, which shows the same error-summary state.
 
 Expected on prod: `?test-fail=` parameters are ignored and every page behaves normally.
 

@@ -33,11 +33,6 @@ export interface Config extends BaseConfig {
 	// screen a site whose simplified outline has more points than this against its bounding box -
 	// config/screening.yaml (see screening-config.ts); unset or 0 never does up front
 	boundingBoxAbovePoints?: number;
-	// listen for CBOS's document events (its nsip-document Service Bus topic) and import a case's
-	// boundaries when one changes - see cbos/subscriber.ts. Undefined - off - unless
-	// CBOS_SUBSCRIBER_ENABLED=true and the namespace and subscription are set: the staging slot has
-	// it off (infrastructure/app-web.tf), so only the live app takes the messages
-	cbosSubscriber?: CbosSubscriberSettings;
 	// whether the prototype/debug pages are mounted (/map-layers-demo, /components,
 	// /consultee-areas-python, /consultee-areas-direct). On by default outside production; set
 	// ENABLE_DEV_PAGES=true to enable them on a deployed environment running NODE_ENV=production
@@ -49,6 +44,11 @@ export interface Config extends BaseConfig {
 	// NODE_ENV=production, so that alone can't gate them. TEMPORARY - remove before go-live
 	// (see kt-docs/overview.md's "Before go-live").
 	testFaultsEnabled: boolean;
+	// the hours of the day, UK time, the app imports every CBOS boundary on its own - as the admin
+	// page's button does (admin/import-from-cbos/scheduled-import.ts). From CBOS_IMPORT_HOURS
+	// ("7,10,13,16,19"); empty - off - unless set, and the staging slot has it off
+	// (infrastructure/app-web.tf), so only the live app imports
+	cbosImportHours: number[];
 	auth: {
 		authority: string;
 		clientId: string;
@@ -63,22 +63,17 @@ export interface Config extends BaseConfig {
 	};
 }
 
-/** Where CBOS's document events are taken from: CBOS's Service Bus namespace, its topic, and our subscription. */
-export interface CbosSubscriberSettings {
-	/** Fully qualified, as pins-sb-back-office-dev-ukw-001.servicebus.windows.net. */
-	namespace: string;
-	topic: string;
-	subscription: string;
-}
-
-/** The CBOS subscriber's settings when it's turned on and set up, else undefined (off). */
-export function cbosSubscriberSettings(env: NodeJS.ProcessEnv): CbosSubscriberSettings | undefined {
-	const namespace = env.CBOS_SERVICE_BUS_NAMESPACE?.trim();
-	const subscription = env.CBOS_SERVICE_BUS_SUBSCRIPTION?.trim();
-	if (env.CBOS_SUBSCRIBER_ENABLED !== 'true' || !namespace || !subscription) {
-		return undefined;
+/** CBOS_IMPORT_HOURS's hours, in order: whole hours 0 to 23, comma separated. Unset or empty is none. */
+export function parseImportHours(value: string | undefined): number[] {
+	const parts = (value ?? '')
+		.split(',')
+		.map((part) => part.trim())
+		.filter(Boolean);
+	const hours = parts.map(Number);
+	if (hours.some((hour) => !Number.isInteger(hour) || hour < 0 || hour > 23)) {
+		throw new Error(`CBOS_IMPORT_HOURS must be whole hours from 0 to 23, comma separated, not "${value}"`);
 	}
-	return { namespace, topic: env.CBOS_SERVICE_BUS_TOPIC?.trim() || 'nsip-document', subscription };
+	return [...new Set(hours)].toSorted((a, b) => a - b);
 }
 
 // cache the config
@@ -111,6 +106,7 @@ export function loadConfig(): Config {
 		AUTH_GROUP_APPLICATION_ACCESS,
 		AUTH_TENANT_ID,
 		BLOB_STORE_HOST,
+		CBOS_IMPORT_HOURS,
 		BLOB_STORE_CONTAINER,
 		CACHE_CONTROL_MAX_AGE,
 		ENABLE_DEV_PAGES,
@@ -176,7 +172,7 @@ export function loadConfig(): Config {
 		boundingBoxAbovePoints: screening.boundingBoxAbovePoints,
 		devPagesEnabled: !isProduction || ENABLE_DEV_PAGES === 'true',
 		testFaultsEnabled: ENVIRONMENT !== 'prod',
-		cbosSubscriber: cbosSubscriberSettings(process.env),
+		cbosImportHours: parseImportHours(CBOS_IMPORT_HOURS),
 		auth: {
 			authority: `https://login.microsoftonline.com/${AUTH_TENANT_ID}`,
 			clientId: AUTH_CLIENT_ID || '',

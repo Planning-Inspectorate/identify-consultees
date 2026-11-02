@@ -153,7 +153,8 @@ export async function fingerprintAndCompressStaticAssets(staticDir: string): Pro
  * Rewrite known asset path literals in a source file from the manifest.
  */
 export async function applyAssetManifestToLocalsFile(localsFile: string, manifest: AssetManifest): Promise<void> {
-	let content = await readFile(localsFile, 'utf8');
+	const original = await readFile(localsFile, 'utf8');
+	let content = original;
 
 	const replacements: { logical: string; property: string }[] = [
 		{ logical: 'assets/js/govuk-frontend.min.js', property: 'govukFrontendJs' },
@@ -193,7 +194,11 @@ export async function applyAssetManifestToLocalsFile(localsFile: string, manifes
 		content = content.replace(/styleFile\s*:\s*'[^']*'/, `styleFile: '${styleHashed}'`);
 	}
 
-	await writeFile(localsFile, content, 'utf8');
+	// rebuilding without an asset change must not touch the file - the dev
+	// watcher keys off writes, and an unchanged rewrite would retrigger it
+	if (content !== original) {
+		await writeFile(localsFile, content, 'utf8');
+	}
 }
 
 /**

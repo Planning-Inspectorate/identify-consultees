@@ -206,7 +206,7 @@ test.describe('manage journeys', () => {
 		await page.getByRole('button', { name: 'Add a consultee' }).click();
 		await expect(page).toHaveURL(/\/report\/consultees\/add\?.*category=Parish/);
 		await expect(page.getByRole('heading', { level: 1 })).toContainText('Add a consultee');
-		const nameInput = page.getByLabel('Name of consultee');
+		const nameInput = page.getByLabel('Name', { exact: true });
 		// the add page's own submit button - "Add consultee" - not the category page's "Add a consultee" link
 		const addButton = page.getByRole('button', { name: 'Add consultee' });
 		await addButton.click();
@@ -225,6 +225,16 @@ test.describe('manage journeys', () => {
 		await expect(page.getByText('There is a problem')).toBeVisible();
 		await expect(page.getByRole('link', { name: 'Consultee not found' })).toBeVisible();
 
+		// Back leaves without adding what was typed: the category page lists what it did before
+		await nameInput.fill('First Test Consultee');
+		await page.getByRole('link', { name: 'Back', exact: true }).click();
+		await expect(page).toHaveURL(/\/report\/consultees\?.*category=Parish/);
+		expect(new URL(page.url()).searchParams.getAll('add')).toEqual([]);
+		await expect(page.getByRole('rowheader', { name: 'First Test Consultee' })).toHaveCount(0);
+		await expect(page.getByRole('link', { name: /Remove/ })).toHaveCount(parishCount - removed);
+		await page.getByRole('button', { name: 'Add a consultee' }).click();
+		await page.getByLabel('Reason for adding').fill('Entered first');
+
 		// adding a consultee returns to the category page with it listed below the map - and any
 		// number can be added one at a time
 		await nameInput.fill('First Test Consultee');
@@ -232,6 +242,14 @@ test.describe('manage journeys', () => {
 		await expect(page).toHaveURL(/\/report\/consultees\?.*category=Parish.*add=/);
 		await expect(page.getByRole('rowheader', { name: 'First Test Consultee' })).toBeVisible();
 		await expect(page.getByText('Entered first')).toBeVisible();
+		// it's far from the site - beyond where the run looked - but the map draws it all the same, as
+		// identified, and the static map's link carries it
+		const mapConfig = JSON.parse((await page.locator('#case-map-data').textContent()) ?? '{}');
+		const drawnFirst = mapConfig.consulteeGeojson.features.find(
+			(feature: { id: string }) => feature.id === E2E_ADDED_CONSULTEES[0].id
+		);
+		expect(drawnFirst?.properties.identified).toBe('true');
+		expect(mapConfig.fallback.src).toContain(`include=${E2E_ADDED_CONSULTEES[0].id}`);
 
 		// back on the add page, with nearby consultees to suggest, the GOV.UK accessible autocomplete
 		// offers them as a name is typed - picking one adds it by name, and the map draws it as

@@ -12,7 +12,12 @@ import type { Geometry } from '@pins/identify-consultees-database/src/geospatial
 import { strToU8, zipSync } from 'fflate';
 import writeExcelFile from 'write-excel-file/node';
 import type { CaseMapConfig } from '../../../../maps/case-geojson.ts';
-import { buildCaseMapConfig, markAddedByHand, REGIONAL_FILL_OPACITY } from '../../../../maps/case-geojson.ts';
+import {
+	addedBeyondRun,
+	buildCaseMapConfig,
+	markAddedByHand,
+	REGIONAL_FILL_OPACITY
+} from '../../../../maps/case-geojson.ts';
 import { computeBounds, computeFittedMapView } from '../../../../maps/geometry-bounds.ts';
 import { MAP_VIEWPORT } from '../../../../maps/sample-geojson.ts';
 import { buildConsulteeStaticMapResponse } from '../../../../maps/serve-static-map.ts';
@@ -226,12 +231,14 @@ async function categoryMap(
 			!excluded.has(match.feature.id) &&
 			(isIdentified(match) || added.has(match.feature.id))
 	);
+	// with the ones added by hand from further away than the run looked
+	const drawn = [...markAddedByHand(visible, added), ...addedBeyondRun(consultees, selection.adds, category)];
 	// its own search area, as its Change page builds - an area that can't be drawn spoils only its
 	// category's map
 	const searchArea = await buildSearchAreaSafely(
 		service.db,
 		project,
-		visible,
+		drawn,
 		service.nearbySearchRadiusMetres,
 		service.logger
 	);
@@ -241,7 +248,7 @@ async function categoryMap(
 			bufferMetres.map(async (metres) => ({ metres, geometry: await bufferAroundSite(context, metres) }))
 		)
 	).filter((buffer): buffer is { metres: number; geometry: Geometry } => buffer.geometry !== undefined);
-	const map = buildCaseMapConfig(project, markAddedByHand(visible, added), category, searchArea);
+	const map = buildCaseMapConfig(project, drawn, category, searchArea);
 	const view = reportMapView(
 		map,
 		buffers.map(({ geometry }) => geometry),
@@ -255,7 +262,7 @@ async function categoryMap(
 	};
 	// a kept run has no geometry, so without display geometry the map shows the site alone
 	const mapNote =
-		visible.length > 0 && map.consulteeGeojson.features.length === 0
+		drawn.length > 0 && map.consulteeGeojson.features.length === 0
 			? 'The consultee areas could not be drawn on this map. They are listed on the next page.'
 			: undefined;
 	const image = await buildConsulteeStaticMapResponse({

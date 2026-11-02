@@ -12,7 +12,7 @@ import type {
 	SiteScreenedAs
 } from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
 import { getRuleset, RULESETS } from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
-import type { SearchAreaDisplay } from '../../maps/case-geojson.ts';
+import type { MapMatch, SearchAreaDisplay } from '../../maps/case-geojson.ts';
 import { findNearbyNsips, isNearbyNsip } from './nearby-nsips.ts';
 import { activeTestFault } from './test-faults.ts';
 
@@ -151,13 +151,15 @@ function screenedGeometry(project: CaseBoundaryFeature) {
 
 /**
  * The interactive map's search area - the site grown by the nearby radius - and the display
- * geometry of every consultee touching it: consultee areas', and Nearby NSIPs' boundaries. The map
- * is an extra: if this fails, the page still lists every consultee in its tables.
+ * geometry of every consultee touching it: consultee areas', and Nearby NSIPs' boundaries. A
+ * consultee added by hand is drawn wherever it is - it may be one the run never found, further
+ * away (see addedBeyondRun). The map is an extra: if this fails, the page still lists every
+ * consultee in its tables.
  */
 export async function buildSearchAreaSafely(
 	db: ManageService['db'],
 	project: CaseBoundaryFeature,
-	matches: ConsulteeMatch[],
+	matches: MapMatch[],
 	nearbyRadiusMetres: number,
 	logger: ManageService['logger']
 ): Promise<SearchAreaDisplay | undefined> {
@@ -166,14 +168,20 @@ export async function buildSearchAreaSafely(
 	}
 	try {
 		const area = await bufferGeometryForDisplay(db, screenedGeometry(project), nearbyRadiusMetres);
-		const ids = (nearbyNsips: boolean) => [
-			...new Set(matches.filter((match) => isNearbyNsip(match) === nearbyNsips).map((match) => match.feature.id))
+		const ids = (nearbyNsips: boolean, addedByHand: boolean) => [
+			...new Set(
+				matches
+					.filter((match) => isNearbyNsip(match) === nearbyNsips && (match.addedByHand === true) === addedByHand)
+					.map((match) => match.feature.id)
+			)
 		];
-		const [consulteeAreas, caseBoundaries] = await Promise.all([
-			getConsulteeAreaDisplayGeometries(db, ids(false), area),
-			getCaseBoundaryDisplayGeometries(db, ids(true), area)
+		const found = await Promise.all([
+			getConsulteeAreaDisplayGeometries(db, ids(false, false), area),
+			getCaseBoundaryDisplayGeometries(db, ids(true, false), area),
+			getConsulteeAreaDisplayGeometries(db, ids(false, true)),
+			getCaseBoundaryDisplayGeometries(db, ids(true, true))
 		]);
-		return { area, geometries: new Map([...consulteeAreas, ...caseBoundaries]) };
+		return { area, geometries: new Map(found.flatMap((geometries) => [...geometries])) };
 	} catch (error) {
 		logger.error({ error, caseId: project.id }, 'Failed to build the map search area');
 		return undefined;

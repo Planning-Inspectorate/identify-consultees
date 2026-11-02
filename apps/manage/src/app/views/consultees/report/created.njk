@@ -1,30 +1,32 @@
 {% extends "views/layouts/main.njk" %}
 
-{% from "govuk/components/error-message/macro.njk" import govukErrorMessage %}
 {% from "govuk/components/panel/macro.njk" import govukPanel %}
 {% from "govuk/components/notification-banner/macro.njk" import govukNotificationBanner %}
 
 {% block pageTitle %}
-	{{ pageHeading }} - {{ config.headerTitle }}
+	{% if errorSummary %}Error: {% endif %}{{ pageHeading }} - {{ config.headerTitle }}
 {% endblock %}
 
-{# the panel's own title is the page heading, so suppress the layout's h1 #}
-{% block pageHeading %}{% endblock %}
+{# the success panel's own title is the page heading, so the layout's h1 only shows in
+   the failure state - which has no panel, just the error summary #}
+{% block pageHeading %}
+	{% if downloadFailed %}{{ super() }}{% endif %}
+{% endblock %}
 
 {% block pageContent %}
 	<div class="govuk-grid-row">
 		<div class="govuk-grid-column-two-thirds">
-			{% call govukPanel({
-				titleText: pageHeading,
-				classes: "govuk-panel--error" if downloadFailed
-			}) %}
-				Project: {{ caseName }}<br>Reference: {{ reference }}
-				{% if downloadFailed %}
-					{{ govukErrorMessage({ text: "The scoping report could not be downloaded - try again" }) }}
-				{% endif %}
-			{% endcall %}
+			{% if downloadFailed %}
+				<p class="govuk-body">
+					Project: {{ caseName }}<br>Reference: {{ reference }}
+				</p>
+			{% else %}
+				{% call govukPanel({
+					titleText: pageHeading
+				}) %}
+					Project: {{ caseName }}<br>Reference: {{ reference }}
+				{% endcall %}
 
-			{% if not downloadFailed %}
 				<p class="govuk-body govuk-!-margin-top-6">
 					<a class="govuk-link" href="{{ downloadUrl }}">{{ downloadText }}</a>
 				</p>

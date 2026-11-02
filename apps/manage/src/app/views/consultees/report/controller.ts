@@ -178,6 +178,7 @@ export function buildReportCreatedPage(service: ManageService): AsyncRequestHand
 		// the download sends them back here with ?download=failed; a build that already
 		// failed here means there is no working report to link to either way
 		const downloadFailed = buildFailed || firstQueryValue(req.query.download) === 'failed';
+		const retryUrl = reportCreatedUrl(project.id, ruleset.id, selection);
 		const viewModel: ReportCreatedViewModel = {
 			pageHeading: downloadFailed ? 'Report could not be created' : 'Report created',
 			backLinkUrl: reportUrl(project.id, ruleset.id, selection),
@@ -186,8 +187,12 @@ export function buildReportCreatedPage(service: ManageService): AsyncRequestHand
 			downloadUrl,
 			downloadText: `Download ${project.properties.caseName} Consultee List report (ZIP${downloadSize ? `, ${downloadSize}` : ''})`,
 			rulesetFailed: failed,
-			retryUrl: reportCreatedUrl(project.id, ruleset.id, selection),
-			downloadFailed
+			retryUrl,
+			downloadFailed,
+			// the error summary's link retries creating the report (reloading this page rebuilds it)
+			...(downloadFailed
+				? { errorSummary: [{ text: 'The report could not be created – try again', href: retryUrl }] }
+				: {})
 		};
 		return res.render('views/consultees/report/created.njk', viewModel);
 	};

@@ -2,13 +2,13 @@ import { mockLogger } from '#lib/testing/index.ts';
 import assert from 'node:assert';
 import { describe, it, mock } from 'node:test';
 import { configureNunjucks } from '../../nunjucks.ts';
-import { buildImportFromCbosPage, buildRunImportFromCbos } from './controller.ts';
+import { buildImportFromCbosPage, buildRunImportFromCbos, scheduleText } from './controller.ts';
 
 describe('admin import from CBOS', () => {
 	const nunjucks = configureNunjucks();
 	const newRes = () => ({ render: mock.fn((view, data) => nunjucks.render(view, data)) });
 	const LOADED = { cases: 270, boundaries: 300, casesFromCbos: 110, boundariesFromCbos: 120 };
-	const newService = (counts: unknown = [LOADED]) => ({
+	const newService = (counts: unknown = [LOADED], cbosImportHours: number[] = []) => ({
 		logger: mockLogger(),
 		db: {
 			$queryRaw: mock.fn(async () => {
@@ -17,7 +17,8 @@ describe('admin import from CBOS', () => {
 			})
 		},
 		pythonFunctionUrl: 'http://localhost:7071/api/consultee-areas',
-		pythonFunctionApiKey: 'test-key'
+		pythonFunctionApiKey: 'test-key',
+		cbosImportHours
 	});
 	const viewModel = (res: ReturnType<typeof newRes>) => res.render.mock.calls[0].arguments[1];
 	const html = (res: ReturnType<typeof newRes>) => res.render.mock.calls[0].result as string;
@@ -32,6 +33,22 @@ describe('admin import from CBOS', () => {
 		assert.match(html(res), /<h1 class="govuk-heading-l">Import cases from CBOS<\/h1>/);
 		assert.match(html(res), /Cases[\s\S]*270 \(110 from CBOS\)/);
 		assert.match(html(res), /Case boundaries[\s\S]*300 \(120 from CBOS\)/);
+	});
+
+	it('says when the service imports on its own, when it does', async () => {
+		const scheduled = newRes();
+		await buildImportFromCbosPage(newService([LOADED], [7, 10, 13, 16, 19]) as never)({}, scheduled);
+		assert.strictEqual(viewModel(scheduled).schedule, '07:00, 10:00, 13:00, 16:00 and 19:00');
+		assert.match(html(scheduled), /on its own every day at 07:00, 10:00, 13:00, 16:00 and 19:00 \(UK time\)/);
+
+		const unscheduled = newRes();
+		await buildImportFromCbosPage(newService() as never)({}, unscheduled);
+		assert.strictEqual(viewModel(unscheduled).schedule, undefined);
+		assert.doesNotMatch(html(unscheduled), /on its own/);
+	});
+
+	it('names a single import hour without a list', () => {
+		assert.strictEqual(scheduleText([9]), '09:00');
 	});
 
 	it('leaves the counts off when they cannot be read', async () => {

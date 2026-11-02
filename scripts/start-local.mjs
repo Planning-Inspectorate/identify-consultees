@@ -252,6 +252,11 @@ async function main() {
 	console.log('Seeding sample data...');
 	await run('npm', ['run', 'db-seed']);
 
+	// stop listeners left over from a previous run - a stale manage app or Python
+	// function would keep its port and keep serving the old code instead of this one
+	// (the manage app also frees :8090 itself via its prestart hook)
+	await run('node', ['scripts/kill-port.ts', '8090', String(functionPort)]);
+
 	const pythonFunction = await startPythonFunction();
 
 	console.log('Starting manage app on http://localhost:8090 ...');

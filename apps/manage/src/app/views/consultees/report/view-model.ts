@@ -51,8 +51,10 @@ export interface ReportCreatedViewModel {
 	retryUrl: string;
 	/**
 	 * True when the report can't be served - the page's own build failed, or the download sent the
-	 * user back with `download=failed`. The panel turns red with a GOV.UK error message and no
-	 * download link.
+	 * user back with `download=failed`. The green confirmation panel is swapped for the heading and
+	 * a GOV.UK error summary, and no download link.
 	 */
 	downloadFailed?: boolean;
+	/** The download failure's error summary entry, linking to the retry. */
+	errorSummary?: { text: string; href: string }[];
 }
