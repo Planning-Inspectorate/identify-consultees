@@ -21,13 +21,15 @@ export interface ReportConsulteesViewModel {
 	/** The category name - the page's h1; the case name sits above it as a caption. */
 	pageHeading: string;
 	pageCaption: string;
-	/** Back to the draft report, carrying the current selection. */
+	/** Back to the draft report, discarding the changes made since the page was opened from it. */
 	backLinkUrl: string;
 	/** "Back to draft report" - the layout renders the back link itself from these two. */
 	backLinkText: string;
 	rows: ConsulteeRow[];
 	/** The "Add a consultee" page the Add consultee link opens, keeping the current selection. */
 	addConsulteeUrl: string;
+	/** Back to the draft report, keeping the changes. */
+	saveAndReturnUrl: string;
 	mapId: string;
 	mapRegionLabel: string;
 	staticMapSrc: string;

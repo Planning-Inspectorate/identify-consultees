@@ -203,6 +203,6 @@ export function buildReportConsulteeRemoveSubmit(
 		];
 		const adds =
 			'addedIndex' in target ? selection.adds.filter((_, index) => index !== target.addedIndex) : selection.adds;
-		return res.redirect(`${consulteesUrl(caseId, ruleset.id, category, { removed, adds })}&removed=open`);
+		return res.redirect(`${consulteesUrl(caseId, ruleset.id, category, { ...selection, removed, adds })}&removed=open`);
 	};
 }
