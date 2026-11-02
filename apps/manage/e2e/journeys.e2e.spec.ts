@@ -308,9 +308,9 @@ test.describe('manage journeys', () => {
 		await expect(removedTable.getByRole('row', { name: /Added in error/ })).toBeVisible();
 		await expect(page.getByRole('link', { name: /Remove/ })).toHaveCount(parishCount - removed + picked + 1);
 
-		// "Back to draft report" lands back on the check page - the row's names matching the rows just
-		// listed (past the fifth the names sit behind a closed "Show more" - still in the DOM)
-		await page.getByRole('link', { name: 'Back to draft report' }).click();
+		// "Save and return" lands back on the check page with the changes - the row's names matching
+		// the rows just listed (past the fifth the names sit behind a closed "Show more" - still in the DOM)
+		await page.getByRole('button', { name: 'Save and return' }).click();
 		await expect(page).toHaveURL(new RegExp(`/consultees/${SAMPLE_CASE_ID}/report\\?ruleset=${SAMPLE_RULESET_ID}`));
 		await expect(page.getByRole('heading', { level: 1 })).toContainText('Check consultees before creating the report');
 		const returnedValue = page
@@ -337,6 +337,19 @@ test.describe('manage journeys', () => {
 			await showLess.click();
 			await expect(details).not.toHaveAttribute('open', '');
 		}
+
+		// "Back to draft report" discards what's changed since the category page was opened: removing
+		// a consultee, then going back, leaves the check page as it was
+		const savedNames = await returnedValue.innerHTML();
+		await page.getByRole('link', { name: 'Change Parish Council' }).click();
+		await page.getByRole('link', { name: 'Remove First Test Consultee' }).click();
+		await page.getByLabel('Reason for removing').fill('Not confirmed');
+		await page.getByRole('button', { name: 'Remove consultee' }).click();
+		await expect(consulteesTable.getByRole('rowheader', { name: 'First Test Consultee' })).toHaveCount(0);
+		await page.getByRole('link', { name: 'Back to draft report' }).click();
+		await expect(page.getByRole('heading', { level: 1 })).toContainText('Check consultees before creating the report');
+		expect(await returnedValue.innerHTML()).toBe(savedNames);
+		expect(page.url()).not.toContain('saved=');
 
 		// "Create report" leads to the confirmation page with the download link, naming the built ZIP's size
 		await page.getByRole('button', { name: 'Create report' }).click();

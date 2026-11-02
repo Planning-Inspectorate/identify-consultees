@@ -159,11 +159,69 @@ function encodeEntry(entry: SelectionEntry): string {
 export interface ConsulteeSelection {
 	removed: readonly RemovedConsultee[];
 	adds: readonly AddedConsultee[];
+	/**
+	 * On a category's Change page and the add and remove pages it opens: the category's own
+	 * removals and adds when the Change page was opened - what its back link returns the check
+	 * page to, so changes not saved with "Save and return" are discarded. Carried as `saved=1`
+	 * with `savedExclude` and `savedAdd` params; absent elsewhere.
+	 */
+	saved?: CategoryEntries;
 }
 
-/** The selection a report-page request's query params carry (`?exclude=` and `?add=`). */
+/** A category's own removals and adds. */
+export interface CategoryEntries {
+	removed: readonly RemovedConsultee[];
+	adds: readonly AddedConsultee[];
+}
+
+/** The selection a report-page request's query params carry (`?exclude=` and `?add=`, and any saved entries). */
 export function consulteeSelection(query?: Record<string, unknown>): ConsulteeSelection {
-	return { removed: removedConsultees(query?.exclude), adds: addedConsultees(query?.add) };
+	const selection = { removed: removedConsultees(query?.exclude), adds: addedConsultees(query?.add) };
+	if (!queryValues(query?.saved).includes('1')) {
+		return selection;
+	}
+	return {
+		...selection,
+		saved: { removed: removedConsultees(query?.savedExclude), adds: addedConsultees(query?.savedAdd) }
+	};
+}
+
+/**
+ * The selection a category's Change page works on: as it is, with the category's entries kept as
+ * its saved ones if they aren't already - the page was opened from the check page.
+ */
+export function withSavedEntries(selection: ConsulteeSelection, category: string): ConsulteeSelection {
+	if (selection.saved) {
+		return selection;
+	}
+	return {
+		...selection,
+		saved: {
+			removed: selection.removed.filter((removal) => removal.category === category),
+			adds: selection.adds.filter((add) => add.category === category)
+		}
+	};
+}
+
+/** What "Save and return" takes to the check page: the selection as it is, with no saved entries. */
+export function savedSelection({ removed, adds }: ConsulteeSelection): ConsulteeSelection {
+	return { removed, adds };
+}
+
+/**
+ * What a Change page's back link takes to the check page: the category's entries as they were
+ * saved, so its changes since are discarded, and every other category's as they are. With no
+ * saved entries (a link made without them), the selection as it is.
+ */
+export function discardUnsavedChanges(selection: ConsulteeSelection, category: string): ConsulteeSelection {
+	const { saved } = selection;
+	if (!saved) {
+		return savedSelection(selection);
+	}
+	return {
+		removed: [...selection.removed.filter((removal) => removal.category !== category), ...saved.removed],
+		adds: [...selection.adds.filter((add) => add.category !== category), ...saved.adds]
+	};
 }
 
 /** No removals and no additions - the selection the map page's links carry. */
@@ -178,6 +236,15 @@ function appendSelection(url: string, selection: ConsulteeSelection): string {
 	}
 	for (const add of selection.adds) {
 		url += `${separator()}add=${encodeURIComponent(encodeEntry(add))}`;
+	}
+	if (selection.saved) {
+		url += `${separator()}saved=1`;
+		for (const removal of selection.saved.removed) {
+			url += `&savedExclude=${encodeURIComponent(encodeEntry(removal))}`;
+		}
+		for (const add of selection.saved.adds) {
+			url += `&savedAdd=${encodeURIComponent(encodeEntry(add))}`;
+		}
 	}
 	return url;
 }

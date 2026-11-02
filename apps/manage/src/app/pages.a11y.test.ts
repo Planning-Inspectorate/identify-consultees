@@ -273,6 +273,7 @@ describe('manage page accessibility smoke', () => {
 			],
 			addConsulteeUrl:
 				'/consultees/11111111-1111-1111-1111-111111111111/report/consultees/add?ruleset=england-wales-post-20240430&category=Parish%20Council',
+			saveAndReturnUrl: '/consultees/11111111-1111-1111-1111-111111111111/report?ruleset=england-wales-post-20240430',
 			mapId: 'case-map',
 			mapRegionLabel: 'Map showing Parish Council consultees for Longfield Solar Farm',
 			staticMapSrc:
@@ -302,6 +303,7 @@ describe('manage page accessibility smoke', () => {
 			rows: [],
 			addConsulteeUrl:
 				'/consultees/11111111-1111-1111-1111-111111111111/report/consultees/add?ruleset=england-wales-post-20240430&category=Parish%20Council',
+			saveAndReturnUrl: '/consultees/11111111-1111-1111-1111-111111111111/report?ruleset=england-wales-post-20240430',
 			mapId: 'case-map',
 			mapRegionLabel: 'Map showing Parish Council consultees for Longfield Solar Farm',
 			staticMapSrc:
