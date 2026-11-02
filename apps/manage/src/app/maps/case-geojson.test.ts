@@ -5,6 +5,7 @@ import assert from 'node:assert';
 import { describe, it } from 'node:test';
 import { REPORT_CONFIG } from '../report-config.ts';
 import {
+	addedBeyondRun,
 	buildCaseMapConfig,
 	buildProjectGeojson,
 	LOCAL_FILL_OPACITY,
@@ -228,6 +229,48 @@ describe('buildCaseMapConfig with a search area', () => {
 				['not-picked', 'false', String(NEARBY_LOCAL_FILL_OPACITY)],
 				['picked', 'true', String(LOCAL_FILL_OPACITY)]
 			]
+		);
+	});
+
+	it('draws a consultee added by hand from beyond the run, widening the map to show it', () => {
+		const run = [match('found')];
+		const beyond = addedBeyondRun(
+			run,
+			[
+				// found by the run - drawn as the run's match, not again
+				{ id: 'FOUND', category: 'Railway', name: 'Network Rail' },
+				{ id: 'far', category: 'Railway', name: 'Far Railway' },
+				{ id: 'far', category: 'Railway', name: 'Far Railway' },
+				// another category's, and one with no id (a link from before ids were kept)
+				{ id: 'other', category: 'Hospital', name: 'A Hospital' },
+				{ category: 'Railway', name: 'Named Only' }
+			],
+			'Railway'
+		);
+		assert.deepStrictEqual(beyond, [
+			{
+				feature: { id: 'far', properties: { consulteeCategory: 'Railway', consultee: 'Far Railway' } },
+				distanceMetres: 0,
+				reasons: [],
+				addedByHand: true,
+				beyondRun: true
+			}
+		]);
+
+		const farAway = { type: 'Point' as const, coordinates: [-3.5, 55.5] as [number, number] };
+		const searchArea = { area, geometries: new Map<string, Geometry>([['far', farAway]]) };
+		const siteOnly = buildCaseMapConfig(project(), run, 'Railway', searchArea);
+		const config = buildCaseMapConfig(project(), [...run, ...beyond], 'Railway', searchArea);
+		const far = config.consulteeGeojson.features.find((feature) => feature.id === 'far');
+		assert.deepStrictEqual(far?.geometry, farAway);
+		assert.strictEqual(far?.properties.identified, 'true');
+		// the view takes in the site and the far one, so opens further out, between the two
+		assert.ok(config.zoom < siteOnly.zoom);
+		assert.ok(config.center[0] < -1.5 && config.center[0] > -3.5);
+		// with nothing beyond the run, the map opens on the site as before
+		assert.deepStrictEqual(
+			[siteOnly.center, siteOnly.zoom],
+			[buildCaseMapConfig(project(), run, 'Railway').center, buildCaseMapConfig(project(), run, 'Railway').zoom]
 		);
 	});
 
