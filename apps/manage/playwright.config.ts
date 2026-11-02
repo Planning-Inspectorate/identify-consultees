@@ -1,10 +1,25 @@
 import { defineConfig, devices } from '@playwright/test';
-import { cpus } from 'node:os';
+import { mkdtempSync } from 'node:fs';
+import { cpus, tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 const e2ePort = process.env.E2E_PORT || '8091';
 const baseURL = process.env.E2E_BASE_URL || `http://127.0.0.1:${e2ePort}`;
 // Azure Pipelines sets TF_BUILD, not CI
 const isCi = Boolean(process.env.CI || process.env.TF_BUILD);
+
+// macOS 27 TCC-protects ~/Library/Application Support/Firefox, and the bundled
+// juggler Firefox still resolves its shared app-data dir there even with
+// -profile set - launched from a terminal rather than Finder it is denied and
+// exits with "Could not find profile folder" (microsoft/playwright#42768, fixed
+// upstream in 1.65 - drop this once @playwright/test reaches it).
+// CFFIXED_USER_HOME redirects Gecko's home-dir lookup to a scratch dir it can
+// write. env replaces the browser's environment wholesale, so process.env has
+// to be spread back in.
+const firefoxLaunchEnv =
+	process.platform === 'darwin'
+		? { ...process.env, CFFIXED_USER_HOME: mkdtempSync(join(tmpdir(), 'playwright-firefox-home-')) }
+		: undefined;
 
 /**
  * Frontend browser tests for the manage app.
@@ -55,7 +70,11 @@ export default defineConfig({
 		{
 			name: 'firefox-render',
 			testMatch: /.*\.render\.spec\.ts/,
-			use: { ...devices['Desktop Firefox'] }
+			use: {
+				...devices['Desktop Firefox'],
+				// undefined off macOS, where the launch env just defaults to process.env
+				launchOptions: { env: firefoxLaunchEnv }
+			}
 		},
 		{
 			// Playwright WebKit covers Safari rendering (Safari itself is macOS-only)
