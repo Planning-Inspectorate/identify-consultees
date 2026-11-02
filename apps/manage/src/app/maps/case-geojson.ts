@@ -52,8 +52,11 @@ function categoryOf(match: Pick<ConsulteeMatch, 'feature'>): string {
 	return match.feature.properties.consulteeCategory || UNCATEGORISED;
 }
 
-/** A match, perhaps one a user added by hand from the nearby search (see markAddedByHand). */
-export type MapMatch = ConsulteeMatch & { addedByHand?: boolean };
+/**
+ * A match, perhaps one a user added by hand (see markAddedByHand) - from the nearby search, or from
+ * further away than the run found anything (`beyondRun`, see addedBeyondRun).
+ */
+export type MapMatch = ConsulteeMatch & { addedByHand?: boolean; beyondRun?: boolean };
 
 /**
  * `matches` with the ones in `ids` - nearby consultees added by hand (a typed name matched to one) - marked
@@ -63,6 +66,44 @@ export function markAddedByHand(matches: ConsulteeMatch[], ids: ReadonlySet<stri
 	return ids.size === 0
 		? matches
 		: matches.map((match) => (ids.has(match.feature.id) ? { ...match, addedByHand: true } : match));
+}
+
+/** A consultee added by hand, as the map needs it: its id (absent on links from before ids were kept) and how it was added. */
+export interface HandAddedConsultee {
+	id?: string;
+	category: string;
+	name: string;
+}
+
+/**
+ * The consultees in `category` added by hand that the run didn't find - from anywhere in the
+ * reference data, or a case further away than Nearby NSIPs look - as matches the map draws by their
+ * id, added by hand. Each is drawn whole, wherever it is, and the category map widens to show it
+ * (see buildCaseMapConfig). One with no id has no area to draw.
+ */
+export function addedBeyondRun(
+	consultees: ConsulteeMatch[],
+	adds: readonly HandAddedConsultee[],
+	category: string
+): MapMatch[] {
+	const runIds = new Set(consultees.map((match) => match.feature.id.toLowerCase()));
+	const seen = new Set<string>();
+	return adds.flatMap((add) => {
+		const id = add.id?.toLowerCase();
+		if (add.category !== category || !id || runIds.has(id) || seen.has(id)) {
+			return [];
+		}
+		seen.add(id);
+		return [
+			{
+				feature: { id, properties: { consulteeCategory: category, consultee: add.name } },
+				distanceMetres: 0,
+				reasons: [],
+				addedByHand: true,
+				beyondRun: true
+			}
+		];
+	});
 }
 
 /** True when the map draws the match as identified: a condition found it, or a user added it. */
@@ -214,11 +255,20 @@ export function buildCaseMapConfig(
 	const searchAreaFeatures: GeoJsonFeature[] | undefined = searchArea && [
 		{ type: 'Feature', properties: {}, geometry: searchArea.area }
 	];
-	const consulteeGeojson = withFillOpacity(
-		buildConsulteeMatchesGeojson(searchArea ? withDisplayGeometry(matches, searchArea.geometries) : matches, colours),
-		searchAreaFeatures
+	const drawn = searchArea ? withDisplayGeometry(matches, searchArea.geometries) : matches;
+	const consulteeGeojson = withFillOpacity(buildConsulteeMatchesGeojson(drawn, colours), searchAreaFeatures);
+	// the map opens on the site - widened to take in any consultee added by hand from beyond where
+	// the run looked, or it would be off the map
+	const view = computeFittedMapView(
+		{
+			features: [
+				...projectGeojson.features,
+				...drawn.flatMap((match) => (match.beyondRun && isDrawable(match) ? [match.feature] : []))
+			]
+		},
+		MAP_VIEWPORT,
+		marginMetres
 	);
-	const view = computeFittedMapView(projectGeojson, MAP_VIEWPORT, marginMetres);
 	const mapLabel = `${rulesetName} for ${project.properties.caseName} (${project.properties.caseReference})`;
 
 	return {

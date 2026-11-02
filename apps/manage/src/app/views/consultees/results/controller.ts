@@ -1,7 +1,7 @@
 import type { ManageService } from '#service';
 import { getRuleset } from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
 import type { AsyncRequestHandler } from '@planning-inspectorate/core/util';
-import { buildCaseMapConfig, markAddedByHand } from '../../../maps/case-geojson.ts';
+import { addedBeyondRun, buildCaseMapConfig, markAddedByHand } from '../../../maps/case-geojson.ts';
 import { buildConsulteeStaticMapResponse, sendStaticMapResponse } from '../../../maps/serve-static-map.ts';
 import { categorySettings } from '../../../report-config.ts';
 import { excludedIds, queryValues } from '../report/urls.ts';
@@ -45,18 +45,25 @@ export function buildResultsStaticMap(service: ManageService, forceSvg = false):
 							(!category || match.feature.properties.consulteeCategory === category) && !excluded.has(match.feature.id)
 					)
 				: consultees;
+		// the consultees added by hand (`include`) the run found are drawn as identified, and a
+		// category's ones it didn't - further away - are drawn too, as its Change page draws them
+		const included = queryValues(req.query.include);
+		const drawn = [
+			...markAddedByHand(displayMatches, new Set(included)),
+			...(category
+				? addedBeyondRun(
+						consultees,
+						included.map((id) => ({ id, category, name: '' })),
+						category
+					)
+				: [])
+		];
 		// same search area as the interactive map, so both open on the same view
-		const searchArea = await buildSearchAreaSafely(
-			db,
-			project,
-			displayMatches,
-			service.nearbySearchRadiusMetres,
-			logger
-		);
+		const searchArea = await buildSearchAreaSafely(db, project, drawn, service.nearbySearchRadiusMetres, logger);
 		// a category's map is framed as config/report.yaml sets for the category
 		const map = buildCaseMapConfig(
 			project,
-			markAddedByHand(displayMatches, new Set(queryValues(req.query.include))),
+			drawn,
 			category || ruleset.name,
 			searchArea,
 			undefined,

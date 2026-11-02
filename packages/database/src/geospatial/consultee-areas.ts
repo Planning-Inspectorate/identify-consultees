@@ -392,14 +392,17 @@ export async function bufferGeometryForDisplay(
  * areas - counties, police forces, health boards - are detailed, coastline and all: at a flat 25m,
  * the areas within 20km of Norwich to Tilbury come to ~3.8MB; simplified by size, ~1.5MB.
  * Display only - never measure distances on these. Ids with no matching row, or not touching
- * `window`, are absent.
+ * `window`, are absent. With no `window`, every one found is - as for consultees added by hand from
+ * anywhere in the reference data.
  */
 export async function getConsulteeAreaDisplayGeometries(
 	dbClient: PrismaClient,
 	ids: string[],
-	window: Geometry
+	window?: Geometry
 ): Promise<Map<string, Geometry>> {
-	const windowWkt = geometryToWkt(window);
+	const touchesWindow = window
+		? Prisma.sql`AND geometrySimplified.STIntersects(geography::STGeomFromText(${geometryToWkt(window)}, 4326)) = 1`
+		: Prisma.empty;
 	const geometries = new Map<string, Geometry>();
 	for (let i = 0; i < ids.length; i += GEOMETRY_LOOKUP_BATCH_SIZE) {
 		const batch = ids.slice(i, i + GEOMETRY_LOOKUP_BATCH_SIZE);
@@ -415,7 +418,7 @@ export async function getConsulteeAreaDisplayGeometries(
 					END AS metres
 				) AS tolerance
 				WHERE id IN (${Prisma.join(batch)})
-					AND geometrySimplified.STIntersects(geography::STGeomFromText(${windowWkt}, 4326)) = 1
+					${touchesWindow}
 			`
 		);
 		for (const row of rows) {

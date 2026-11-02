@@ -286,6 +286,36 @@ describe('buildSearchAreaSafely', () => {
 		assert.equal($queryRaw.mock.callCount(), 3);
 	});
 
+	it('draws a consultee added by hand wherever it is, not only where it touches the search area', async () => {
+		// whether each query was limited to the search area - its window is a nested SQL fragment
+		const windowed: { table: string; windowed: boolean }[] = [];
+		const $queryRaw = mock.fn(async (sql: TemplateStringsArray, ...values: unknown[]) => {
+			const text = sql.join('');
+			if (!/\bFROM\b/.test(text)) return [{ wkt: 'POINT(-1.5 52.5)' }];
+			windowed.push({
+				table: text.includes('FROM consultee_area') ? 'consultee_area' : 'case_boundary',
+				windowed: values.some((value) => String((value as { sql?: string })?.sql).includes('STIntersects'))
+			});
+			return [];
+		});
+		const added = { ...parish, feature: { ...parish.feature, id: 'cccccccc-0000-0000-0000-000000000003' } };
+		await buildSearchAreaSafely(
+			{ $queryRaw } as unknown as RulesetRunService['db'],
+			project(),
+			[parish, { ...added, addedByHand: true }, { ...nsip, addedByHand: true }],
+			20_000,
+			mockLogger()
+		);
+		assert.deepStrictEqual(
+			windowed.toSorted((a, b) => a.table.localeCompare(b.table) || Number(b.windowed) - Number(a.windowed)),
+			[
+				{ table: 'case_boundary', windowed: false },
+				{ table: 'consultee_area', windowed: true },
+				{ table: 'consultee_area', windowed: false }
+			]
+		);
+	});
+
 	it('looks up no case boundaries when there are no Nearby NSIPs', async () => {
 		const $queryRaw = mock.fn(async (sql: TemplateStringsArray) =>
 			/\bFROM\b/.test(sql.join('')) ? [] : [{ wkt: 'POINT(-1.5 52.5)' }]

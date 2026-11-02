@@ -515,12 +515,13 @@ export async function findOtherCases(dbClient: PrismaClient, caseId: string): Pr
  * for those that touch `window`, simplified more the larger they are, as
  * getConsulteeAreaDisplayGeometries simplifies consultee areas. Display only - never measure
  * distances on these. Ids with no matching row, or not touching `window`, are absent; ids come
- * back lowercase, as the maps give them.
+ * back lowercase, as the maps give them. With no `window`, every one found is - as for a case added
+ * by hand from further than Nearby NSIPs look.
  */
 export async function getCaseBoundaryDisplayGeometries(
 	dbClient: PrismaClient,
 	ids: string[],
-	window: Geometry
+	window?: Geometry
 ): Promise<Map<string, Geometry>> {
 	const geometries = new Map<string, Geometry>();
 	if (ids.length === 0) {
@@ -538,7 +539,11 @@ export async function getCaseBoundaryDisplayGeometries(
 				END AS metres
 			) AS tolerance
 			WHERE id IN (${Prisma.join(ids)})
-				AND geometrySimplified.STIntersects(geography::STGeomFromText(${geometryToWkt(window)}, 4326)) = 1
+				${
+					window
+						? Prisma.sql`AND geometrySimplified.STIntersects(geography::STGeomFromText(${geometryToWkt(window)}, 4326)) = 1`
+						: Prisma.empty
+				}
 		`
 	);
 	for (const row of rows) {

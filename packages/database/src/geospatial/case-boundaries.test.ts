@@ -533,6 +533,9 @@ describe('case boundaries (requires a local SQL Server - see docker-compose.yml)
 			assert.deepEqual([...geometries.keys()], [ids.near]);
 			assert.equal(geometries.get(ids.near)?.type, 'Polygon');
 			assert.deepEqual(await getCaseBoundaryDisplayGeometries(dbClient, [], window), new Map());
+			// with no window - a case added by hand from further away - the far one is drawn too
+			const anywhere = await getCaseBoundaryDisplayGeometries(dbClient, [ids.near, ids.far]);
+			assert.deepEqual([...anywhere.keys()].toSorted(), [ids.near, ids.far.toLowerCase()].toSorted());
 		} finally {
 			await cleanupCases();
 		}

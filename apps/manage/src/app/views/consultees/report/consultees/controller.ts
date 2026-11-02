@@ -5,7 +5,7 @@ import type { ConsulteeMatch, Ruleset } from '@pins/identify-consultees-database
 import { isIdentified } from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
 import type { AsyncRequestHandler } from '@planning-inspectorate/core/util';
 import type { Request, Response } from 'express';
-import { buildCaseMapConfig, markAddedByHand } from '../../../../maps/case-geojson.ts';
+import { addedBeyondRun, buildCaseMapConfig, markAddedByHand } from '../../../../maps/case-geojson.ts';
 import { MAP_VIEWPORT } from '../../../../maps/sample-geojson.ts';
 import { categorySettings } from '../../../../report-config.ts';
 import { NEARBY_NSIPS } from '../../nearby-nsips.ts';
@@ -119,10 +119,15 @@ async function renderCategoryPage(
 		(match) => match.feature.properties.consulteeCategory === category && !excluded.has(match.feature.id)
 	);
 	const identified = visible.filter(isIdentified);
+	// and the ones added by hand from further away than the run looked
+	const drawn = [
+		...markAddedByHand(visible, addedMatchIds(selection.adds)),
+		...addedBeyondRun(consultees, selection.adds, category)
+	];
 	const searchArea = await buildSearchAreaSafely(
 		service.db,
 		project,
-		visible,
+		drawn,
 		service.nearbySearchRadiusMetres,
 		service.logger
 	);
@@ -130,7 +135,7 @@ async function renderCategoryPage(
 	const staticMapAlt = `Static map showing ${category} consultees for ${project.properties.caseName}`;
 	const map = buildCaseMapConfig(
 		project,
-		markAddedByHand(visible, addedMatchIds(selection.adds)),
+		drawn,
 		category,
 		searchArea,
 		{ src: staticMapSrc, alt: staticMapAlt },

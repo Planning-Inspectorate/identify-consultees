@@ -232,6 +232,14 @@ test.describe('manage journeys', () => {
 		await expect(page).toHaveURL(/\/report\/consultees\?.*category=Parish.*add=/);
 		await expect(page.getByRole('rowheader', { name: 'First Test Consultee' })).toBeVisible();
 		await expect(page.getByText('Entered first')).toBeVisible();
+		// it's far from the site - beyond where the run looked - but the map draws it all the same, as
+		// identified, and the static map's link carries it
+		const mapConfig = JSON.parse((await page.locator('#case-map-data').textContent()) ?? '{}');
+		const drawnFirst = mapConfig.consulteeGeojson.features.find(
+			(feature: { id: string }) => feature.id === E2E_ADDED_CONSULTEES[0].id
+		);
+		expect(drawnFirst?.properties.identified).toBe('true');
+		expect(mapConfig.fallback.src).toContain(`include=${E2E_ADDED_CONSULTEES[0].id}`);
 
 		// back on the add page, with nearby consultees to suggest, the GOV.UK accessible autocomplete
 		// offers them as a name is typed - picking one adds it by name, and the map draws it as
