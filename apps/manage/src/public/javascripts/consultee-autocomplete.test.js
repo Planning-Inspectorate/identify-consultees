@@ -12,7 +12,7 @@ import {
 
 const FORM = `
 	<form>
-		<label for="consultee-name">Name of consultee</label>
+		<label for="consultee-name">Name</label>
 		<input class="govuk-input govuk-input--error" id="consultee-name" name="name" value="Bar"
 			list="nearby-consultees" data-consultee-autocomplete>
 		<datalist id="nearby-consultees">
