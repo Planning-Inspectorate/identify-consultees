@@ -14,6 +14,12 @@
 # dir has neither problem - it just costs one ~50MB download on agents whose
 # image is behind, and is a no-op once the image ships a compliant <major>.x.
 #
+# When no <major>.x is preinstalled at all, node_script.yml itself falls back
+# to `nvm install <major>` in that shared dir before this script runs - jobs
+# pre-warm the shared dir once via ci-preinstall-node.sh instead (see the first
+# step of each job), which does the install under stale-lock stealing and a
+# longer timeout so template `nvm use` never touches the lock.
+#
 # Deliberately no `set -u`: sourced into the step's shell, it would leak.
 MAJOR="${1:?usage: source scripts/ci-use-latest-node.sh <node-major>}"
 

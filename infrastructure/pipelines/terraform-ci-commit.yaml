@@ -34,6 +34,10 @@ extends:
                 npm | "$(Agent.OS)" | package-lock.json
               path: $(Pipeline.Workspace)/.npm
             displayName: Cache NPM
+          # pre-warm the pool's shared nvm so the node_script steps below only
+          # `nvm use` an installed 26.x - see scripts/ci-preinstall-node.sh
+          - script: bash scripts/ci-preinstall-node.sh 26
+            displayName: 'Pre-install Node 26 into shared nvm'
           - template: ../steps/node_script.yml
             parameters:
               displayName: 'npm ci'
