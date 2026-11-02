@@ -95,15 +95,13 @@ def cbos_health(req: func.HttpRequest) -> func.HttpResponse:
 
 @app.route(route="cbos/boundary-files")
 def cbos_boundary_files(req: func.HttpRequest) -> func.HttpResponse:
-    """Every case boundary file CBOS has converted to GeoJSON - or, with ?caseReference=, one case's
-    (when CBOS says a case's boundary changed) - see cbos/boundaries.py."""
+    """Every case boundary file CBOS has converted to GeoJSON - see cbos/boundaries.py."""
     auth_error = _check_api_key(req)
     if auth_error is not None:
         return auth_error
 
-    case_reference = (req.params.get("caseReference") or "").strip() or None
     try:
-        files = list_boundary_files(cbos_config_from_env(), default_credential(), case_reference)
+        files = list_boundary_files(cbos_config_from_env(), default_credential())
     except CbosNotConfigured as error:
         return _json_response({"error": str(error)}, 500)
     except Exception:

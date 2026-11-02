@@ -7,7 +7,7 @@ Terraform for the service's Azure resources, in four environments: **Dev**, **Te
 | `app-service-plan.tf` | The App Service plan the apps run on |
 | `app-web.tf` | The web app (`apps/manage`, the `consultees/web` image) with its staging slot and session secret |
 | `app-function.tf` | The Python Function App (`apps/function-python`) behind a private endpoint, and its `x-api-key` secret in Key Vault |
-| `idas-back-office.tf` | Read access to CBOS (the IDAS back office): its database's settings, `Storage Blob Data Reader` on its document container, the VNet peering, and (with `cbos_subscriber_enabled`) the web app's subscription to its `nsip-document` topic. Its database permissions are granted in SQL, not here |
+| `idas-back-office.tf` | Read access to CBOS (the IDAS back office): its database's settings, `Storage Blob Data Reader` on its document container, and the VNet peering. Its database permissions are granted in SQL, not here |
 | `database.tf`, `database-secondary.tf` | Azure SQL server and database, and the secondary region where configured |
 | `storage.tf` | The reference data storage account and its `data` container, for uploads and imports |
 | `app-managed-redis.tf` | Azure Managed Redis for the web app's sessions |
