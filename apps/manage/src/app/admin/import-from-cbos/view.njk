@@ -76,6 +76,13 @@
         lists them all to pick from; elsewhere, as for Nearby NSIPs, a case is its newest boundary.
     </p>
 
+    {% if schedule %}
+        <p class="govuk-body">
+            The service also imports from CBOS on its own every day at {{ schedule }} (UK time), so
+            you only need this button for a case added since the last one.
+        </p>
+    {% endif %}
+
     <p class="govuk-body">
         It can take several minutes. If the page times out, the import carries on: reload this page
         in a few minutes and check the counts, rather than importing again.

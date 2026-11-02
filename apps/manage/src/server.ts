@@ -1,5 +1,6 @@
 import { ManageService } from '#service';
 import { sleep } from '@planning-inspectorate/core/util';
+import { startScheduledCbosImport } from './app/admin/import-from-cbos/scheduled-import.ts';
 import { createApp, prepareStaticAssetServing } from './app/app.ts';
 import { loadConfig } from './app/config.ts';
 
@@ -50,3 +51,10 @@ app.set('http-port', config.httpPort);
 app.listen(app.get('http-port'), () => {
 	service.logger.info(`Server is running at http://localhost:${app.get('http-port')} in ${app.get('env')} mode`);
 });
+
+// import CBOS's boundaries at set hours - only where they're set (the live app, not the staging
+// slot or a local run; see config.ts)
+const stopCbosImport = startScheduledCbosImport(service);
+if (stopCbosImport) {
+	process.once('SIGTERM', stopCbosImport);
+}

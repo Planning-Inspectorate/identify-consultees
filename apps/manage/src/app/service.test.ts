@@ -12,6 +12,7 @@ describe('ManageService', () => {
 			assert.equal(service.authConfig.clientId, 'client-id');
 			assert.equal(service.pythonFunctionUrl, config.pythonFunctionUrl);
 			assert.equal(service.pythonFunctionApiKey, config.pythonFunctionApiKey);
+			assert.deepEqual(service.cbosImportHours, config.cbosImportHours);
 			assert.equal(service.blobStoreConfig, config.blobStore);
 			assert.equal(service.nearbyConsulteeRadiusMetres, config.nearbyConsulteeRadiusMetres);
 			assert.equal(service.nearbyNsipRadiusMetres, config.nearbyNsipRadiusMetres);

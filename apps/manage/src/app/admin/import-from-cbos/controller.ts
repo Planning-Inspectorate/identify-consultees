@@ -6,6 +6,16 @@ import type { ImportFromCbosViewModel } from './view-model.ts';
 const VIEW = 'admin/import-from-cbos/view.njk';
 const PAGE_HEADING = 'Import cases from CBOS';
 
+/** The hours the app imports on its own, for the page: "07:00, 10:00 and 13:00". */
+export function scheduleText(hours: number[]): string | undefined {
+	const times = hours.map((hour) => `${String(hour).padStart(2, '0')}:00`);
+	return times.length > 1 ? `${times.slice(0, -1).join(', ')} and ${times.at(-1)}` : times[0];
+}
+
+function newViewModel(service: Pick<ManageService, 'cbosImportHours'>): ImportFromCbosViewModel {
+	return { pageHeading: PAGE_HEADING, schedule: scheduleText(service.cbosImportHours) };
+}
+
 /**
  * The cases and case boundaries in the database now, in all and from CBOS. An import of every CBOS
  * boundary can outlast Front Door's response timeout - the browser then shows an error while the
@@ -34,7 +44,7 @@ async function withLoadedCounts(
 
 export function buildImportFromCbosPage(service: ManageService): AsyncRequestHandler {
 	return async (req, res) => {
-		return res.render(VIEW, await withLoadedCounts(service, { pageHeading: PAGE_HEADING }));
+		return res.render(VIEW, await withLoadedCounts(service, newViewModel(service)));
 	};
 }
 
@@ -51,7 +61,7 @@ export function buildRunImportFromCbos(
 	const { db, logger } = service;
 
 	return async (req, res) => {
-		const viewModel: ImportFromCbosViewModel = { pageHeading: PAGE_HEADING };
+		const viewModel = newViewModel(service);
 		const options = { pythonFunctionUrl: service.pythonFunctionUrl, apiKey: service.pythonFunctionApiKey };
 
 		try {
