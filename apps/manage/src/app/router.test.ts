@@ -315,7 +315,7 @@ describe('manage router wiring', () => {
 		);
 		assert.equal(response.status, 200);
 		assert.match(response.text, /Add a consultee/);
-		assert.match(response.text, /Name of consultee/);
+		assert.match(response.text, /<label class="govuk-label govuk-label--m" for="consultee-name">\s*Name\s*<\/label>/);
 		assert.match(response.text, /Reason for adding/);
 		assert.match(response.text, /<script defer src="\/assets\/js\/accessible-autocomplete\.min[^"]*\.js">/);
 		assert.match(response.text, /<script type="module" src="\/javascripts\/consultee-autocomplete[^"]*\.js">/);

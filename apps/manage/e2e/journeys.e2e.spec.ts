@@ -206,7 +206,7 @@ test.describe('manage journeys', () => {
 		await page.getByRole('button', { name: 'Add a consultee' }).click();
 		await expect(page).toHaveURL(/\/report\/consultees\/add\?.*category=Parish/);
 		await expect(page.getByRole('heading', { level: 1 })).toContainText('Add a consultee');
-		const nameInput = page.getByLabel('Name of consultee');
+		const nameInput = page.getByLabel('Name', { exact: true });
 		// the add page's own submit button - "Add consultee" - not the category page's "Add a consultee" link
 		const addButton = page.getByRole('button', { name: 'Add consultee' });
 		await addButton.click();
@@ -224,6 +224,16 @@ test.describe('manage journeys', () => {
 		await addButton.click();
 		await expect(page.getByText('There is a problem')).toBeVisible();
 		await expect(page.getByRole('link', { name: 'Consultee not found' })).toBeVisible();
+
+		// Back leaves without adding what was typed: the category page lists what it did before
+		await nameInput.fill('First Test Consultee');
+		await page.getByRole('link', { name: 'Back', exact: true }).click();
+		await expect(page).toHaveURL(/\/report\/consultees\?.*category=Parish/);
+		expect(new URL(page.url()).searchParams.getAll('add')).toEqual([]);
+		await expect(page.getByRole('rowheader', { name: 'First Test Consultee' })).toHaveCount(0);
+		await expect(page.getByRole('link', { name: /Remove/ })).toHaveCount(parishCount - removed);
+		await page.getByRole('button', { name: 'Add a consultee' }).click();
+		await page.getByLabel('Reason for adding').fill('Entered first');
 
 		// adding a consultee returns to the category page with it listed below the map - and any
 		// number can be added one at a time
