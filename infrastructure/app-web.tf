@@ -78,6 +78,16 @@ module "app_web" {
     # from the Docker image (node:24-alpine in apps/manage/Dockerfile). Set to a
     # supported value anyway so Azure Advisor stops flagging it as unconfigured.
     WEBSITE_NODE_DEFAULT_VERSION = "~24"
+
+    # import every CBOS boundary at these hours, UK time (apps/manage - scheduled-import.ts). Off
+    # in the staging slot (below)
+    CBOS_IMPORT_HOURS = var.cbos_import_hours
+  }
+
+  # sticky to its slot: only the live app imports from CBOS - a staging slot running the next
+  # release mustn't import too
+  slot_setting_overrides = {
+    CBOS_IMPORT_HOURS = ""
   }
 
   providers = {

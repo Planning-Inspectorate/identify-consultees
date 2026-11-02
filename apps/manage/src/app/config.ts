@@ -44,6 +44,11 @@ export interface Config extends BaseConfig {
 	// NODE_ENV=production, so that alone can't gate them. TEMPORARY - remove before go-live
 	// (see kt-docs/overview.md's "Before go-live").
 	testFaultsEnabled: boolean;
+	// the hours of the day, UK time, the app imports every CBOS boundary on its own - as the admin
+	// page's button does (admin/import-from-cbos/scheduled-import.ts). From CBOS_IMPORT_HOURS
+	// ("7,10,13,16,19"); empty - off - unless set, and the staging slot has it off
+	// (infrastructure/app-web.tf), so only the live app imports
+	cbosImportHours: number[];
 	auth: {
 		authority: string;
 		clientId: string;
@@ -56,6 +61,19 @@ export interface Config extends BaseConfig {
 		redirectUri: string;
 		signoutUrl: string;
 	};
+}
+
+/** CBOS_IMPORT_HOURS's hours, in order: whole hours 0 to 23, comma separated. Unset or empty is none. */
+export function parseImportHours(value: string | undefined): number[] {
+	const parts = (value ?? '')
+		.split(',')
+		.map((part) => part.trim())
+		.filter(Boolean);
+	const hours = parts.map(Number);
+	if (hours.some((hour) => !Number.isInteger(hour) || hour < 0 || hour > 23)) {
+		throw new Error(`CBOS_IMPORT_HOURS must be whole hours from 0 to 23, comma separated, not "${value}"`);
+	}
+	return [...new Set(hours)].toSorted((a, b) => a - b);
 }
 
 // cache the config
@@ -88,6 +106,7 @@ export function loadConfig(): Config {
 		AUTH_GROUP_APPLICATION_ACCESS,
 		AUTH_TENANT_ID,
 		BLOB_STORE_HOST,
+		CBOS_IMPORT_HOURS,
 		BLOB_STORE_CONTAINER,
 		CACHE_CONTROL_MAX_AGE,
 		ENABLE_DEV_PAGES,
@@ -153,6 +172,7 @@ export function loadConfig(): Config {
 		boundingBoxAbovePoints: screening.boundingBoxAbovePoints,
 		devPagesEnabled: !isProduction || ENABLE_DEV_PAGES === 'true',
 		testFaultsEnabled: ENVIRONMENT !== 'prod',
+		cbosImportHours: parseImportHours(CBOS_IMPORT_HOURS),
 		auth: {
 			authority: `https://login.microsoftonline.com/${AUTH_TENANT_ID}`,
 			clientId: AUTH_CLIENT_ID || '',

@@ -43,6 +43,12 @@ variable "apps_config" {
   })
 }
 
+variable "cbos_import_hours" {
+  description = "The hours of the day, UK time, the web app imports every case boundary from CBOS - comma separated, or empty for none"
+  type        = string
+  default     = "7,10,13,16,19"
+}
+
 variable "common_config" {
   description = "Config for the common resources, such as action groups"
   type = object({

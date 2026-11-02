@@ -126,10 +126,12 @@ CBOS (the IDAS back office) is PINS's system of record for cases. A case officer
 - A case keeps every boundary it's had: its boundary page lists them all to pick from, and everywhere else (search, Nearby NSIPs) a case is its newest.
 - A file's features (a site and its access routes, say) become one MultiPolygon. The loader corrects winding and runs `MakeValid()` as for any import.
 - The project name is CBOS's current case title, not the one stamped on the GeoJSON.
-- `acceptance` is the case's stage now, labelled as CBOS labels it: Pre-Application, Acceptance, Pre-Examination, Examination, Recommendation, Decision, Post-Decision or Withdrawn (the `CaseStatus` row that's `valid`; any other value, such as a draft case's, is left blank). The search page shows it as a tag. It's the stage when the import last ran, so run it again to bring stages up to date. If the function can't read `CaseStatus`, the files are still imported, without stages, and the function logs a warning.
+- `acceptance` is the case's stage now, labelled as CBOS labels it: Pre-Application, Acceptance, Pre-Examination, Examination, Recommendation, Decision, Post-Decision or Withdrawn (the `CaseStatus` row that's `valid`; any other value, such as a draft case's, is left blank). The search page shows it as a tag. It's the stage when the import last ran, which it does several times a day (below). If the function can't read `CaseStatus`, the files are still imported, without stages, and the function logs a warning.
 - A file whose coordinates aren't longitude and latitude is turned away. CBOS only reprojects when the ZIP has a `.prj` file, and accepts one without.
 - `metadata` records `source: "cbos"` and the CBOS document id and version.
 - It merges and never deletes. A file that can't be read is listed on the page and skipped.
+
+**It also runs on its own** at 07:00, 10:00, 13:00, 16:00 and 19:00 UK time (`scheduled-import.ts`, started by `server.ts`): the same import, so new cases, boundaries and stages arrive without anyone pressing the button, and the page says when. The hours are the web app's `CBOS_IMPORT_HOURS` setting (Terraform's `cbos_import_hours`; empty turns it off). The staging slot has it empty, as a sticky slot setting, so only the live app imports. An hour's import starts within its first 15 minutes (a restart at 10:05 still runs it) and once; one still running when the next is due isn't started twice. It logs "Scheduled CBOS import finished" with the counts, files it couldn't import as a warning, and a failure as an error, then tries again at the next hour.
 
 Nothing else is done to the geometry: screening simplifies the site to 10m when it runs, as for any boundary.
 

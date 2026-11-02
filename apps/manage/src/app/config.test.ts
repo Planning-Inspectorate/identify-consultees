@@ -3,7 +3,7 @@ import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, test } from 'node:test';
-import { loadConfig, resetConfigCache } from './config.ts';
+import { loadConfig, parseImportHours, resetConfigCache } from './config.ts';
 import { loadNearbyConsultees } from './nearby-consultees.ts';
 import { loadScreeningConfig } from './screening-config.ts';
 
@@ -24,6 +24,7 @@ const managedKeys = [
 	'AUTH_TENANT_ID',
 	'BLOB_STORE_CONTAINER',
 	'BLOB_STORE_HOST',
+	'CBOS_IMPORT_HOURS',
 	'ENABLE_DEV_PAGES',
 	'ENVIRONMENT',
 	'LOG_LEVEL',
@@ -179,6 +180,20 @@ describe('manage loadConfig', () => {
 		// unset/empty where there is no deployment environment (local runs)
 		setBaseEnv({ AUTH_DISABLED: 'true', ENVIRONMENT: '' });
 		assert.equal(loadConfig().testFaultsEnabled, true);
+	});
+
+	test('reads the hours CBOS is imported at, off unless they are set', () => {
+		setBaseEnv({ AUTH_DISABLED: 'true', CBOS_IMPORT_HOURS: '' });
+		assert.deepEqual(loadConfig().cbosImportHours, []);
+
+		resetConfigCache();
+		setBaseEnv({ AUTH_DISABLED: 'true', CBOS_IMPORT_HOURS: ' 19,7, 13,7 ' });
+		assert.deepEqual(loadConfig().cbosImportHours, [7, 13, 19]);
+
+		resetConfigCache();
+		setBaseEnv({ AUTH_DISABLED: 'true', CBOS_IMPORT_HOURS: '7,24' });
+		assert.throws(() => loadConfig(), /CBOS_IMPORT_HOURS must be whole hours from 0 to 23/);
+		assert.throws(() => parseImportHours('7am'), /not "7am"/);
 	});
 
 	test('returns cached config on subsequent calls', () => {
