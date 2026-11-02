@@ -1,6 +1,6 @@
 # Web app
 
-`apps/manage`: Express, Nunjucks and GOV.UK Frontend on Node 24. Pages are server-rendered. Client JS only enhances them, mainly the maps.
+`apps/manage`: Express, Nunjucks and GOV.UK Frontend on Node 26. Pages are server-rendered. Client JS only enhances them, mainly the maps.
 
 ## Layout
 

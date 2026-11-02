@@ -4,7 +4,7 @@
 # carried 24.21.0 when engines.node already floored at ^24.22.1 (October 2026
 # security release). Source this before `npm ci` (or any engines-gated step):
 #
-#   source scripts/ci-use-latest-node.sh 24 && npm ci
+#   source scripts/ci-use-latest-node.sh 26 && npm ci
 #
 # When the newest installed <major>.x fails check-toolchain, it installs the
 # true latest into a *private* nvm dir under mktemp. The pool shares
@@ -12,7 +12,7 @@
 # per-version lock (losers wait out a 600s timeout then fail, and a dead holder
 # leaves the lock stale), and the dir may not even be agent-writable. A private
 # dir has neither problem - it just costs one ~50MB download on agents whose
-# image is behind, and is a no-op once the image ships a compliant 24.x.
+# image is behind, and is a no-op once the image ships a compliant <major>.x.
 #
 # Deliberately no `set -u`: sourced into the step's shell, it would leak.
 MAJOR="${1:?usage: source scripts/ci-use-latest-node.sh <node-major>}"

@@ -1,12 +1,12 @@
 # Stage 1/2 - Builder
-# Major-only tag on purpose: tracks the latest Node 24.x (matching .nvmrc and
-# engines.node ^24.22.1) so the image picks up minor/patch releases without a code
+# Major-only tag on purpose: tracks the latest Node 26.x (matching .nvmrc and
+# engines.node ^26.13.0) so the image picks up minor/patch releases without a code
 # change. engines.npm is a >=11 floor, so the bundled npm always satisfies
 # engine-strict - no EBADENGINE drift.
-FROM node:24-alpine AS base
+FROM node:26-alpine AS base
 
 # npm nags about newer npm releases on every command; the image ships whatever
-# npm the current Node 24.x bundles so the notice is never actionable here.
+# npm the current Node 26.x bundles so the notice is never actionable here.
 ENV npm_config_update_notifier=false
 # npm still needs a cache dir the runtime user can write
 ENV npm_config_cache=/home/node/.npm

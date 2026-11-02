@@ -20,8 +20,8 @@ The function needs Azure Functions Core Tools (`npm install -g azure-functions-c
 
 | Tool    | Version                                                                                                     |
 | ------- | ----------------------------------------------------------------------------------------------------------- |
-| Node.js | 24.x, from `.nvmrc`. `engines` enforces `^24.22.1` (October 2026 security release floor)                    |
-| npm     | 11+, bundled with Node 24                                                                                   |
+| Node.js | 26.x, from `.nvmrc`. `engines` enforces `^26.13.0` (first Node 26 LTS release)                              |
+| npm     | 11+, bundled with Node 26                                                                                   |
 | Docker  | Recent; SQL Server needs `GEOGRAPHY`, so not Azure SQL Edge. On Apple Silicon it runs under amd64 emulation |
 | Python  | 3.12, for the function                                                                                      |
 

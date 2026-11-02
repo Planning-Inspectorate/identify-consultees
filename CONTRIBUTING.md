@@ -4,10 +4,10 @@ Thank you for contributing to Identify consultees. This guide covers how to set 
 
 ## Prerequisites
 
-- Node.js **24** (latest 24.x LTS — `.nvmrc` pins the major only) and the bundled **npm 11+** (see `package.json` `engines` — same as Azure Pipelines)
+- Node.js **26** (latest 26.x LTS — `.nvmrc` pins the major only) and the bundled **npm 11+** (see `package.json` `engines` — same as Azure Pipelines)
 - Docker (for the local database)
 
-Use `nvm use` then `npm ci`. Do not regenerate the lockfile under a different Node/npm major (e.g. Node 26 / npm 12). Run `npm run check-toolchain` if unsure. Toolchain rules for agents are in [AGENTS.md](./AGENTS.md).
+Use `nvm use` then `npm ci`. Do not regenerate the lockfile under a different Node/npm major (e.g. Node 24 / npm 12). Run `npm run check-toolchain` if unsure. Toolchain rules for agents are in [AGENTS.md](./AGENTS.md).
 
 ## Getting started
 
