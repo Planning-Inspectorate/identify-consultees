@@ -4,7 +4,7 @@ import { formatDate } from './workbook.ts';
 
 /**
  * One category's map as a PDF, for the report download: an A4 landscape page with the category's
- * static map and a key, then the category's consultees in the report, with why each is in it.
+ * static map, a scale bar and a key, then the category's consultees in the report, with why each is in it.
  */
 
 /** A consultee as the map PDF lists it. */
@@ -26,6 +26,8 @@ export interface MapPdfInput {
 	category: string;
 	/** The static map as a PNG. */
 	image: Buffer;
+	/** How many metres a pixel of `image` covers, at its centre - for the scale bar. */
+	metresPerPixel: number;
 	/** The colours the map draws the category's consultees and the site in, for the key. */
 	colours: { consultee: string; site: string; siteFillOpacity: number };
 	/** The ruleset's buffers the map draws around the site - `2 km`, `10 km` - for the key. */
@@ -79,6 +81,55 @@ function dashedSwatch(doc: PDFKit.PDFDocument, x: number, y: number): void {
 		.lineTo(x + SWATCH * 2, y + SWATCH / 2)
 		.stroke()
 		.restore();
+}
+
+/** A PNG's width and height in pixels, from its header. */
+function pngSize(png: Buffer): { width: number; height: number } {
+	return { width: png.readUInt32BE(16), height: png.readUInt32BE(20) };
+}
+
+// the longest the scale bar is drawn, in points, and how far in from the map's corner
+const SCALE_BAR_MAX_LENGTH = 150;
+const SCALE_BAR_INSET = 8;
+
+/**
+ * The scale bar for a map with `metresPerPoint`: the longest round distance - 1, 2 or 5 times a
+ * power of ten metres - that fits in `maxLength` points, its length in points, and its label.
+ */
+export function scaleBar(metresPerPoint: number, maxLength: number): { length: number; label: string } {
+	const longest = metresPerPoint * maxLength;
+	const power = 10 ** Math.floor(Math.log10(longest));
+	const metres = [5, 2, 1].map((step) => step * power).find((distance) => distance <= longest)!;
+	return { length: metres / metresPerPoint, label: metres < 1000 ? `${metres} m` : `${metres / 1000} km` };
+}
+
+/**
+ * A scale bar in the bottom left corner of the map, on a white panel so it reads over any
+ * basemap: a bar, its first half filled as a printed map's, and the distance it covers.
+ */
+function drawScaleBar(doc: PDFKit.PDFDocument, left: number, bottom: number, metresPerPoint: number): void {
+	const { length, label } = scaleBar(metresPerPoint, SCALE_BAR_MAX_LENGTH);
+	doc.font('Helvetica').fontSize(9);
+	const [padding, barHeight, panelHeight] = [6, 5, 18];
+	const x = left + SCALE_BAR_INSET;
+	const y = bottom - SCALE_BAR_INSET - panelHeight;
+	const panelWidth = padding + length + padding + doc.widthOfString(label) + padding;
+	doc.save().fillColor('#ffffff').fillOpacity(0.85).rect(x, y, panelWidth, panelHeight).fill().restore();
+	const barTop = y + (panelHeight - barHeight) / 2;
+	doc
+		.save()
+		.fillColor(TEXT_COLOUR)
+		.rect(x + padding, barTop, length / 2, barHeight)
+		.fill()
+		.restore();
+	doc
+		.save()
+		.strokeColor(TEXT_COLOUR)
+		.lineWidth(0.75)
+		.rect(x + padding, barTop, length, barHeight)
+		.stroke()
+		.restore();
+	doc.fillColor(TEXT_COLOUR).text(label, x + padding + length + padding, y + 5, { lineBreak: false });
 }
 
 // how many of the projects' colours the key shows, side by side, for "a colour per project"
@@ -154,6 +205,15 @@ export function buildMapPdf(input: MapPdfInput): Promise<Buffer> {
 
 	const mapTop = doc.y;
 	doc.image(input.image, MARGIN, mapTop, { fit: [width, MAP_HEIGHT], align: 'center' });
+	// where the image lands: fitted to the map's box, centred across it
+	const image = pngSize(input.image);
+	const pointsPerPixel = Math.min(width / image.width, MAP_HEIGHT / image.height);
+	drawScaleBar(
+		doc,
+		MARGIN + (width - image.width * pointsPerPixel) / 2,
+		mapTop + image.height * pointsPerPixel,
+		input.metresPerPixel / pointsPerPixel
+	);
 	const projectColours = input.consultees.flatMap((consultee) => (consultee.colour ? [consultee.colour] : []));
 	drawKey(doc, mapTop + MAP_HEIGHT + 10, input.colours, input.buffers, projectColours);
 	if (input.mapNote) {

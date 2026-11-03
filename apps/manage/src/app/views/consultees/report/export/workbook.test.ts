@@ -235,7 +235,7 @@ describe('report workbook', () => {
 				'A parish with a town council',
 				'Stored region',
 				'"B" host Parish Councils: intersects the site',
-				'Ruleset',
+				'Test ruleset ruleset',
 				1
 			],
 			// added by hand, with the default reason
@@ -249,7 +249,7 @@ describe('report workbook', () => {
 				null,
 				'Feature region',
 				'"B" host Parish Councils: intersects the site',
-				'Ruleset',
+				'Test ruleset ruleset',
 				null
 			]
 		]);
@@ -604,7 +604,7 @@ tabs:
 			null,
 			null,
 			'"B" host Parish Councils: intersects the site',
-			'Ruleset'
+			'Test ruleset ruleset'
 		]);
 	});
 
@@ -660,6 +660,7 @@ tabs:
 		);
 		const energy = sheets.find((sheet) => sheet.sheet === 'Energy')!;
 		assert.deepStrictEqual(rowValues(energy.data[0]), [
+			'ID',
 			'Consultee',
 			'Category',
 			'Subcategory',
@@ -668,7 +669,6 @@ tabs:
 			'Why identified',
 			'Source',
 			// every attribute the category lists, blank where this consultee has none
-			'Official name',
 			'Operator',
 			'Technology',
 			'Capacity (MW)',
@@ -677,27 +677,18 @@ tabs:
 			'PINS reference',
 			'DUKES reference'
 		]);
-		assert.deepStrictEqual(rowValues(energy.data[1]).slice(-8), [
-			'Solar Farm (England)',
-			null,
-			'Solar',
-			null,
-			null,
-			null,
-			null,
-			null
-		]);
+		assert.deepStrictEqual(rowValues(energy.data[1]).slice(-7), [null, 'Solar', null, null, null, null, null]);
 		const admin = sheets.find((sheet) => sheet.sheet === 'Administrative boundaries')!;
-		// only the attributes listed - CODE and NAME, not FID
+		// only the attributes listed - CODE, not NAME (the Consultee column already has it) or FID
 		assert.deepStrictEqual(rowValues(admin.data[0]), [
+			'ID',
 			'Consultee',
 			'Category',
 			'Why identified',
 			'Source',
-			'Code',
-			'Official name'
+			'External code'
 		]);
-		assert.deepStrictEqual(rowValues(admin.data[1]).slice(-2), ['E04000001', 'Abbey']);
+		assert.deepStrictEqual(rowValues(admin.data[1]).slice(-1), ['E04000001']);
 		// no tab shows a consultee's region
 		assert.ok(sheets.slice(1).every((sheet) => !rowValues(sheet.data[0]).includes('Region')));
 	});
@@ -741,7 +732,7 @@ tabs:
 			'Distance from site (km)',
 			'Consultee area id',
 			'Geometry type',
-			'Source id',
+			'ID',
 			'Group',
 			'Subcategory',
 			'Subcategory description',
@@ -758,14 +749,14 @@ tabs:
 				'Local Authorities',
 				'Active',
 				'Railway line in use',
-				'Ruleset'
+				'Test ruleset ruleset'
 			],
 			[null, 'Picked', 1, 'p', null, null, null, null, null, 'Manually added'],
 			[null, 'Typed', null, null, null, null, null, null, null, 'Manually added']
 		]);
 		assert.deepStrictEqual(
 			admin.columns.map((column) => column.width),
-			[18, 36, 12, 38, 16, 30, 22, 22, 40, 16]
+			[18, 36, 12, 38, 16, 30, 22, 22, 40, 36]
 		);
 	});
 

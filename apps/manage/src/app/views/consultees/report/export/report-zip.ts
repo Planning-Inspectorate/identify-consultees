@@ -18,7 +18,7 @@ import {
 	markAddedByHand,
 	REGIONAL_FILL_OPACITY
 } from '../../../../maps/case-geojson.ts';
-import { computeBounds, computeFittedMapView } from '../../../../maps/geometry-bounds.ts';
+import { computeBounds, computeFittedMapView, metresPerPixel } from '../../../../maps/geometry-bounds.ts';
 import { MAP_VIEWPORT } from '../../../../maps/sample-geojson.ts';
 import { buildConsulteeStaticMapResponse } from '../../../../maps/serve-static-map.ts';
 import { consulteeColours, projectColours } from '../../../../maps/static-map.ts';
@@ -50,18 +50,22 @@ async function consulteeAreaRecords(db: ManageService['db'], ids: string[]): Pro
 
 /**
  * Each Nearby NSIP's row for the report, by id, as a consultee's would be: built from its
- * case_boundary row, with the case's details - and how far it is from the site - as its metadata.
+ * case_boundary row, with the case's details - its stage as CBOS last gave it, and how far it is
+ * from the site when the run found it - as its metadata. For those the run found, and those added
+ * by hand (another case's id).
  */
 async function nearbyNsipRecords(
 	db: ManageService['db'],
-	matches: ConsulteeMatch[]
+	matches: ConsulteeMatch[],
+	addedIds: Iterable<string>
 ): Promise<Map<string, ConsulteeAreaRecord>> {
 	const records = new Map<string, ConsulteeAreaRecord>();
-	if (matches.length === 0) {
+	const distances = new Map(matches.map((match) => [match.feature.id, match.distanceMetres]));
+	const ids = [...new Set([...distances.keys(), ...addedIds])];
+	if (ids.length === 0) {
 		return records;
 	}
-	const distances = new Map(matches.map((match) => [match.feature.id, match.distanceMetres]));
-	const rows = await db.caseBoundary.findMany({ where: { id: { in: [...distances.keys()] } } });
+	const rows = await db.caseBoundary.findMany({ where: { id: { in: ids } } });
 	for (const row of rows) {
 		const id = row.id.toLowerCase();
 		records.set(id, {
@@ -79,7 +83,8 @@ async function nearbyNsipRecords(
 				'Project name': row.caseName,
 				Shapefile: row.fileName,
 				Received: row.receivedDate ? formatDate(row.receivedDate) : null,
-				'Distance (km)': Math.round(distances.get(id)! / 10) / 100
+				Stage: row.acceptance,
+				'Distance (km)': distances.has(id) ? Math.round(distances.get(id)! / 10) / 100 : null
 			}),
 			lastUpdated: row.lastUpdated
 		});
@@ -219,7 +224,11 @@ export function reportMapView(
 async function categoryMap(
 	context: ReportMapsContext,
 	category: string
-): Promise<Pick<MapPdfInput, 'image' | 'colours' | 'buffers' | 'mapNote'> & { projectColours: Map<string, string> }> {
+): Promise<
+	Pick<MapPdfInput, 'image' | 'metresPerPixel' | 'colours' | 'buffers' | 'mapNote'> & {
+		projectColours: Map<string, string>;
+	}
+> {
 	const { service, project, ruleset, consultees, selection } = context;
 	const excluded = excludedMatchIds(selection.removed);
 	const added = addedMatchIds(selection.adds);
@@ -287,6 +296,8 @@ async function categoryMap(
 	});
 	return {
 		image: image.body as Buffer,
+		// for the scale bar - the image has MAP_PIXEL_RATIO pixels to a map pixel
+		metresPerPixel: metresPerPixel(view) / MAP_PIXEL_RATIO,
 		colours,
 		buffers: buffers.map(({ metres }) => formatBufferDistance(metres)),
 		...(mapNote ? { mapNote } : {}),
@@ -330,6 +341,11 @@ export async function buildReportZip({
 	const { db, logger } = service;
 	const excluded = excludedMatchIds(selection.removed);
 	const identified = consultees.filter((match) => isIdentified(match) && !excluded.has(match.feature.id));
+	// a hand-added NSIP is another case - its row is in case_boundary
+	const [addedNsips, addedConsultees] = [
+		selection.adds.filter((add) => add.category === NEARBY_NSIPS),
+		selection.adds.filter((add) => add.category !== NEARBY_NSIPS)
+	];
 	const report = {
 		caseName: project.properties.caseName,
 		caseReference: project.properties.caseReference,
@@ -342,9 +358,9 @@ export async function buildReportZip({
 		records: new Map([
 			...(await consulteeAreaRecords(db, [
 				...identified.filter((match) => !isNearbyNsip(match)).map((match) => match.feature.id),
-				...addedMatchIds(selection.adds)
+				...addedMatchIds(addedConsultees)
 			])),
-			...(await nearbyNsipRecords(db, identified.filter(isNearbyNsip)))
+			...(await nearbyNsipRecords(db, identified.filter(isNearbyNsip), addedMatchIds(addedNsips)))
 		]),
 		// a hand-added consultee the run found has its distance - for the distanceKm column
 		added: selection.adds.map((add) => {

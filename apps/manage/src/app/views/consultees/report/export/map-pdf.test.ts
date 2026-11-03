@@ -2,7 +2,7 @@ import assert from 'node:assert';
 import { describe, it } from 'node:test';
 import { ONE_PIXEL_PNG, pdfTextLines } from '../../../../testing/pdf-text.ts';
 import type { MapPdfInput } from './map-pdf.ts';
-import { buildMapPdf, pdfText } from './map-pdf.ts';
+import { buildMapPdf, pdfText, scaleBar } from './map-pdf.ts';
 
 function input(overrides: Partial<MapPdfInput> = {}): MapPdfInput {
 	return {
@@ -13,6 +13,8 @@ function input(overrides: Partial<MapPdfInput> = {}): MapPdfInput {
 		generatedAt: new Date('2026-10-13T14:00:00Z'),
 		category: 'Parish Council',
 		image: ONE_PIXEL_PNG,
+		// the one pixel is drawn 400pt square - 10 m a point
+		metresPerPixel: 4_000,
 		colours: { consultee: '#4c72b0', site: '#ff0000', siteFillOpacity: 0.2 },
 		buffers: ['2 km', '10 km'],
 		consultees: [
@@ -37,6 +39,8 @@ describe('report map PDF', () => {
 			'Ruleset: Test ruleset   |   Boundary file: site.geojson   |   Generated 13 October 2026'
 		]);
 		for (const line of [
+			// the scale bar: the longest round distance that fits
+			'1 km',
 			'In the report',
 			'The site',
 			'Ruleset buffers (2 km, 10 km)',
@@ -88,6 +92,16 @@ describe('report map PDF', () => {
 		);
 		assert.equal(lines[2], 'Ruleset: Test ruleset   |   Generated 13 October 2026');
 		assert.ok(lines.includes('The consultee areas could not be drawn on this map.'));
+	});
+
+	it('scales its bar to the longest round distance that fits - 1, 2 or 5 of a power of ten metres', () => {
+		// 100pt at 10 m a point is 1 km exactly
+		assert.deepStrictEqual(scaleBar(10, 100), { length: 100, label: '1 km' });
+		assert.deepStrictEqual(scaleBar(30, 100), { length: 2000 / 30, label: '2 km' });
+		assert.deepStrictEqual(scaleBar(60, 100), { length: 5000 / 60, label: '5 km' });
+		// under a kilometre, in metres
+		assert.deepStrictEqual(scaleBar(4, 100), { length: 50, label: '200 m' });
+		assert.deepStrictEqual(scaleBar(0.9, 100), { length: 50 / 0.9, label: '50 m' });
 	});
 
 	it('keeps text the standard PDF fonts can draw, and drops what they cannot', () => {

@@ -24,7 +24,8 @@ export const REPORT_COLUMNS = {
 	subcategoryDescription: 'Subcategory description',
 	distanceKm: 'Distance from site (km)',
 	consulteeAreaId: 'Consultee area id',
-	sourceId: 'Source id',
+	// the reference data's own id - local_authorities_PAR_EW_00001
+	sourceId: 'ID',
 	geometryType: 'Geometry type',
 	lastUpdated: 'Last updated'
 } as const;

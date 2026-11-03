@@ -46,10 +46,22 @@ describe('report config', () => {
 			categorySettings('Passenger Transport Executive').metadata,
 			categorySettings('Integrated Transport Authority').metadata
 		);
-		assert.deepEqual(categorySettings('Parish Council').metadata, [
-			{ attribute: 'CODE', heading: 'Code' },
-			{ attribute: 'NAME', heading: 'Official name' }
-		]);
+		assert.deepEqual(categorySettings('Parish Council').metadata, [{ attribute: 'CODE', heading: 'External code' }]);
+		// every consultee tab opens with the reference data's own id
+		for (const tab of REPORT_TABS.filter((tab) => tab !== 'NSIPs')) {
+			assert.equal(tabSettings(tab).columns[0], 'sourceId', tab);
+		}
+		// the consultee column is the name - no metadata repeats it
+		const everyMetadata = [
+			REPORT_CONFIG.defaults,
+			...Object.values(REPORT_CONFIG.tabs),
+			...Object.values(REPORT_CONFIG.categories)
+		]
+			.map(({ metadata }) => metadata)
+			.flatMap((metadata) => (Array.isArray(metadata) ? metadata : []));
+		assert.ok(!everyMetadata.some(({ heading }) => heading === 'Official name'));
+		// a case's stage, as CBOS last gave it
+		assert.ok((tabSettings('NSIPs').metadata as { heading: string }[]).some(({ heading }) => heading === 'Stage'));
 	});
 
 	test("resolves a tab's settings over the defaults, and a category's over its tab", () => {

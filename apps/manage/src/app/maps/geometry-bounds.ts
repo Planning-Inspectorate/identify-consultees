@@ -133,6 +133,14 @@ export function computeMapView(featureCollection: { features: { geometry: Geomet
 const WORLD_TILE_PIXELS = 256;
 const EARTH_CIRCUMFERENCE_METRES = 40_075_016.686;
 
+/**
+ * How many metres a map pixel covers at a view's centre - Web Mercator, as the maps draw, so a
+ * pixel covers less ground further north. Close enough across a site's map for its scale bar.
+ */
+export function metresPerPixel({ center, zoom }: MapView): number {
+	return (EARTH_CIRCUMFERENCE_METRES * Math.cos((center[1] * Math.PI) / 180)) / (WORLD_TILE_PIXELS * 2 ** zoom);
+}
+
 /** A longitude/latitude as a fraction of the Web Mercator world, x east and y south from the top left. */
 function worldFraction(longitude: number, latitude: number): [number, number] {
 	const clamped = Math.max(-85.051_128_78, Math.min(85.051_128_78, latitude));

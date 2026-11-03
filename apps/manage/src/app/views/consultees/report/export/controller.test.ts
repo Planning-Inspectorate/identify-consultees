@@ -193,6 +193,8 @@ describe('report download', () => {
 	it("puts Nearby NSIPs in the report like any category - their own tab, with their case's details, and a map", async () => {
 		const nearbyNsip = 'bbbbbbbb-0000-0000-0000-000000000001';
 		const undatedNsip = 'bbbbbbbb-0000-0000-0000-000000000002';
+		// another case, added by hand
+		const addedNsip = 'bbbbbbbb-0000-0000-0000-000000000003';
 		const base = serviceWith(rulesetRunnerReturning([matchRow(identifiedParish, identifiedReason)]));
 		const parishQueries = base.db.$queryRaw;
 		const nearbyCase = (id: string, caseReference: string, caseName: string, distanceMetres: number) => ({
@@ -223,33 +225,41 @@ describe('report download', () => {
 					return parishQueries(sql, ...(values as []));
 				}),
 				caseBoundary: {
-					findMany: mock.fn(async ({ where }: { where: { id: { in: string[] } } }) =>
-						where.id.in.map((id) => ({
+					findMany: mock.fn(async ({ where }: { where: { id: { in: string[] } } }) => {
+						const cases: Record<string, [string, string, string | null]> = {
+							[nearbyNsip]: ['EN010200', 'Neighbouring Solar Farm', 'Pre-Examination'],
+							[undatedNsip]: ['EN010201', 'Undated Wind Farm', null],
+							[addedNsip]: ['EN010202', 'Added Tidal Lagoon', 'Decision']
+						};
+						return where.id.in.map((id) => ({
 							id: id.toUpperCase(),
 							geometryType: 'Polygon',
-							caseReference: id === nearbyNsip ? 'EN010200' : 'EN010201',
-							caseName: id === nearbyNsip ? 'Neighbouring Solar Farm' : 'Undated Wind Farm',
+							caseReference: cases[id][0],
+							caseName: cases[id][1],
+							acceptance: cases[id][2],
 							fileName: id === nearbyNsip ? 'neighbour.geojson' : null,
 							receivedDate: id === nearbyNsip ? new Date('2026-09-01T09:00:00Z') : null,
 							lastUpdated: new Date('2026-10-01T09:00:00Z')
-						}))
-					)
+						}));
+					})
 				}
 			}
 		};
 		const res = response();
+		const add = JSON.stringify({ i: addedNsip, c: 'NSIPs', n: 'Added Tidal Lagoon (EN010202)', r: 'Shares a road' });
 		await buildReportDownload(service as never)(
-			{ params: { caseId: realProjectId }, query: { ruleset } } as never,
+			{ params: { caseId: realProjectId }, query: { ruleset, add } } as never,
 			res as never
 		);
 
-		// their rows come from case_boundary, not consultee_area
+		// their rows come from case_boundary, not consultee_area - those found, and the one added
 		assert.deepStrictEqual(service.db.consulteeArea.findMany.mock.calls[0].arguments[0].where.id.in, [
 			identifiedParish
 		]);
 		assert.deepStrictEqual(service.db.caseBoundary.findMany.mock.calls[0].arguments[0].where.id.in, [
 			nearbyNsip,
-			undatedNsip
+			undatedNsip,
+			addedNsip
 		]);
 		const files = zipOf(res);
 		const names = Object.keys(files);
@@ -259,20 +269,24 @@ describe('report download', () => {
 			.filter(([name]) => name.startsWith('xl/'))
 			.map(([, data]) => strFromU8(data))
 			.join('');
-		// the NSIPs tab: each one's name, number, type, sub-type and the query that found it
+		// the NSIPs tab: each one's name, number, type, sub-type, stage and the query that found it
 		for (const text of [
 			'name="NSIPs"',
 			'Neighbouring Solar Farm',
 			'EN010200',
 			'Energy',
 			'Generating Stations',
+			'Stage',
+			'Pre-Examination',
+			// the one added by hand has its stage too
+			'Decision',
 			'10km buffer',
 			'Query'
 		]) {
 			assert.ok(xml.includes(text), text);
 		}
 		const nsips = pdfTextLines(Buffer.from(files['maps/02 NSIPs.pdf']));
-		assert.ok(nsips.includes('NSIPs: 2 in the report'));
+		assert.ok(nsips.includes('NSIPs: 3 in the report'));
 		// with the distance they were looked for within drawn around the site
 		assert.ok(nsips.includes('Ruleset buffer (10 km)'));
 		assert.ok(nsips.includes('Neighbouring Solar Farm (EN010200)'));

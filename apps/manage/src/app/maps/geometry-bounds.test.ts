@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
-import { computeBounds, computeFittedMapView, computeMapView } from './geometry-bounds.ts';
+import { computeBounds, computeFittedMapView, computeMapView, metresPerPixel } from './geometry-bounds.ts';
 
 describe('computeMapView', () => {
 	test('returns England/Wales fallback for an empty collection', () => {
@@ -149,5 +149,16 @@ describe('computeFittedMapView', () => {
 
 	test('never zooms out further than the maps go', () => {
 		assert.equal(computeFittedMapView(square(-170, -80, 160), viewport, 0).zoom, 2);
+	});
+});
+
+describe('metresPerPixel', () => {
+	test('is the Web Mercator ground resolution at the view centre - less at higher latitudes', () => {
+		// the world is 256 pixels at zoom 0, so a pixel on the equator is 1/256th of it
+		assert.ok(Math.abs(metresPerPixel({ center: [0, 0], zoom: 0 }) - 40_075_016.686 / 256) < 1e-6);
+		// each zoom halves it
+		assert.ok(Math.abs(metresPerPixel({ center: [0, 0], zoom: 10 }) - 40_075_016.686 / 256 / 1024) < 1e-9);
+		// at 60 degrees north, half the equator's
+		assert.ok(Math.abs(metresPerPixel({ center: [-1.5, 60], zoom: 0 }) - 40_075_016.686 / 512) < 1e-6);
 	});
 });

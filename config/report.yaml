@@ -13,9 +13,9 @@
 #               group                   Group                    the reference data's broad group
 #               region                  Region
 #               whyIdentified           Why identified
-#               source                  Source                   Ruleset, or Manually added
+#               source                  Source                   the ruleset that found it, or Manually added
 #               distanceKm              Distance from site (km)
-#               sourceId                Source id                the reference data's own id
+#               sourceId                ID                       the reference data's own id
 #               consulteeAreaId         Consultee area id
 #               geometryType            Geometry type
 #               lastUpdated             Last updated
@@ -42,13 +42,13 @@
 version: 2
 
 defaults:
-  columns: [consultee, category, subcategory, whyIdentified, source]
-  metadata: { CODE: Code, NAME: Official name }
+  columns: [sourceId, consultee, category, subcategory, whyIdentified, source]
+  metadata: { CODE: External code }
   mapKm: 10
 
 tabs:
   Administrative boundaries:
-    columns: [consultee, category, whyIdentified, source]
+    columns: [sourceId, consultee, category, whyIdentified, source]
     categories:
       Parish Council: { summary: 'Parish, Town and Community Councils' }
       Lower Tier Authority: { summary: District Councils (Lower Tier Authorities) }
@@ -58,20 +58,20 @@ tabs:
       Greater London Authority: { summary: Greater London Authority }
 
   Public bodies:
-    columns: [consultee, category, whyIdentified, source]
+    columns: [sourceId, consultee, category, whyIdentified, source]
     categories:
       # a line for each buffer its conditions find it within, each trust on its nearest
       Ambulance Trust: { summary: { 1: Ambulance Trusts (1km buffer), 10: Ambulance Trusts (10km buffer) } }
       Fire and Rescue Authority:
         summary: Fire and Rescue Authorities
-        metadata: { ONS_CODE: Code, NAME: Official name }
+        metadata: { ONS_CODE: External code }
       Police:
         summary: Police and Crime Commissioners
-        metadata: { PFA22CD: Code, NAME: Official name, PFA22NM: Police force area }
+        metadata: { PFA22CD: External code, PFA22NM: Police force area }
       Hospital: { summary: Hospitals operated by NHS Trusts and NHS Foundation Trusts (England) }
       ICB:
         summary: Integrated Care Boards (England)
-        metadata: { ICB26CD: Code, ICB26NM: Official name }
+        metadata: { ICB26CD: External code }
       # a drainage district's consultee is its board
       Internal Drainage Board: { summary: Internal Drainage Boards }
       Internal Drainage District: { summary: Internal Drainage Boards }
@@ -79,16 +79,15 @@ tabs:
       Local Health Board: { summary: Local Health Boards (Wales) }
       National Landscape:
         summary: National Landscapes
-        metadata: { CODE: Code, NAME: Official name, NAT_ENG_CODE: Natural England code }
+        metadata: { CODE: External code, NAT_ENG_CODE: Natural England code }
 
   Energy:
-    columns: [consultee, category, subcategory, subcategoryDescription, distanceKm, whyIdentified, source]
-    metadata: { NAME: Official name }
+    columns: [sourceId, consultee, category, subcategory, subcategoryDescription, distanceKm, whyIdentified, source]
+    metadata: none
     categories:
       Electricity Generator:
         summary: Electricity Generators
         metadata:
-          NAME: Official name
           COMPANY_NAME: Operator
           PRIMARY_TYPE: Technology
           INSTALLED_CAPACITY_MW: Capacity (MW)
@@ -98,19 +97,19 @@ tabs:
           DUKES_REFERENCE: DUKES reference
       Offshore Wind Site:
         summary: Offshore Wind Sites
-        metadata: { NAME: Official name, TENANT: Operator }
+        metadata: { TENANT: Operator }
       Offshore Wind Export Cable:
         summary: Wind Export Cables
-        metadata: { NAME: Official name, TENANT: Operator }
+        metadata: { TENANT: Operator }
       ONR Site: { summary: Office for Nuclear Regulation Sites }
       DNO: { summary: Distribution Network Operators }
       Interconnector:
         summary: Interconnectors
-        metadata: { NAME: Official name, LICENSEE: Operator, STATUS: Status }
+        metadata: { LICENSEE: Operator, STATUS: Status }
 
   Transport:
-    columns: [consultee, category, subcategory, subcategoryDescription, distanceKm, whyIdentified, source]
-    metadata: { NAME: Official name }
+    columns: [sourceId, consultee, category, subcategory, subcategoryDescription, distanceKm, whyIdentified, source]
+    metadata: none
     categories:
       Canal: { summary: Canals }
       Railway:
@@ -118,26 +117,20 @@ tabs:
         metadata: { STATUS: Status, HS2: HS2 }
       Passenger Transport Executive:
         summary: Passenger Transport Executives
-        metadata:
-          &combined_authority {
-            COMB_AUTH_CODE: Code,
-            COMB_AUTH_NAME: Official name,
-            PTE_NAME: Passenger transport executive
-          }
+        metadata: &combined_authority { COMB_AUTH_CODE: External code, PTE_NAME: Passenger transport executive }
       Integrated Transport Authority:
         summary: Integrated Transport Authorities
         metadata: *combined_authority
       Dock or Harbour:
         summary: Docks and Harbours operated by Statutory Harbour Authorities
         metadata:
-          NAME: Official name
           STATUS: Ownership
           MAJOR_PORT: Major port
           STATUTORY_HARBOUR_AUTHORITY: Statutory harbour authority
           COMPETENT_HARBOUR_AUTHORITY: Competent harbour authority
       Corporate Joint Committee:
         summary: Corporate Joint Committees (Wales)
-        metadata: { NAME: Official name, CTYUA23NM: Member councils }
+        metadata: { CTYUA23NM: Member councils }
 
   Other:
     categories:
@@ -148,7 +141,8 @@ tabs:
 
   NSIPs:
     # its own fields alone (see NSIP_FIELDS in workbook.ts): the project, its case reference, its
-    # type and sub-type from that reference, and the query that found it - "35km buffer"
+    # type and sub-type from that reference, its stage as CBOS last gave it, and the query that
+    # found it - "35km buffer"
     columns: []
     # as far as config/nearby-consultees.yaml's nsipRadiusKm looks, so the cases found fit the map
     mapKm: 35
@@ -157,6 +151,7 @@ tabs:
       Number: Number
       Type: Type
       Sub-type: Sub-type
+      Stage: Stage
       Query: Query
     categories:
       NSIPs: { summary: National infrastructure projects }
