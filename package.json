@@ -96,16 +96,16 @@
     "prettier-plugin-organize-imports": "^4.3.0",
     "prettier-plugin-prisma": "^5.0.0",
     "prisma": "^7.10.1",
-    "sass": "^1.105.2",
+    "sass": "^1.106.1",
     "stylelint": "^17.15.0",
     "stylelint-config-prettier-scss": "^1.0.0",
-    "stylelint-config-recess-order": "^7.8.2",
+    "stylelint-config-recess-order": "^7.9.0",
     "stylelint-config-standard-scss": "^17.0.0",
     "stylelint-order": "^8.1.2",
-    "stylelint-scss": "^7.3.0",
+    "stylelint-scss": "^7.4.0",
     "supertest": "^7.3.1",
     "typescript": "npm:@typescript/typescript6@^6.0.2",
-    "typescript-eslint": "^8.72.0"
+    "typescript-eslint": "^8.72.1"
   },
   "lint-staged": {
     "*.{js,ts}": [
