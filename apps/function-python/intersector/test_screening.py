@@ -24,6 +24,7 @@ from intersector.models import (
 )
 from intersector.queries import bounding_box, point_count
 from intersector.screening import (
+    _measure_unmeasured,
     _nearest_first,
     answerable_from_nearby,
     meets_intersection_condition,
@@ -634,3 +635,20 @@ def test_screens_a_quarters_dataset_when_asked_rather_than_the_one_in_use(connec
     assert QUARTER_TABLE_AREA_ID not in _ids(run_ruleset(connection_params, "POINT(0 0)", rules, 1_000))
     with pytest.raises(UnknownDataset, match="There is no 2098Q1 dataset"):
         screen(connection_params, "POINT(0 0)", rules, 1_000, dataset="2098Q1")
+
+
+def test_bordering_queries_find_nothing_with_no_categories():
+    # the categories guard returns before the database is asked anything
+    assert queries.find_areas_bordering(None, "POINT(0 0)", "Parish Council", []) == []
+    assert queries.find_areas_bordering_box(None, "POLYGON((0 0, 1 0, 1 1, 0 1, 0 0))", "Parish Council", []) == []
+
+
+def test_a_consultee_deleted_between_queries_is_dropped(monkeypatch):
+    # a reference data reload mid-request can remove an area before it is measured - there is
+    # nothing left to notify, so it just goes
+    consultees = {"gone": Consultee(area=ConsulteeArea(id="gone", properties={}), distance_metres=None)}
+    monkeypatch.setattr(queries, "measure_distances", lambda *_args: {})
+
+    _measure_unmeasured(None, "POINT(0 0)", consultees)
+
+    assert consultees == {}

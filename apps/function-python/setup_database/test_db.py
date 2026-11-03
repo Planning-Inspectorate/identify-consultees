@@ -3,6 +3,7 @@ import pytest
 from setup_database.db import (
     ConnectionParams,
     check_connection,
+    connection_params_from_env,
     parse_connection_string,
 )
 
@@ -56,3 +57,9 @@ def test_check_connection_raises_when_the_database_is_unreachable():
     )
     with pytest.raises(Exception):  # noqa: B017 - pymssql's own connection error, not ours to name
         check_connection(bad_params)
+
+
+def test_connection_params_from_env_requires_the_connection_string(monkeypatch):
+    monkeypatch.delenv("SQL_CONNECTION_STRING", raising=False)
+    with pytest.raises(RuntimeError, match="SQL_CONNECTION_STRING is not set"):
+        connection_params_from_env()

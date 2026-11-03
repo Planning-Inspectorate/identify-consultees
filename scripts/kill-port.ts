@@ -17,11 +17,11 @@ const POLL_MS = 150;
 
 const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
-/** PIDs holding a TCP listener on the port; empty when free or the probe tool is missing. */
-export function listeningPids(port: number): number[] {
+/** PIDs holding a TCP listener on the port; empty when free or the probe tool is missing. `spawn` stands in for spawnSync in tests. */
+export function listeningPids(port: number, spawn: typeof spawnSync = spawnSync): number[] {
 	const result =
 		process.platform === 'win32'
-			? spawnSync(
+			? spawn(
 					'powershell',
 					[
 						'-NoProfile',
@@ -30,7 +30,7 @@ export function listeningPids(port: number): number[] {
 					],
 					{ encoding: 'utf8' }
 				)
-			: spawnSync('lsof', ['-nP', `-tiTCP:${port}`, '-sTCP:LISTEN'], { encoding: 'utf8' });
+			: spawn('lsof', ['-nP', `-tiTCP:${port}`, '-sTCP:LISTEN'], { encoding: 'utf8' });
 
 	if (result.error || result.status === null) {
 		return [];
@@ -43,12 +43,12 @@ export function listeningPids(port: number): number[] {
 	return [...new Set(pids)];
 }
 
-/** Best-effort command label for a log line ('node src/server.ts'); empty when unavailable. */
-function commandFor(pid: number): string {
+/** Best-effort command label for a log line ('node src/server.ts'); empty when unavailable. `spawn` stands in for spawnSync in tests. */
+function commandFor(pid: number, spawn: typeof spawnSync = spawnSync): string {
 	if (process.platform === 'win32') {
 		return '';
 	}
-	const result = spawnSync('ps', ['-o', 'command=', '-p', String(pid)], { encoding: 'utf8' });
+	const result = spawn('ps', ['-o', 'command=', '-p', String(pid)], { encoding: 'utf8' });
 	return (result.stdout ?? '').trim().slice(0, 80);
 }
 
@@ -59,10 +59,10 @@ export type FreedPort = { port: number; stopped: string[]; free: boolean };
  * wait until nothing listens (or FREE_TIMEOUT_MS elapses). `stopped` is a log
  * label per killed process ('command [pid]').
  */
-export async function freePort(port: number): Promise<FreedPort> {
-	const pids = listeningPids(port);
+export async function freePort(port: number, spawn: typeof spawnSync = spawnSync): Promise<FreedPort> {
+	const pids = listeningPids(port, spawn);
 	const stopped = pids.map((pid) => {
-		const command = commandFor(pid);
+		const command = commandFor(pid, spawn);
 		return command ? `'${command}' [pid ${pid}]` : `pid ${pid}`;
 	});
 
@@ -75,7 +75,7 @@ export async function freePort(port: number): Promise<FreedPort> {
 	}
 
 	const started = Date.now();
-	let remaining = listeningPids(port);
+	let remaining = listeningPids(port, spawn);
 	while (remaining.length > 0 && Date.now() - started < FREE_TIMEOUT_MS) {
 		if (Date.now() - started > SIGKILL_GRACE_MS) {
 			for (const pid of remaining) {
@@ -87,17 +87,17 @@ export async function freePort(port: number): Promise<FreedPort> {
 			}
 		}
 		await sleep(POLL_MS);
-		remaining = listeningPids(port);
+		remaining = listeningPids(port, spawn);
 	}
 
 	return { port, stopped, free: remaining.length === 0 };
 }
 
-/** Free each port in turn; returns false when any port is still held. */
-export async function freePorts(ports: number[]): Promise<boolean> {
+/** Free each port in turn; returns false when any port is still held. `spawn` stands in for spawnSync in tests. */
+export async function freePorts(ports: number[], spawn: typeof spawnSync = spawnSync): Promise<boolean> {
 	let allFree = true;
 	for (const port of ports) {
-		const { stopped, free } = await freePort(port);
+		const { stopped, free } = await freePort(port, spawn);
 		if (stopped.length > 0) {
 			console.log(`Freed :${port} (stopped ${stopped.join(', ')})`);
 		}

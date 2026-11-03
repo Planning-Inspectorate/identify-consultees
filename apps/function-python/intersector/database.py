@@ -63,7 +63,7 @@ def with_deadlock_retry(fn: Callable[[], T], retries: int = DEADLOCK_RETRIES) ->
                 raise
             # a small random backoff, so retried queries don't collide again
             time.sleep(0.025 + random.random() * 0.075)
-    raise AssertionError("unreachable")
+    raise AssertionError("unreachable")  # pragma: no cover
 
 
 @contextmanager

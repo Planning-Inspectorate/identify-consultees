@@ -76,6 +76,13 @@ describe('parseRulesetSettings', () => {
 		assert.ok(real.some(({ wording, awaitingData }) => wording === 'Ambulance Trusts' && !awaitingData));
 	});
 
+	test('a wording with no consulteeTypes entry awaits nothing', () => {
+		const settings = parseRulesetSettings(SETTINGS);
+		assert.deepEqual(acceptedConsulteeTypes({ ...settings, consulteeTypeWordings: ['No such wording'] }), [
+			{ wording: 'No such wording', awaitingData: false }
+		]);
+	});
+
 	test('treats names and categoriesAwaitingData as optional', () => {
 		const settings = parseRulesetSettings(
 			SETTINGS.replace(/names:\n {2}c: Ruleset C\n/, '').replace('categoriesAwaitingData: [Canal]', '')

@@ -240,11 +240,8 @@ export async function importQuarter(
 	return manifest;
 }
 
-export interface PromotionArgs {
-	command: 'export' | 'import';
-	dir: string;
-	quarter?: string;
-}
+export type PromotionArgs =
+	{ command: 'export'; dir: string; quarter: string } | { command: 'import'; dir: string; quarter: string | undefined };
 
 export function parsePromotionArgs(argv: string[]): PromotionArgs {
 	const [command, ...rest] = argv;
@@ -260,33 +257,40 @@ export function parsePromotionArgs(argv: string[]): PromotionArgs {
 	if (!values.dir) {
 		throw new Error('--dir is required');
 	}
-	if (command === 'export' && !values.quarter) {
-		throw new Error('export needs --quarter, as in --quarter=2026Q4');
+	if (command === 'export') {
+		if (!values.quarter) {
+			throw new Error('export needs --quarter, as in --quarter=2026Q4');
+		}
+		return { command, dir: values.dir, quarter: values.quarter };
 	}
 	return { command, dir: values.dir, quarter: values.quarter };
 }
 
-async function run() {
-	const args = parsePromotionArgs(process.argv.slice(2));
-	const dbClient = newDatabaseClient(withExtendedTimeout(loadConfig().db, IMPORT_REQUEST_TIMEOUT_MS));
-	try {
-		const dataset = databaseDataset(dbClient);
-		const store = blobFileStore();
-		const manifest =
-			args.command === 'export'
-				? await exportQuarter(dataset, store, args.quarter ?? '', args.dir)
-				: await importQuarter(dataset, store, args.dir);
-		console.log(`${args.command === 'export' ? 'Exported' : 'Imported'} ${manifest.quarter}:`);
-		for (const file of manifest.files) {
-			console.log(`  ${file.blobName}: ${file.rowsLoaded} rows`);
-		}
-	} finally {
-		await dbClient.$disconnect();
+/** Run the export or import `argv` asks for against `dataset` and `store`, logging what it did. */
+export async function run(
+	argv: string[],
+	dataset: Dataset,
+	store: FileStore,
+	log: (line: string) => void = console.log
+): Promise<void> {
+	const args = parsePromotionArgs(argv);
+	const manifest =
+		args.command === 'export'
+			? await exportQuarter(dataset, store, args.quarter, args.dir)
+			: await importQuarter(dataset, store, args.dir, log);
+	log(`${args.command === 'export' ? 'Exported' : 'Imported'} ${manifest.quarter}:`);
+	for (const file of manifest.files) {
+		log(`  ${file.blobName}: ${file.rowsLoaded} rows`);
 	}
 }
 
 const isMain = process.argv[1] !== undefined && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
 
 if (isMain) {
-	await run();
+	const dbClient = newDatabaseClient(withExtendedTimeout(loadConfig().db, IMPORT_REQUEST_TIMEOUT_MS));
+	try {
+		await run(process.argv.slice(2), databaseDataset(dbClient), blobFileStore());
+	} finally {
+		await dbClient.$disconnect();
+	}
 }

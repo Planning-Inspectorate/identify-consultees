@@ -40,7 +40,8 @@
     "test:e2e": "npm run test:e2e --workspace identify-consultees-manage",
     "test:visual": "npm run test:visual --workspace identify-consultees-manage",
     "test:frontend-coverage": "npm run test:coverage --workspace identify-consultees-manage",
-    "test-coverage": "node --test --experimental-test-coverage \"packages/**/*.test.*\" \"scripts/**/*.test.*\" && npm run test:e2e --workspace identify-consultees-manage && npm run test:frontend-coverage",
+    "test:packages-coverage": "node --test --experimental-test-coverage --test-coverage-lines=100 --test-coverage-functions=100 --test-coverage-branches=100 --test-coverage-include=\"packages/database/src/**\" --test-coverage-include=\"scripts/**/*.ts\" --test-coverage-exclude=\"**/*.test.*\" --test-coverage-exclude=\"packages/database/src/client/**\" --test-coverage-exclude=\"packages/database/src/seed/data-dev.ts\" --test-coverage-exclude=\"packages/database/src/seed/seed-dev.ts\" --test-coverage-exclude=\"packages/database/src/seed/seed-prod.ts\" \"packages/**/*.test.*\" \"scripts/**/*.test.*\"",
+    "test-coverage": "npm run test:packages-coverage && npm run test:e2e --workspace identify-consultees-manage && npm run test:frontend-coverage",
     "playwright:install": "npm run playwright:install --workspace identify-consultees-manage"
   },
   "dependencies": {

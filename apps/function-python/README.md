@@ -30,10 +30,10 @@ Tests sit beside the code they test (`test_screening.py` beside `screening.py`).
 
 ```bash
 python3 -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt pytest ruff
+pip install -r requirements.txt pytest pytest-cov ruff
 func start                                  # needs local.settings.json, below
 curl http://localhost:7071/api/health
-ruff check . && pytest                      # database tests skip without SQL_CONNECTION_STRING
+ruff check . && pytest --cov --cov-fail-under=100   # database tests skip without SQL_CONNECTION_STRING
 ```
 
 `local.settings.json` (not committed; match the connection string to `packages/database/.env`):
