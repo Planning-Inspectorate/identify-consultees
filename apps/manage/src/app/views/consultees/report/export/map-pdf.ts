@@ -4,7 +4,7 @@ import { formatDate } from './workbook.ts';
 
 /**
  * One category's map as a PDF, for the report download: an A4 landscape page with the category's
- * static map, a scale bar and a key, then the category's consultees in the report, with why each is in it.
+ * static map, a scale bar, a key and the licences its data is used under, then the category's consultees in the report, with why each is in it.
  */
 
 /** A consultee as the map PDF lists it. */
@@ -132,6 +132,35 @@ function drawScaleBar(doc: PDFKit.PDFDocument, left: number, bottom: number, met
 	doc.fillColor(TEXT_COLOUR).text(label, x + padding + length + padding, y + 5, { lineBreak: false });
 }
 
+// the report's maps are always drawn on OpenStreetMap's tiles: Google's static maps can't draw
+// their pixel ratio (see buildConsulteeStaticMapResponse). OpenStreetMap's licence needs this
+// credit beside the map - https://www.openstreetmap.org/copyright
+const BASEMAP_CREDIT = '© OpenStreetMap contributors';
+
+/** The basemap's credit in the bottom right corner of the map, on a white panel as the scale bar's. */
+function drawBasemapCredit(doc: PDFKit.PDFDocument, right: number, bottom: number): void {
+	doc.font('Helvetica').fontSize(7);
+	const [padding, panelHeight] = [4, 12];
+	const panelWidth = padding + doc.widthOfString(BASEMAP_CREDIT) + padding;
+	const x = right - SCALE_BAR_INSET - panelWidth;
+	const y = bottom - SCALE_BAR_INSET - panelHeight;
+	doc.save().fillColor('#ffffff').fillOpacity(0.85).rect(x, y, panelWidth, panelHeight).fill().restore();
+	doc.fillColor(TEXT_COLOUR).text(BASEMAP_CREDIT, x + padding, y + 3, { lineBreak: false });
+}
+
+/**
+ * The licences a map's data is used under, at the foot of its page: the basemap's, and the
+ * consultee areas' and site boundaries' - Ordnance Survey and other public sector data, under the
+ * Open Government Licence - dated the year the report was made.
+ */
+export function mapLicensing(generatedAt: Date): string[] {
+	const year = generatedAt.toLocaleDateString('en-GB', { year: 'numeric', timeZone: 'Europe/London' });
+	return [
+		'Basemap © OpenStreetMap contributors, available under the Open Database Licence: openstreetmap.org/copyright.',
+		`Contains OS data © Crown copyright and database right ${year}. Contains public sector information licensed under the Open Government Licence v3.0.`
+	];
+}
+
 // how many of the projects' colours the key shows, side by side, for "a colour per project"
 const KEY_PROJECT_COLOURS = 4;
 
@@ -208,12 +237,10 @@ export function buildMapPdf(input: MapPdfInput): Promise<Buffer> {
 	// where the image lands: fitted to the map's box, centred across it
 	const image = pngSize(input.image);
 	const pointsPerPixel = Math.min(width / image.width, MAP_HEIGHT / image.height);
-	drawScaleBar(
-		doc,
-		MARGIN + (width - image.width * pointsPerPixel) / 2,
-		mapTop + image.height * pointsPerPixel,
-		input.metresPerPixel / pointsPerPixel
-	);
+	const imageLeft = MARGIN + (width - image.width * pointsPerPixel) / 2;
+	const imageBottom = mapTop + image.height * pointsPerPixel;
+	drawScaleBar(doc, imageLeft, imageBottom, input.metresPerPixel / pointsPerPixel);
+	drawBasemapCredit(doc, imageLeft + image.width * pointsPerPixel, imageBottom);
 	const projectColours = input.consultees.flatMap((consultee) => (consultee.colour ? [consultee.colour] : []));
 	drawKey(doc, mapTop + MAP_HEIGHT + 10, input.colours, input.buffers, projectColours);
 	if (input.mapNote) {
@@ -223,6 +250,10 @@ export function buildMapPdf(input: MapPdfInput): Promise<Buffer> {
 			.fillColor(TEXT_COLOUR)
 			.text(pdfText(input.mapNote), MARGIN, mapTop + MAP_HEIGHT + 30, { width });
 	}
+	// at the foot of the page, clear of the key and any note
+	const licensing = mapLicensing(input.generatedAt).join('\n');
+	doc.font('Helvetica').fontSize(8).fillColor(SECONDARY_TEXT_COLOUR);
+	doc.text(licensing, MARGIN, doc.page.height - MARGIN - doc.heightOfString(licensing, { width }), { width });
 
 	doc.addPage();
 	doc
