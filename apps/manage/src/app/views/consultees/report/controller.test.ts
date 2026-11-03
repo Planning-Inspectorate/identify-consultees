@@ -138,18 +138,23 @@ describe('consultee report check page', () => {
 		assert.strictEqual(viewModel.pageHeading, 'Check consultees before creating the report');
 		assert.strictEqual(viewModel.caseName, 'Real Test Project');
 		assert.strictEqual(viewModel.reference, 'EN010099');
-		assert.strictEqual(viewModel.caseChangeUrl, '/');
+		// each Change changes that answer alone, then comes back here: the project search keeping the
+		// ruleset, this project's shapefiles keeping the ruleset, and the ruleset picker
+		assert.strictEqual(viewModel.caseChangeUrl, '/?change=project&ruleset=england-wales-post-20240430');
 		assert.strictEqual(viewModel.shapefileName, 'Not provided');
-		assert.strictEqual(viewModel.shapefileChangeUrl, `/consultees/${realProjectId}`);
+		assert.strictEqual(
+			viewModel.shapefileChangeUrl,
+			`/consultees/${realProjectId}?change=shapefile&ruleset=england-wales-post-20240430`
+		);
 		assert.strictEqual(viewModel.rulesetName, 'England Wales post 30 April 2024');
-		// back, and the ruleset's Change, both lead to the ruleset picker the check page followed
+		// back leads to the ruleset picker the check page followed
 		assert.strictEqual(
 			viewModel.backLinkUrl,
 			`/consultees/${realProjectId}/ruleset?ruleset=england-wales-post-20240430`
 		);
 		assert.strictEqual(
 			viewModel.rulesetChangeUrl,
-			`/consultees/${realProjectId}/ruleset?ruleset=england-wales-post-20240430`
+			`/consultees/${realProjectId}/ruleset?ruleset=england-wales-post-20240430&change=ruleset`
 		);
 		assert.strictEqual(
 			viewModel.generateReportUrl,

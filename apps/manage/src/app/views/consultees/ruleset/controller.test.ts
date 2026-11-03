@@ -57,6 +57,31 @@ describe('ruleset picker page', () => {
 		assert.match(html, /Identify consultees/);
 	});
 
+	it('should go back to the check page as it was when changing its ruleset, and post back to say so', async () => {
+		const exclude = urlParam('{"i":"m1","c":"Parish Council","n":"Abbey Parish","r":"Not affected"}');
+		const render = async (query: Record<string, unknown>) => {
+			const mockRes = { status: mock.fn(() => mockRes), render: mock.fn() };
+			await buildRulesetPickerPage({ db: summaryDb() })({ params: { caseId: realProjectId }, query }, mockRes);
+			return mockRes.render.mock.calls[0].arguments[1];
+		};
+		const changing = await render({ ruleset: 'england-wales-post-20240430', change: 'ruleset', exclude });
+		assert.strictEqual(
+			changing.backLinkUrl,
+			`/consultees/${realProjectId}/report?ruleset=england-wales-post-20240430&exclude=${exclude}`
+		);
+		assert.strictEqual(
+			changing.formAction,
+			`/consultees/${realProjectId}/ruleset?ruleset=england-wales-post-20240430&change=ruleset&exclude=${exclude}`
+		);
+		// still the answer it has, checked
+		assert.ok(
+			changing.rulesets.find((ruleset: { value: string }) => ruleset.value === 'england-wales-post-20240430').checked
+		);
+		// a ruleset that isn't one can't be gone back to - back through the journey instead
+		const unknown = await render({ ruleset: 'not-a-ruleset', change: 'ruleset' });
+		assert.strictEqual(unknown.backLinkUrl, `/consultees/${realProjectId}`);
+	});
+
 	it('should not pre-select a radio when no ruleset is selected yet', async () => {
 		const mockRes = {
 			status: mock.fn(() => mockRes),
@@ -193,6 +218,26 @@ describe('ruleset picker submit', () => {
 		const secondViewModel = mockRes.render.mock.calls[1].arguments[1];
 		assert.deepStrictEqual(secondViewModel.errorSummary, [{ text: 'Select a ruleset', href: '#ruleset' }]);
 		assert.strictEqual(mockRes.redirect.mock.callCount(), 0);
+	});
+
+	it('should keep going back to the check page through an error re-render while changing its ruleset', async () => {
+		const mockRes = { status: mock.fn(() => mockRes), render: mock.fn(), redirect: mock.fn() };
+		await buildRulesetPickerSubmit({ db: summaryDb() })(
+			{
+				params: { caseId: realProjectId },
+				query: { ruleset: 'england-wales-post-20240430', change: 'ruleset' },
+				body: {}
+			},
+			mockRes
+		);
+		const viewModel = mockRes.render.mock.calls[0].arguments[1];
+		assert.strictEqual(
+			viewModel.backLinkUrl,
+			`/consultees/${realProjectId}/report?ruleset=england-wales-post-20240430`
+		);
+		assert.ok(viewModel.formAction.endsWith('&change=ruleset'));
+		// nothing was picked, so nothing is checked
+		assert.ok(viewModel.rulesets.every((ruleset: { checked: boolean }) => ruleset.checked === false));
 	});
 
 	it('should carry the consultee selection through an error re-render', async () => {

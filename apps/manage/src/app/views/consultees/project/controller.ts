@@ -5,6 +5,7 @@ import {
 	getCaseBoundaryById,
 	listCaseBoundaryFiles
 } from '@pins/identify-consultees-database/src/geospatial/case-boundaries.ts';
+import { getRuleset } from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
 import type { AsyncRequestHandler, AsyncRequestHandlerWithBody } from '@planning-inspectorate/core/util';
 import { recencyRanks, styleForRank } from '../../../maps/boundary-map-styles.ts';
 import type { BoundaryMapFile } from '../../../maps/boundary-map.ts';
@@ -15,6 +16,15 @@ import { MAP_VIEW } from '../../../maps/map-view.ts';
 import type { GeoJsonFeature, GeoJsonFeatureCollection } from '../../../maps/sample-geojson.ts';
 import { MAP_VIEWPORT } from '../../../maps/sample-geojson.ts';
 import { buildConsulteeStaticMapResponse, sendStaticMapResponse } from '../../../maps/serve-static-map.ts';
+import type { ConsulteeSelection } from '../report/urls.ts';
+import {
+	boundaryUrl,
+	changedStep,
+	changeProjectUrl,
+	consulteeSelection,
+	reportUrl,
+	rulesetUrl
+} from '../report/urls.ts';
 import { resolveCase } from '../resolve-case.ts';
 import { firstQueryValue } from '../run-ruleset.ts';
 import type { TestFault } from '../test-faults.ts';
@@ -50,6 +60,25 @@ async function mapFiles(
 }
 
 /**
+ * The check page's project or shapefile being changed (see changedStep): the ruleset it keeps, and
+ * - for a shapefile, the same project's - the consultees added and removed. None for a ruleset
+ * that isn't one, so a bad link carries on through the journey instead.
+ */
+function boundaryChange(
+	query: Record<string, unknown>
+): { step: 'project' | 'shapefile'; rulesetId: string; selection: ConsulteeSelection } | undefined {
+	const change = changedStep(query);
+	if (!change || change.step === 'ruleset' || !getRuleset(change.rulesetId)) {
+		return undefined;
+	}
+	return {
+		step: change.step,
+		rulesetId: change.rulesetId,
+		selection: change.step === 'shapefile' ? consulteeSelection(query) : consulteeSelection()
+	};
+}
+
+/**
  * The boundary page's view model: the map draws every shapefile the case holds (the page's own
  * file visible first), and the radios below ask the user to confirm which single file is carried
  * into the report - never pre-selected, so `shapefileError` marks them invalid after an
@@ -62,9 +91,11 @@ async function boundaryPageViewModel(
 	logger: ManageService['logger'],
 	project: CaseBoundaryFeature,
 	options: BoundaryFileOption[],
+	query: Record<string, unknown>,
 	shapefileError?: string,
 	fault?: TestFault
 ): Promise<ConsulteeProjectViewModel> {
+	const change = boundaryChange(query);
 	const fallback = {
 		src: `/consultees/${encodeURIComponent(project.id)}/boundary-map`,
 		alt: `Static map showing the project boundary for ${project.properties.caseName}`
@@ -89,18 +120,24 @@ async function boundaryPageViewModel(
 		reference: project.properties.caseReference,
 		caseName: project.properties.caseName,
 		caseId: project.id,
-		backLinkUrl: '/',
-		backLinkText: 'Back to projects',
-		formAction: `/consultees/${encodeURIComponent(project.id)}`,
+		// changing the check page's shapefile, back to it as it was; its project, back to the search
+		...(change?.step === 'shapefile'
+			? { backLinkUrl: reportUrl(project.id, change.rulesetId, change.selection), backLinkText: 'Back' }
+			: {
+					backLinkUrl: change ? changeProjectUrl(change.rulesetId) : '/',
+					backLinkText: 'Back to projects'
+				}),
+		formAction: boundaryUrl(project.id, change, change?.selection),
 		files: options.map((option): BoundaryFileRadio => ({
 			value: option.id,
 			text: option.label,
-			...(option.receivedDate ? { hint: { text: `Uploaded: ${formatUploadedAt(option.receivedDate)}` } } : {})
+			...(option.receivedDate ? { hint: { text: `Uploaded: ${formatUploadedAt(option.receivedDate)}` } } : {}),
+			...(change?.step === 'shapefile' && !shapefileError && option.id === project.id ? { checked: true } : {})
 		})),
 		...(shapefileError
 			? { shapefileError: { text: shapefileError }, errorSummary: [{ text: shapefileError, href: '#shapefile' }] }
 			: {}),
-		retryUrl: `/consultees/${encodeURIComponent(project.id)}`,
+		retryUrl: boundaryUrl(project.id, change, change?.selection),
 		...(map
 			? {
 					mapId: 'case-map',
@@ -142,6 +179,7 @@ export function buildConsulteeProjectPage(service: ManageService): AsyncRequestH
 			logger,
 			project,
 			options,
+			req.query,
 			undefined,
 			requestTestFault(service, req.query) === 'map' ? 'map' : undefined
 		);
@@ -153,7 +191,8 @@ export function buildConsulteeProjectPage(service: ManageService): AsyncRequestH
 /**
  * "Continue" on the boundary page: the chosen file must be one of this project's options. The
  * radios are never pre-selected, so an unanswered (or unrecognised) submit re-renders the page
- * with a validation error rather than guessing a file.
+ * with a validation error rather than guessing a file. On to the ruleset page - or, changing the
+ * check page's project or shapefile, back to the check page.
  */
 export function buildBoundarySubmit(service: ManageService): AsyncRequestHandlerWithBody<{ shapefile?: unknown }> {
 	const { db, logger } = service;
@@ -177,6 +216,7 @@ export function buildBoundarySubmit(service: ManageService): AsyncRequestHandler
 					logger,
 					project,
 					options,
+					req.query ?? {},
 					'Select a shapefile',
 					requestTestFault(service, req.query) === 'map' ? 'map' : undefined
 				)
@@ -184,7 +224,9 @@ export function buildBoundarySubmit(service: ManageService): AsyncRequestHandler
 			return;
 		}
 
-		res.redirect(`/consultees/${encodeURIComponent(chosen.id)}/ruleset`);
+		// changing the check page's project or shapefile goes straight back to it, with its ruleset
+		const change = boundaryChange(req.query ?? {});
+		res.redirect(change ? reportUrl(chosen.id, change.rulesetId, change.selection) : rulesetUrl(chosen.id));
 	};
 }
 

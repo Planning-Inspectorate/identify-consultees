@@ -3,7 +3,14 @@ import type { CaseBoundarySummary } from '@pins/identify-consultees-database/src
 import { getRuleset, RULESETS } from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
 import type { AsyncRequestHandler, AsyncRequestHandlerWithBody } from '@planning-inspectorate/core/util';
 import type { ConsulteeSelection } from '../report/urls.ts';
-import { consulteeSelection, reportUrl, rulesetUrl } from '../report/urls.ts';
+import {
+	boundaryUrl,
+	changedStep,
+	changeRulesetUrl,
+	consulteeSelection,
+	reportUrl,
+	rulesetUrl
+} from '../report/urls.ts';
 import { isCaseId, resolveCaseSummary } from '../resolve-case.ts';
 import { firstQueryValue } from '../run-ruleset.ts';
 import type { RulesetPickerViewModel } from './view-model.ts';
@@ -13,25 +20,30 @@ import type { RulesetPickerViewModel } from './view-model.ts';
  * answer (the check page's "Change"/back links carry it in `?ruleset=`). The Design System's
  * radios guidance says never to pre-select an option the user hasn't chosen, so a first visit -
  * or an unrecognised `?ruleset=` - checks nothing, and `rulesetError` marks the radios invalid
- * after an unanswered submit.
+ * after an unanswered submit. Changing the check page's ruleset (`?change=ruleset`), its back link
+ * returns to the check page as it was; otherwise to the boundary page, the step before.
  */
 function pickerViewModel(
 	project: CaseBoundarySummary,
-	requestedRulesetId: string,
-	selection: ConsulteeSelection,
+	query: Record<string, unknown>,
 	rulesetError?: string
 ): RulesetPickerViewModel {
-	const requestedRuleset = getRuleset(requestedRulesetId);
+	const selection = consulteeSelection(query);
+	const requestedRuleset = getRuleset(firstQueryValue(query.ruleset));
+	const changing = changedStep(query)?.step === 'ruleset' ? requestedRuleset : undefined;
 	return {
 		pageHeading: 'Ruleset',
 		pageCaption: project.caseName,
-		backLinkUrl: `/consultees/${encodeURIComponent(project.id)}`,
+		backLinkUrl: changing ? reportUrl(project.id, changing.id, selection) : boundaryUrl(project.id),
 		caseId: project.id,
-		formAction: rulesetUrl(project.id, requestedRuleset?.id, selection),
+		// posts back to the URL it came from, so the submit carries the selection on to the report
+		formAction: changing
+			? changeRulesetUrl(project.id, changing.id, selection)
+			: rulesetUrl(project.id, requestedRuleset?.id, selection),
 		rulesets: RULESETS.map((option) => ({
 			value: option.id,
 			text: option.name,
-			checked: option.id === requestedRuleset?.id
+			checked: !rulesetError && option.id === requestedRuleset?.id
 		})),
 		...(rulesetError
 			? { rulesetError: { text: rulesetError }, errorSummary: [{ text: rulesetError, href: '#ruleset' }] }
@@ -60,12 +72,7 @@ export function buildRulesetPickerPage(service: ManageService): AsyncRequestHand
 
 		// the check page's "Change" link arrives here carrying the user's consultee selection -
 		// the form posts back to the same URL so the submit can carry it on to the report
-		const selection: ConsulteeSelection = consulteeSelection(req.query);
-
-		return res.render(
-			'views/consultees/ruleset/view.njk',
-			pickerViewModel(project, firstQueryValue(req.query?.ruleset), selection)
-		);
+		return res.render('views/consultees/ruleset/view.njk', pickerViewModel(project, req.query));
 	};
 }
 
@@ -94,7 +101,7 @@ export function buildRulesetPickerSubmit(service: ManageService): AsyncRequestHa
 		const chosen = firstQueryValue(req.body?.ruleset);
 		const ruleset = getRuleset(chosen);
 		if (!ruleset) {
-			res.render('views/consultees/ruleset/view.njk', pickerViewModel(project, chosen, selection, 'Select a ruleset'));
+			res.render('views/consultees/ruleset/view.njk', pickerViewModel(project, req.query ?? {}, 'Select a ruleset'));
 			return;
 		}
 
