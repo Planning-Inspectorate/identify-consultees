@@ -58,7 +58,9 @@ const NEARBY_POINT_ALPHA = 0.45;
  * nearby search found (`identified: 'false'`), which aren't in the report but show what's nearby:
  * a thin dashed outline and the lighter `fillOpacity` the page gives them. Points (hospitals,
  * harbours) are drawn as small dots; areas are filled at their `fillOpacity`, lightest first so
- * regional tints and nearby context sit under the identified local areas.
+ * regional tints and nearby context sit under the identified local areas. A feature marked
+ * `ownLayer` - a Nearby NSIP, each another project in its own colour - has a sublayer to itself,
+ * named for it, so the layers menu keys each project's colour.
  *
  * @param {object[]} features
  * @param {string} idPrefix
@@ -69,19 +71,32 @@ export function buildCategorySublayers(features, idPrefix) {
 	for (const feature of features) {
 		const category = feature.properties?.consulteeCategory || 'Other';
 		const nearbyOnly = feature.properties?.identified === 'false';
-		const key = `${nearbyOnly ? 1 : 0}${category}`;
-		const group = groups.get(key) ?? { category, nearbyOnly, members: [] };
+		const own = feature.properties?.ownLayer === 'true' ? feature.properties.consulteeId : undefined;
+		const key = `${nearbyOnly ? 1 : 0}${category}\n${own ?? ''}`;
+		const group = groups.get(key) ?? {
+			category,
+			nearbyOnly,
+			own,
+			name: own ? feature.properties?.name || category : undefined,
+			members: []
+		};
 		group.members.push(feature);
 		groups.set(key, group);
 	}
 
 	const sorted = [...groups.values()]
-		.sort((a, b) => a.category.localeCompare(b.category) || Number(a.nearbyOnly) - Number(b.nearbyOnly))
+		.sort(
+			(a, b) =>
+				a.category.localeCompare(b.category) ||
+				Number(a.nearbyOnly) - Number(b.nearbyOnly) ||
+				// only a category's own-layer groups get this far, and each has a name
+				String(a.name).localeCompare(String(b.name))
+		)
 		.map((group) => ({ ...group, opacity: Number(group.members[0].properties?.fillOpacity) || DEFAULT_FILL_OPACITY }));
 	// sublayers draw in order
 	sorted.sort((a, b) => a.opacity - b.opacity);
 
-	return sorted.map(({ category, nearbyOnly, members, opacity }, index) => {
+	return sorted.map(({ category, nearbyOnly, own, name, members, opacity }, index) => {
 		const colour = members[0].properties?.colour || DEFAULT_CONSULTEE_COLOUR;
 		const isPoints = members.every((feature) => POINT_TYPES.has(feature.geometry?.type));
 		let style;
@@ -98,12 +113,21 @@ export function buildCategorySublayers(features, idPrefix) {
 		const identifiedFilter = nearbyOnly
 			? ['==', ['get', 'identified'], 'false']
 			: ['!=', ['get', 'identified'], 'false'];
+		let label = `${category} (${members.length})`;
+		if (own) {
+			label = name;
+		} else if (nearbyOnly) {
+			label = `${category}: nearby, not identified (${members.length})`;
+		}
 		return {
 			id: `${idPrefix}-${index}`,
 			// nearby context always starts shown, like the identified consultees - the Layers panel can hide it
 			visible: true,
-			label: nearbyOnly ? `${category}: nearby, not identified (${members.length})` : `${category} (${members.length})`,
-			filter: ['all', ['==', ['get', 'consulteeCategory'], category], identifiedFilter],
+			label,
+			// a category's features all have their own layers or none do - Nearby NSIPs, or not
+			filter: own
+				? ['==', ['get', 'consulteeId'], own]
+				: ['all', ['==', ['get', 'consulteeCategory'], category], identifiedFilter],
 			style
 		};
 	});

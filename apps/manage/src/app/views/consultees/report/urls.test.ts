@@ -8,6 +8,7 @@ import {
 	consulteeSelection,
 	consulteesUrl,
 	decodeSelectionEntry,
+	discardUnsavedChanges,
 	encodeSelectionEntry,
 	excludedIds,
 	queryValues,
@@ -15,7 +16,9 @@ import {
 	removedConsultees,
 	reportCreatedUrl,
 	reportUrl,
-	rulesetUrl
+	rulesetUrl,
+	savedSelection,
+	withSavedEntries
 } from './urls.ts';
 
 // a selection entry as the app's URLs carry it - base64url-encoded JSON (see ENCODED_JSON)
@@ -153,6 +156,50 @@ describe('report url helpers', () => {
 		assert.deepStrictEqual(selection.adds, [
 			{ category: 'Parish Council', name: 'Added Consultee', reason: 'it borders' }
 		]);
+	});
+
+	it("should read and carry a category's saved entries, only when they're marked as saved", () => {
+		const saved = { removed: [{ category: 'Parish Council', name: 'Removed', reason: 'r' }], adds: [] };
+		const selection = consulteeSelection({
+			saved: '1',
+			savedExclude: '{"c":"Parish Council","n":"Removed","r":"r"}'
+		});
+		assert.deepStrictEqual(selection, { removed: [], adds: [], saved });
+		// a category with nothing saved is still marked, so its back link returns it to nothing
+		assert.deepStrictEqual(consulteeSelection({ saved: ['1'] }).saved, { removed: [], adds: [] });
+		assert.strictEqual(consulteeSelection({ savedExclude: 'x' }).saved, undefined);
+
+		const add = { category: 'Parish Council', name: 'Added', reason: 'a' };
+		const url = consulteesUrl('c', 'r', 'Parish Council', { removed: [], adds: [], saved: { ...saved, adds: [add] } });
+		assert.ok(
+			url.endsWith(
+				`&saved=1&savedExclude=${urlParam('{"c":"Parish Council","n":"Removed","r":"r"}')}&savedAdd=${urlParam('{"c":"Parish Council","n":"Added","r":"a"}')}`
+			)
+		);
+	});
+
+	it("should go back to a category's saved entries, or save its entries as they are", () => {
+		const parishAdd = { category: 'Parish Council', name: 'Parish Add', reason: 'a' };
+		const hospitalAdd = { category: 'Hospital', name: 'Hospital Add', reason: 'h' };
+		const parishRemoval = { id: 'm-1', category: 'Parish Council', name: 'Parish Removal', reason: 'r' };
+		const bareRemoval = { id: 'm-2', category: '', name: '', reason: '' };
+		const opened = { removed: [parishRemoval, bareRemoval], adds: [hospitalAdd] };
+
+		// opened from the check page: the category's entries then are what's saved
+		const editing = withSavedEntries(opened, 'Parish Council');
+		assert.deepStrictEqual(editing.saved, { removed: [parishRemoval], adds: [] });
+		// already saved - kept, not replaced by the entries now
+		assert.strictEqual(withSavedEntries(editing, 'Parish Council'), editing);
+
+		// since then a parish consultee added and the parish removal undone
+		const changed = { ...editing, removed: [bareRemoval], adds: [hospitalAdd, parishAdd] };
+		assert.deepStrictEqual(discardUnsavedChanges(changed, 'Parish Council'), {
+			removed: [bareRemoval, parishRemoval],
+			adds: [hospitalAdd]
+		});
+		assert.deepStrictEqual(savedSelection(changed), { removed: [bareRemoval], adds: [hospitalAdd, parishAdd] });
+		// nothing saved (a link made without it): back keeps the selection as it is
+		assert.deepStrictEqual(discardUnsavedChanges(opened, 'Parish Council'), opened);
 	});
 
 	it('should read a missing query as an empty selection', () => {

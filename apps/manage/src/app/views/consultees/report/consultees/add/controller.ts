@@ -227,11 +227,8 @@ export function buildReportConsulteeAddSubmit(
 			(removed) => removed.category === category && removed.id?.toLowerCase() === stored.id.toLowerCase()
 		);
 		const next = removal
-			? { removed: selection.removed.filter((removed) => removed !== removal), adds: selection.adds }
-			: {
-					removed: selection.removed,
-					adds: [...selection.adds, { id: stored.id, category, name: stored.consultee, reason }]
-				};
+			? { ...selection, removed: selection.removed.filter((removed) => removed !== removal) }
+			: { ...selection, adds: [...selection.adds, { id: stored.id, category, name: stored.consultee, reason }] };
 		return res.redirect(`${consulteesUrl(project.id, ruleset.id, category, next)}#consultees`);
 	};
 }

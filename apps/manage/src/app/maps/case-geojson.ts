@@ -9,7 +9,8 @@ import type { ConsulteeMatch } from '@pins/identify-consultees-database/src/geos
 import { isIdentified } from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
 import type { Geometry } from '@pins/identify-consultees-database/src/geospatial/wkt.ts';
 import { REPORT_CONFIG } from '../report-config.ts';
-import { assignCategoryColours, colourFor, UNCATEGORISED } from './category-colours.ts';
+import { isNearbyNsip } from '../views/consultees/nearby-nsips.ts';
+import { assignCategoryColours, colourFor, CONSULTEE_CATEGORY_COLOURS, UNCATEGORISED } from './category-colours.ts';
 import { computeBounds, computeFittedMapView } from './geometry-bounds.ts';
 import type { GeoJsonFeature, GeoJsonFeatureCollection } from './sample-geojson.ts';
 import { MAP_VIEWPORT } from './sample-geojson.ts';
@@ -118,13 +119,30 @@ function isDrawable(match: MapMatch): match is DrawableMatch {
 }
 
 /**
+ * A colour for each Nearby NSIP drawn - each is another project, so each has its own, from the
+ * category palette in name order, so the map, its static image and the report's PDF agree.
+ */
+export function nsipColours(matches: Pick<ConsulteeMatch, 'feature'>[]): Map<string, string> {
+	const nsips = matches
+		.filter(isNearbyNsip)
+		.map((match) => ({ id: match.feature.id, name: match.feature.properties.consultee ?? '' }))
+		.toSorted((a, b) => a.name.localeCompare(b.name, 'en-GB') || a.id.localeCompare(b.id));
+	return new Map(
+		nsips.map(({ id }, index) => [id, CONSULTEE_CATEGORY_COLOURS[index % CONSULTEE_CATEGORY_COLOURS.length]])
+	);
+}
+
+/**
  * The consultees that have geometry to draw. A run's matches carry none (the function is never
- * asked for it), so these are drawn from display geometry (see buildCaseMapConfig).
+ * asked for it), so these are drawn from display geometry (see buildCaseMapConfig). A Nearby NSIP
+ * is drawn in its own colour (nsipColours), marked `ownLayer` so the map lists it on its own.
  */
 function buildConsulteeMatchesGeojson(matches: MapMatch[], colours: Map<string, string>): GeoJsonFeatureCollection {
+	const drawable = matches.filter(isDrawable);
+	const projectColours = nsipColours(drawable);
 	return {
 		type: 'FeatureCollection',
-		features: matches.filter(isDrawable).map((match) => ({
+		features: drawable.map((match) => ({
 			type: 'Feature',
 			id: match.feature.id,
 			properties: {
@@ -133,7 +151,8 @@ function buildConsulteeMatchesGeojson(matches: MapMatch[], colours: Map<string, 
 				name: match.feature.properties.consultee ?? '',
 				consulteeCategory: categoryOf(match),
 				region: match.feature.properties.region ?? '',
-				colour: colourFor(colours, categoryOf(match)),
+				colour: projectColours.get(match.feature.id) ?? colourFor(colours, categoryOf(match)),
+				...(projectColours.has(match.feature.id) ? { ownLayer: 'true' } : {}),
 				// 'false' when only the nearby search found it, and no one added it: drawn fainter, as
 				// context (see withFillOpacity)
 				identified: String(isDrawnAsIdentified(match))

@@ -251,6 +251,18 @@ describe('report consultee remove submit', () => {
 		);
 	});
 
+	it("should keep the category's saved entries, for the category page's back link to return to", async () => {
+		const mockRes = { redirect: mock.fn(), render: mock.fn(), status: mock.fn(() => mockRes) };
+		const savedAdd = addJson('Saved Consultee', 'Saved before');
+		await removeSubmit(dbReturning([[realProjectRow()]], [parishMatchRow()]))(
+			request({ query: { ...parishQuery, match: matchId, saved: '1', savedAdd } }),
+			mockRes
+		);
+
+		const location = mockRes.redirect.mock.calls[0].arguments[0];
+		assert.ok(location.endsWith(`&saved=1&savedAdd=${urlParam(savedAdd)}&removed=open`));
+	});
+
 	it('should drop a hand-added consultee’s add param and record the removal', async () => {
 		const mockRes = { redirect: mock.fn(), render: mock.fn(), status: mock.fn(() => mockRes) };
 		const kept = addJson('Kept Consultee', 'Still borders');

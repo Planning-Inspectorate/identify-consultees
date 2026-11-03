@@ -21,9 +21,12 @@ import {
 	categoryStaticMapUrl,
 	consulteeSelection,
 	consulteesUrl,
+	discardUnsavedChanges,
 	excludedMatchIds,
 	removeConsulteeUrl,
-	reportUrl
+	reportUrl,
+	savedSelection,
+	withSavedEntries
 } from '../urls.ts';
 import type { ConsulteeRow, ReportConsulteesViewModel } from './view-model.ts';
 
@@ -109,7 +112,10 @@ async function renderCategoryPage(
 	res: Response,
 	context: CategoryContext
 ): Promise<void> {
-	const { project, ruleset, category, selection, consultees, failed, screenedBoundingBox } = context;
+	const { project, ruleset, category, consultees, failed, screenedBoundingBox } = context;
+	// the page's links carry the category's entries as they were when it was opened, for its back
+	// link to return to - only "Save and return" keeps what's changed since
+	const selection = withSavedEntries(context.selection, category);
 	const excluded = excludedMatchIds(selection.removed);
 
 	// the map shows the category's consultees the nearby search found too, fainter (see
@@ -168,10 +174,11 @@ async function renderCategoryPage(
 	const viewModel: ReportConsulteesViewModel = {
 		pageHeading: category,
 		pageCaption: project.properties.caseName,
-		backLinkUrl: reportUrl(project.id, ruleset.id, selection),
+		backLinkUrl: reportUrl(project.id, ruleset.id, discardUnsavedChanges(selection, category)),
 		backLinkText: 'Back to draft report',
 		rows,
 		addConsulteeUrl: addConsulteeUrl(project.id, ruleset.id, category, selection),
+		saveAndReturnUrl: reportUrl(project.id, ruleset.id, savedSelection(selection)),
 		mapId: 'case-map',
 		mapRegionLabel: `Map showing ${category} consultees for ${project.properties.caseName}`,
 		staticMapSrc,
@@ -199,7 +206,8 @@ async function renderCategoryPage(
  * reason for the removal), then any added by hand. The "Add a consultee" page (see add/) adds a
  * consultee by a typed name, matched to the category's nearby consultees as it's typed.
  * The whole selection lives in the URL (see urls.ts), so the check page's counts stay in step.
- * "Back to draft report" goes back to the check page.
+ * "Save and return" goes back to the check page with the changes; "Back to draft report" goes back
+ * without them - the category as it was when the page was opened.
  */
 export function buildReportConsulteesPage(service: ManageService): AsyncRequestHandler {
 	return async (req, res) => {
