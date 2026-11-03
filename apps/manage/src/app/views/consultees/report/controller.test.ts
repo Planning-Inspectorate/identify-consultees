@@ -282,7 +282,7 @@ describe('consultee report check page', () => {
 		);
 	});
 
-	it('should list Nearby NSIPs last, under their own heading, while they are looked for - found or not', () => {
+	it('should list Nearby NSIPs first, under their own heading, while they are looked for - found or not', () => {
 		const ruleset = {
 			id: 'test-ruleset',
 			name: 'Test',
@@ -295,8 +295,8 @@ describe('consultee report check page', () => {
 				group.consultees.map((row) => [row.name, row.names])
 			]),
 			[
-				['Administrative boundaries', [['Parish Council', []]]],
-				['NSIPs', [['NSIPs', []]]]
+				['NSIPs', [['NSIPs', []]]],
+				['Administrative boundaries', [['Parish Council', []]]]
 			]
 		);
 		const nearbyNsip = {
@@ -305,7 +305,7 @@ describe('consultee report check page', () => {
 			reasons: [{ type: 'nearbyNsip' as const, radiusMetres: 10_000 }]
 		};
 		const found = groupedConsultees(ruleset, realProjectId, [nearbyNsip], none, true);
-		assert.deepStrictEqual(found.at(-1)?.consultees, [
+		assert.deepStrictEqual(found[0]?.consultees, [
 			{
 				name: 'NSIPs',
 				names: ['Neighbour (EN010200)'],

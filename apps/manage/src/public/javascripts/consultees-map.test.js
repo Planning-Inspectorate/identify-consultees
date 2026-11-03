@@ -93,6 +93,27 @@ describe('consultees-map client helpers', () => {
 		);
 	});
 
+	test('buildCategorySublayers gives each project drawn in its own colour a sublayer of its own, named for it', () => {
+		const nsip = (id, name, colour) => ({
+			type: 'Feature',
+			properties: { consulteeCategory: 'NSIPs', consulteeId: id, name, colour, ownLayer: 'true' },
+			geometry: { type: 'Polygon', coordinates: [] }
+		});
+		const sublayers = buildCategorySublayers(
+			[nsip('b', 'Second Solar (EN010002)', '#f47738'), nsip('a', 'First Wind (EN010001)', '#1d70b8')],
+			'nsips'
+		);
+		assert.deepEqual(
+			sublayers.map(({ label, filter, style }) => [label, filter, style.stroke]),
+			[
+				['First Wind (EN010001)', ['==', ['get', 'consulteeId'], 'a'], '#1d70b8'],
+				['Second Solar (EN010002)', ['==', ['get', 'consulteeId'], 'b'], '#f47738']
+			]
+		);
+		// one with no name is still listed, under its category
+		assert.equal(buildCategorySublayers([nsip('c', '', '#912b88')], 'nsips')[0].label, 'NSIPs');
+	});
+
 	test('buildDatasets fills the matches by category, one sublayer each, under the project site', () => {
 		const point = (category, colour) => ({
 			type: 'Feature',

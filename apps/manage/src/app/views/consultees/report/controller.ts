@@ -31,7 +31,9 @@ import type {
  * Every category the ruleset covers, in the order its rules name them, then any other category its
  * conditions identified consultees in (see reportCategories), then Nearby NSIPs when they're looked
  * for (`nearbyNsips`) - found or not, as a covered category is - bucketed into the export workbook's
- * group tabs (export/workbook.ts's tabForCategory) so the page's sections match the report.
+ * group tabs (export/workbook.ts's tabForCategory) so the page's sections match the report. The
+ * NSIPs section comes first, where the workbook's tab is last: the other projects near the site are
+ * the first thing a case officer checks.
  * Consultees only the nearby search found aren't counted: they're map context, not report
  * content - including covered categories that matched nothing, so the list reads as the
  * ruleset's full coverage. Excluded consultees (removed on a category's Change page) don't
@@ -70,9 +72,9 @@ export function groupedConsultees(
 		const group = tabForCategory(category, ruleset);
 		byGroup.set(group, [...(byGroup.get(group) ?? []), row(category)]);
 	}
-	return GROUP_TABS.map((tab) => ({ name: tab, consultees: byGroup.get(tab) ?? [] })).filter(
-		(group) => group.consultees.length > 0
-	);
+	return [NEARBY_NSIPS, ...GROUP_TABS.filter((tab) => tab !== NEARBY_NSIPS)]
+		.map((tab) => ({ name: tab, consultees: byGroup.get(tab) ?? [] }))
+		.filter((group) => group.consultees.length > 0);
 }
 
 /**
