@@ -279,6 +279,54 @@ export function rulesetUrl(caseId: string, rulesetId?: string, selection: Consul
 	return appendSelection(url, selection);
 }
 
+/**
+ * The check page's answer a "Change" link changes (`?change=`) - the project, its shapefile or the
+ * ruleset. That step's page then goes back, and on, to the check page, keeping the other answers,
+ * rather than on through the rest of the journey.
+ */
+export type ChangedStep = 'project' | 'shapefile' | 'ruleset';
+
+/** The answer being changed, and the ruleset to keep - none unless both are in the query. */
+export function changedStep(query: Record<string, unknown> = {}): { step: ChangedStep; rulesetId: string } | undefined {
+	const [step] = queryValues(query.change);
+	const [rulesetId] = queryValues(query.ruleset);
+	return (step === 'project' || step === 'shapefile' || step === 'ruleset') && rulesetId
+		? { step, rulesetId }
+		: undefined;
+}
+
+/** The check page's project Change link: the project search, keeping the ruleset for the project picked. */
+export function changeProjectUrl(rulesetId: string): string {
+	return `/?change=project&ruleset=${encodeURIComponent(rulesetId)}`;
+}
+
+/**
+ * The boundary page: on through the journey, or - with `change` - changing the check page's
+ * project or shapefile, keeping its ruleset and, for the shapefile, its selection.
+ */
+export function boundaryUrl(
+	caseId: string,
+	change?: { step: 'project' | 'shapefile'; rulesetId: string },
+	selection: ConsulteeSelection = NO_SELECTION
+): string {
+	const url = `/consultees/${encodeURIComponent(caseId)}`;
+	return change
+		? appendSelection(`${url}?change=${change.step}&ruleset=${encodeURIComponent(change.rulesetId)}`, selection)
+		: url;
+}
+
+/** The check page's ruleset Change link: the picker, its back link and answer both leading back to the check page. */
+export function changeRulesetUrl(
+	caseId: string,
+	rulesetId: string,
+	selection: ConsulteeSelection = NO_SELECTION
+): string {
+	return appendSelection(
+		`/consultees/${encodeURIComponent(caseId)}/ruleset?ruleset=${encodeURIComponent(rulesetId)}&change=ruleset`,
+		selection
+	);
+}
+
 /** The report check page ("Identify consultees" destination) for a boundary/ruleset/selection. */
 export function reportUrl(caseId: string, rulesetId: string, selection: ConsulteeSelection = NO_SELECTION): string {
 	return reportPageUrl(caseId, 'report', rulesetId, selection);

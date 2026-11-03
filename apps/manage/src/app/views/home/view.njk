@@ -37,6 +37,10 @@
 		</div>
 
 		<input type="hidden" name="pageSize" value="{{ pageSize }}">
+		{% if changingProject %}
+			<input type="hidden" name="change" value="{{ changingProject.step }}">
+			<input type="hidden" name="ruleset" value="{{ changingProject.rulesetId }}">
+		{% endif %}
 	</form>
 
 	{% if errorSummary %}
@@ -47,7 +51,7 @@
 
 		{% set tableRows = [] %}
 		{% for geometry in geometries %}
-			{% set nameLink %}<a class="govuk-link" href="/consultees/{{ geometry.id | urlencode }}">{{ geometry.reference }} - {{ geometry.caseName }}</a>{% endset %}
+			{% set nameLink %}<a class="govuk-link" href="{{ geometry.href }}">{{ geometry.reference }} - {{ geometry.caseName }}</a>{% endset %}
 			{% if geometry.stage %}
 				{% set stageCell = govukTag({ text: geometry.stage }) %}
 			{% else %}

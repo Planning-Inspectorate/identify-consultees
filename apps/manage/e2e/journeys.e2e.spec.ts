@@ -385,6 +385,43 @@ test.describe('manage journeys', () => {
 		await expect(page).toHaveURL(/\/consultees\/[0-9a-f-]{36}\/ruleset/);
 	});
 
+	test("the check page's Change links change one answer, then come straight back", async ({ page }) => {
+		const checkPage = new RegExp(`/consultees/${SAMPLE_CASE_ID}/report\\?ruleset=${SAMPLE_RULESET_ID}$`);
+		await page.goto(`/consultees/${SAMPLE_CASE_ID}/report?ruleset=${SAMPLE_RULESET_ID}`);
+
+		// the shapefile: its own file checked, back to the check page, and Continue back to it too
+		await page.getByRole('link', { name: 'Change shapefile' }).click();
+		await expect(page.getByRole('heading', { level: 1 })).toContainText('Project boundary');
+		await expect(page.locator(`input[name="shapefile"][value="${SAMPLE_CASE_ID}"]`)).toBeChecked();
+		await page.getByRole('link', { name: 'Back', exact: true }).click();
+		await expect(page).toHaveURL(checkPage);
+		await page.getByRole('link', { name: 'Change shapefile' }).click();
+		await page.getByRole('button', { name: 'Continue' }).click();
+		await expect(page).toHaveURL(checkPage);
+		await expect(page.getByRole('heading', { level: 1 })).toContainText('Check consultees before creating the report');
+
+		// the ruleset: back to the check page, and Identify consultees back to it with the one picked
+		await page.getByRole('link', { name: 'Change ruleset' }).click();
+		await expect(page.getByRole('radio', { name: SAMPLE_RULESET_NAME })).toBeChecked();
+		await page.getByRole('link', { name: 'Back', exact: true }).click();
+		await expect(page).toHaveURL(checkPage);
+		await page.getByRole('link', { name: 'Change ruleset' }).click();
+		await page.getByRole('button', { name: 'Identify consultees' }).click();
+		await expect(page).toHaveURL(checkPage);
+
+		// the project: the search - a new one keeping the ruleset - and its project links keeping it
+		// for the one picked
+		await page.getByRole('link', { name: 'Change project' }).click();
+		await expect(page).toHaveURL(new RegExp(`/\\?change=project&ruleset=${SAMPLE_RULESET_ID}$`));
+		await page.getByLabel('Find a project').fill(SAMPLE_CASE_REFERENCE);
+		await page.getByRole('button', { name: 'Search' }).click();
+		await expect(page).toHaveURL(new RegExp(`change=project&ruleset=${SAMPLE_RULESET_ID}`));
+		await page.locator(`a[href="/consultees/${SAMPLE_CASE_ID}?change=project&ruleset=${SAMPLE_RULESET_ID}"]`).click();
+		await page.locator(`input[name="shapefile"][value="${SAMPLE_CASE_ID}"]`).check();
+		await page.getByRole('button', { name: 'Continue' }).click();
+		await expect(page).toHaveURL(checkPage);
+	});
+
 	test('a direct link to the project boundary page works', async ({ page }) => {
 		await page.goto(`/consultees/${SAMPLE_CASE_ID}`);
 		await expect(page.getByRole('heading', { level: 1 })).toContainText('Project boundary');

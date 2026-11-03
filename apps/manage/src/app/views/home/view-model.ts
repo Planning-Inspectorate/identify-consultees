@@ -15,10 +15,14 @@ export interface HomeViewModel {
 	searchError?: { text: string };
 	/** The layout renders the summary itself - links to the search input. */
 	errorSummary?: { text: string; href: string }[];
+	/** Changing the check page's project - the search form carries it, and the ruleset it keeps. */
+	changingProject?: { step: 'project'; rulesetId: string };
 }
 
 export interface ProjectGeometry {
 	id: string;
+	/** Its boundary page - keeping the check page's ruleset when changing its project. */
+	href: string;
 	reference: string;
 	caseName: string;
 	/** The case's stage (Pre-Examination), shown as a tag - case_boundary.acceptance, set by a CBOS import. */

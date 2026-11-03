@@ -1,7 +1,9 @@
 import type { ManageService } from '#service';
 import type { CaseBoundarySummary } from '@pins/identify-consultees-database/src/geospatial/case-boundaries.ts';
 import { searchCaseBoundaries } from '@pins/identify-consultees-database/src/geospatial/case-boundaries.ts';
+import { getRuleset } from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
 import type { AsyncRequestHandler } from '@planning-inspectorate/core/util';
+import { boundaryUrl, changedStep } from '../consultees/report/urls.ts';
 import { buildPagination } from './pagination.ts';
 import type { HomeViewModel, ProjectGeometry } from './view-model.ts';
 
@@ -25,9 +27,13 @@ function parsePage(value: unknown): number {
 	return parsed >= 1 ? parsed : 1;
 }
 
-function toProjectGeometry(summary: CaseBoundarySummary): ProjectGeometry {
+function toProjectGeometry(
+	summary: CaseBoundarySummary,
+	changingProject?: { step: 'project'; rulesetId: string }
+): ProjectGeometry {
 	return {
 		id: summary.id,
+		href: boundaryUrl(summary.id, changingProject),
 		reference: summary.reference,
 		caseName: summary.caseName,
 		stage: summary.acceptance
@@ -36,7 +42,9 @@ function toProjectGeometry(summary: CaseBoundarySummary): ProjectGeometry {
 
 /**
  * Step 1 of the identify-consultees flow: search for and pick a project. Picking one (see
- * views/home/view.njk) moves on to /consultees/:caseId - the project boundary page.
+ * views/home/view.njk) moves on to /consultees/:caseId - the project boundary page. Changing the
+ * check page's project (`?change=project`), the search, its pages and its project links keep the
+ * check page's ruleset, so the boundary page goes straight back to it.
  */
 export function buildHomePage(service: ManageService): AsyncRequestHandler {
 	const { db, logger } = service;
@@ -51,12 +59,20 @@ export function buildHomePage(service: ManageService): AsyncRequestHandler {
 		const pageSize = parsePageSize(req.query.pageSize);
 		const page = parsePage(req.query.page);
 
+		// changing the check page's project: the search keeps its ruleset, for the project picked
+		const change = changedStep(req.query);
+		const changingProject =
+			change?.step === 'project' && getRuleset(change.rulesetId)
+				? { step: 'project' as const, rulesetId: change.rulesetId }
+				: undefined;
+
 		const hrefForPage = (targetPage: number): string => {
 			const params = new URLSearchParams({
 				// no q at all when nothing was searched - a blank q is a blank search, an error
 				...(searchQuery ? { q: searchQuery } : {}),
 				pageSize: String(pageSize),
-				page: String(targetPage)
+				page: String(targetPage),
+				...(changingProject ? { change: changingProject.step, ruleset: changingProject.rulesetId } : {})
 			});
 			return `/?${params.toString()}`;
 		};
@@ -70,7 +86,7 @@ export function buildHomePage(service: ManageService): AsyncRequestHandler {
 					limit: pageSize,
 					offset: (page - 1) * pageSize
 				});
-				geometries = features.map(toProjectGeometry);
+				geometries = features.map((summary) => toProjectGeometry(summary, changingProject));
 				resultsTotal = total;
 			} catch (error) {
 				logger.error({ error }, 'Failed to search case boundaries');
@@ -94,6 +110,7 @@ export function buildHomePage(service: ManageService): AsyncRequestHandler {
 			resultsTotal,
 			geometries,
 			pagination: buildPagination(page, totalPages, hrefForPage),
+			...(changingProject ? { changingProject } : {}),
 			...(blankSearch
 				? {
 						searchError: { text: 'Enter a search term' },

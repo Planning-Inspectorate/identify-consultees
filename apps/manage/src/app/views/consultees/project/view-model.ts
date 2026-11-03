@@ -5,6 +5,8 @@ export interface BoundaryFileRadio {
 	text: string;
 	/** "Uploaded: ..." when the file has a received date. */
 	hint?: { text: string };
+	/** The file the check page has - checked only when changing it there. */
+	checked?: boolean;
 }
 
 export interface ConsulteeProjectViewModel {
@@ -15,14 +17,15 @@ export interface ConsulteeProjectViewModel {
 	caseName: string;
 	caseId: string;
 	backLinkUrl: string;
-	/** "Back to projects" - the layout renders the back link itself from these two. */
+	/** "Back to projects", or "Back" to the check page - the layout renders the back link itself from these two. */
 	backLinkText: string;
 	/** Where the "Confirm shapefile" form posts. */
 	formAction: string;
 	/**
 	 * Every shapefile the case holds, as radios - only one is carried into the report. The
-	 * Design System's radios guidance says never to pre-select an option, so the items carry
-	 * no `checked` state: the user must pick one before continuing.
+	 * Design System's radios guidance says never to pre-select an option the user hasn't chosen,
+	 * so only the check page's own file is checked, when it's being changed there: otherwise the
+	 * user must pick one before continuing.
 	 */
 	files: BoundaryFileRadio[];
 	/** govukRadios' errorMessage param - present only after an unanswered submit. */

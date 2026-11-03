@@ -12,6 +12,9 @@ import { GROUP_TABS, tabForCategory } from './export/workbook.ts';
 import { consulteeName } from './report-consultees.ts';
 import type { ConsulteeSelection } from './urls.ts';
 import {
+	boundaryUrl,
+	changeProjectUrl,
+	changeRulesetUrl,
 	consulteeSelection,
 	consulteesUrl,
 	excludedMatchIds,
@@ -112,13 +115,14 @@ export function buildReportCheckPage(service: ManageService): AsyncRequestHandle
 			backLinkUrl: rulesetUrl(project.id, ruleset.id, selection),
 			caseName: project.properties.caseName,
 			reference: project.properties.caseReference,
-			// changing the project means picking a different one - back to the search
-			caseChangeUrl: '/',
+			// each Change link changes that answer alone, then comes back here keeping the others: a
+			// different project (and its shapefile) keeps the ruleset; a different shapefile of this
+			// project keeps the ruleset and the consultees added and removed
+			caseChangeUrl: changeProjectUrl(ruleset.id),
 			shapefileName: project.properties.fileName ?? 'Not provided',
-			// changing the shapefile means re-confirming the boundary - back to the map page
-			shapefileChangeUrl: `/consultees/${encodeURIComponent(project.id)}`,
+			shapefileChangeUrl: boundaryUrl(project.id, { step: 'shapefile', rulesetId: ruleset.id }, selection),
 			rulesetName: ruleset.name,
-			rulesetChangeUrl: rulesetUrl(project.id, ruleset.id, selection),
+			rulesetChangeUrl: changeRulesetUrl(project.id, ruleset.id, selection),
 			groups: groupedConsultees(ruleset, project.id, consultees, selection, service.nearbyNsipRadiusMetres > 0),
 			generateReportUrl: reportCreatedUrl(project.id, ruleset.id, selection),
 			rulesetFailed: failed,

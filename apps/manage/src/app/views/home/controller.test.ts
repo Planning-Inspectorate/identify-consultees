@@ -89,6 +89,32 @@ describe('home page', () => {
 		assert.strictEqual(viewModel.resultsTotal, 1);
 	});
 
+	it("should keep the check page's ruleset through the search when changing its project", async () => {
+		const nunjucks = configureNunjucks();
+		const render = async (query: Record<string, unknown>) => {
+			const mockRes = { render: mock.fn((view, data) => nunjucks.render(view, data)) };
+			// more than a page of results, so there are page links
+			const rows = [{ ...newRow({ id: 'aaaa' }), totalCount: 60n }];
+			await buildHomePage({ logger: mockLogger(), db: createMockDb(rows) })(query, mockRes);
+			return { viewModel: mockRes.render.mock.calls[0].arguments[1], html: mockRes.render.mock.calls[0].result };
+		};
+		const ruleset = 'england-wales-post-20240430';
+		const { viewModel, html } = await render({ query: { change: 'project', ruleset, q: 'Wind' } });
+		// the project picked goes to its boundary page, and from there straight back to the check page
+		assert.strictEqual(viewModel.geometries[0].href, `/consultees/aaaa?change=project&ruleset=${ruleset}`);
+		assert.ok(viewModel.pagination.next.href.endsWith(`&change=project&ruleset=${ruleset}`));
+		// and a new search keeps it too
+		assert.match(html, /<input type="hidden" name="change" value="project">/);
+		assert.match(html, new RegExp(`<input type="hidden" name="ruleset" value="${ruleset}">`));
+
+		// a plain search, or a ruleset that isn't one, is the start of the journey
+		for (const query of [{}, { change: 'project', ruleset: 'not-a-ruleset' }]) {
+			const plain = await render({ query });
+			assert.strictEqual(plain.viewModel.geometries[0].href, '/consultees/aaaa');
+			assert.doesNotMatch(plain.html, /name="change"/);
+		}
+	});
+
 	it('should map acceptance to the stage shown in the results table', async () => {
 		const mockRes = { render: mock.fn() };
 		const rows = [{ ...newRow(), acceptance: 'Acceptance' }];

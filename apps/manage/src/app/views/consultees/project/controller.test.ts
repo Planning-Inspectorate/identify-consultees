@@ -93,6 +93,60 @@ describe('consultee project boundary page', () => {
 		assert.match(html, /app-consultee-map/);
 	});
 
+	it("should check the check page's file, and go back to it, when changing its shapefile", async () => {
+		const exclude = Buffer.from('{"i":"m1","c":"Parish Council","n":"Abbey Parish","r":"Not affected"}').toString(
+			'base64url'
+		);
+		const render = async (query: Record<string, unknown>) => {
+			const mockRes = { status: mock.fn(() => mockRes), render: mock.fn() };
+			const db = dbReturning([
+				[realProjectRow()],
+				[boundaryFile(siblingProjectRow()), boundaryFile(realProjectRow())],
+				[siblingProjectRow()]
+			]);
+			await pageHandlerFor(db)({ params: { caseId: realProjectId }, query }, mockRes);
+			return mockRes.render.mock.calls[0].arguments[1];
+		};
+		const ruleset = 'england-wales-post-20240430';
+		const shapefile = await render({ change: 'shapefile', ruleset, exclude });
+		assert.strictEqual(
+			shapefile.backLinkUrl,
+			`/consultees/${realProjectId}/report?ruleset=${ruleset}&exclude=${exclude}`
+		);
+		assert.strictEqual(shapefile.backLinkText, 'Back');
+		assert.strictEqual(
+			shapefile.formAction,
+			`/consultees/${realProjectId}?change=shapefile&ruleset=${ruleset}&exclude=${exclude}`
+		);
+		assert.strictEqual(shapefile.retryUrl, shapefile.formAction);
+		// the file the check page has is the answer being changed - checked; the other isn't
+		assert.deepStrictEqual(
+			shapefile.files.map((file: { value: string; checked?: boolean }) => [file.value, file.checked ?? false]),
+			[
+				[siblingProjectId, false],
+				[realProjectId, true]
+			]
+		);
+
+		// a different project: back to the search keeping the ruleset, nothing checked, no selection
+		const project = await render({ change: 'project', ruleset, exclude });
+		assert.strictEqual(project.backLinkUrl, `/?change=project&ruleset=${ruleset}`);
+		assert.strictEqual(project.backLinkText, 'Back to projects');
+		assert.strictEqual(project.formAction, `/consultees/${realProjectId}?change=project&ruleset=${ruleset}`);
+		assert.ok(project.files.every((file: { checked?: boolean }) => !file.checked));
+
+		// a ruleset that isn't one, or no step, carries on through the journey
+		for (const query of [
+			{ change: 'shapefile', ruleset: 'not-a-ruleset' },
+			{ change: 'ruleset', ruleset },
+			{ ruleset }
+		]) {
+			const page = await render(query);
+			assert.strictEqual(page.backLinkUrl, '/', JSON.stringify(query));
+			assert.strictEqual(page.formAction, `/consultees/${realProjectId}`, JSON.stringify(query));
+		}
+	});
+
 	it('should list every stored file when a case has more than one', async () => {
 		const mockRes = { status: mock.fn(() => mockRes), render: mock.fn() };
 		const db = dbReturning([
@@ -258,6 +312,47 @@ describe('project boundary submit', () => {
 		const db = dbReturning([[realProjectRow()], [boundaryFile(siblingProjectRow()), boundaryFile(realProjectRow())]]);
 		await submitHandlerFor(db)({ params: { caseId: realProjectId }, body: { shapefile: siblingProjectId } }, mockRes);
 		assert.strictEqual(mockRes.redirect.mock.calls[0].arguments[0], `/consultees/${siblingProjectId}/ruleset`);
+	});
+
+	it('should go straight back to the check page when changing its project or shapefile', async () => {
+		const exclude = Buffer.from('{"i":"m1","c":"Parish Council","n":"Abbey Parish","r":"Not affected"}').toString(
+			'base64url'
+		);
+		const ruleset = 'england-wales-post-20240430';
+		const submit = async (query: Record<string, unknown>) => {
+			const mockRes = { status: mock.fn(() => mockRes), render: mock.fn(), redirect: mock.fn() };
+			const db = dbReturning([[realProjectRow()], [boundaryFile(siblingProjectRow()), boundaryFile(realProjectRow())]]);
+			await submitHandlerFor(db)(
+				{ params: { caseId: realProjectId }, query, body: { shapefile: siblingProjectId } },
+				mockRes
+			);
+			return mockRes.redirect.mock.calls[0].arguments[0];
+		};
+		// the other file of this project keeps the ruleset and the consultees added and removed
+		assert.strictEqual(
+			await submit({ change: 'shapefile', ruleset, exclude }),
+			`/consultees/${siblingProjectId}/report?ruleset=${ruleset}&exclude=${exclude}`
+		);
+		// another project keeps the ruleset alone
+		assert.strictEqual(
+			await submit({ change: 'project', ruleset, exclude }),
+			`/consultees/${siblingProjectId}/report?ruleset=${ruleset}`
+		);
+	});
+
+	it("should keep changing the check page's shapefile through an error re-render", async () => {
+		const mockRes = { status: mock.fn(() => mockRes), render: mock.fn(), redirect: mock.fn() };
+		const db = dbReturning([[realProjectRow()], [boundaryFile(realProjectRow())], [realProjectRow()]]);
+		const ruleset = 'england-wales-post-20240430';
+		await submitHandlerFor(db)(
+			{ params: { caseId: realProjectId }, query: { change: 'shapefile', ruleset }, body: {} },
+			mockRes
+		);
+		const viewModel = mockRes.render.mock.calls[0].arguments[1];
+		assert.strictEqual(viewModel.backLinkUrl, `/consultees/${realProjectId}/report?ruleset=${ruleset}`);
+		assert.strictEqual(viewModel.formAction, `/consultees/${realProjectId}?change=shapefile&ruleset=${ruleset}`);
+		// nothing was picked, so nothing is checked
+		assert.ok(viewModel.files.every((file: { checked?: boolean }) => !file.checked));
 	});
 
 	it('should re-render with a validation error when the submitted file is missing or not one of this project', async () => {
