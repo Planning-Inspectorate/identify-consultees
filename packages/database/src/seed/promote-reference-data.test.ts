@@ -475,8 +475,8 @@ describe('blobFileStore', () => {
 });
 
 // the isMain block only runs as a script, so this spawns the real CLI in a child process - child
-// coverage still counts towards this file's numbers. The seeded database's consultee areas have no
-// load on record, so the export fails with the PromotionError the run logs
+// coverage still counts towards this file's numbers. The export asks for a quarter that isn't in
+// use, so it fails with the PromotionError the run logs
 const cliPath = fileURLToPath(new URL('./promote-reference-data.ts', import.meta.url));
 
 let dbClient: PrismaClient;
@@ -516,10 +516,12 @@ describe('running as a script (requires a local SQL Server - see docker-compose.
 
 	test('fails with the PromotionError a real export raises', async (t) => {
 		if (!dbAvailable) return t.skip('SQL Server database not available');
+		// a quarter long before any dataset, so it's never the one in use: the export refuses it
+		// before reading a load or touching blob storage, whatever this database has loaded
 		try {
 			execFileSync(
 				process.execPath,
-				['--experimental-strip-types', cliPath, 'export', '--quarter=2026Q4', `--dir=${dir}`],
+				['--experimental-strip-types', cliPath, 'export', '--quarter=1999Q1', `--dir=${dir}`],
 				{
 					env: { ...process.env, SQL_CONNECTION_STRING: connectionString!, ...BLOB_ENV },
 					encoding: 'utf8'
