@@ -128,15 +128,33 @@ describe('running as a script', () => {
 		});
 	});
 
-	test("frees the PORT env var's port, defaulting to 8090, with no arguments", async () => {
+	test("frees the PORT env var's port with no arguments", async () => {
 		const port = await unusedPort();
 		execFileSync(process.execPath, ['--experimental-strip-types', cliPath, 'not-a-port'], {
 			encoding: 'utf8',
 			env: { ...process.env, PORT: String(port) }
 		});
+	});
+
+	test('defaults to 8090 with no arguments and no PORT - probed, never freed', () => {
+		// 8090 is where the app runs locally, so the real script must not free it from a test: the
+		// probe is faked to report what it was asked about, and that nothing listens
+		const harness = `
+			const { mock } = await import('node:test');
+			mock.module('node:child_process', {
+				namedExports: { spawnSync: (command, args) => { console.log(command, args.join(' ')); return { status: 0, stdout: '' }; } }
+			});
+			process.argv[1] = ${JSON.stringify(cliPath)};
+			await import(${JSON.stringify(pathToFileURL(cliPath).href)});
+		`;
 		const env = { ...process.env };
 		delete env.PORT;
-		execFileSync(process.execPath, ['--experimental-strip-types', cliPath], { encoding: 'utf8', env });
+		const stdout = execFileSync(
+			process.execPath,
+			['--experimental-test-module-mocks', '--input-type=module', '--experimental-strip-types', '--eval', harness],
+			{ encoding: 'utf8', env }
+		);
+		assert.match(stdout, process.platform === 'win32' ? /LocalPort 8090/ : /-tiTCP:8090/);
 	});
 
 	test('exits non-zero when the ports cannot be probed', () => {
