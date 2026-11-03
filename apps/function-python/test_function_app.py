@@ -256,6 +256,7 @@ def test_run_ruleset_passes_each_categorys_nearby_radius_on():
         {**VALID_BODY, "timeoutSeconds": 601},
         {**VALID_BODY, "timeoutSeconds": True},
         {**VALID_BODY, "timeoutSeconds": "55"},
+        {**VALID_BODY, "rules": ["not-an-object"]},
     ],
 )
 def test_run_ruleset_rejects_a_malformed_request_before_touching_the_database(body):

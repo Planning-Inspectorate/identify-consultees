@@ -95,9 +95,9 @@ Before a PR is opened or handed over for review, run the same checks the pipelin
 
 - `npm run check-types && npm run lint && npm run format-prettier-check` — the static checks.
 - `npm run build` (in `apps/manage`) — the app must still build.
-- `npm run test-coverage` — every test passes, and the run ends with the manage app's hard 100% line/function/branch coverage gate (`apps/manage/scripts/run-frontend-coverage.mjs`): a green `node --test` run alone does not prove the gate passes, and new code needs tests that cover it.
+- `npm run test-coverage` — every test passes, with hard 100% line/function/branch coverage gates across the JavaScript codebase: `test:packages-coverage` covers `packages/database/src` and `scripts/*.ts`, and the run ends with the manage app's gate (`apps/manage/scripts/run-frontend-coverage.mjs`). A green `node --test` run alone does not prove the gates pass, and new code needs tests that cover it.
 - `npm run commitlint` — confirms the commit subjects are Conventional Commits.
-- `apps/function-python` changes: `python3 -m ruff check .` and `python3 -m pytest` there.
+- `apps/function-python` changes: `python3 -m ruff check .` and `python3 -m pytest --cov --cov-fail-under=100` there — the same 100% statement gate as the JavaScript suites.
 
 `test-coverage` needs the local database and Playwright browsers set up (see CONTRIBUTING.md). If the pipeline still fails, "Reading Azure DevOps CI logs" below explains how to pull the failing step's log.
 

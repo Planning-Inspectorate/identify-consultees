@@ -5,7 +5,12 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from cbos.config import CbosConfig, CbosNotConfigured, cbos_config_from_env
-from cbos.connection_check import check_cbos, check_database, check_storage
+from cbos.connection_check import (
+    check_cbos,
+    check_database,
+    check_storage,
+    default_credential,
+)
 
 SETTINGS = {
     "IDAS_BACK_OFFICE_DATABASE_SERVER": "sql.example.net",
@@ -108,3 +113,9 @@ def test_check_cbos_reports_each_part_and_fails_if_either_does():
         "database": {"status": "ERROR", "detail": "TimeoutError: timed out"},
         "storage": {"status": "OK", "detail": "listed 1 blob name(s) in document-service-uploads"},
     }
+
+
+def test_default_credential_builds_an_azure_identity():
+    from azure.identity import DefaultAzureCredential
+
+    assert isinstance(default_credential(), DefaultAzureCredential)

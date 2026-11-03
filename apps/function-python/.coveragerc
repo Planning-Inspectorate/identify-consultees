@@ -1,0 +1,8 @@
+[run]
+# the tests themselves are not part of the 100% gate - the conftest skip path in particular only
+# runs where there is no database, which no environment with a database can hit
+omit =
+    conftest.py
+    */conftest.py
+    test_*.py
+    */test_*.py
