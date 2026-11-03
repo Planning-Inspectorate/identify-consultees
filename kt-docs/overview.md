@@ -152,13 +152,14 @@ The main journey is **database-backed**: there are no fixtures. Locally the data
 
 ## Open questions
 
-| Question                                                                      | Today                                                              |
-| ----------------------------------------------------------------------------- | ------------------------------------------------------------------ |
-| Where do the other rulesets come from?                                        | Three, from the rulesets workbook                                  |
-| Should the report include every consultee within the nearby radius?           | It does: they're listed with the reason "Within 20km of the site"  |
-| Which formats should project upload accept, and who owns the stored boundary? | No upload; existing case boundaries only                           |
-| When does the full reference dataset replace the sample in Test and Training? | Dev has the full dataset; Test and Training have the seeded sample |
-| Are the screening margins right?                                              | See [Screening issues](./data/screening-issues.md)                 |
+| Question                                                                      | Today                                                                                                                                                     |
+| ----------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Where do the other rulesets come from?                                        | Three, from the rulesets workbook                                                                                                                         |
+| Should the report include every consultee within the nearby radius?           | It does: they're listed with the reason "Within 20km of the site"                                                                                         |
+| Which formats should project upload accept, and who owns the stored boundary? | No upload; existing case boundaries only                                                                                                                  |
+| When does the full reference dataset replace the sample in Test and Training? | Dev has the full dataset; Test and Training have the seeded sample                                                                                        |
+| Are the screening margins right?                                              | See [Screening issues](./data/screening-issues.md)                                                                                                        |
+| Does the map PDFs' licensing statement cover every reference dataset?         | OpenStreetMap, OS data and the OGL (`mapLicensing` in `map-pdf.ts`); a dataset under another licence (The Crown Estate's, say) needs its own credit added |
 
 ## Before go-live
 
