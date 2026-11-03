@@ -12,6 +12,7 @@ import { NEARBY_NSIPS } from '../../nearby-nsips.ts';
 import { describeReasons } from '../../reasons.ts';
 import { resolveCase } from '../../resolve-case.ts';
 import { buildSearchAreaSafely, firstQueryValue, requestedRuleset, runRulesetSafely } from '../../run-ruleset.ts';
+import { categoryBufferMetres, siteBufferGeojson, siteBuffers } from '../../site-buffers.ts';
 import { rulesetCategories } from '../categories.ts';
 import { addedConsulteeReason, consulteeName } from '../report-consultees.ts';
 import type { ConsulteeSelection } from '../urls.ts';
@@ -139,14 +140,24 @@ async function renderCategoryPage(
 	);
 	const staticMapSrc = categoryStaticMapUrl(project.id, ruleset.id, category, selection);
 	const staticMapAlt = `Static map showing ${category} consultees for ${project.properties.caseName}`;
-	const map = buildCaseMapConfig(
+	// the ruleset's buffers for the category around the site, as the report's map draws them
+	const buffers = await siteBuffers(
+		service,
 		project,
-		drawn,
-		category,
-		searchArea,
-		{ src: staticMapSrc, alt: staticMapAlt },
-		categorySettings(category).mapMarginMetres
+		screenedBoundingBox ? 'boundingBox' : 'outline',
+		categoryBufferMetres(ruleset, category, service.nearbyNsipRadiusMetres)
 	);
+	const map = {
+		...buildCaseMapConfig(
+			project,
+			drawn,
+			category,
+			searchArea,
+			{ src: staticMapSrc, alt: staticMapAlt },
+			categorySettings(category).mapMarginMetres
+		),
+		...(buffers.length > 0 ? { bufferGeojson: siteBufferGeojson(buffers) } : {})
+	};
 
 	// consultees alphabetically by name, ruleset matches and hand-added ones together - every
 	// Remove link opens the "Remove consultee" page, which records the reason before excluding

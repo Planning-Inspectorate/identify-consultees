@@ -259,6 +259,46 @@ describe('consultees results static map', () => {
 		assert.match(await svg({ ...query, include: nearbyRow.id }), new RegExp(`fill-opacity="${REGIONAL_FILL_OPACITY}"`));
 	});
 
+	it("should draw the category's ruleset buffers around the site, dashed, as its interactive map does", async () => {
+		const svg = async (category: string) => {
+			const db = dbReturning([[realProjectRow()], [railwayMatchRow()]]);
+			const siteQueries = db.$queryRaw;
+			// the site grown by a buffer - a square around the point site
+			const withBuffer = {
+				...db,
+				$queryRaw: mock.fn(async (sql: TemplateStringsArray) =>
+					sql.join('').includes('BufferWithTolerance')
+						? [{ wkt: 'POLYGON((-1.6 52.4, -1.4 52.4, -1.4 52.6, -1.6 52.6, -1.6 52.4))' }]
+						: siteQueries(sql)
+				)
+			};
+			const handler = buildResultsStaticMap(
+				{
+					db: withBuffer,
+					logger: mockLogger(),
+					nearbyConsulteeRadiusMetres: 20_000,
+					rulesetRunner: rulesetRunnerFor(db)
+				},
+				true
+			);
+			const mockRes = {
+				status: mock.fn(() => mockRes),
+				type: mock.fn(() => mockRes),
+				set: mock.fn(() => mockRes),
+				send: mock.fn()
+			};
+			await handler(
+				{ params: { caseId: realProjectId }, query: { ruleset: 'england-wales-post-20240430', category }, headers: {} },
+				mockRes
+			);
+			return String(mockRes.send.mock.calls[0].arguments[0]);
+		};
+		// railways are found within 10km of the site
+		assert.match(await svg('Railway'), /stroke-dasharray="8 5"/);
+		// parishes must intersect it - no buffer
+		assert.doesNotMatch(await svg('Parish Council'), /stroke-dasharray="8 5"/);
+	});
+
 	it('should 503 rather than serve a cacheable empty map if the ruleset query fails', async () => {
 		const mockRes = {
 			status: mock.fn(() => mockRes),

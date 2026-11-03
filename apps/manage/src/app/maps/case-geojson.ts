@@ -194,6 +194,11 @@ export interface CaseMapConfig {
 	projectGeojson: GeoJsonFeatureCollection;
 	consulteeGeojson: GeoJsonFeatureCollection;
 	/**
+	 * The ruleset's buffers around the site for the map's category, drawn dashed - each labelled
+	 * with its distance (see views/consultees/site-buffers.ts). None when its conditions have none.
+	 */
+	bufferGeojson?: GeoJsonFeatureCollection;
+	/**
 	 * The JS init-failure fallback's static-map image - carried in the page config because
 	 * data-* attributes on the map container are JSON.parsed by the InteractiveMap constructor.
 	 */

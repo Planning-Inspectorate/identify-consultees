@@ -157,6 +157,30 @@ describe('report consultees change page', () => {
 		assert.doesNotMatch(html, /Removed consultees/);
 	});
 
+	it("should draw the category's ruleset buffers around the site on its map - none for one without", async () => {
+		const ambulanceTrust = {
+			...parishMatchRow(matchId, 'East of England Ambulance Service', 4_000),
+			consulteeCategory: 'Ambulance Trust',
+			reasons: [{ type: 'condition' as const, conditionId: 'ambulance_trusts_10km' }]
+		};
+		const mapFor = async (category: string, match: unknown) => {
+			const mockRes = { status: mock.fn(() => mockRes), render: mock.fn() };
+			await handlerFor(dbReturning([[realProjectRow()], [match]]))(
+				{ params: { caseId: realProjectId }, query: { ruleset: 'england-wales-post-20240430', category } },
+				mockRes
+			);
+			return JSON.parse(mockRes.render.mock.calls[0].arguments[1].mapConfigJson);
+		};
+		// its conditions find it within 1km and within 10km
+		const ambulance = await mapFor('Ambulance Trust', ambulanceTrust);
+		assert.deepStrictEqual(
+			ambulance.bufferGeojson.features.map((feature: { properties: { label: string } }) => feature.properties.label),
+			['1 km', '10 km']
+		);
+		// a parish must intersect the site - no buffer to draw
+		assert.strictEqual((await mapFor('Parish Council', parishMatchRow())).bufferGeojson, undefined);
+	});
+
 	it('should list every condition a consultee met, but not the nearby search', async () => {
 		const mockRes = { status: mock.fn(() => mockRes), render: mock.fn() };
 		const hospitalRow = {
