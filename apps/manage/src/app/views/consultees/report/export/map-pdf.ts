@@ -4,7 +4,7 @@ import { formatDate } from './workbook.ts';
 
 /**
  * One category's map as a PDF, for the report download: an A4 landscape page with the category's
- * static map, a scale bar, a key and the licences its data is used under, then the category's consultees in the report, with why each is in it.
+ * static map, a scale bar, a key and its basemap's licence, then the category's consultees in the report, with why each is in it.
  */
 
 /** A consultee as the map PDF lists it. */
@@ -148,18 +148,9 @@ function drawBasemapCredit(doc: PDFKit.PDFDocument, right: number, bottom: numbe
 	doc.fillColor(TEXT_COLOUR).text(BASEMAP_CREDIT, x + padding, y + 3, { lineBreak: false });
 }
 
-/**
- * The licences a map's data is used under, at the foot of its page: the basemap's, and the
- * consultee areas' and site boundaries' - Ordnance Survey and other public sector data, under the
- * Open Government Licence - dated the year the report was made.
- */
-export function mapLicensing(generatedAt: Date): string[] {
-	const year = generatedAt.toLocaleDateString('en-GB', { year: 'numeric', timeZone: 'Europe/London' });
-	return [
-		'Basemap © OpenStreetMap contributors, available under the Open Database Licence: openstreetmap.org/copyright.',
-		`Contains OS data © Crown copyright and database right ${year}. Contains public sector information licensed under the Open Government Licence v3.0.`
-	];
-}
+// the basemap's licence in full, at the foot of the map's page
+const BASEMAP_LICENCE =
+	'Basemap © OpenStreetMap contributors, available under the Open Database Licence: openstreetmap.org/copyright.';
 
 // how many of the projects' colours the key shows, side by side, for "a colour per project"
 const KEY_PROJECT_COLOURS = 4;
@@ -250,10 +241,13 @@ export function buildMapPdf(input: MapPdfInput): Promise<Buffer> {
 			.fillColor(TEXT_COLOUR)
 			.text(pdfText(input.mapNote), MARGIN, mapTop + MAP_HEIGHT + 30, { width });
 	}
-	// at the foot of the page, clear of the key and any note
-	const licensing = mapLicensing(input.generatedAt).join('\n');
-	doc.font('Helvetica').fontSize(8).fillColor(SECONDARY_TEXT_COLOUR);
-	doc.text(licensing, MARGIN, doc.page.height - MARGIN - doc.heightOfString(licensing, { width }), { width });
+	// at the foot of the page, clear of the key and any note - one line, so it can't spill onto a
+	// page of its own
+	doc
+		.font('Helvetica')
+		.fontSize(8)
+		.fillColor(SECONDARY_TEXT_COLOUR)
+		.text(BASEMAP_LICENCE, MARGIN, doc.page.height - MARGIN - doc.currentLineHeight(true), { lineBreak: false });
 
 	doc.addPage();
 	doc
