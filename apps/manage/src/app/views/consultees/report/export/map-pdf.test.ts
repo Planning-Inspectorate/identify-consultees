@@ -54,6 +54,27 @@ describe('report map PDF', () => {
 		assert.ok(!lines.some((line) => line.startsWith('Nearby')));
 	});
 
+	it('keys a colour per project when each is drawn in its own, with its swatch beside its name', async () => {
+		const colours = ['#1d70b8', '#f47738', '#912b88', '#28a197', '#b58840'];
+		const pdf = await buildMapPdf(
+			input({
+				category: 'NSIPs',
+				consultees: colours.map((colour, index) => ({
+					name: `Project ${index + 1} (EN01000${index + 1})`,
+					identified: ['35km buffer'],
+					mapped: true,
+					colour
+				}))
+			})
+		);
+		const lines = pdfTextLines(pdf);
+		assert.ok(lines.includes('In the report, a colour per project (listed on the next page)'));
+		assert.ok(!lines.includes('In the report'));
+		assert.ok(lines.includes('Project 5 (EN010005)'));
+		// each project is still listed, each with its own swatch beside its name
+		assert.equal(lines.filter((line) => /^Project \d \(EN01000\d\)$/.test(line)).length, 5);
+	});
+
 	it('keys one buffer, and none when the map draws none', async () => {
 		assert.ok(pdfTextLines(await buildMapPdf(input({ buffers: ['500 m'] }))).includes('Ruleset buffer (500 m)'));
 		assert.ok(!pdfTextLines(await buildMapPdf(input({ buffers: [] }))).some((line) => line.startsWith('Ruleset b')));

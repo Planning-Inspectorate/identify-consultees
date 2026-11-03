@@ -13,6 +13,8 @@ export interface MapPdfConsultee {
 	identified: string[];
 	/** False for one added by hand that the map doesn't draw - see ReportConsultee.mapped. */
 	mapped: boolean;
+	/** The colour it alone is drawn in - a Nearby NSIP, each project its own (see nsipColours). */
+	colour?: string;
 }
 
 export interface MapPdfInput {
@@ -79,9 +81,25 @@ function dashedSwatch(doc: PDFKit.PDFDocument, x: number, y: number): void {
 		.restore();
 }
 
-function drawKey(doc: PDFKit.PDFDocument, y: number, colours: MapPdfInput['colours'], buffers: string[]): void {
+// how many of the projects' colours the key shows, side by side, for "a colour per project"
+const KEY_PROJECT_COLOURS = 4;
+
+function drawKey(
+	doc: PDFKit.PDFDocument,
+	y: number,
+	colours: MapPdfInput['colours'],
+	buffers: string[],
+	projectColours: string[]
+): void {
+	const shown = projectColours.slice(0, KEY_PROJECT_COLOURS);
 	const entries: [(x: number) => void, number, string][] = [
-		[(x) => swatch(doc, x, y, colours.consultee, LOCAL_FILL_OPACITY), SWATCH, 'In the report'],
+		shown.length > 0
+			? [
+					(x) => shown.forEach((colour, index) => swatch(doc, x + index * (SWATCH + 2), y, colour, LOCAL_FILL_OPACITY)),
+					shown.length * (SWATCH + 2) - 2,
+					'In the report, a colour per project (listed on the next page)'
+				]
+			: [(x) => swatch(doc, x, y, colours.consultee, LOCAL_FILL_OPACITY), SWATCH, 'In the report'],
 		[(x) => swatch(doc, x, y, colours.site, colours.siteFillOpacity), SWATCH, 'The site']
 	];
 	if (buffers.length > 0) {
@@ -136,7 +154,8 @@ export function buildMapPdf(input: MapPdfInput): Promise<Buffer> {
 
 	const mapTop = doc.y;
 	doc.image(input.image, MARGIN, mapTop, { fit: [width, MAP_HEIGHT], align: 'center' });
-	drawKey(doc, mapTop + MAP_HEIGHT + 10, input.colours, input.buffers);
+	const projectColours = input.consultees.flatMap((consultee) => (consultee.colour ? [consultee.colour] : []));
+	drawKey(doc, mapTop + MAP_HEIGHT + 10, input.colours, input.buffers, projectColours);
 	if (input.mapNote) {
 		doc
 			.font('Helvetica-Bold')
@@ -153,15 +172,25 @@ export function buildMapPdf(input: MapPdfInput): Promise<Buffer> {
 		.text(pdfText(`${input.category}: ${input.consultees.length} in the report`), MARGIN, MARGIN);
 	doc.moveDown(0.5);
 	for (const consultee of input.consultees) {
-		doc.font('Helvetica-Bold').fontSize(10).fillColor(TEXT_COLOUR).text(pdfText(consultee.name), { width });
+		// a project drawn in its own colour has its swatch beside its name, as the map's key
+		const indent = consultee.colour ? SWATCH + 6 : 0;
+		if (consultee.colour) {
+			swatch(doc, MARGIN, doc.y + 1, consultee.colour, LOCAL_FILL_OPACITY);
+		}
+		doc
+			.font('Helvetica-Bold')
+			.fontSize(10)
+			.fillColor(TEXT_COLOUR)
+			.text(pdfText(consultee.name), MARGIN + indent, doc.y, { width: width - indent });
 		doc.font('Helvetica').fontSize(9).fillColor(SECONDARY_TEXT_COLOUR);
 		for (const line of consultee.identified) {
-			doc.text(pdfText(line), { width });
+			doc.text(pdfText(line), { width: width - indent });
 		}
 		if (!consultee.mapped) {
-			doc.font('Helvetica-Oblique').text('Manually added - not on the map', { width });
+			doc.font('Helvetica-Oblique').text('Manually added - not on the map', { width: width - indent });
 		}
 		doc.moveDown(0.4);
+		doc.x = MARGIN;
 	}
 
 	doc.end();
