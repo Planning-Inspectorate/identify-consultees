@@ -205,7 +205,10 @@ export function buildSwatch(style = {}, { mapStyle, symbolRegistry, patternRegis
 		return { shape: 'rect', fill, stroke, strokeWidth };
 	}
 	if (stroke) {
-		return { shape: 'line', stroke, strokeWidth };
+		// a dashed outline's line is dashed too, in the same widths MapLibre measures dashes in
+		return style.strokeDashArray
+			? { shape: 'line', stroke, strokeWidth, dashArray: style.strokeDashArray.map((part) => part * strokeWidth) }
+			: { shape: 'line', stroke, strokeWidth };
 	}
 	return { shape: 'rect', fill: 'transparent', stroke: '#d4351c', strokeWidth };
 }
@@ -248,7 +251,9 @@ function Swatch({ style, mapState, services }) {
 				y2: SWATCH_SIZE / 2,
 				stroke: swatch.stroke,
 				strokeWidth: swatch.strokeWidth,
-				strokeLinecap: 'round'
+				...(swatch.dashArray
+					? { strokeDasharray: swatch.dashArray.join(' '), strokeLinecap: 'butt' }
+					: { strokeLinecap: 'round' })
 			})
 		);
 	}

@@ -7,6 +7,7 @@ import { categorySettings } from '../../../report-config.ts';
 import { excludedIds, queryValues } from '../report/urls.ts';
 import { resolveCase } from '../resolve-case.ts';
 import { buildSearchAreaSafely, firstQueryValue, runRulesetSafely } from '../run-ruleset.ts';
+import { categoryBufferMetres, siteBufferGeojson, siteBuffers } from '../site-buffers.ts';
 
 /**
  * A category page's static map - the image its map falls back to without JavaScript, and when the
@@ -26,7 +27,7 @@ export function buildResultsStaticMap(service: ManageService, forceSvg = false):
 			return;
 		}
 
-		const { consultees, failed } = await runRulesetSafely(service, project, ruleset, req.session);
+		const { consultees, failed, siteScreenedAs } = await runRulesetSafely(service, project, ruleset, req.session);
 		if (failed) {
 			// not an empty map: that would be cached (see Cache-Control below) as if it were a real
 			// "no matches" result
@@ -69,13 +70,22 @@ export function buildResultsStaticMap(service: ManageService, forceSvg = false):
 			undefined,
 			categorySettings(category).mapMarginMetres
 		);
+		// with the category's ruleset buffers around the site, as its interactive map draws them
+		const buffers = category
+			? await siteBuffers(
+					service,
+					project,
+					siteScreenedAs,
+					categoryBufferMetres(ruleset, category, service.nearbyNsipRadiusMetres)
+				)
+			: [];
 		const ifNoneMatch = typeof req.headers['if-none-match'] === 'string' ? req.headers['if-none-match'] : undefined;
 		const accept = typeof req.headers.accept === 'string' ? req.headers.accept : undefined;
 
 		const image = await buildConsulteeStaticMapResponse({
 			geometryId: project.id,
 			sectionId: ruleset.id,
-			map,
+			map: buffers.length > 0 ? { ...map, bufferGeojson: siteBufferGeojson(buffers) } : map,
 			forceSvg,
 			ifNoneMatch,
 			accept

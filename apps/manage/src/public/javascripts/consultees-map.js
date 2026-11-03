@@ -150,6 +150,30 @@ export function readMapConfig(mapId) {
 	}
 }
 
+// as the report's PDF draws a buffer: a dark dashed outline, nothing filled
+const BUFFER_COLOUR = '#0b0c0c';
+
+/**
+ * The ruleset's buffers around the site, outlined dashed and keyed with their distances - "Ruleset
+ * buffers (1 km, 10 km)", as the report's PDF keys them.
+ * @param {{ features: { properties: { label: string } }[] }} geojson
+ * @returns {object}
+ */
+export function bufferDataset(geojson) {
+	const distances = geojson.features.map((feature) => feature.properties.label);
+	return {
+		id: 'ruleset-buffers',
+		label: `Ruleset ${distances.length === 1 ? 'buffer' : 'buffers'} (${distances.join(', ')})`,
+		geojson,
+		minZoom: 0,
+		maxZoom: 24,
+		visible: true,
+		showInKey: true,
+		showInMenu: true,
+		style: { stroke: BUFFER_COLOUR, strokeWidth: 2, strokeDashArray: [2, 2] }
+	};
+}
+
 /**
  * @param {object} config
  * @returns {object[]}
@@ -182,7 +206,11 @@ export function buildDatasets(config) {
 		}
 	}
 
-	// datasets draw in order: the project site on top of the consultee areas
+	// datasets draw in order: the ruleset's buffers under everything, the project site on top
+	if (config.bufferGeojson?.features?.length > 0) {
+		datasets.push(bufferDataset(config.bufferGeojson));
+	}
+
 	if (config.consulteeGeojson?.features?.length > 0) {
 		datasets.push({
 			id: 'consultee-areas',

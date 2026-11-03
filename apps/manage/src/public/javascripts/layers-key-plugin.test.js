@@ -209,8 +209,12 @@ describe('layers-key-plugin helpers', () => {
 		assert.equal(outline.shape, 'rect');
 		assert.equal(outline.fill, 'transparent');
 
-		const line = buildSwatch({ stroke: '#1d70b8', strokeWidth: 3, strokeDashArray: [2, 2] });
+		const line = buildSwatch({ stroke: '#1d70b8', strokeWidth: 3 });
 		assert.deepEqual(line, { shape: 'line', stroke: '#1d70b8', strokeWidth: 3 });
+
+		// a dashed one's dashes, in pixels - MapLibre measures them in line widths
+		const dashed = buildSwatch({ stroke: '#1d70b8', strokeWidth: 3, strokeDashArray: [2, 1] });
+		assert.deepEqual(dashed, { shape: 'line', stroke: '#1d70b8', strokeWidth: 3, dashArray: [6, 3] });
 	});
 
 	test('buildSwatch resolves symbol datasets through the symbol registry when available', () => {
@@ -616,6 +620,12 @@ describe('LayersKeyPanel component', () => {
 						label: 'Line layer',
 						showInMenu: true,
 						style: { stroke: { outdoor: '#1d70b8', dark: '#fff' }, strokeWidth: 3 }
+					},
+					{
+						id: 'dashed',
+						label: 'Dashed layer',
+						showInMenu: true,
+						style: { stroke: '#0b0c0c', strokeWidth: 2, strokeDashArray: [2, 2] }
 					}
 				],
 				checkedCache: new Map()
@@ -626,7 +636,7 @@ describe('LayersKeyPanel component', () => {
 		});
 
 		const swatches = container.querySelectorAll('.app-layers-key__swatch');
-		assert.equal(swatches.length, 4);
+		assert.equal(swatches.length, 5);
 		// symbol resolved through the registry - its svg content is injected
 		assert.match(swatches[0].innerHTML, /circle fill="#f00"/);
 		// the accessible symbol description rides along visually-hidden
@@ -640,6 +650,9 @@ describe('LayersKeyPanel component', () => {
 		const line = swatches[3].querySelector('line');
 		assert.ok(line);
 		assert.equal(line.getAttribute('stroke'), '#1d70b8');
+		assert.equal(line.getAttribute('stroke-dasharray'), null);
+		// a dashed one is dashed in the key too
+		assert.equal(swatches[4].querySelector('line').getAttribute('stroke-dasharray'), '4 4');
 	});
 
 	test('the manifest render entry goes through the preact guard shell', async () => {

@@ -2,6 +2,7 @@ import { JSDOM } from 'jsdom';
 import assert from 'node:assert/strict';
 import { afterEach, describe, mock, test } from 'node:test';
 import {
+	bufferDataset,
 	buildCategorySublayers,
 	buildDatasets,
 	buildSelectableLayers,
@@ -251,6 +252,30 @@ describe('consultees-map client helpers', () => {
 
 	test('translucent turns a hex colour into an rgba fill', () => {
 		assert.equal(translucent('#ff0000', 0.2), 'rgba(255, 0, 0, 0.2)');
+	});
+
+	test("buildDatasets draws the ruleset's buffers dashed, under everything, keyed with their distances", () => {
+		const buffer = (label) => ({
+			type: 'Feature',
+			properties: { label },
+			geometry: { type: 'Polygon', coordinates: [] }
+		});
+		const datasets = buildDatasets({
+			projectGeojson: { features: [{ type: 'Feature' }] },
+			consulteeGeojson: { features: [{ type: 'Feature' }] },
+			bufferGeojson: { features: [buffer('1 km'), buffer('10 km')] }
+		});
+		assert.deepEqual(
+			datasets.map((dataset) => dataset.id),
+			['ruleset-buffers', 'consultee-areas', 'project-site']
+		);
+		const [buffers] = datasets;
+		assert.equal(buffers.label, 'Ruleset buffers (1 km, 10 km)');
+		// an outline alone - nothing filled to hide what's under it
+		assert.deepEqual(buffers.style, { stroke: '#0b0c0c', strokeWidth: 2, strokeDashArray: [2, 2] });
+		assert.equal(bufferDataset({ features: [buffer('35 km')] }).label, 'Ruleset buffer (35 km)');
+		// none without any
+		assert.ok(!buildDatasets({ bufferGeojson: { features: [] } }).some((dataset) => dataset.id === 'ruleset-buffers'));
 	});
 
 	test('buildDatasets omits empty collections', () => {
