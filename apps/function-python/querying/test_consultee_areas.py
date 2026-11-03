@@ -1,5 +1,6 @@
 import json
 
+import pymssql
 import pytest
 
 from querying.consultee_areas import fetch_consultee_areas
@@ -40,3 +41,37 @@ def test_fetch_consultee_areas_rejects_non_integer_limits(limit):
 def test_fetch_consultee_areas_rejects_out_of_range_limits(limit):
     with pytest.raises(ValueError):
         fetch_consultee_areas(None, limit=limit)
+
+
+def test_fetch_consultee_areas_normalises_each_row(connection_params):
+    # the row-normalising loop only runs when a row comes back - insert one, since a migrate-only
+    # database (CI's) is otherwise empty
+    area_id = "c9999999-9999-4999-8999-999999999999"
+    connection = pymssql.connect(
+        server=connection_params.server,
+        port=connection_params.port,
+        database=connection_params.database,
+        user=connection_params.user,
+        password=connection_params.password,
+        autocommit=True,
+    )
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute("DELETE FROM consultee_area WHERE id = %s", (area_id,))
+            cursor.execute(
+                """
+                INSERT INTO consultee_area (id, geometryType, geometry, geometrySimplified, consulteeCategory,
+                    consultee, metadata)
+                SELECT %s, 'Point', g.geometry, g.geometry.Reduce(10).MakeValid(), 'Hospital', 'Test Trust', '{}'
+                FROM (SELECT geography::STGeomFromText('POINT(0 0)', 4326).MakeValid() AS geometry) AS g
+                """,
+                (area_id,),
+            )
+        try:
+            [row] = [row for row in fetch_consultee_areas(connection_params, limit=500) if row["id"] == area_id]
+            json.dumps(row)
+        finally:
+            with connection.cursor() as cursor:
+                cursor.execute("DELETE FROM consultee_area WHERE id = %s", (area_id,))
+    finally:
+        connection.close()
