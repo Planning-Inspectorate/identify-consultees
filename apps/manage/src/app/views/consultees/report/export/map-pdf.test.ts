@@ -2,7 +2,7 @@ import assert from 'node:assert';
 import { describe, it } from 'node:test';
 import { ONE_PIXEL_PNG, pdfTextLines } from '../../../../testing/pdf-text.ts';
 import type { MapPdfInput } from './map-pdf.ts';
-import { buildMapPdf, mapLicensing, pdfText, scaleBar } from './map-pdf.ts';
+import { buildMapPdf, pdfText, scaleBar } from './map-pdf.ts';
 
 function input(overrides: Partial<MapPdfInput> = {}): MapPdfInput {
 	return {
@@ -41,9 +41,9 @@ describe('report map PDF', () => {
 		for (const line of [
 			// the scale bar: the longest round distance that fits
 			'1 km',
-			// the basemap's credit on the map, and every licence under it
+			// the basemap's credit on the map, and its licence under it
 			'© OpenStreetMap contributors',
-			...mapLicensing(new Date('2026-10-13T14:00:00Z')),
+			'Basemap © OpenStreetMap contributors, available under the Open Database Licence: openstreetmap.org/copyright.',
 			'In the report',
 			'The site',
 			'Ruleset buffers (2 km, 10 km)',
@@ -94,7 +94,7 @@ describe('report map PDF', () => {
 		const lines = pdfTextLines(pdf);
 		assert.equal(lines[2], 'Ruleset: Test ruleset   |   Generated 13 October 2026');
 		assert.ok(lines.includes('The consultee areas could not be drawn on this map.'));
-		// the note and the licences both fit on the map's page
+		// the note and the licence both fit on the map's page
 		assert.equal(pdf.toString('latin1').match(/\/Type \/Page\b/g)?.length, 2);
 	});
 
@@ -106,13 +106,6 @@ describe('report map PDF', () => {
 		// under a kilometre, in metres
 		assert.deepStrictEqual(scaleBar(4, 100), { length: 50, label: '200 m' });
 		assert.deepStrictEqual(scaleBar(0.9, 100), { length: 50 / 0.9, label: '50 m' });
-	});
-
-	it("credits the basemap and the Crown's data, dated the year the report was made", () => {
-		assert.deepStrictEqual(mapLicensing(new Date('2027-03-01T09:00:00Z')), [
-			'Basemap © OpenStreetMap contributors, available under the Open Database Licence: openstreetmap.org/copyright.',
-			'Contains OS data © Crown copyright and database right 2027. Contains public sector information licensed under the Open Government Licence v3.0.'
-		]);
 	});
 
 	it('keeps text the standard PDF fonts can draw, and drops what they cannot', () => {
