@@ -236,7 +236,8 @@ interface RowSource {
 	category: string | null | undefined;
 	region: string | null | undefined;
 	whyIdentified: string;
-	source: 'Ruleset' | 'Manually added';
+	/** The ruleset that identified it, by name - or "Manually added". */
+	source: string;
 	distanceMetres: number | null | undefined;
 	/** Its stored row - missing for a consultee added by name alone, or deleted mid-request. */
 	record: ConsulteeAreaRecord | undefined;
@@ -271,7 +272,7 @@ const COLUMN_WIDTHS: Record<ReportColumn, number> = {
 	category: 28,
 	region: 22,
 	whyIdentified: 60,
-	source: 16,
+	source: 36,
 	group: 22,
 	subcategory: 22,
 	subcategoryDescription: 40,
@@ -368,7 +369,7 @@ function groupTabs(report: ReportExport, config: ReportConfig): Map<GroupTab, Gr
 					category: record?.consulteeCategory ?? properties.consulteeCategory,
 					region: record?.region ?? properties.region,
 					whyIdentified: describeReasons(match, report.ruleset, { nearby: false }).join('\n'),
-					source: 'Ruleset',
+					source: `${report.ruleset.name} ruleset`,
 					distanceMetres: match.distanceMetres,
 					record,
 					bufferKm: nearestBufferKm(match, report.ruleset),
