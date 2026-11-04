@@ -32,7 +32,7 @@ Each ruleset is a sheet of the rulesets workbook saved as UTF-8 CSV, with the co
 | ----- | ---- | -------- |
 | `ew_aft_30_04_2024` | `england_wales_post_20240430_ruleset.csv` | England Wales post 30 April 2024 (default) |
 | `en_pre_30_04_2024` | `england_pre_20240430_ruleset.csv` | England pre 30 April 2024 |
-| `wa_pre_30_04_2024` | `wales_pre_20240430_ruleset.csv` | Wales pre 30 April 2024 |
+| `wa_pre_30_04_2024` | `wales_pre_20240430_ruleset.csv` | Wales (Pre 30 April 2024) |
 
 - **To update a ruleset**, save its sheet over its file. **To add one**, save it as `<name>_ruleset.csv`; the app offers every one in the folder.
 - **Its name** comes from the file name, unless `names` in `rulesets.yaml` gives another.

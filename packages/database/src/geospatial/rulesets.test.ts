@@ -403,7 +403,7 @@ describe('rulesets registry', () => {
 			[
 				['england-wales-post-20240430', 'England Wales post 30 April 2024', 34],
 				['england-pre-20240430', 'England pre 30 April 2024', 31],
-				['wales-pre-20240430', 'Wales pre 30 April 2024', 23]
+				['wales-pre-20240430', 'Wales (Pre 30 April 2024)', 23]
 			]
 		);
 		assert.equal(RULESETS[0].id, rulesetIdFromFileName(`${RULESET_SETTINGS.default}_ruleset.csv`));
