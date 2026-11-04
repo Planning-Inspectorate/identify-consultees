@@ -402,7 +402,7 @@ describe('rulesets registry', () => {
 			RULESETS.map((ruleset) => [ruleset.id, ruleset.name, ruleset.rules.length]),
 			[
 				['england-wales-post-20240430', 'England and Wales (Post 30 April 2024)', 34],
-				['england-pre-20240430', 'England pre 30 April 2024', 31],
+				['england-pre-20240430', 'England (Pre 30 April 2024)', 31],
 				['wales-pre-20240430', 'Wales (Pre 30 April 2024)', 23]
 			]
 		);
