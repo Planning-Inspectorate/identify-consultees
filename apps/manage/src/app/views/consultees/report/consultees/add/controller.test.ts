@@ -81,26 +81,29 @@ const STORED = [
 		consultee: 'Barton',
 		consulteeCategory: 'Parish Council',
 		distanceMetres: 1_250,
-		region: 'East of England'
+		region: 'East of England',
+		authority: 'South Cambridgeshire'
 	},
 	{
 		id: fartherNearbyId.toUpperCase(),
 		consultee: 'Barton',
 		consulteeCategory: 'Parish Council',
 		distanceMetres: 4_000,
-		region: 'East of England'
+		region: 'East of England',
+		authority: 'Bedford'
 	},
-	// three parishes sharing a name, none near the site - two the same distance away
+	// three parishes sharing a name, none near the site - two in the same council area
 	...[
-		['f1f1f1f1-0000-0000-0000-000000000001', 40_000, 'North West'],
-		['f1f1f1f1-0000-0000-0000-000000000002', 40_000, 'Yorkshire and The Humber'],
-		['f1f1f1f1-0000-0000-0000-000000000003', 95_000, 'East Midlands']
-	].map(([id, distanceMetres, region]) => ({
+		['f1f1f1f1-0000-0000-0000-000000000001', 40_000, 'North West', 'Lancaster'],
+		['f1f1f1f1-0000-0000-0000-000000000002', 40_000, 'Yorkshire and The Humber', 'North Yorkshire'],
+		['f1f1f1f1-0000-0000-0000-000000000003', 95_000, 'Yorkshire and The Humber', 'North Yorkshire']
+	].map(([id, distanceMetres, region, authority]) => ({
 		id: String(id).toUpperCase(),
 		consultee: 'Middleton',
 		consulteeCategory: 'Parish Council',
 		distanceMetres: Number(distanceMetres),
-		region: String(region)
+		region: String(region),
+		authority: String(authority)
 	})),
 	{
 		id: 'cccccccc-cccc-cccc-cccc-cccccccccccc',
@@ -144,6 +147,22 @@ function dbReturning(rows: unknown[][], otherCases: unknown[] = OTHER_CASES) {
 			if (!/\bFROM\b/.test(text)) return [realProjectRow().geometryWkt];
 			if (text.includes('PARTITION BY caseReference')) {
 				return text.includes('EnvelopeCenter') ? NEARBY_CASES : otherCases;
+			}
+			// each consultee's details, with a parish's council area
+			if (text.includes('OUTER APPLY')) {
+				// Prisma.join's lists arrive as one Sql value each
+				const ids = (values as unknown[])
+					.flatMap((value) =>
+						value && typeof value === 'object' && 'values' in value ? (value as { values: unknown[] }).values : [value]
+					)
+					.map((value) => String(value).toLowerCase());
+				return STORED.filter((row) => ids.includes(row.id.toLowerCase())).map((row) => ({
+					id: row.id,
+					region: row.region,
+					subcategory: null,
+					metadata: '{}',
+					authority: 'authority' in row ? row.authority : null
+				}));
 			}
 			if (text.includes('LOWER(consultee)')) {
 				const [category, name] = (values as string[]).slice(-2);
@@ -234,15 +253,18 @@ describe('add a consultee page', () => {
 			res as never
 		);
 
-		// two parishes called Barton, each its own suggestion, told apart by distance, with its region
+		// two parishes called Barton, each its own suggestion, told apart by its council area
 		assert.deepStrictEqual(viewModelOf(res).nearbySuggestions, [
-			{ name: 'Barton (1.3 km from the site)', hint: 'East of England' },
-			{ name: 'Barton (4.0 km from the site)', hint: 'East of England' },
+			{ name: 'Barton (South Cambridgeshire)', hint: '1.3 km from the site, East of England' },
+			{ name: 'Barton (Bedford)', hint: '4.0 km from the site, East of England' },
 			{ name: 'Christleton', hint: '7.3 km from the site' }
 		]);
 		const html = res.render.mock.calls[0].result as string;
 		assert.match(html, /<input[^>]*name="name"[^>]*list="nearby-consultees"[^>]*data-consultee-autocomplete/);
-		assert.match(html, /<option value="Barton \(1\.3 km from the site\)" label="East of England"><\/option>/);
+		assert.match(
+			html,
+			/<option value="Barton \(South Cambridgeshire\)" label="1\.3 km from the site, East of England"><\/option>/
+		);
 		assert.match(html, /<option value="Christleton" label="7\.3 km from the site"><\/option>/);
 		assert.doesNotMatch(html, /Nearby Hospital|value="Little Snoring/);
 	});
@@ -265,8 +287,8 @@ describe('add a consultee page', () => {
 		);
 		assert.deepStrictEqual(viewModelOf(res).nearbySuggestions, [
 			{ name: 'Little Snoring Parish Council', hint: '0.0 km from the site, removed' },
-			{ name: 'Barton (1.3 km from the site)', hint: 'East of England' },
-			{ name: 'Barton (4.0 km from the site)', hint: 'East of England' },
+			{ name: 'Barton (South Cambridgeshire)', hint: '1.3 km from the site, East of England' },
+			{ name: 'Barton (Bedford)', hint: '4.0 km from the site, East of England' },
 			{ name: 'Christleton', hint: '7.3 km from the site' }
 		]);
 		assert.match(viewModelOf(res).nameHint.text, /find consultees local to the site/);
@@ -292,10 +314,10 @@ describe('add a consultee page', () => {
 			{ params: { caseId: realProjectId }, query: { ...parishQuery, add: added } } as never,
 			res as never
 		);
-		// the farther Barton is still there to suggest - by distance, as one of its name is listed
+		// the farther Barton is still there to suggest - by its council area, as one of its name is listed
 		assert.deepStrictEqual(
 			viewModelOf(res).nearbySuggestions.map((suggestion: { name: string }) => suggestion.name),
-			['Barton (4.0 km from the site)', 'Christleton']
+			['Barton (Bedford)', 'Christleton']
 		);
 	});
 
@@ -308,10 +330,12 @@ describe('add a consultee page', () => {
 		);
 	});
 
-	it('adds the one of a shared name its suggestion names, by distance', async () => {
+	it('adds the one of a shared name its suggestion names, typed any of the ways a label reads', async () => {
 		for (const [typed, id] of [
-			['Barton (1.3 km from the site)', nearbyId],
-			['barton (4.0 KM from the site)', fartherNearbyId]
+			['Barton (South Cambridgeshire)', nearbyId],
+			['barton  (bedford)', fartherNearbyId],
+			['Barton (Bedford, 4.0 km from the site)', fartherNearbyId],
+			['Barton (1.3 km from the site)', nearbyId]
 		]) {
 			const res = await submit({ name: typed, reason: 'r' });
 			assert.strictEqual(
@@ -330,7 +354,7 @@ describe('add a consultee page', () => {
 			'There is more than one Barton - choose the one you mean from the list'
 		);
 
-		// three far from it, now suggested too - the two the same distance away by region as well
+		// three far from it, now suggested too - the two in North Yorkshire by distance as well
 		const farName = await submit({ name: 'Middleton', reason: 'r' });
 		assert.strictEqual(
 			viewModelOf(farName).addForm.nameError.text,
@@ -341,19 +365,19 @@ describe('add a consultee page', () => {
 				.nearbySuggestions.filter((suggestion: { name: string }) => suggestion.name.startsWith('Middleton'))
 				.map((suggestion: { name: string }) => suggestion.name),
 			[
-				'Middleton (40.0 km from the site, North West)',
-				'Middleton (40.0 km from the site, Yorkshire and The Humber)',
-				'Middleton (95.0 km from the site)'
+				'Middleton (Lancaster)',
+				'Middleton (North Yorkshire, 40.0 km from the site)',
+				'Middleton (North Yorkshire, 95.0 km from the site)'
 			]
 		);
 		// and the one chosen is added
-		const chosen = await submit({ name: 'Middleton (40.0 km from the site, Yorkshire and The Humber)', reason: 'r' });
+		const chosen = await submit({ name: 'Middleton (North Yorkshire, 40.0 km from the site)', reason: 'r' });
 		assert.strictEqual(
 			chosen.redirect.mock.calls[0].arguments[0],
 			`${categoryUrl}&add=${urlParam(JSON.stringify({ i: 'f1f1f1f1-0000-0000-0000-000000000002', c: 'Parish Council', n: 'Middleton', r: 'r' }))}#consultees`
 		);
-		// a label that's no longer right - the distance changed - asks again
-		const stale = await submit({ name: 'Middleton (12.0 km from the site)', reason: 'r' });
+		// one that doesn't tell them apart - North Yorkshire has two - asks again
+		const stale = await submit({ name: 'Middleton (North Yorkshire)', reason: 'r' });
 		assert.match(viewModelOf(stale).addForm.nameError.text, /There is more than one Middleton/);
 	});
 
@@ -366,14 +390,16 @@ describe('add a consultee page', () => {
 			'Barton is already listed in Parish Council - to add another Barton, choose it from the list'
 		);
 		// the other Barton, chosen, is added after the first
-		const other = await submit({ name: 'Barton (4.0 km from the site)', reason: 'r2' }, added);
+		const other = await submit({ name: 'Barton (Bedford)', reason: 'r2' }, added);
 		const location = other.redirect.mock.calls[0].arguments[0] as string;
 		assert.ok(
 			location.includes(urlParam(JSON.stringify({ i: fartherNearbyId, c: 'Parish Council', n: 'Barton', r: 'r2' })))
 		);
 		// the listed one itself is never offered again
 		assert.ok(
-			!viewModelOf(bare).nearbySuggestions.some((suggestion: { name: string }) => suggestion.name.includes('1.3 km'))
+			!viewModelOf(bare).nearbySuggestions.some((suggestion: { name: string }) =>
+				suggestion.name.includes('South Cambridgeshire')
+			)
 		);
 	});
 
@@ -591,6 +617,21 @@ describe('add a consultee page', () => {
 				)}#consultees`
 			);
 		}
+	});
+
+	it('refuses a Nearby NSIP already listed, typed as it is listed', async () => {
+		const res = await submitNsip({ name: 'Neighbouring Solar Farm (EN010200)', reason: 'r' });
+		assert.strictEqual(
+			viewModelOf(res).addForm.nameError.text,
+			'Neighbouring Solar Farm (EN010200) is already listed in NSIPs'
+		);
+	});
+
+	it('asks only for the reason when the name is a consultee', async () => {
+		const res = await submit({ name: 'Christleton', reason: ' ' });
+		assert.strictEqual(viewModelOf(res).addForm.nameError, undefined);
+		assert.strictEqual(viewModelOf(res).addForm.reasonError.text, 'Enter a reason for adding this consultee');
+		assert.strictEqual(viewModelOf(res).addForm.nameValue, 'Christleton');
 	});
 
 	it('refuses a Nearby NSIP already listed, found by its project name alone', async () => {

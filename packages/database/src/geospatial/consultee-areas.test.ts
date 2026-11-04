@@ -7,6 +7,7 @@ import { newDatabaseClient } from '../index.ts';
 import type { ConsulteeAreaFeatureCollection } from './consultee-areas.ts';
 import {
 	bufferGeometryForDisplay,
+	consulteeAreaDetails,
 	consulteeAreaTable,
 	datasetInUse,
 	findConsulteeAreasByName,
@@ -21,6 +22,7 @@ import {
 // a shared local dev database
 const testAreaId = '11111111-1111-1111-1111-111111111111';
 const secondAreaId = '11111111-1111-1111-1111-111111111112';
+const thirdAreaId = '11111111-1111-1111-1111-111111111113';
 
 let dbClient: PrismaClient;
 let dbAvailable = false;
@@ -45,7 +47,7 @@ after(async () => {
 });
 
 async function cleanup() {
-	await dbClient.$executeRaw`DELETE FROM consultee_area WHERE id IN (${testAreaId}, ${secondAreaId})`;
+	await dbClient.$executeRaw`DELETE FROM consultee_area WHERE id IN (${testAreaId}, ${secondAreaId}, ${thirdAreaId})`;
 }
 
 describe('consultee areas (requires a local SQL Server - see docker-compose.yml)', () => {
@@ -324,6 +326,76 @@ describe('consultee areas (requires a local SQL Server - see docker-compose.yml)
 			// another category, or a name that isn't a consultee - none
 			assert.deepEqual(await findConsulteeAreasByName(dbClient, 'Hospital', testName, site), []);
 			assert.deepEqual(await findConsulteeAreasByName(dbClient, 'Parish Council', 'Banana', site), []);
+		} finally {
+			await cleanup();
+		}
+	});
+
+	test("gives each consultee's details, and a parish the council area it's in", async (t) => {
+		if (!dbAvailable) return t.skip('SQL Server database not available');
+
+		await cleanup();
+		try {
+			// out in the Atlantic, clear of the real data a local database holds
+			const square = (west: number, south: number, size: number) => ({
+				type: 'Polygon' as const,
+				coordinates: [
+					[
+						[west, south],
+						[west + size, south],
+						[west + size, south + size],
+						[west, south + size],
+						[west, south]
+					]
+				]
+			});
+			await loadConsulteeAreas(dbClient, {
+				type: 'FeatureCollection',
+				features: [
+					{
+						id: testAreaId,
+						type: 'Feature',
+						geometry: square(-30, 50, 0.01),
+						properties: {
+							consulteeCategory: 'Parish Council',
+							consultee: 'Detail Test Parish',
+							region: 'Test Region',
+							consulteeSubcategory: 'Parish Councils'
+						}
+					},
+					{
+						id: secondAreaId,
+						type: 'Feature',
+						geometry: square(-30.05, 49.95, 0.2),
+						properties: { consulteeCategory: 'Lower Tier Authority', consultee: 'Detail Test District' }
+					},
+					{
+						id: thirdAreaId,
+						type: 'Feature',
+						geometry: square(-35, 50, 0.01),
+						properties: { consulteeCategory: 'Parish Council', consultee: 'Detail Test Parish', region: 'Elsewhere' }
+					}
+				]
+			});
+
+			const details = await consulteeAreaDetails(dbClient, [
+				testAreaId.toUpperCase(),
+				thirdAreaId,
+				'99999999-0000-0000-0000-000000000000',
+				'added-0'
+			]);
+			assert.deepEqual(details.get(testAreaId), {
+				region: 'Test Region',
+				subcategory: 'Parish Councils',
+				metadata: '{}',
+				authority: 'Detail Test District'
+			});
+			// one with no row, and one that isn't an id, are absent - a parish in no council area the data has
+			// has none, and a district no council area of its own
+			assert.equal(details.get(thirdAreaId)?.authority, null);
+			assert.equal(details.get(thirdAreaId)?.region, 'Elsewhere');
+			assert.equal((await consulteeAreaDetails(dbClient, [secondAreaId])).get(secondAreaId)?.authority, null);
+			assert.equal(details.size, 2);
 		} finally {
 			await cleanup();
 		}
