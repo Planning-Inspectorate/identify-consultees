@@ -34,8 +34,8 @@ version: 1
 
 default: england_wales_post_20240430
 
-names: {}
-#  england_wales_post_20240430: England and Wales, from 30 April 2024
+names:
+  wales_pre_20240430: Wales (Pre 30 April 2024)
 
 consulteeTypes:
   # administrative boundaries - see the workbook's A-D_authorities sheet
