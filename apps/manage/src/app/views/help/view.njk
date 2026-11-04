@@ -217,9 +217,11 @@
 						<li>{{ wording }}</li>
 					{% endfor %}
 				</ul>
-				<p class="govuk-body">
-					{{ awaitingDataWordings | join(", ") }} have no map data yet, so their conditions find nothing until it is loaded.
-				</p>
+				{% if awaitingDataWordings.length %}
+					<p class="govuk-body">
+						{{ awaitingDataWordings | join(", ") }} have no map data yet, so their conditions find nothing until it is loaded.
+					</p>
+				{% endif %}
 			{% endset %}
 			{{ govukDetails({
 				summaryText: "Consultee Type(s) wordings accepted today (" ~ consulteeTypeWordings.length ~ ")",

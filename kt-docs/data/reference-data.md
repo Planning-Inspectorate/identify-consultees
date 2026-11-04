@@ -38,6 +38,18 @@ Profiled from `combined_reference_data_v1.geojson` (18,258 consultee areas) and 
 
 "Polygon" includes MultiPolygon; "Line" is LineString or MultiLineString.
 
+**Since the 2026-11-02 export** (the group files, not the profiled combined file above):
+
+| Category                   | Dataset  |  Rows | Shape   |        Points | Group         |
+| -------------------------- | -------- | ----: | ------- | ------------: | ------------- |
+| Hospital                   | `HSP_EN` | 1,291 | Point   |             1 | Public bodies |
+| MOD Safeguarding Area      | `MSG_EW` |   874 | Polygon | 910 / 115,199 | Other         |
+| Coal Mining Reporting Area | `CMA_EW` |   211 | Polygon |     9 / 4,413 | Other         |
+| MOD Low Flying Area        | `MLF_EW` |    40 | Polygon |     426 / 970 | Other         |
+| Cheshire Brine Area        | `CBA_EN` |     1 | Polygon |        14,325 | Other         |
+
+Hospitals are England's only (`HSP_EN`, 1,291), against 3,088 in the combined file profiled above. The rulesets' condition is for hospitals operated by NHS Trusts and NHS Foundation Trusts (England).
+
 Offshore Wind Site and Offshore Wind Export Cable come from one dataset, `OWF_EW`, told apart by `consultee_subcategory` (Offshore Wind Sites, Offshore Wind Export Cables): [`config/reference-data.yaml`](../../config/reference-data.yaml) loads the cables as their own category, so the rulesets' "Wind Export Cables" condition matches them.
 
 Corporate Joint Committee is the England and Wales (Post 30 April 2024) ruleset's "Joint Transport Authorities (Wales)": Wales's Corporate Joint Committees hold its regional transport planning duties.
