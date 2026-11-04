@@ -87,6 +87,7 @@ When the feature branch has diverged or accumulated noise:
 - `--force-with-lease` is allowed on feature / PR branches only, and only after an intentional history rewrite (rebase/squash).
 - Still never force-push `main` (or `master`).
 - Still only commit / push / open PRs when the user asks (or existing user rules already authorize that step); when they do, apply the practices above.
+- When the request that started the work names a JIRA ticket (e.g. `GIS-159`), always mention it in the PR body and link it (`https://pins-ds.atlassian.net/browse/<TICKET-ID>`), so the change can be tracked and tested against the ticket.
 - Follow the AI identification rules above: do not identify as an AI or add AI co-authorship in any GitHub-visible content.
 
 ### Verifying changes before opening a PR
@@ -116,6 +117,7 @@ And mechanically:
 - [ ] Branch name reflects the change (`<type>/<kebab-case-description>`).
 - [ ] Branch is based on current `main` with linear, squashed history.
 - [ ] Commit subjects are semantic (`feat:` / `fix:` / `docs:` / …).
+- [ ] Any JIRA ticket named in the request is mentioned and linked in the PR body.
 - [ ] No secrets, `.env`, or production data dumps in the diff.
 - [ ] No AI self-identification in the PR description, commits, or diff.
 - [ ] All tests and the CI checks (lint, typecheck, format, coverage) pass locally — see "Verifying changes before opening a PR".
