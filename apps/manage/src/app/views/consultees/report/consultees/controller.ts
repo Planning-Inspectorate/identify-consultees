@@ -1,6 +1,7 @@
 import type { ManageService } from '#service';
 import { stringifyForInlineScript } from '#util/inline-json.ts';
 import type { CaseBoundaryFeature } from '@pins/identify-consultees-database/src/geospatial/case-boundaries.ts';
+import { consulteeAreaDetails } from '@pins/identify-consultees-database/src/geospatial/consultee-areas.ts';
 import type { ConsulteeMatch, Ruleset } from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
 import { isIdentified } from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
 import type { AsyncRequestHandler } from '@planning-inspectorate/core/util';
@@ -8,6 +9,7 @@ import type { Request, Response } from 'express';
 import { addedBeyondRun, buildCaseMapConfig, markAddedByHand } from '../../../../maps/case-geojson.ts';
 import { MAP_VIEWPORT } from '../../../../maps/sample-geojson.ts';
 import { categorySettings } from '../../../../report-config.ts';
+import { comparableName, distinguishedLabels } from '../../consultee-labels.ts';
 import { NEARBY_NSIPS } from '../../nearby-nsips.ts';
 import { describeReasons } from '../../reasons.ts';
 import { resolveCase } from '../../resolve-case.ts';
@@ -94,13 +96,28 @@ export function nearbyCandidates({ consultees, category, selection }: CategoryCo
 	);
 }
 
-/** A name as names are compared: case, and runs of spaces, ignored. */
-export function comparableName(name: string): string {
-	return name.trim().replace(/\s+/g, ' ').toLowerCase();
-}
+// how names are compared, and distances given - shared with the add page's labels
+export { comparableName, kilometresFromSite } from '../../consultee-labels.ts';
 
-export function kilometresFromSite(metres: number): string {
-	return `${(metres / 1000).toFixed(1)} km from the site`;
+/**
+ * Each listed consultee's name, by id - those sharing a name with what tells them apart, looked up
+ * only for them (consultee-labels.ts). Nearby NSIPs' names carry their case reference already.
+ */
+async function listLabels(
+	service: ManageService,
+	category: string,
+	rows: { id: string; name: string; distanceMetres?: number }[]
+): Promise<Map<string, string>> {
+	const names = rows.map((row) => comparableName(row.name));
+	const sharing = rows.filter((row) => names.filter((name) => name === comparableName(row.name)).length > 1);
+	const details =
+		sharing.length > 0 && category !== NEARBY_NSIPS
+			? await consulteeAreaDetails(
+					service.db,
+					sharing.map(({ id }) => id)
+				)
+			: new Map();
+	return distinguishedLabels(rows, category, details);
 }
 
 /** The page: map, the category's identified consultees, and the removed-consultees section. */
@@ -157,9 +174,11 @@ async function renderCategoryPage(
 	// consultees alphabetically by name, ruleset matches and hand-added ones together - every
 	// Remove link opens the "Remove consultee" page, which records the reason before excluding
 	// the match or dropping the add
-	const rows: ConsulteeRow[] = [
+	const listedRows = [
 		...identified.map((match) => ({
+			id: match.feature.id,
 			name: consulteeName(match),
+			distanceMetres: match.distanceMetres,
 			identified: describeReasons(match, ruleset, { nearby: false }),
 			removeUrl: removeConsulteeUrl(project.id, ruleset.id, category, { matchId: match.feature.id }, selection)
 		})),
@@ -167,15 +186,24 @@ async function renderCategoryPage(
 			if (add.category !== category) {
 				return [];
 			}
+			// one the run found has its distance; one added from further away, or by name alone, none
+			const found = add.id ? consultees.find((match) => match.feature.id === add.id) : undefined;
 			return [
 				{
+					id: add.id ?? `added-${index}`,
 					name: add.name,
+					...(found ? { distanceMetres: found.distanceMetres } : {}),
 					identified: [addedConsulteeReason(add)],
 					removeUrl: removeConsulteeUrl(project.id, ruleset.id, category, { addedIndex: index }, selection)
 				}
 			];
 		})
-	].sort((a, b) => a.name.localeCompare(b.name, 'en-GB'));
+	];
+	// two of the same name - two Middletons - each read with what tells it apart (consultee-labels.ts)
+	const labels = await listLabels(service, category, listedRows);
+	const rows: ConsulteeRow[] = listedRows
+		.map(({ id, identified: reasons, removeUrl }) => ({ name: labels.get(id)!, identified: reasons, removeUrl }))
+		.sort((a, b) => a.name.localeCompare(b.name, 'en-GB'));
 
 	const viewModel: ReportConsulteesViewModel = {
 		pageHeading: category,

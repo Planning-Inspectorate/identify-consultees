@@ -1,9 +1,18 @@
 import type { ManageService } from '#service';
 import { findOtherCases } from '@pins/identify-consultees-database/src/geospatial/case-boundaries.ts';
-import { findConsulteeAreasByName } from '@pins/identify-consultees-database/src/geospatial/consultee-areas.ts';
+import {
+	consulteeAreaDetails,
+	findConsulteeAreasByName
+} from '@pins/identify-consultees-database/src/geospatial/consultee-areas.ts';
 import { isIdentified } from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
 import type { AsyncRequestHandler, AsyncRequestHandlerWithBody } from '@planning-inspectorate/core/util';
 import type { Response } from 'express';
+import {
+	distinguishedLabels,
+	distinguishingDetail,
+	labelVariants,
+	nameBeforeLabel
+} from '../../../consultee-labels.ts';
 import { NEARBY_NSIPS, nearbyNsipName } from '../../../nearby-nsips.ts';
 import { consulteeName } from '../../report-consultees.ts';
 import { addConsulteeUrl, consulteesUrl, excludedMatchIds } from '../../urls.ts';
@@ -33,45 +42,41 @@ interface LabelledCandidate extends NameCandidate {
 }
 
 /**
- * How each candidate is offered and typed. Several consultees can share a name - 575 parish names
- * are shared, 12 parishes are called Middleton - so one whose name another candidate or a listed
- * consultee also has reads with its distance from the site, "Middleton (3.2 km from the site)", and
- * its region as the hint: each can be told apart, and picked. Two that would still read the same add
- * their region.
+ * How each candidate is offered and typed: its name - or, when another candidate or a listed
+ * consultee has its name too, its name and what tells it apart, "Middleton (Lancaster)" (see
+ * consultee-labels.ts). The hint gives its distance from the site, and its region.
  */
-function labelCandidates(candidates: NameCandidate[], listed: string[]): LabelledCandidate[] {
+async function labelCandidates(
+	service: ManageService,
+	category: string,
+	candidates: NameCandidate[],
+	listed: string[]
+): Promise<LabelledCandidate[]> {
 	const names = [...candidates.map((candidate) => comparableName(candidate.name)), ...listed];
-	const shared = new Set(names.filter((name, index) => names.indexOf(name) !== index));
-	const labelled = candidates.map((candidate) => {
-		const isShared = shared.has(comparableName(candidate.name));
-		const distance = kilometresFromSite(candidate.distanceMetres);
-		const hint = [isShared ? candidate.region : distance, candidate.removed ? 'removed' : undefined]
+	const sharing = candidates.filter(
+		(candidate) => names.filter((name) => name === comparableName(candidate.name)).length > 1
+	);
+	const details =
+		sharing.length > 0 && category !== NEARBY_NSIPS
+			? await consulteeAreaDetails(
+					service.db,
+					sharing.map(({ id }) => id)
+				)
+			: new Map();
+	const labels = distinguishedLabels(candidates, category, details, listed);
+	return candidates.map((candidate) => {
+		// every candidate has one
+		const label = labels.get(candidate.id)!;
+		const isShared = sharing.includes(candidate);
+		const hint = [
+			label.includes(' km from the site') ? undefined : kilometresFromSite(candidate.distanceMetres),
+			isShared && candidate.region && !label.includes(candidate.region) ? candidate.region : undefined,
+			candidate.removed ? 'removed' : undefined
+		]
 			.filter(Boolean)
 			.join(', ');
-		return { ...candidate, label: isShared ? `${candidate.name} (${distance})` : candidate.name, hint };
+		return { ...candidate, label, hint };
 	});
-	const labels = labelled.map(({ label }) => comparableName(label));
-	return labelled.map((candidate) =>
-		labels.filter((label) => label === comparableName(candidate.label)).length > 1
-			? {
-					...candidate,
-					label: `${candidate.name} (${kilometresFromSite(candidate.distanceMetres)}, ${candidate.region ?? candidate.id})`
-				}
-			: candidate
-	);
-}
-
-const LABEL = /^(.*) \(([\d.]+ km from the site)(?:, ([^)]*))?\)$/i;
-
-/**
- * A typed name, and - for a label labelCandidates gave - the distance (and region or id) that tells
- * it from others of the name: "Middleton (3.2 km from the site)".
- */
-function parseLabel(typed: string): { name: string; distance?: string; detail?: string } {
-	const match = LABEL.exec(typed);
-	return match
-		? { name: match[1], distance: match[2].toLowerCase(), ...(match[3] ? { detail: match[3] } : {}) }
-		: { name: typed };
 }
 
 /** The one item, or undefined for none or several. */
@@ -201,9 +206,13 @@ async function renderAddPage(
 			candidates.push(candidate);
 		}
 	}
-	const suggestions = labelCandidates(
-		candidates.filter((candidate) => !hidden.has(comparableName(candidate.name))),
-		category === NEARBY_NSIPS ? [] : listed
+	const suggestions = (
+		await labelCandidates(
+			service,
+			category,
+			candidates.filter((candidate) => !hidden.has(comparableName(candidate.name))),
+			category === NEARBY_NSIPS ? [] : listed
+		)
 	).map(({ label, hint }) => ({ name: label, hint }));
 
 	const errorSummary = [
@@ -246,6 +255,36 @@ export function buildReportConsulteeAddPage(service: ManageService): AsyncReques
 	};
 }
 
+/**
+ * The consultees of the category called `name`, not already listed: those the page suggested -
+ * near the site, or removed from the list - and then the rest of the reference data's.
+ */
+async function consulteesNamed(
+	service: ManageService,
+	context: CategoryContext,
+	name: string
+): Promise<{ suggested: NameCandidate[]; matching: NameCandidate[] }> {
+	const inList = listedIds(context);
+	const removed = excludedMatchIds(context.selection.removed);
+	const suggested = (await nameCandidates(service, context)).filter(
+		(candidate) => comparableName(candidate.name) === comparableName(name)
+	);
+	const matching: NameCandidate[] = [...suggested];
+	for (const area of await findConsulteeAreasByName(service.db, context.category, name, context.project.geometry)) {
+		if (!inList.has(area.id) && !matching.some((candidate) => candidate.id === area.id)) {
+			matching.push({
+				id: area.id,
+				name: area.consultee,
+				aliases: [area.consultee],
+				distanceMetres: area.distanceMetres,
+				region: area.region,
+				removed: removed.has(area.id)
+			});
+		}
+	}
+	return { suggested, matching };
+}
+
 /** What a typed name came to: the consultee it is, or why not - with the consultees it could be. */
 interface ResolvedName {
 	stored?: { id: string; consultee: string };
@@ -266,7 +305,7 @@ async function resolveTypedName(
 	context: CategoryContext,
 	typed: string
 ): Promise<ResolvedName> {
-	const { project, category } = context;
+	const { category } = context;
 	const listed = listedNames(context);
 	if (category === NEARBY_NSIPS) {
 		// case names carry their reference, so a name is one case
@@ -286,8 +325,17 @@ async function resolveTypedName(
 			: { error: 'Consultee not found', matching: [] };
 	}
 
-	const { name, distance, detail } = parseLabel(typed);
-	const inList = listedIds(context);
+	// the name as typed - or, when no consultee is called that, a label the page gave: the name
+	// before its last bracket, "Middleton (Lancaster)". Names can have brackets of their own -
+	// "Aikengall II (Scotland)" - so the name as typed comes first
+	let name = typed;
+	let { suggested, matching } = await consulteesNamed(service, context, name);
+	const labelName = nameBeforeLabel(typed);
+	const asLabel = matching.length === 0 && labelName !== undefined && !listed.includes(comparableName(typed));
+	if (asLabel) {
+		name = labelName;
+		({ suggested, matching } = await consulteesNamed(service, context, name));
+	}
 	const nameListed = listed.includes(comparableName(name));
 	// one added by name alone, from a link made before additions kept their id, can't be told from
 	// another of its name - so its name is refused outright, as before
@@ -297,40 +345,25 @@ async function resolveTypedName(
 	if (addedByNameAlone) {
 		return { error: `${name} is already listed in ${category}`, matching: [] };
 	}
-	const named = (candidate: NameCandidate) => comparableName(candidate.name) === comparableName(name);
-	// the ones the page suggested - near the site, or removed from the list - then the rest of the
-	// reference data's consultees of the name
-	const suggested = (await nameCandidates(service, context)).filter(named);
-	const removed = excludedMatchIds(context.selection.removed);
-	const matching: NameCandidate[] = [...suggested];
-	for (const area of await findConsulteeAreasByName(service.db, category, name, project.geometry)) {
-		if (!inList.has(area.id) && !matching.some((candidate) => candidate.id === area.id)) {
-			matching.push({
-				id: area.id,
-				name: area.consultee,
-				aliases: [area.consultee],
-				distanceMetres: area.distanceMetres,
-				region: area.region,
-				removed: removed.has(area.id)
-			});
-		}
-	}
-	const picked = distance
-		? // a suggestion's label: the one of the name at that distance (and region, if it says)
-			only(
-				matching.filter(
-					(candidate) =>
-						kilometresFromSite(candidate.distanceMetres) === distance &&
-						(!detail || candidate.region === detail || candidate.id === detail)
+	let picked: NameCandidate | undefined;
+	if (asLabel) {
+		// the one of the name the label is, in any of the ways the page gives it
+		const details = await consulteeAreaDetails(
+			service.db,
+			matching.map(({ id }) => id)
+		);
+		picked = only(
+			matching.filter((candidate) =>
+				labelVariants(candidate, distinguishingDetail(category, details.get(candidate.id.toLowerCase()))).some(
+					(variant) => comparableName(variant) === comparableName(typed)
 				)
 			)
-		: // a name alone: the one the page suggested, or else the only one there is - never when one of
-			// the name is already listed, as which was meant can't be told
-			nameListed
-			? undefined
-			: suggested.length > 0
-				? only(suggested)
-				: only(matching);
+		);
+	} else if (!nameListed) {
+		// a name alone: the one the page suggested, or else the only one there is - never when one of
+		// the name is already listed, as which was meant can't be told
+		picked = suggested.length > 0 ? only(suggested) : only(matching);
+	}
 	if (picked) {
 		return { stored: { id: picked.id, consultee: picked.name }, matching: [] };
 	}

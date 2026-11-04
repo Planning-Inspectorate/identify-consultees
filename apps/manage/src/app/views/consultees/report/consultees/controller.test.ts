@@ -176,6 +176,54 @@ describe('report consultees change page', () => {
 		assert.strictEqual((await mapFor('Parish Council', parishMatchRow())).bufferGeojson, undefined);
 	});
 
+	it('should tell apart two listed consultees of the same name by their council area', async () => {
+		const otherId = '12121212-1212-1212-1212-121212121212';
+		// the second one the run found nearby - so it has its distance - and added by hand
+		const base = dbReturning([
+			[realProjectRow()],
+			[
+				parishMatchRow(),
+				{
+					...parishMatchRow(otherId, 'Little Snoring Parish Council', 3_000),
+					reasons: [{ type: 'nearby' as const, radiusMetres: 20_000 }]
+				}
+			]
+		]);
+		const db = {
+			...base,
+			$queryRaw: mock.fn(async (sql: TemplateStringsArray, ...values: unknown[]) =>
+				sql.join('').includes('OUTER APPLY')
+					? [
+							{
+								id: matchId.toUpperCase(),
+								region: 'East of England',
+								subcategory: null,
+								metadata: '{}',
+								authority: 'Breckland'
+							},
+							{ id: otherId, region: 'East of England', subcategory: null, metadata: '{}', authority: 'North Norfolk' }
+						]
+					: base.$queryRaw(sql, ...(values as []))
+			)
+		};
+		const mockRes = { status: mock.fn(() => mockRes), render: mock.fn() };
+		// the identified one, and another of its name added by hand
+		const add = urlParam(
+			JSON.stringify({ i: otherId, c: 'Parish Council', n: 'Little Snoring Parish Council', r: 'r' })
+		);
+		await handlerFor(db)(
+			{
+				params: { caseId: realProjectId },
+				query: { ruleset: 'england-wales-post-20240430', category: 'Parish Council', add }
+			},
+			mockRes
+		);
+		assert.deepStrictEqual(
+			mockRes.render.mock.calls[0].arguments[1].rows.map((row: { name: string }) => row.name),
+			['Little Snoring Parish Council (Breckland)', 'Little Snoring Parish Council (North Norfolk)']
+		);
+	});
+
 	it('should list every condition a consultee met, but not the nearby search', async () => {
 		const mockRes = { status: mock.fn(() => mockRes), render: mock.fn() };
 		const hospitalRow = {

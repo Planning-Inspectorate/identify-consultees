@@ -472,3 +472,66 @@ export async function findConsulteeAreasByName(
 		region: row.region
 	}));
 }
+
+/** What tells a consultee from others of its name - see consulteeAreaDetails. */
+export interface ConsulteeAreaDetail {
+	region: string | null;
+	subcategory: string | null;
+	/** The source data's own attributes, as JSON. */
+	metadata: string;
+	/** For a parish, the council area it's in - its district, or its unitary authority. */
+	authority: string | null;
+}
+
+// the categories whose areas lie within a council area - named for it when they share a name
+const WITHIN_A_COUNCIL_AREA = ['Parish Council'];
+
+// a consultee_area id - anything else in a list of ids would fail the whole query's conversion
+const AREA_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * Each consultee's details, by lowercase id, to tell apart consultees that share a name: its
+ * region, subcategory and metadata, and - for a parish - the council area it's in: the district or
+ * unitary authority its middle falls in (or else any it overlaps), as the parish's own data doesn't
+ * say. Ids with no row, or that aren't ids, are absent.
+ */
+export async function consulteeAreaDetails(
+	dbClient: PrismaClient,
+	ids: string[]
+): Promise<Map<string, ConsulteeAreaDetail>> {
+	const details = new Map<string, ConsulteeAreaDetail>();
+	// an id that isn't one - from a crafted link, or a placeholder - has no row, so isn't looked up
+	const areaIds = ids.filter((id) => AREA_ID.test(id));
+	for (let i = 0; i < areaIds.length; i += GEOMETRY_LOOKUP_BATCH_SIZE) {
+		const batch = areaIds.slice(i, i + GEOMETRY_LOOKUP_BATCH_SIZE);
+		const rows = await withDeadlockRetry(
+			() => dbClient.$queryRaw<
+				{
+					id: string;
+					region: string | null;
+					subcategory: string | null;
+					metadata: string;
+					authority: string | null;
+				}[]
+			>`
+				SELECT a.id, a.region, a.consulteeSubcategory AS subcategory, a.metadata, council.consultee AS authority
+				FROM consultee_area a
+				OUTER APPLY (
+					SELECT TOP 1 c.consultee
+					FROM consultee_area c WITH (INDEX(consultee_area_geometry_simplified_sidx))
+					WHERE a.consulteeCategory IN (${Prisma.join(WITHIN_A_COUNCIL_AREA)})
+						AND c.consulteeCategory IN ('Lower Tier Authority', 'Unitary Authority')
+						AND c.geometrySimplified.STIntersects(a.geometrySimplified) = 1
+					ORDER BY
+						CASE WHEN c.geometrySimplified.STIntersects(a.geometrySimplified.EnvelopeCenter()) = 1 THEN 0 ELSE 1 END,
+						CASE c.consulteeCategory WHEN 'Lower Tier Authority' THEN 0 ELSE 1 END
+				) AS council
+				WHERE a.id IN (${Prisma.join(batch)})
+			`
+		);
+		for (const { id, ...detail } of rows) {
+			details.set(id.toLowerCase(), detail);
+		}
+	}
+	return details;
+}
