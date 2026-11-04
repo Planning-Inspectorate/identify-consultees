@@ -129,19 +129,14 @@ describe('report consultees change page', () => {
 		]);
 		assert.strictEqual(
 			viewModel.rows[0].removeUrl,
-			`/consultees/${realProjectId}/report/consultees/remove?ruleset=england-wales-post-20240430&category=Parish%20Council&match=${matchId}&saved=1`
+			`/consultees/${realProjectId}/report/consultees/remove?ruleset=england-wales-post-20240430&category=Parish%20Council&match=${matchId}`
 		);
 		assert.strictEqual(viewModel.removedRows.length, 0);
 		assert.strictEqual(viewModel.removedOpen, false);
-		// the Add a consultee link opens the add page, keeping the current selection - and the
-		// category as it was opened (nothing yet), for the back link to return to
+		// the Add a consultee link opens the add page, keeping the current selection
 		assert.strictEqual(
 			viewModel.addConsulteeUrl,
-			`/consultees/${realProjectId}/report/consultees/add?ruleset=england-wales-post-20240430&category=Parish%20Council&saved=1`
-		);
-		assert.strictEqual(
-			viewModel.saveAndReturnUrl,
-			`/consultees/${realProjectId}/report?ruleset=england-wales-post-20240430`
+			`/consultees/${realProjectId}/report/consultees/add?ruleset=england-wales-post-20240430&category=Parish%20Council`
 		);
 		assert.ok(viewModel.mapConfigJson.includes('FeatureCollection'));
 
@@ -150,9 +145,9 @@ describe('report consultees change page', () => {
 		assert.match(html, /href="[^"]*\/report\/consultees\/add\?[^"]*"[^>]*>\s*Add a consultee/);
 		// the add form lives on its own page now - no name input or datalist here
 		assert.doesNotMatch(html, /<datalist|data-consultee-autocomplete|name="name"/);
-		// back to the check page two ways: "Save and return" keeps the changes, the back link doesn't
+		// changes are kept as they're made - the back link returns to the check page, no save step
 		assert.match(html, /Back to draft report/);
-		assert.match(html, /<a href="[^"]*\/report\?ruleset=[^"]*"[^>]*class="govuk-button"[^>]*>\s*Save and return/);
+		assert.doesNotMatch(html, /Save and return/);
 		// nothing has been removed - the expandable Removed consultees section doesn't render
 		assert.doesNotMatch(html, /Removed consultees/);
 	});
@@ -299,7 +294,7 @@ describe('report consultees change page', () => {
 		// the remaining row's remove link opens the remove page, carrying the existing exclusion forward
 		assert.strictEqual(
 			viewModel.rows[0].removeUrl,
-			`/consultees/${realProjectId}/report/consultees/remove?ruleset=england-wales-post-20240430&category=Parish%20Council&match=${otherMatchId}&exclude=${matchId}&saved=1`
+			`/consultees/${realProjectId}/report/consultees/remove?ruleset=england-wales-post-20240430&category=Parish%20Council&match=${otherMatchId}&exclude=${matchId}`
 		);
 		assert.strictEqual(
 			viewModel.backLinkUrl,
@@ -356,9 +351,7 @@ describe('report consultees change page', () => {
 
 		// a hand-added row's remove link opens the remove page targeting that add's index - the
 		// adds all ride along so the page can drop the right one on submit
-		const addsParam =
-			`&add=${urlParam(firstAdd)}&add=${urlParam(secondAdd)}&add=${urlParam(otherCategoryAdd)}` +
-			`&saved=1&savedAdd=${urlParam(firstAdd)}&savedAdd=${urlParam(secondAdd)}`;
+		const addsParam = `&add=${urlParam(firstAdd)}&add=${urlParam(secondAdd)}&add=${urlParam(otherCategoryAdd)}`;
 		assert.strictEqual(
 			viewModel.rows[0].removeUrl,
 			`/consultees/${realProjectId}/report/consultees/remove?ruleset=england-wales-post-20240430&category=Parish%20Council&added=0${addsParam}`
@@ -440,9 +433,9 @@ describe('report consultees change page', () => {
 		assert.ok(viewModel.backLinkUrl.includes('exclude=id-without-reason'));
 	});
 
-	it("should go back without the category's changes since it was opened, and save and return with them", async () => {
+	it("should go back to the check page with the category's changes kept", async () => {
 		const mockRes = { status: mock.fn(() => mockRes), render: mock.fn() };
-		const savedAdd = addJson('First Test Consultee', 'Saved before');
+		const firstAdd = addJson('First Test Consultee', 'Added first');
 		const newAdd = addJson('Second Test Consultee', 'Added since');
 		const otherCategoryAdd = addJson('Hospital Test Consultee', 'r', 'Hospital');
 		const removal = JSON.stringify({ i: matchId, c: 'Parish Council', n: 'Little Snoring Parish Council', r: 'Since' });
@@ -450,13 +443,10 @@ describe('report consultees change page', () => {
 		await handlerFor(db)(
 			{
 				params: { caseId: realProjectId },
-				// opened with the first add saved; since then the second added and the match removed
 				query: {
 					category: 'Parish Council',
-					add: [savedAdd, otherCategoryAdd, newAdd],
-					exclude: removal,
-					saved: '1',
-					savedAdd: savedAdd
+					add: [firstAdd, otherCategoryAdd, newAdd],
+					exclude: removal
 				}
 			},
 			mockRes
@@ -464,15 +454,17 @@ describe('report consultees change page', () => {
 
 		const viewModel = mockRes.render.mock.calls[0].arguments[1];
 		const report = `/consultees/${realProjectId}/report?ruleset=england-wales-post-20240430`;
-		// back: the category as it was opened - the other category's add as it is
-		assert.strictEqual(viewModel.backLinkUrl, `${report}&add=${urlParam(otherCategoryAdd)}&add=${urlParam(savedAdd)}`);
-		// save and return: everything as it is now, with nothing saved to go back to
+		// back: the selection as it is - every removal and add, this category's and others'
 		assert.strictEqual(
-			viewModel.saveAndReturnUrl,
-			`${report}&exclude=${urlParam(removal)}&add=${urlParam(savedAdd)}&add=${urlParam(otherCategoryAdd)}&add=${urlParam(newAdd)}`
+			viewModel.backLinkUrl,
+			`${report}&exclude=${urlParam(removal)}&add=${urlParam(firstAdd)}&add=${urlParam(otherCategoryAdd)}&add=${urlParam(newAdd)}`
 		);
-		// the page's links keep what was saved, not what's there now
-		assert.ok(viewModel.addConsulteeUrl.endsWith(`&saved=1&savedAdd=${urlParam(savedAdd)}`));
+		// the page's links carry the same selection
+		assert.ok(
+			viewModel.addConsulteeUrl.endsWith(
+				`&add=${urlParam(firstAdd)}&add=${urlParam(otherCategoryAdd)}&add=${urlParam(newAdd)}`
+			)
+		);
 	});
 
 	it('should ignore malformed add params rather than fail the page', async () => {
