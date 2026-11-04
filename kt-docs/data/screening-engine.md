@@ -11,7 +11,7 @@ A ruleset is a list of **conditions**, such as "the district council the site is
 | Workbook sheet      | File                                      | Shown as                               | Conditions |
 | ------------------- | ----------------------------------------- | -------------------------------------- | ---------: |
 | `ew_aft_30_04_2024` | `england_wales_post_20240430_ruleset.csv` | England and Wales (Post 30 April 2024) |         34 |
-| `en_pre_30_04_2024` | `england_pre_20240430_ruleset.csv`        | England pre 30 April 2024              |         31 |
+| `en_pre_30_04_2024` | `england_pre_20240430_ruleset.csv`        | England (Pre 30 April 2024)            |         31 |
 | `wa_pre_30_04_2024` | `wales_pre_20240430_ruleset.csv`          | Wales (Pre 30 April 2024)              |         23 |
 
 The file name gives the id and, unless `names` in [`config/rulesets/rulesets.yaml`](../../config/rulesets/rulesets.yaml) says otherwise, the display name: `england_wales_post_20240430_ruleset.csv` is `england-wales-post-20240430` (joining words stay lower case, `YYYYMMDD` dates are written out). This one is named in `names`, shown as "England and Wales (Post 30 April 2024)". Rename the file, or give it a name under `names`, to change what users see. England and Wales (Post 30 April 2024) is the default (`default` in the same file).
