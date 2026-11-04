@@ -1,6 +1,6 @@
 import type { ManageService } from '#service';
 import type { AsyncRequestHandler } from '@planning-inspectorate/core/util';
-import { checkCbosConnection, importCaseBoundariesFromCbos } from './cbos-boundaries.ts';
+import { checkCbosConnection, importCaseBoundariesFromCbos } from '../../cbos/cbos-boundaries.ts';
 import type { ImportFromCbosViewModel } from './view-model.ts';
 
 const VIEW = 'admin/import-from-cbos/view.njk';

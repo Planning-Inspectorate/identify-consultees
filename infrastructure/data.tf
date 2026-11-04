@@ -62,3 +62,11 @@ data "azurerm_private_dns_zone" "storage" {
 
   provider = azurerm.tooling
 }
+
+# CBOS's Service Bus (idas-back-office.tf) is reached through its private endpoint
+data "azurerm_private_dns_zone" "service_bus" {
+  name                = "privatelink.servicebus.windows.net"
+  resource_group_name = var.tooling_config.network_rg
+
+  provider = azurerm.tooling
+}

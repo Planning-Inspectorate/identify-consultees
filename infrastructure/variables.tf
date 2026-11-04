@@ -52,6 +52,12 @@ variable "cbos_import_hours" {
   default     = "7,10,13,16,19"
 }
 
+variable "cbos_subscriber_enabled" {
+  description = "Subscribe the web app to CBOS's nsip-document Service Bus topic, so a case's boundaries are imported when CBOS converts a new one (see idas-back-office.tf)"
+  type        = bool
+  default     = false
+}
+
 variable "common_config" {
   description = "Config for the common resources, such as action groups"
   type = object({

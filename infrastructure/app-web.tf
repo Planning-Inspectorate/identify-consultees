@@ -83,12 +83,20 @@ module "app_web" {
     # import every CBOS boundary at these hours, UK time (apps/manage - scheduled-import.ts). Off
     # in the staging slot (below)
     CBOS_IMPORT_HOURS = var.cbos_import_hours
+
+    # CBOS's document events (idas-back-office.tf) - a case's boundaries are imported when CBOS
+    # converts a new one. Off in the staging slot (below)
+    CBOS_SUBSCRIBER_ENABLED       = var.cbos_subscriber_enabled ? "true" : "false"
+    CBOS_SERVICE_BUS_NAMESPACE    = var.cbos_subscriber_enabled ? "${data.azurerm_servicebus_namespace.idas[0].name}.servicebus.windows.net" : ""
+    CBOS_SERVICE_BUS_TOPIC        = var.cbos_subscriber_enabled ? data.azurerm_servicebus_topic.idas_nsip_document[0].name : ""
+    CBOS_SERVICE_BUS_SUBSCRIPTION = var.cbos_subscriber_enabled ? azurerm_servicebus_subscription.web_nsip_document[0].name : ""
   }
 
-  # sticky to its slot: only the live app imports from CBOS - a staging slot running the next
-  # release mustn't import too
+  # sticky to its slot: only the live app imports from CBOS or takes its events - a staging slot
+  # running the next release mustn't do either (and has no access to the subscription)
   slot_setting_overrides = {
-    CBOS_IMPORT_HOURS = ""
+    CBOS_IMPORT_HOURS       = ""
+    CBOS_SUBSCRIBER_ENABLED = "false"
   }
 
   providers = {
