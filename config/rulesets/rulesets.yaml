@@ -10,8 +10,9 @@
 #   names                  - optional display names, by file name less _ruleset.csv. A ruleset not
 #                            listed is named from its file name: words capitalised, joining words
 #                            like "and" or "post" lower case, and a YYYYMMDD date written out -
-#                            england_wales_post_20240430 reads "England Wales post 30 April 2024".
-#                            Its id, in ?ruleset= links, is always the file name, kebab-cased.
+#                            england_wales_post_20240430 would read "England Wales post 30 April
+#                            2024", so names gives it the workbook's title instead. A ruleset's id,
+#                            in ?ruleset= links, is always the file name, kebab-cased.
 #   consulteeTypes         - what each Consultee Type(s) wording in the CSVs matches in the reference
 #                            data: its consultee categories (consultee_area.consulteeCategory - see
 #                            kt-docs/data/reference-data.md), and for a bordering condition the
@@ -35,6 +36,7 @@ version: 1
 default: england_wales_post_20240430
 
 names:
+  england_wales_post_20240430: England and Wales (Post 30 April 2024)
   wales_pre_20240430: Wales (Pre 30 April 2024)
 
 consulteeTypes:

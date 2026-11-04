@@ -151,12 +151,12 @@ describe('report download', () => {
 		assert.equal(headers['Content-Type'], 'application/zip');
 		assert.match(
 			headers['Content-Disposition'],
-			/^attachment; filename="EN010099 England Wales post 30 April 2024 consultee report \d{4}-\d{2}-\d{2}\.zip"$/
+			/^attachment; filename="EN010099 England and Wales \(Post 30 April 2024\) consultee report \d{4}-\d{2}-\d{2}\.zip"$/
 		);
 		const files = zipOf(res);
 		const names = Object.keys(files);
 		assert.deepStrictEqual(names.slice(1), ['maps/01 Parish Council.pdf', 'maps/02 Landowner.pdf']);
-		assert.match(names[0], /^EN010099 England Wales post 30 April 2024 consultees \d{4}-\d{2}-\d{2}\.xlsx$/);
+		assert.match(names[0], /^EN010099 England and Wales \(Post 30 April 2024\) consultees \d{4}-\d{2}-\d{2}\.xlsx$/);
 		// the workbook lists the picked parish, manually added, with the reason given - and none of
 		// the columns the report leaves out
 		const workbook = unzipSync(files[names[0]]);
@@ -339,7 +339,7 @@ describe('report download', () => {
 		);
 		assert.match(
 			(res.set.mock.calls[0].arguments as unknown as [Record<string, string>])[0]['Content-Disposition'],
-			/England Wales post 30 April 2024/
+			/England and Wales \(Post 30 April 2024\)/
 		);
 	});
 

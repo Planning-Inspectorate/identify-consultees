@@ -422,7 +422,8 @@ export function rulesetIdFromFileName(fileName: string): string {
 /**
  * A ruleset's display name from its CSV's file name: words capitalised (except joining words like
  * "and" or "post"), and a `YYYYMMDD` date written out - `england_wales_post_20240430_ruleset.csv`
- * → "England Wales post 30 April 2024". Rename the file to change what users see.
+ * → "England Wales post 30 April 2024". Rename the file, or give it a name under `names` in
+ * rulesets.yaml, to change what users see.
  */
 export function rulesetNameFromFileName(fileName: string): string {
 	const words = rulesetStem(fileName)

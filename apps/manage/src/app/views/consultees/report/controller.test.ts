@@ -106,7 +106,7 @@ describe('consultee report check page', () => {
 			...parishMatchRow('88888888-8888-8888-8888-888888888888', 'Nearby Parish Council'),
 			reasons: [{ type: 'nearby' as const, radiusMetres: 20_000 }]
 		};
-		// the default ruleset (England Wales post 30 April 2024) has no Local Resilience Forum condition
+		// the default ruleset (England and Wales (Post 30 April 2024)) has no Local Resilience Forum condition
 		const nearbyForum = {
 			...parishMatchRow('99999999-9999-9999-9999-999999999999', 'Example Local Resilience Forum'),
 			consulteeCategory: 'Local Resilience Forum',
@@ -146,7 +146,7 @@ describe('consultee report check page', () => {
 			viewModel.shapefileChangeUrl,
 			`/consultees/${realProjectId}?change=shapefile&ruleset=england-wales-post-20240430`
 		);
-		assert.strictEqual(viewModel.rulesetName, 'England Wales post 30 April 2024');
+		assert.strictEqual(viewModel.rulesetName, 'England and Wales (Post 30 April 2024)');
 		// back leads to the ruleset picker the check page followed
 		assert.strictEqual(
 			viewModel.backLinkUrl,
@@ -346,7 +346,7 @@ describe('consultee report check page', () => {
 		await handlerFor(db)({ params: { caseId: realProjectId }, query: {} }, mockRes);
 
 		const viewModel = mockRes.render.mock.calls[0].arguments[1];
-		assert.strictEqual(viewModel.rulesetName, 'England Wales post 30 April 2024');
+		assert.strictEqual(viewModel.rulesetName, 'England and Wales (Post 30 April 2024)');
 	});
 
 	it('should 404 for a present-but-unknown ruleset', async () => {
