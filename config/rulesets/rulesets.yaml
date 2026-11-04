@@ -132,8 +132,5 @@ logic:
   Intersects application site buffer: buffer
   Borders host authority: bordering
 
-categoriesAwaitingData:
-  - MOD Safeguarding Area
-  - MOD Low Flying Area
-  - Coal Mining Reporting Area
-  - Cheshire Brine Area
+# none today - every category the rulesets name has reference data (config/reference-data.yaml)
+categoriesAwaitingData: []

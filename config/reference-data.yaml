@@ -46,6 +46,7 @@ datasets:
   CJC_EW: Corporate Joint Committee
   # health
   AMB_EW: Ambulance Trust
+  HSP_EN: Hospital
   ICB_EW: ICB
   LHB_WA: Local Health Board
   # landscape and water
@@ -71,6 +72,11 @@ datasets:
     subcategories:
       Offshore Wind Export Cables: Offshore Wind Export Cable
   ONR_EW: ONR Site
+  # other - safeguarding and reporting areas
+  MSG_EW: MOD Safeguarding Area
+  MLF_EW: MOD Low Flying Area
+  CMA_EW: Coal Mining Reporting Area
+  CBA_EN: Cheshire Brine Area
   # earlier exports' codes for the same datasets
   OWS_NA: Offshore Wind Site
   ONR_NA: ONR Site

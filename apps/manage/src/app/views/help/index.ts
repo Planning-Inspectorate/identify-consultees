@@ -6,10 +6,10 @@ export const HELP_PAGE_HEADING = 'How to use Identify consultees';
 
 /**
  * The help page's view model: the accepted Consultee Type(s) wordings come from
- * config/rulesets/rulesets.yaml, so the list can't fall out of step with what the rulesets accept.
+ * config/rulesets/rulesets.yaml, so the list can't fall out of step with what the rulesets accept -
+ * and those with no data yet, which the page names, if there are any.
  */
-export function helpViewModel() {
-	const types = acceptedConsulteeTypes();
+export function helpViewModel(types = acceptedConsulteeTypes()) {
 	return {
 		pageHeading: HELP_PAGE_HEADING,
 		consulteeTypeWordings: types.map(({ wording }) => wording),

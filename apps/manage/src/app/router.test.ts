@@ -153,7 +153,9 @@ describe('manage router wiring', () => {
 		assert.match(response.text, /How to use Identify consultees/);
 		assert.match(response.text, /Formatting a ruleset change/);
 		assert.match(response.text, /<li>Ambulance Trusts<\/li>/);
-		assert.match(response.text, /Cheshire Brine Area have no map data yet/);
+		// every wording has data today, so no "have no map data yet" note (see views/help/index.test.ts)
+		assert.match(response.text, /<li>Cheshire Brine Area<\/li>/);
+		assert.doesNotMatch(response.text, /have no map data yet/);
 		assert.match(response.text, /role="img"/);
 	});
 

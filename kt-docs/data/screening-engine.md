@@ -26,7 +26,7 @@ The file name gives the id and, unless `names` in [`config/rulesets/rulesets.yam
 
 **An unrecognised Consultee Type(s), Logic or buffer stops the app at start-up**, naming the row, rather than silently matching nothing. A condition's id comes from its authority letter, consultee type and buffer (`b_host_unitary_authorities`, `ambulance_trusts_10km`); its name, shown in **Why identified**, keeps the letter (`"B" host Unitary Authorities`).
 
-Some consultee types have no reference data yet: MoD safeguarding and low flying areas, coal mining reporting areas and the Cheshire brine area (`categoriesAwaitingData` in `rulesets.yaml`). Joint Transport Authorities (Wales) match Wales's Corporate Joint Committees, which hold its regional transport planning duties. Their conditions stay in the rulesets and match nothing until data with those category names is loaded. The check page still lists them, with nothing found.
+Every consultee type the rulesets name has reference data: the last four - MoD safeguarding and low flying areas, coal mining reporting areas and the Cheshire brine area - came with the 2026-11-02 Other group file. A type added to a ruleset before its data exists goes in `categoriesAwaitingData` in `rulesets.yaml`: its conditions stay in the rulesets and match nothing until data with that category name is loaded, and the check page still lists it, with nothing found. Joint Transport Authorities (Wales) match Wales's Corporate Joint Committees, which hold its regional transport planning duties.
 
 ## How a run works
 

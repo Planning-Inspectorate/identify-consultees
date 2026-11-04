@@ -72,8 +72,8 @@ describe('parseRulesetSettings', () => {
 		// the real settings: every wording, the ones with no data yet among them
 		const real = acceptedConsulteeTypes();
 		assert.ok(real.length > 30);
-		assert.ok(real.some(({ wording, awaitingData }) => wording === 'Cheshire Brine Area' && awaitingData));
-		assert.ok(real.some(({ wording, awaitingData }) => wording === 'Ambulance Trusts' && !awaitingData));
+		// every category the rulesets name has data now - the last four came with the 2026-11-02 export
+		assert.ok(real.every(({ awaitingData }) => !awaitingData));
 	});
 
 	test('a wording with no consulteeTypes entry awaits nothing', () => {
@@ -414,6 +414,8 @@ describe('rulesets registry', () => {
 		const referenceCategories = new Set([
 			'Ambulance Trust',
 			'Canal',
+			'Cheshire Brine Area',
+			'Coal Mining Reporting Area',
 			'Corporate Joint Committee',
 			'DNO',
 			'Dock or Harbour',
@@ -429,6 +431,8 @@ describe('rulesets registry', () => {
 			'Local Health Board',
 			'Local Resilience Forum',
 			'Lower Tier Authority',
+			'MOD Low Flying Area',
+			'MOD Safeguarding Area',
 			'National Landscape',
 			'National Park',
 			'ONR Site',
