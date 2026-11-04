@@ -94,7 +94,8 @@ describe('report consultee remove page', () => {
 		assert.strictEqual(mockRes.render.mock.calls[0].arguments[0], 'views/consultees/report/consultees/remove/view.njk');
 		const viewModel = mockRes.render.mock.calls[0].arguments[1];
 		assert.strictEqual(viewModel.pageHeading, 'Remove consultee');
-		assert.strictEqual(viewModel.pageCaption, 'Real Test Project');
+		// captioned with its category, as the Add a consultee page is
+		assert.strictEqual(viewModel.pageCaption, 'Parish Council');
 		assert.strictEqual(viewModel.name, 'Little Snoring Parish Council');
 		assert.deepStrictEqual(viewModel.identified, ['"B" host Parish / Town / Community Councils: intersects the site']);
 		assert.strictEqual(

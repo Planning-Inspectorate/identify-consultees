@@ -1,7 +1,7 @@
 export interface RemoveConsulteeViewModel {
 	/** "Remove consultee" - the heading above the consultee's details and reason form. */
 	pageHeading: string;
-	/** The case name - the caption above the heading. */
+	/** The category it's being removed from - the caption above the heading, as on the add page. */
 	pageCaption: string;
 	/** Back to the category page, keeping the current selection. */
 	backLinkUrl: string;
