@@ -14,9 +14,8 @@ import type { RemoveConsulteeViewModel } from './view-model.ts';
 
 interface RemoveConsulteeContext {
 	caseId: string;
-	/** The case name - the page caption. */
-	caseName: string;
 	ruleset: Ruleset;
+	/** The category it's being removed from - the page caption, as the Add a consultee page's. */
 	category: string;
 	selection: ConsulteeSelection;
 	/** Which consultee the page is removing - a ruleset match or a hand-added one. */
@@ -61,7 +60,6 @@ async function removeConsulteeContext(
 		if (failed) {
 			return {
 				caseId: project.id,
-				caseName: project.properties.caseName,
 				ruleset,
 				category,
 				selection,
@@ -85,7 +83,6 @@ async function removeConsulteeContext(
 		}
 		return {
 			caseId: project.id,
-			caseName: project.properties.caseName,
 			ruleset,
 			category,
 			selection,
@@ -111,7 +108,6 @@ async function removeConsulteeContext(
 	}
 	return {
 		caseId: project.id,
-		caseName: project.caseName,
 		ruleset,
 		category,
 		selection,
@@ -132,7 +128,7 @@ function viewModel(context: RemoveConsulteeContext, reasonValue = '', reasonErro
 	);
 	return {
 		pageHeading: 'Remove consultee',
-		pageCaption: context.caseName,
+		pageCaption: context.category,
 		backLinkUrl: consulteesUrl(context.caseId, context.ruleset.id, context.category, context.selection),
 		formAction: selfUrl,
 		name: context.name,
