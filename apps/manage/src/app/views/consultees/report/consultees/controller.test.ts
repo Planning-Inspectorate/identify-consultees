@@ -227,7 +227,7 @@ describe('report consultees change page', () => {
 
 	it('should 404 a category only the nearby search found - it is not in the report', async () => {
 		const mockRes = { status: mock.fn(() => mockRes), render: mock.fn() };
-		// the default ruleset (England Wales post 30 April 2024) has no Local Resilience Forum
+		// the default ruleset (England and Wales (Post 30 April 2024)) has no Local Resilience Forum
 		// condition, so only the nearby search finds one
 		const { geometryWkt: _noGeometry, ...forum } = {
 			...parishMatchRow(),

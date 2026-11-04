@@ -141,7 +141,7 @@ describe('manage page accessibility smoke', () => {
 			formAction: '/consultees/11111111-1111-1111-1111-111111111111/ruleset?ruleset=england-wales-post-20240430',
 			_csrf: 'test-csrf',
 			rulesets: [
-				{ value: 'england-wales-post-20240430', text: 'England Wales post 30 April 2024', checked: true },
+				{ value: 'england-wales-post-20240430', text: 'England and Wales (Post 30 April 2024)', checked: true },
 				{ value: 'other-ruleset', text: 'Other ruleset', checked: false }
 			]
 		});
@@ -193,7 +193,7 @@ describe('manage page accessibility smoke', () => {
 			caseChangeUrl: '/',
 			shapefileName: 'EN0110007.geojson',
 			shapefileChangeUrl: '/consultees/11111111-1111-1111-1111-111111111111',
-			rulesetName: 'England Wales post 30 April 2024',
+			rulesetName: 'England and Wales (Post 30 April 2024)',
 			rulesetChangeUrl: '/consultees/11111111-1111-1111-1111-111111111111/ruleset?ruleset=england-wales-post-20240430',
 			groups: [
 				{
@@ -244,7 +244,7 @@ describe('manage page accessibility smoke', () => {
 			caseChangeUrl: '/',
 			shapefileName: 'EN0110007.geojson',
 			shapefileChangeUrl: '/consultees/11111111-1111-1111-1111-111111111111',
-			rulesetName: 'England Wales post 30 April 2024',
+			rulesetName: 'England and Wales (Post 30 April 2024)',
 			rulesetChangeUrl: '/consultees/11111111-1111-1111-1111-111111111111/ruleset?ruleset=england-wales-post-20240430',
 			groups: [],
 			generateReportUrl:

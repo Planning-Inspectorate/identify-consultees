@@ -10,6 +10,8 @@ import {
 
 const CATEGORY_PAGE = `/consultees/${SAMPLE_CASE_ID}/report/consultees?ruleset=${SAMPLE_RULESET_ID}&category=Parish%20Council`;
 
+const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
 /**
  * The opening tag of the element with `className`, as the server sent it. The live DOM won't do:
  * the map adds its own data-breakpoint to the container once it starts, so whether it's there
@@ -46,7 +48,7 @@ const pages = [
 		path: `/consultees/${SAMPLE_CASE_ID}/ruleset`,
 		name: 'ruleset picker',
 		heading: /Ruleset/i,
-		mustSee: [new RegExp(SAMPLE_RULESET_NAME, 'i'), /Identify consultees/i]
+		mustSee: [new RegExp(escapeRegExp(SAMPLE_RULESET_NAME), 'i'), /Identify consultees/i]
 	},
 	{
 		path: `/consultees/${SAMPLE_CASE_ID}/report?ruleset=${SAMPLE_RULESET_ID}`,

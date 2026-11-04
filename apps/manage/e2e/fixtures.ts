@@ -12,4 +12,4 @@ export const SAMPLE_CASE_NAME = 'East Anglia ONE Offshore Windfarm';
 
 // the default ruleset, built from config/rulesets/england_wales_post_20240430_ruleset.csv
 export const SAMPLE_RULESET_ID = 'england-wales-post-20240430';
-export const SAMPLE_RULESET_NAME = 'England Wales post 30 April 2024';
+export const SAMPLE_RULESET_NAME = 'England and Wales (Post 30 April 2024)';

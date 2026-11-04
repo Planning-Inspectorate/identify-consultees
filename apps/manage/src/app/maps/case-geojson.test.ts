@@ -44,19 +44,23 @@ function match(id: string): ConsulteeMatch {
 describe('buildCaseMapConfig', () => {
 	it('draws a match with no category under the uncategorised colour', () => {
 		const uncategorised = { ...match('u'), feature: { ...match('u').feature, properties: { consultee: 'Unknown' } } };
-		const config = buildCaseMapConfig(project(), [uncategorised as ConsulteeMatch], 'England Wales post 30 April 2024');
+		const config = buildCaseMapConfig(
+			project(),
+			[uncategorised as ConsulteeMatch],
+			'England and Wales (Post 30 April 2024)'
+		);
 		assert.strictEqual(config.consulteeGeojson.features[0].properties.consulteeCategory, UNCATEGORISED);
 		assert.strictEqual(config.consulteeGeojson.features[0].properties.region, '');
 	});
 
 	it('draws every match that has geometry, without a search area', () => {
 		const matches = Array.from({ length: 60 }, (_, i) => match(`${i}`));
-		const config = buildCaseMapConfig(project(), matches, 'England Wales post 30 April 2024');
+		const config = buildCaseMapConfig(project(), matches, 'England and Wales (Post 30 April 2024)');
 		assert.strictEqual(config.consulteeGeojson.features.length, 60);
 	});
 
 	it('carries the static-map fallback in the page config when given one', () => {
-		const withFallback = buildCaseMapConfig(project(), [], 'England Wales post 30 April 2024', undefined, {
+		const withFallback = buildCaseMapConfig(project(), [], 'England and Wales (Post 30 April 2024)', undefined, {
 			src: '/consultees/x/results/static-map',
 			alt: 'Static map'
 		});
@@ -67,7 +71,7 @@ describe('buildCaseMapConfig', () => {
 			height: MAP_VIEWPORT.height
 		});
 
-		const without = buildCaseMapConfig(project(), [], 'England Wales post 30 April 2024');
+		const without = buildCaseMapConfig(project(), [], 'England and Wales (Post 30 April 2024)');
 		assert.strictEqual(without.fallback, undefined);
 	});
 });
@@ -91,7 +95,7 @@ describe('buildCaseMapConfig with a search area', () => {
 		const config = buildCaseMapConfig(
 			project(),
 			[match('inside'), match('outside')],
-			'England Wales post 30 April 2024',
+			'England and Wales (Post 30 April 2024)',
 			{
 				area,
 				geometries: new Map([['inside', display]])
@@ -119,7 +123,7 @@ describe('buildCaseMapConfig with a search area', () => {
 
 	it('draws every match, coloured by category', () => {
 		const matches = Array.from({ length: 60 }, (_, i) => match(`${i}`));
-		const config = buildCaseMapConfig(project(), matches, 'England Wales post 30 April 2024', {
+		const config = buildCaseMapConfig(project(), matches, 'England and Wales (Post 30 April 2024)', {
 			area,
 			geometries: new Map(matches.map((m) => [m.feature.id, display] as const))
 		});
@@ -143,7 +147,7 @@ describe('buildCaseMapConfig with a search area', () => {
 		const config = buildCaseMapConfig(
 			project(),
 			[match('parish'), regionalMatch, match('empty')],
-			'England Wales post 30 April 2024',
+			'England and Wales (Post 30 April 2024)',
 			{
 				area,
 				geometries: new Map<string, Geometry>([
@@ -177,7 +181,7 @@ describe('buildCaseMapConfig with a search area', () => {
 		const config = buildCaseMapConfig(
 			project(),
 			[match('parish'), nearby(match('x'), 'nearby-parish'), regionalMatch, nearby(regionalMatch, 'nearby-county')],
-			'England Wales post 30 April 2024',
+			'England and Wales (Post 30 April 2024)',
 			{
 				area,
 				geometries: new Map<string, Geometry>([
@@ -314,7 +318,7 @@ describe('buildCaseMapConfig with a search area', () => {
 	});
 
 	it('fills every match as local without a search area', () => {
-		const config = buildCaseMapConfig(project(), [match('a')], 'England Wales post 30 April 2024');
+		const config = buildCaseMapConfig(project(), [match('a')], 'England and Wales (Post 30 April 2024)');
 		assert.strictEqual(config.consulteeGeojson.features[0].properties.fillOpacity, String(LOCAL_FILL_OPACITY));
 	});
 
@@ -323,7 +327,7 @@ describe('buildCaseMapConfig with a search area', () => {
 			...project(),
 			geometry: { type: 'Point' as const, coordinates: [-1.123456789, 52.987654321] as [number, number] }
 		};
-		const config = buildCaseMapConfig(detailed, [], 'England Wales post 30 April 2024');
+		const config = buildCaseMapConfig(detailed, [], 'England and Wales (Post 30 April 2024)');
 		assert.deepStrictEqual(config.projectGeojson.features[0].geometry, {
 			type: 'Point',
 			coordinates: [-1.12346, 52.98765]
@@ -331,7 +335,7 @@ describe('buildCaseMapConfig with a search area', () => {
 	});
 
 	it('draws matches in their stored geometry, with no nearby layer, without a search area', () => {
-		const config = buildCaseMapConfig(project(), [match('a')], 'England Wales post 30 April 2024');
+		const config = buildCaseMapConfig(project(), [match('a')], 'England and Wales (Post 30 April 2024)');
 		assert.strictEqual('nearbyGeojson' in config, false);
 		assert.deepStrictEqual(config.consulteeGeojson.features[0].geometry, match('a').feature.geometry);
 	});
