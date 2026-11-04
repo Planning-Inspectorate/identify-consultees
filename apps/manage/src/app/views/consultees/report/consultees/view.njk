@@ -41,7 +41,7 @@
 	{% include "views/partials/consultee-map-region.njk" %}
 
 	{% if not rulesetFailed %}
-		<h2 class="govuk-heading-m govuk-!-margin-top-6" id="consultees">Consultees</h2>
+		<h2 class="govuk-heading-m govuk-!-margin-top-6" id="consultees">Included consultees</h2>
 
 		{% if rows.length == 0 %}
 			<p class="govuk-body">No consultees identified in this category.</p>
@@ -60,7 +60,7 @@
 				]), tableRows) %}
 			{% endfor %}
 			{{ govukTable({
-				caption: "Consultees",
+				caption: "Included consultees",
 				captionClasses: "govuk-visually-hidden",
 				firstCellIsHeader: true,
 				head: [

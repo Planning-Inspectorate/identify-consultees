@@ -179,7 +179,7 @@ test.describe('manage journeys', () => {
 
 		await expect(page).toHaveURL(/\/report\/consultees\?.*category=Parish/);
 		await expect(page.getByRole('heading', { level: 1 })).toContainText('Parish Council');
-		await expect(page.getByRole('heading', { level: 2, name: 'Consultees' })).toBeVisible();
+		await expect(page.getByRole('heading', { level: 2, name: 'Included consultees' })).toBeVisible();
 		const removeLinks = page.getByRole('link', { name: /Remove/ });
 		await expect(removeLinks).toHaveCount(parishCount);
 
@@ -296,13 +296,13 @@ test.describe('manage journeys', () => {
 		await expect(page.getByRole('link', { name: /Remove/ })).toHaveCount(parishCount - removed + picked + 2);
 
 		// a hand-added consultee's Remove link goes through the same reason page -
-		// its row leaves the Consultees table and joins Removed consultees instead
+		// its row leaves the Included consultees table and joins Removed consultees instead
 		await page.getByRole('link', { name: 'Remove Second Test Consultee' }).click();
 		await expect(page).toHaveURL(/\/report\/consultees\/remove\?.*added=/);
 		await expect(page.getByRole('rowheader', { name: 'Second Test Consultee' })).toBeVisible();
 		await page.getByLabel('Reason for removing').fill('Added in error');
 		await page.getByRole('button', { name: 'Remove consultee' }).click();
-		const consulteesTable = page.getByRole('table', { name: 'Consultees', exact: true });
+		const consulteesTable = page.getByRole('table', { name: 'Included consultees', exact: true });
 		await expect(consulteesTable.getByRole('rowheader', { name: 'Second Test Consultee' })).toHaveCount(0);
 		await expect(consulteesTable.getByRole('rowheader', { name: 'First Test Consultee' })).toBeVisible();
 		const removedTable = page.getByRole('table', { name: 'Removed consultees' });
