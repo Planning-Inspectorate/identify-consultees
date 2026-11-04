@@ -19,6 +19,9 @@ variable "apps_config" {
     auth = object({
       client_id                = string
       group_application_access = string
+      # the Entra group for the admin section (/admin) - "" leaves it open to everyone with
+      # application access (apps/manage/src/app/admin/access.ts)
+      group_admin = string
       # groups = object({
       #   inspectors           = string
       #   team_leads           = string

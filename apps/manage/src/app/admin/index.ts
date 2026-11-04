@@ -1,7 +1,8 @@
 import type { ManageService } from '#service';
 import { asyncHandler } from '@planning-inspectorate/core/util';
-import type { IRouter, RequestHandler } from 'express';
+import type { IRouter } from 'express';
 import { Router as createRouter } from 'express';
+import { buildAssertAdminAccess } from './access.ts';
 import {
 	buildCaseBoundariesPage,
 	buildCaseBoundaryRowPage,
@@ -16,21 +17,19 @@ import { createRoutes as createUploadToBlobRoutes } from './upload-to-blob/index
 
 /**
  * The admin section: internal tools for loading and checking an environment's data, all under
- * /admin with a menu between them (layout.njk). Self-contained - to take it out of the service,
+ * /admin with a menu between them (layout.njk), for the members of its Entra group (access.ts).
+ * Self-contained - to take it out of the service,
  * delete this folder and the lines in router.ts and app.ts that name it.
  */
 
 /** Routes taking multipart uploads - core's CSRF check has to let multer read them first. */
 export const ADMIN_MULTIPART_ROUTES = ['/admin/upload-to-blob/run'];
 
-/** The header's Admin link, on every page - set before the routes so any page's header can show it. */
-export const adminHeaderLink: RequestHandler = (req, res, next) => {
-	res.locals.adminLink = { href: '/admin', active: req.path === '/admin' || req.path.startsWith('/admin/') };
-	next();
-};
-
 export function createAdminRoutes(service: ManageService): IRouter {
 	const router = createRouter();
+
+	// only its Entra group's members - see access.ts
+	router.use(buildAssertAdminAccess(service));
 
 	// every admin page's menu, with the current page marked
 	router.use((req, res, next) => {

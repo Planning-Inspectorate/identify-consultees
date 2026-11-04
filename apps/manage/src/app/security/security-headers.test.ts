@@ -30,7 +30,8 @@ function buildTestConfig(nodeEnv: Config['NODE_ENV']): Config {
 			clientSecret: 'client-secret',
 			disabled: true,
 			groups: {
-				applicationAccess: 'group-id'
+				applicationAccess: 'group-id',
+				admin: ''
 			},
 			redirectUri: 'http://localhost/auth/redirect',
 			signoutUrl: 'https://login.microsoftonline.com/common/oauth2/v2.0/logout'

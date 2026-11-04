@@ -5,7 +5,8 @@ import { cacheNoCacheMiddleware } from '@planning-inspectorate/core/middleware';
 import type { IRouter, RequestHandler } from 'express';
 import { Router as createRouter } from 'express';
 import rateLimit from 'express-rate-limit';
-import { adminHeaderLink, createAdminRoutes } from './admin/index.ts';
+import { buildAdminHeaderLink } from './admin/access.ts';
+import { createAdminRoutes } from './admin/index.ts';
 import { buildSanitisingErrorHandler } from './error-handler.ts';
 import { createDefraVendorRouter } from './maps/vendor.ts';
 import { createRoutes as createComponentRoutes } from './views/components/index.ts';
@@ -109,8 +110,8 @@ export function buildRouter(service: ManageService, options: BuildRouterOptions 
 		});
 	}
 
-	// the header's Admin link - see admin/index.ts
-	router.use(adminHeaderLink);
+	// the header's Admin link, for those who may use the admin section - see admin/access.ts
+	router.use(buildAdminHeaderLink(service));
 	router.use('/', homeRoutes);
 	router.use('/consultees', consulteeRoutes);
 	// the user guide - behind sign-in, as it describes how rulesets are changed

@@ -85,11 +85,13 @@ If the ruleset can't be run (function down, timeout, bad key) the pages say so i
 
 ## Admin section
 
-Internal tools for loading and checking an environment's data, all in `apps/manage/src/app/admin/`: one folder per page, a layout with a menu between them (`admin/layout.njk`, the list in `admin/navigation.ts`), and their tests. `createAdminRoutes` mounts them under `/admin`; `adminHeaderLink` adds **Admin** to the header. To add a page, add its folder, a route in `admin/index.ts` and an entry in `ADMIN_PAGES`. To take the section out of the service, delete the folder, the lines in `router.ts` and `app.ts` (and `testing/create-test-app.ts`) that import from it, and its paths in the `e2e/` page lists.
+Internal tools for loading and checking an environment's data, all in `apps/manage/src/app/admin/`: one folder per page, a layout with a menu between them (`admin/layout.njk`, the list in `admin/navigation.ts`), and their tests. `createAdminRoutes` mounts them under `/admin`; `buildAdminHeaderLink` adds **Admin** to the header for those who may use it.
+
+**Who may use it** (`admin/access.ts`): the members of its own Entra group, `AUTH_GROUP_ADMIN` (Terraform's `apps_config.auth.group_admin`, per environment), on top of the application access group every page needs - so an admin is in both. Anyone else gets the 403 page at any `/admin` URL, logged, and no Admin link. While the group isn't set (`""`), the section is open to everyone with application access, as it was before; with sign-in off locally, to everyone. The group comes from the ID token's `groups` claim, as the application access group does. To add a page, add its folder, a route in `admin/index.ts` and an entry in `ADMIN_PAGES`. To take the section out of the service, delete the folder, the lines in `router.ts` and `app.ts` (and `testing/create-test-app.ts`) that import from it, and its paths in the `e2e/` page lists.
 
 ## Auth
 
-`AUTH_DISABLED=true` locally. Otherwise `/auth` is rate limited and everything after it needs an Entra login and group membership (`authGuards`). Footer pages and monitoring stay public.
+`AUTH_DISABLED=true` locally. Otherwise `/auth` is rate limited and everything after it needs an Entra login and group membership (`authGuards`), and `/admin` its own group too (see "Admin section"). Footer pages and monitoring stay public.
 
 ## Changing the case or ruleset shape
 

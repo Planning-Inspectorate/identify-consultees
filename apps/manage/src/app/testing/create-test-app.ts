@@ -38,7 +38,8 @@ export function buildManageTestConfig(authDisabled = true, overrides: Partial<Co
 			clientSecret: 'client-secret',
 			disabled: authDisabled,
 			groups: {
-				applicationAccess: 'group-id'
+				applicationAccess: 'group-id',
+				admin: ''
 			},
 			redirectUri: 'http://localhost/auth/redirect',
 			signoutUrl: 'https://login.microsoftonline.com/common/oauth2/v2.0/logout'
