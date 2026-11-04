@@ -69,13 +69,45 @@ const RUN = [
 // the reference data's consultees, as the name lookup finds them (ids as SQL Server returns them)
 const storedId = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';
 const STORED = [
-	{ id: storedId.toUpperCase(), consultee: 'Mr Smith', consulteeCategory: 'Parish Council', distanceMetres: 31_000 },
-	{ id: nearbyId.toUpperCase(), consultee: 'Barton', consulteeCategory: 'Parish Council', distanceMetres: 1_250 },
+	{
+		id: storedId.toUpperCase(),
+		consultee: 'Mr Smith',
+		consulteeCategory: 'Parish Council',
+		distanceMetres: 31_000,
+		region: 'East of England'
+	},
+	{
+		id: nearbyId.toUpperCase(),
+		consultee: 'Barton',
+		consulteeCategory: 'Parish Council',
+		distanceMetres: 1_250,
+		region: 'East of England'
+	},
+	{
+		id: fartherNearbyId.toUpperCase(),
+		consultee: 'Barton',
+		consulteeCategory: 'Parish Council',
+		distanceMetres: 4_000,
+		region: 'East of England'
+	},
+	// three parishes sharing a name, none near the site - two the same distance away
+	...[
+		['f1f1f1f1-0000-0000-0000-000000000001', 40_000, 'North West'],
+		['f1f1f1f1-0000-0000-0000-000000000002', 40_000, 'Yorkshire and The Humber'],
+		['f1f1f1f1-0000-0000-0000-000000000003', 95_000, 'East Midlands']
+	].map(([id, distanceMetres, region]) => ({
+		id: String(id).toUpperCase(),
+		consultee: 'Middleton',
+		consulteeCategory: 'Parish Council',
+		distanceMetres: Number(distanceMetres),
+		region: String(region)
+	})),
 	{
 		id: 'cccccccc-cccc-cccc-cccc-cccccccccccc',
 		consultee: 'Banana Hospital',
 		consulteeCategory: 'Hospital',
-		distanceMetres: 5
+		distanceMetres: 5,
+		region: null
 	}
 ];
 
@@ -114,10 +146,10 @@ function dbReturning(rows: unknown[][], otherCases: unknown[] = OTHER_CASES) {
 				return text.includes('EnvelopeCenter') ? NEARBY_CASES : otherCases;
 			}
 			if (text.includes('LOWER(consultee)')) {
-				const [, category, name] = values as string[];
+				const [category, name] = (values as string[]).slice(-2);
 				return STORED.filter(
 					(row) => row.consulteeCategory === category && row.consultee.toLowerCase() === name.toLowerCase()
-				).map(({ id, consultee, distanceMetres }) => ({ id, consultee, distanceMetres }));
+				).map(({ id, consultee, distanceMetres, region }) => ({ id, consultee, distanceMetres, region }));
 			}
 			return rows[Math.min(call++, rows.length - 1)] ?? [];
 		})
@@ -195,20 +227,23 @@ describe('add a consultee page', () => {
 		assert.match(html, /govuk-label--m/);
 	});
 
-	it("suggests the category's nearby consultees as the name is typed, nearest first, once per name", async () => {
+	it("suggests each of the category's nearby consultees, nearest first - those sharing a name by distance", async () => {
 		const res = rendering();
 		await buildReportConsulteeAddPage(service() as never)(
 			{ params: { caseId: realProjectId }, query: parishQuery } as never,
 			res as never
 		);
 
+		// two parishes called Barton, each its own suggestion, told apart by distance, with its region
 		assert.deepStrictEqual(viewModelOf(res).nearbySuggestions, [
-			{ name: 'Barton', hint: '1.3 km from the site' },
+			{ name: 'Barton (1.3 km from the site)', hint: 'East of England' },
+			{ name: 'Barton (4.0 km from the site)', hint: 'East of England' },
 			{ name: 'Christleton', hint: '7.3 km from the site' }
 		]);
 		const html = res.render.mock.calls[0].result as string;
 		assert.match(html, /<input[^>]*name="name"[^>]*list="nearby-consultees"[^>]*data-consultee-autocomplete/);
-		assert.match(html, /<option value="Barton" label="1\.3 km from the site"><\/option>/);
+		assert.match(html, /<option value="Barton \(1\.3 km from the site\)" label="East of England"><\/option>/);
+		assert.match(html, /<option value="Christleton" label="7\.3 km from the site"><\/option>/);
 		assert.doesNotMatch(html, /Nearby Hospital|value="Little Snoring/);
 	});
 
@@ -230,7 +265,8 @@ describe('add a consultee page', () => {
 		);
 		assert.deepStrictEqual(viewModelOf(res).nearbySuggestions, [
 			{ name: 'Little Snoring Parish Council', hint: '0.0 km from the site, removed' },
-			{ name: 'Barton', hint: '1.3 km from the site' },
+			{ name: 'Barton (1.3 km from the site)', hint: 'East of England' },
+			{ name: 'Barton (4.0 km from the site)', hint: 'East of England' },
 			{ name: 'Christleton', hint: '7.3 km from the site' }
 		]);
 		assert.match(viewModelOf(res).nameHint.text, /find consultees local to the site/);
@@ -256,19 +292,88 @@ describe('add a consultee page', () => {
 			{ params: { caseId: realProjectId }, query: { ...parishQuery, add: added } } as never,
 			res as never
 		);
-		// the farther Barton is still there to suggest
+		// the farther Barton is still there to suggest - by distance, as one of its name is listed
 		assert.deepStrictEqual(
 			viewModelOf(res).nearbySuggestions.map((suggestion: { name: string }) => suggestion.name),
-			['Barton', 'Christleton']
+			['Barton (4.0 km from the site)', 'Christleton']
 		);
 	});
 
-	it('adds a typed name matching a nearby consultee by its id - the nearest of that name', async () => {
-		const res = await submit({ name: '  barton ', reason: ' Borders the site ' });
+	it('adds a typed name matching one nearby consultee by its id', async () => {
+		const res = await submit({ name: '  christleton ', reason: ' Borders the site ' });
 
 		assert.strictEqual(
 			res.redirect.mock.calls[0].arguments[0],
-			`${categoryUrl}&add=${urlParam(JSON.stringify({ i: nearbyId, c: 'Parish Council', n: 'Barton', r: 'Borders the site' }))}#consultees`
+			`${categoryUrl}&add=${urlParam(JSON.stringify({ i: '99999999-9999-9999-9999-999999999999', c: 'Parish Council', n: 'Christleton', r: 'Borders the site' }))}#consultees`
+		);
+	});
+
+	it('adds the one of a shared name its suggestion names, by distance', async () => {
+		for (const [typed, id] of [
+			['Barton (1.3 km from the site)', nearbyId],
+			['barton (4.0 KM from the site)', fartherNearbyId]
+		]) {
+			const res = await submit({ name: typed, reason: 'r' });
+			assert.strictEqual(
+				res.redirect.mock.calls[0].arguments[0],
+				`${categoryUrl}&add=${urlParam(JSON.stringify({ i: id, c: 'Parish Council', n: 'Barton', r: 'r' }))}#consultees`
+			);
+		}
+	});
+
+	it('asks which is meant for a name several consultees share, listing them all', async () => {
+		// two near the site
+		const nearbyName = await submit({ name: 'barton', reason: 'r' });
+		assert.strictEqual(nearbyName.redirect.mock.callCount(), 0);
+		assert.strictEqual(
+			viewModelOf(nearbyName).addForm.nameError.text,
+			'There is more than one Barton - choose the one you mean from the list'
+		);
+
+		// three far from it, now suggested too - the two the same distance away by region as well
+		const farName = await submit({ name: 'Middleton', reason: 'r' });
+		assert.strictEqual(
+			viewModelOf(farName).addForm.nameError.text,
+			'There is more than one Middleton - choose the one you mean from the list'
+		);
+		assert.deepStrictEqual(
+			viewModelOf(farName)
+				.nearbySuggestions.filter((suggestion: { name: string }) => suggestion.name.startsWith('Middleton'))
+				.map((suggestion: { name: string }) => suggestion.name),
+			[
+				'Middleton (40.0 km from the site, North West)',
+				'Middleton (40.0 km from the site, Yorkshire and The Humber)',
+				'Middleton (95.0 km from the site)'
+			]
+		);
+		// and the one chosen is added
+		const chosen = await submit({ name: 'Middleton (40.0 km from the site, Yorkshire and The Humber)', reason: 'r' });
+		assert.strictEqual(
+			chosen.redirect.mock.calls[0].arguments[0],
+			`${categoryUrl}&add=${urlParam(JSON.stringify({ i: 'f1f1f1f1-0000-0000-0000-000000000002', c: 'Parish Council', n: 'Middleton', r: 'r' }))}#consultees`
+		);
+		// a label that's no longer right - the distance changed - asks again
+		const stale = await submit({ name: 'Middleton (12.0 km from the site)', reason: 'r' });
+		assert.match(viewModelOf(stale).addForm.nameError.text, /There is more than one Middleton/);
+	});
+
+	it('adds another consultee of a name already listed, chosen from the list', async () => {
+		const added = { ...parishQuery, add: JSON.stringify({ i: nearbyId, c: 'Parish Council', n: 'Barton', r: 'r' }) };
+		// the name alone could be the one listed - so it asks
+		const bare = await submit({ name: 'Barton', reason: 'r' }, added);
+		assert.strictEqual(
+			viewModelOf(bare).addForm.nameError.text,
+			'Barton is already listed in Parish Council - to add another Barton, choose it from the list'
+		);
+		// the other Barton, chosen, is added after the first
+		const other = await submit({ name: 'Barton (4.0 km from the site)', reason: 'r2' }, added);
+		const location = other.redirect.mock.calls[0].arguments[0] as string;
+		assert.ok(
+			location.includes(urlParam(JSON.stringify({ i: fartherNearbyId, c: 'Parish Council', n: 'Barton', r: 'r2' })))
+		);
+		// the listed one itself is never offered again
+		assert.ok(
+			!viewModelOf(bare).nearbySuggestions.some((suggestion: { name: string }) => suggestion.name.includes('1.3 km'))
 		);
 	});
 
@@ -290,7 +395,7 @@ describe('add a consultee page', () => {
 	});
 
 	it("ignores saved-entry params an older link carries - there's no save step to go back to", async () => {
-		const res = await submit({ name: 'barton', reason: 'Borders the site' }, { ...parishQuery, saved: '1' });
+		const res = await submit({ name: 'christleton', reason: 'Borders the site' }, { ...parishQuery, saved: '1' });
 
 		const location = res.redirect.mock.calls[0].arguments[0] as string;
 		assert.ok(!location.includes('saved'));
@@ -370,10 +475,10 @@ describe('add a consultee page', () => {
 	});
 
 	it("still adds a consultee, from the reference data, when the ruleset can't be run", async () => {
-		const res = await submit({ name: 'Barton', reason: 'r' }, parishQuery, failingRulesetRunner());
+		const res = await submit({ name: 'Mr Smith', reason: 'r' }, parishQuery, failingRulesetRunner());
 		assert.ok(
 			(res.redirect.mock.calls[0].arguments[0] as string).endsWith(
-				`&add=${urlParam(JSON.stringify({ i: nearbyId, c: 'Parish Council', n: 'Barton', r: 'r' }))}#consultees`
+				`&add=${urlParam(JSON.stringify({ i: storedId, c: 'Parish Council', n: 'Mr Smith', r: 'r' }))}#consultees`
 			)
 		);
 	});
