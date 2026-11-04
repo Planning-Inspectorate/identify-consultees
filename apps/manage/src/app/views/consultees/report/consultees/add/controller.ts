@@ -297,7 +297,7 @@ interface ResolvedName {
  * The consultee a typed name is. For Nearby NSIPs, the other case it names. For a consultee
  * category, any consultee of the category in the reference data, near the site or not: a name only
  * one unlisted consultee has is that one; one several have - Middleton - has to be told apart by
- * the label the page suggests it with, "Middleton (3.2 km from the site)". A consultee already in
+ * the label the page suggests it with, "Middleton (Lancaster)". A consultee already in
  * the list - the same one, by id - is refused, but another of its name can be added.
  */
 async function resolveTypedName(
@@ -382,11 +382,10 @@ async function resolveTypedName(
 /**
  * Saves a hand-added consultee. The name and the reason are both required - like the removal
  * reason, the reason is recorded for auditing and shows in the Identified column. The name has to
- * be a real consultee of the category: one of the candidates it's matched to as it's typed (case
- * and spacing aside, the nearest of that name), so the report has its stored row - for a consultee
- * category, a nearby one or any other in the reference data; for Nearby NSIPs, another case's
- * newest shapefile. Anything else - a typo, or a made-up name - is refused, as is a name already
- * listed. A failed submit shows the page again with the entered values and an error per field; a
+ * be a real consultee of the category, case and spacing aside (resolveTypedName), so the report has
+ * its stored row - for a consultee category, a nearby one or any other in the reference data, one
+ * of a name several share chosen by its label; for Nearby NSIPs, another case's newest shapefile.
+ * Anything else - a typo, or a made-up name - is refused, as is a consultee already listed. A failed submit shows the page again with the entered values and an error per field; a
  * successful one adds the consultee to the URL's `add` params and returns to the category page.
  */
 export function buildReportConsulteeAddSubmit(
