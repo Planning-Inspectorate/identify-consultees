@@ -157,7 +157,7 @@ describe('manage page accessibility smoke', () => {
 			caseName: 'Longfield Solar Farm',
 			caseId: '11111111-1111-1111-1111-111111111111',
 			backLinkUrl: '/',
-			backLinkText: 'Back to projects',
+			backLinkText: 'Back',
 			formAction: '/consultees/11111111-1111-1111-1111-111111111111',
 			_csrf: 'test-csrf',
 			files: [

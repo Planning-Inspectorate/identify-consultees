@@ -70,7 +70,7 @@ describe('consultee project boundary page', () => {
 		assert.strictEqual(viewModel.pageCaption, 'Real Test Project');
 		assert.strictEqual(viewModel.reference, 'EN010099');
 		assert.strictEqual(viewModel.backLinkUrl, '/');
-		assert.strictEqual(viewModel.backLinkText, 'Back to projects');
+		assert.strictEqual(viewModel.backLinkText, 'Back');
 		assert.strictEqual(viewModel.formAction, `/consultees/${realProjectId}`);
 		assert.ok(viewModel.mapConfigJson.includes('FeatureCollection'));
 
@@ -87,7 +87,7 @@ describe('consultee project boundary page', () => {
 		assert.strictEqual(mapConfig.fallback.src, `/consultees/${realProjectId}/boundary-map`);
 
 		const html = mockRes.render.mock.calls[0].result;
-		assert.match(html, /Back to projects/);
+		assert.match(html, />Back</);
 		assert.match(html, /Confirm shapefile for report/);
 		assert.match(html, /Continue/);
 		assert.match(html, /app-consultee-map/);
@@ -131,7 +131,7 @@ describe('consultee project boundary page', () => {
 		// a different project: back to the search keeping the ruleset, nothing checked, no selection
 		const project = await render({ change: 'project', ruleset, exclude });
 		assert.strictEqual(project.backLinkUrl, `/?change=project&ruleset=${ruleset}`);
-		assert.strictEqual(project.backLinkText, 'Back to projects');
+		assert.strictEqual(project.backLinkText, 'Back');
 		assert.strictEqual(project.formAction, `/consultees/${realProjectId}?change=project&ruleset=${ruleset}`);
 		assert.ok(project.files.every((file: { checked?: boolean }) => !file.checked));
 

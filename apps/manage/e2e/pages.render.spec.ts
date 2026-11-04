@@ -42,7 +42,7 @@ const pages = [
 		path: `/consultees/${SAMPLE_CASE_ID}`,
 		name: 'project boundary',
 		heading: /Project boundary/i,
-		mustSee: [/Back to projects/i, /Confirm shapefile for report/i, /Continue/i]
+		mustSee: [/^Back$/i, /Confirm shapefile for report/i, /Continue/i]
 	},
 	{
 		path: `/consultees/${SAMPLE_CASE_ID}/ruleset`,

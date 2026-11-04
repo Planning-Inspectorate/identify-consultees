@@ -122,11 +122,9 @@ async function boundaryPageViewModel(
 		caseId: project.id,
 		// changing the check page's shapefile, back to it as it was; its project, back to the search
 		...(change?.step === 'shapefile'
-			? { backLinkUrl: reportUrl(project.id, change.rulesetId, change.selection), backLinkText: 'Back' }
-			: {
-					backLinkUrl: change ? changeProjectUrl(change.rulesetId) : '/',
-					backLinkText: 'Back to projects'
-				}),
+			? { backLinkUrl: reportUrl(project.id, change.rulesetId, change.selection) }
+			: { backLinkUrl: change ? changeProjectUrl(change.rulesetId) : '/' }),
+		backLinkText: 'Back',
 		formAction: boundaryUrl(project.id, change, change?.selection),
 		files: options.map((option): BoundaryFileRadio => ({
 			value: option.id,

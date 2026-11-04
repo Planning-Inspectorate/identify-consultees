@@ -17,7 +17,7 @@ export interface ConsulteeProjectViewModel {
 	caseName: string;
 	caseId: string;
 	backLinkUrl: string;
-	/** "Back to projects", or "Back" to the check page - the layout renders the back link itself from these two. */
+	/** "Back" - the layout renders the back link itself from these two. */
 	backLinkText: string;
 	/** Where the "Confirm shapefile" form posts. */
 	formAction: string;

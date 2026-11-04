@@ -426,7 +426,7 @@ test.describe('manage journeys', () => {
 		await page.goto(`/consultees/${SAMPLE_CASE_ID}`);
 		await expect(page.getByRole('heading', { level: 1 })).toContainText('Project boundary');
 		await expect(page.getByText(SAMPLE_CASE_NAME).first()).toBeVisible();
-		await expect(page.getByRole('link', { name: 'Back to projects' })).toBeVisible();
+		await expect(page.getByRole('link', { name: 'Back', exact: true })).toBeVisible();
 	});
 
 	test('map layers demo page renders layer summaries', async ({ page }) => {
