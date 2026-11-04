@@ -9,7 +9,7 @@ import {
 	bufferGeometryForDisplay,
 	consulteeAreaTable,
 	datasetInUse,
-	findConsulteeAreaByName,
+	findConsulteeAreasByName,
 	getConsulteeAreaById,
 	getConsulteeAreaDisplayGeometries,
 	listConsulteeAreas,
@@ -309,12 +309,21 @@ describe('consultee areas (requires a local SQL Server - see docker-compose.yml)
 			});
 			const site = { type: 'Point' as const, coordinates: [-0.14, 51.505] };
 
-			const found = await findConsulteeAreaByName(dbClient, 'Parish Council', testName.toUpperCase(), site);
-			assert.deepEqual(found, { id: secondAreaId, consultee: testName, distanceMetres: 0 });
+			// both, nearest first, with their regions to tell them apart - case aside
+			const found = await findConsulteeAreasByName(dbClient, 'Parish Council', testName.toUpperCase(), site);
+			assert.deepEqual(
+				found.map(({ id, consultee, region }) => ({ id, consultee, region })),
+				[
+					{ id: secondAreaId, consultee: testName, region: 'Near' },
+					{ id: testAreaId, consultee: testName, region: 'Far' }
+				]
+			);
+			assert.equal(found[0].distanceMetres, 0);
+			assert.ok(found[1].distanceMetres > 100_000);
 
-			// another category, or a name that isn't a consultee - nothing
-			assert.equal(await findConsulteeAreaByName(dbClient, 'Hospital', testName, site), undefined);
-			assert.equal(await findConsulteeAreaByName(dbClient, 'Parish Council', 'Banana', site), undefined);
+			// another category, or a name that isn't a consultee - none
+			assert.deepEqual(await findConsulteeAreasByName(dbClient, 'Hospital', testName, site), []);
+			assert.deepEqual(await findConsulteeAreasByName(dbClient, 'Parish Council', 'Banana', site), []);
 		} finally {
 			await cleanup();
 		}

@@ -428,29 +428,36 @@ export async function getConsulteeAreaDisplayGeometries(
 	return geometries;
 }
 
-/** A consultee found by its name - see findConsulteeAreaByName. */
+/** A consultee found by its name - see findConsulteeAreasByName. */
 export interface NamedConsulteeArea {
 	/** Lowercase, as the Python function and the report's URLs give consultee_area ids. */
 	id: string;
 	/** As the reference data spells it. */
 	consultee: string;
 	distanceMetres: number;
+	/** Its region, to tell apart areas that share a name. */
+	region: string | null;
 }
 
+// a name more areas share than this is listed only this far - Middleton, the most shared parish
+// name, has 12
+const MAX_NAMED_AREAS = 50;
+
 /**
- * The consultee_area row in `category` called `name` - case aside, as names are compared when
- * consultees are added by hand - nearest `site` when several share it, or `undefined` when there's
- * none: the check that a name typed on the Add a consultee page is a real consultee.
+ * The consultee_area rows in `category` called `name` - case aside, as names are compared when
+ * consultees are added by hand - nearest `site` first: the check that a name typed on the Add a
+ * consultee page is a real consultee, and which. Several parishes share a name (575 names, 12
+ * Middletons), so it's every one, not just the nearest - none when there's none.
  */
-export async function findConsulteeAreaByName(
+export async function findConsulteeAreasByName(
 	dbClient: PrismaClient,
 	category: string,
 	name: string,
 	site: Geometry
-): Promise<NamedConsulteeArea | undefined> {
-	const [row] = await withDeadlockRetry(
-		() => dbClient.$queryRaw<{ id: string; consultee: string; distanceMetres: number }[]>`
-			SELECT TOP 1 id, consultee,
+): Promise<NamedConsulteeArea[]> {
+	const rows = await withDeadlockRetry(
+		() => dbClient.$queryRaw<{ id: string; consultee: string; distanceMetres: number; region: string | null }[]>`
+			SELECT TOP (${MAX_NAMED_AREAS}) id, consultee, region,
 				geometrySimplified.STDistance(geography::STGeomFromText(${geometryToWkt(site)}, 4326)) AS distanceMetres
 			FROM consultee_area
 			WHERE consulteeCategory = ${category}
@@ -458,5 +465,10 @@ export async function findConsulteeAreaByName(
 			ORDER BY distanceMetres, id
 		`
 	);
-	return row ? { id: row.id.toLowerCase(), consultee: row.consultee, distanceMetres: row.distanceMetres } : undefined;
+	return rows.map((row) => ({
+		id: row.id.toLowerCase(),
+		consultee: row.consultee,
+		distanceMetres: row.distanceMetres,
+		region: row.region
+	}));
 }
