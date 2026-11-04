@@ -252,7 +252,7 @@ describe('report consultee remove submit', () => {
 		);
 	});
 
-	it("should keep the category's saved entries, for the category page's back link to return to", async () => {
+	it("should ignore saved-entry params an older link carries - there's no save step to go back to", async () => {
 		const mockRes = { redirect: mock.fn(), render: mock.fn(), status: mock.fn(() => mockRes) };
 		const savedAdd = addJson('Saved Consultee', 'Saved before');
 		await removeSubmit(dbReturning([[realProjectRow()]], [parishMatchRow()]))(
@@ -261,7 +261,8 @@ describe('report consultee remove submit', () => {
 		);
 
 		const location = mockRes.redirect.mock.calls[0].arguments[0];
-		assert.ok(location.endsWith(`&saved=1&savedAdd=${urlParam(savedAdd)}&removed=open`));
+		assert.ok(!location.includes('saved'));
+		assert.ok(location.endsWith('&removed=open'));
 	});
 
 	it('should drop a hand-added consultee’s add param and record the removal', async () => {

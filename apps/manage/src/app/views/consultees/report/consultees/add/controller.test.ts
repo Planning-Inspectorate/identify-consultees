@@ -289,18 +289,18 @@ describe('add a consultee page', () => {
 		assert.ok(location.indexOf(urlParam(earlier)) < location.indexOf(newAdd));
 	});
 
-	it("keeps the category's saved entries, for the category page's back link to return to", async () => {
+	it("ignores saved-entry params an older link carries - there's no save step to go back to", async () => {
 		const res = await submit({ name: 'barton', reason: 'Borders the site' }, { ...parishQuery, saved: '1' });
 
 		const location = res.redirect.mock.calls[0].arguments[0] as string;
-		assert.ok(location.endsWith('&saved=1#consultees'));
-		// and its own back link keeps them too
+		assert.ok(!location.includes('saved'));
+		// nor does its own back link carry them on
 		const page = rendering();
 		await buildReportConsulteeAddPage(service() as never)(
 			{ params: { caseId: realProjectId }, query: { ...parishQuery, saved: '1' } } as never,
 			page as never
 		);
-		assert.ok(viewModelOf(page).backLinkUrl.endsWith('&saved=1'));
+		assert.ok(!viewModelOf(page).backLinkUrl.includes('saved'));
 	});
 
 	it('refuses a name that is not a consultee of the category, saying so above the form', async () => {
