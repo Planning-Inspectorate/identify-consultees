@@ -168,7 +168,7 @@ describe('manage router wiring', () => {
 		assert.equal(response.status, 200);
 		assert.match(response.text, /Project boundary/);
 		assert.match(response.text, /Router Test Fixture Wind Farm/);
-		assert.match(response.text, /Back to projects/);
+		assert.match(response.text, />Back</);
 		assert.match(response.text, /Confirm shapefile for report/);
 		assert.match(response.text, /Continue/);
 		assert.match(response.text, /app-consultee-map/);
