@@ -33,6 +33,11 @@ export interface Config extends BaseConfig {
 	// screen a site whose simplified outline has more points than this against its bounding box -
 	// config/screening.yaml (see screening-config.ts); unset or 0 never does up front
 	boundingBoxAbovePoints?: number;
+	// listen for CBOS's document events (its nsip-document Service Bus topic) and import a case's
+	// boundaries when one changes - see cbos/subscriber.ts. Undefined - off - unless
+	// CBOS_SUBSCRIBER_ENABLED=true and the namespace and subscription are set: the staging slot has
+	// it off (infrastructure/app-web.tf), so only the live app takes the messages
+	cbosSubscriber?: CbosSubscriberSettings;
 	// whether the prototype/debug pages are mounted (/map-layers-demo, /components,
 	// /consultee-areas-python, /consultee-areas-direct). On by default outside production; set
 	// ENABLE_DEV_PAGES=true to enable them on a deployed environment running NODE_ENV=production
@@ -77,6 +82,24 @@ export function parseImportHours(value: string | undefined): number[] {
 		throw new Error(`CBOS_IMPORT_HOURS must be whole hours from 0 to 23, comma separated, not "${value}"`);
 	}
 	return [...new Set(hours)].toSorted((a, b) => a - b);
+}
+
+/** Where CBOS's document events are taken from: CBOS's Service Bus namespace, its topic, and our subscription. */
+export interface CbosSubscriberSettings {
+	/** Fully qualified, as pins-sb-back-office-dev-ukw-001.servicebus.windows.net. */
+	namespace: string;
+	topic: string;
+	subscription: string;
+}
+
+/** The CBOS subscriber's settings when it's turned on and set up, else undefined (off). */
+export function cbosSubscriberSettings(env: NodeJS.ProcessEnv): CbosSubscriberSettings | undefined {
+	const namespace = env.CBOS_SERVICE_BUS_NAMESPACE?.trim();
+	const subscription = env.CBOS_SERVICE_BUS_SUBSCRIPTION?.trim();
+	if (env.CBOS_SUBSCRIBER_ENABLED !== 'true' || !namespace || !subscription) {
+		return undefined;
+	}
+	return { namespace, topic: env.CBOS_SERVICE_BUS_TOPIC?.trim() || 'nsip-document', subscription };
 }
 
 // cache the config
@@ -177,6 +200,7 @@ export function loadConfig(): Config {
 		devPagesEnabled: !isProduction || ENABLE_DEV_PAGES === 'true',
 		testFaultsEnabled: ENVIRONMENT !== 'prod',
 		cbosImportHours: parseImportHours(CBOS_IMPORT_HOURS),
+		cbosSubscriber: cbosSubscriberSettings(process.env),
 		auth: {
 			authority: `https://login.microsoftonline.com/${AUTH_TENANT_ID}`,
 			clientId: AUTH_CLIENT_ID || '',

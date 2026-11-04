@@ -97,3 +97,17 @@ resource "azurerm_private_dns_zone_virtual_network_link" "storage" {
 
   provider = azurerm.tooling
 }
+
+# CBOS's Service Bus, for the web app's subscriber (idas-back-office.tf) - as other PINS services
+# that take its events link it. NxDomainRedirect: a namespace with no private endpoint still
+# resolves publicly
+resource "azurerm_private_dns_zone_virtual_network_link" "service_bus" {
+  count = var.cbos_subscriber_enabled ? 1 : 0
+
+  name                = "${local.org}-vnetlink-service-bus-${local.resource_suffix}"
+  private_dns_zone_id = data.azurerm_private_dns_zone.service_bus.id
+  virtual_network_id  = azurerm_virtual_network.main.id
+  resolution_policy   = "NxDomainRedirect"
+
+  provider = azurerm.tooling
+}

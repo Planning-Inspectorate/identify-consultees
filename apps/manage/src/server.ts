@@ -2,6 +2,7 @@ import { ManageService } from '#service';
 import { sleep } from '@planning-inspectorate/core/util';
 import { startScheduledCbosImport } from './app/admin/import-from-cbos/scheduled-import.ts';
 import { createApp, prepareStaticAssetServing } from './app/app.ts';
+import { startCbosSubscriber } from './app/cbos/subscriber.ts';
 import { loadConfig } from './app/config.ts';
 
 const config = loadConfig();
@@ -57,4 +58,15 @@ app.listen(app.get('http-port'), () => {
 const stopCbosImport = startScheduledCbosImport(service);
 if (stopCbosImport) {
 	process.once('SIGTERM', stopCbosImport);
+}
+
+// keep case boundaries in step with CBOS's document events - only where it's turned on (the live
+// app, not the staging slot or a local run; see config.ts)
+if (config.cbosSubscriber) {
+	const subscriber = startCbosSubscriber(service, config.cbosSubscriber);
+	// stop taking messages on shutdown - one being imported goes back on the subscription when its
+	// lock runs out, to be taken again
+	process.once('SIGTERM', () => {
+		subscriber.close().catch((error) => service.logger.warn({ error }, 'Could not close the CBOS subscriber'));
+	});
 }

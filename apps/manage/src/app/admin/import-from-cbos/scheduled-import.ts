@@ -1,5 +1,5 @@
 import type { ManageService } from '#service';
-import { importCaseBoundariesFromCbos } from './cbos-boundaries.ts';
+import { importCaseBoundariesFromCbos } from '../../cbos/cbos-boundaries.ts';
 
 // how often the clock is looked at - an import starts within a minute of its hour
 const CHECK_EVERY_MS = 60_000;
