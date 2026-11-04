@@ -57,6 +57,9 @@ export interface Config extends BaseConfig {
 		groups: {
 			// group ID for accessing the application
 			applicationAccess: string;
+			// group ID for the admin section (/admin) - from AUTH_GROUP_ADMIN. Empty - unset - leaves it
+			// open to everyone with application access, as before there was one (admin/access.ts)
+			admin: string;
 		};
 		redirectUri: string;
 		signoutUrl: string;
@@ -103,6 +106,7 @@ export function loadConfig(): Config {
 		AUTH_CLIENT_ID,
 		AUTH_CLIENT_SECRET,
 		AUTH_DISABLED,
+		AUTH_GROUP_ADMIN,
 		AUTH_GROUP_APPLICATION_ACCESS,
 		AUTH_TENANT_ID,
 		BLOB_STORE_HOST,
@@ -179,7 +183,8 @@ export function loadConfig(): Config {
 			clientSecret: AUTH_CLIENT_SECRET || '',
 			disabled: authDisabled,
 			groups: {
-				applicationAccess: AUTH_GROUP_APPLICATION_ACCESS || ''
+				applicationAccess: AUTH_GROUP_APPLICATION_ACCESS || '',
+				admin: AUTH_GROUP_ADMIN?.trim() || ''
 			},
 			redirectUri: `${protocol}${APP_HOSTNAME}/auth/redirect`,
 			signoutUrl: `https://login.microsoftonline.com/common/oauth2/v2.0/logout?post_logout_redirect_uri=${encodeURIComponent(`${protocol}${APP_HOSTNAME}/signed-out`)}`

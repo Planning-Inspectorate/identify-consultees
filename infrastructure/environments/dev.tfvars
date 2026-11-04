@@ -11,6 +11,8 @@ apps_config = {
   auth = {
     client_id                = "bcdf014b-623d-46c5-bc65-32f01353c6ba"
     group_application_access = "bbdea632-70d9-4677-8223-8f55325579d8"
+    # the admin section's Entra group's object id - "" until it's created
+    group_admin = ""
     # groups = {
     #   inspectors    = ""
     #   team_leads    = ""
