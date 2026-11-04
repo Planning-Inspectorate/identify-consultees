@@ -29,6 +29,12 @@ $font-family: arial, helvetica, sans-serif;
 	height: auto;
 }
 
+// a case name with no spaces (underscores don't break either) overflows the green
+// confirmation panel - let it wrap anywhere instead
+.govuk-panel__body {
+	overflow-wrap: break-word;
+}
+
 /* stylelint-disable-next-line selector-class-pattern */
 .app-case-map-static {
 	display: block;
