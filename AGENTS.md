@@ -226,7 +226,7 @@ Read the relevant guidance before proposing or implementing user-facing or archi
 
 When changing UI or frontend behaviour:
 
-- **Prefer `@planning-inspectorate/core` components first, then GOV.UK Frontend.** When a shared component exists in `@planning-inspectorate/core` (for example `pinsHeader`, `pinsFooter` under `ui/`), use it ahead of assembling the equivalent from `govuk-frontend` parts or local markup. Fall back to GOV.UK Frontend Nunjucks macros (for example `govukButton`, `govukInput`, `govukSelect`, `govukTable`, `govukRadios`, `govukPhaseBanner`) where no core component exists. Do not hand-write equivalent component HTML. This maximises accessibility, GDS compliance, and web performance (consistent markup, shared assets, and fewer bespoke patterns).
+- **Prefer `@planning-inspectorate/core` components first, then GOV.UK Frontend.** When a shared component exists in `@planning-inspectorate/core` (for example `pinsHeader`, `pinsFooter` under `ui/`), use it ahead of assembling the equivalent from `govuk-frontend` parts or local markup. Fall back to GOV.UK Frontend Nunjucks macros (for example `govukButton`, `govukInput`, `govukSelect`, `govukTable`, `govukRadios`, `govukPhaseBanner`) where no core component exists. A packaged component always takes precedence over custom HTML and CSS: never hand-write a component's markup, copy its rendered output, or restyle it from scratch — component upgrades and accessibility fixes land with the package bump, while a copied equivalent drifts. This maximises accessibility, GDS compliance, upgradability, and web performance (consistent markup, shared assets, and fewer bespoke patterns).
 - **Header / footer chrome:** Use `pinsHeader` and `pinsFooter` from `@planning-inspectorate/core` for PINS-branded chrome — their styles come from core's `ui/header`/`ui/footer` Sass, pulled in via `apps/manage/src/app/sass/govuk-overrides.scss`. Pair with `govukServiceNavigation` for the navigation. Do not use `govukHeader`/`govukFooter` — GOV.UK Frontend 6 reserves those for services on GOV.UK.
 - Layout wrappers that use Design System classes (for example `govuk-grid-row`, `govuk-width-container`, `govuk-heading-*`) and plain content text are fine; interactive and presentational UI components must still be macros.
 - Prefer documented components (for example button, error summary, text input, radios, table, notification banner) and [patterns](https://design-system.service.gov.uk/patterns/) (for example question pages, check answers, validation errors).
@@ -279,7 +279,7 @@ Use the [Service Manual](https://www.gov.uk/service-manual) for wider delivery t
 Before implementing or opening a PR that affects users or architecture:
 
 - [ ] Checked Design System for an existing component/pattern before adding custom UI.
-- [ ] Page HTML uses GOV.UK Frontend macros only for UI components (no hand-rolled component markup).
+- [ ] Page HTML uses GOV.UK Frontend macros only for UI components (no hand-rolled component markup or styles — a packaged component takes precedence over a local equivalent).
 - [ ] Used existing GOV.UK Frontend / Nunjucks patterns already in this codebase where possible.
 - [ ] Content is plain language; errors follow Design System error patterns.
 - [ ] Radios/checkboxes are never pre-selected; a `checked` state only reflects an answer the user already gave, and an unanswered required question fails validation with an error summary.
