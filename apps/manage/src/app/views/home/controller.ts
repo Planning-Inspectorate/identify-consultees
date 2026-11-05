@@ -3,12 +3,16 @@ import type { CaseBoundarySummary } from '@pins/identify-consultees-database/src
 import { searchCaseBoundaries } from '@pins/identify-consultees-database/src/geospatial/case-boundaries.ts';
 import { getRuleset } from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
 import type { AsyncRequestHandler } from '@planning-inspectorate/core/util';
+import type { Request, Response } from 'express';
+import type { CbosCaseRefresh } from '../../cbos/refresh-cases.ts';
 import { boundaryUrl, changedStep } from '../consultees/report/urls.ts';
 import { buildPagination } from './pagination.ts';
 import type { HomeViewModel, ProjectGeometry } from './view-model.ts';
 
 const PAGE_SIZE_OPTIONS = [25, 50, 100];
 const DEFAULT_PAGE_SIZE = 25;
+// the search's own fields, which Refresh cases carries back to it
+const SEARCH_FIELDS = ['q', 'pageSize', 'change', 'ruleset'];
 
 function firstQueryValue(value: unknown): string {
 	if (Array.isArray(value)) {
@@ -111,6 +115,7 @@ export function buildHomePage(service: ManageService): AsyncRequestHandler {
 			geometries,
 			pagination: buildPagination(page, totalPages, hrefForPage),
 			...(changingProject ? { changingProject } : {}),
+			...(req.query.refreshing === '1' ? { refreshing: true } : {}),
 			...(blankSearch
 				? {
 						searchError: { text: 'Enter a search term' },
@@ -120,5 +125,27 @@ export function buildHomePage(service: ManageService): AsyncRequestHandler {
 		};
 
 		return res.render('views/home/view.njk', viewModel);
+	};
+}
+
+/**
+ * The search page's Refresh cases button: starts importing every case from CBOS (see
+ * cbos/refresh-cases.ts) and goes straight back to the same search, which says it's under way - the
+ * import takes minutes, so the search is run again once it's done.
+ */
+export function buildRefreshCases(service: Pick<ManageService, 'logger'>, refresh: CbosCaseRefresh) {
+	return (req: Request, res: Response) => {
+		const started = refresh.start();
+		service.logger.info({ started }, started ? 'Refreshing cases from CBOS' : 'Cases are already being refreshed');
+
+		const params = new URLSearchParams();
+		for (const field of SEARCH_FIELDS) {
+			const value = firstQueryValue(req.body?.[field]);
+			if (value) {
+				params.set(field, value);
+			}
+		}
+		params.set('refreshing', '1');
+		return res.redirect(`/?${params.toString()}`);
 	};
 }

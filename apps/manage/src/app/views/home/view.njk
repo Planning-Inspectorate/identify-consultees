@@ -2,6 +2,7 @@
 
 {% from "govuk/components/button/macro.njk" import govukButton %}
 {% from "govuk/components/input/macro.njk" import govukInput %}
+{% from "govuk/components/notification-banner/macro.njk" import govukNotificationBanner %}
 {% from "govuk/components/pagination/macro.njk" import govukPagination %}
 {% from "govuk/components/table/macro.njk" import govukTable %}
 {% from "govuk/components/tag/macro.njk" import govukTag %}
@@ -11,6 +12,14 @@
 {% endblock %}
 
 {% block pageContent %}
+	{% if refreshing %}
+		{{ govukNotificationBanner({
+			titleText: "Important",
+			html: '<p class="govuk-notification-banner__heading">Refreshing cases from CBOS</p>'
+				~ '<p class="govuk-body">New and changed projects will appear in a few minutes. Search again then.</p>'
+		}) }}
+	{% endif %}
+
 	<form method="get" action="/">
 		<div class="pins-inline-search">
 			{{ govukInput({
@@ -41,6 +50,27 @@
 			<input type="hidden" name="change" value="{{ changingProject.step }}">
 			<input type="hidden" name="ruleset" value="{{ changingProject.rulesetId }}">
 		{% endif %}
+	</form>
+
+	{# imports every case from CBOS now, rather than at the next scheduled import - then back to this search #}
+	<form method="post" action="/refresh-cases" class="govuk-!-margin-top-4" novalidate>
+		<input type="hidden" name="_csrf" value="{{ _csrf }}">
+		{% if searchQuery %}
+			<input type="hidden" name="q" value="{{ searchQuery }}">
+		{% endif %}
+		<input type="hidden" name="pageSize" value="{{ pageSize }}">
+		{% if changingProject %}
+			<input type="hidden" name="change" value="{{ changingProject.step }}">
+			<input type="hidden" name="ruleset" value="{{ changingProject.rulesetId }}">
+		{% endif %}
+		<p class="govuk-body govuk-!-margin-bottom-2">
+			Cannot find a project? Cases are imported from CBOS 5 times a day. Refresh them to get any added since.
+		</p>
+		{{ govukButton({
+			text: "Refresh cases",
+			classes: "govuk-button--secondary govuk-!-margin-bottom-0",
+			preventDoubleClick: true
+		}) }}
 	</form>
 
 	{% if errorSummary %}

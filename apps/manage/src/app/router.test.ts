@@ -205,6 +205,21 @@ describe('manage router wiring', () => {
 		assert.match(response.text, /Identify consultees/);
 	});
 
+	test('POST /refresh-cases starts refreshing cases and goes back to the same search', async () => {
+		const agent = request.agent(authDisabledApp);
+		const page = await agent.get('/?q=EN01');
+		const csrf = /name="_csrf" value="([^"]+)"/.exec(page.text)?.[1];
+		assert.ok(csrf, 'expected the Refresh cases form to carry a CSRF token');
+
+		// no function is configured here, so the import it starts in the background fails at once
+		const response = await agent.post('/refresh-cases').type('form').send({ _csrf: csrf, q: 'EN01', pageSize: '25' });
+		assert.equal(response.status, 302);
+		assert.equal(response.headers.location, '/?q=EN01&pageSize=25&refreshing=1');
+
+		const back = await agent.get(response.headers.location);
+		assert.match(back.text, /Refreshing cases from CBOS/);
+	});
+
 	test('GET /consultees/:id/ruleset?ruleset= marks only the already-chosen ruleset checked', async () => {
 		const response = await request(authDisabledApp).get(
 			`/consultees/${homePageTestCaseId}/ruleset?ruleset=england-wales-post-20240430`

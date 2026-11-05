@@ -17,6 +17,8 @@ export interface HomeViewModel {
 	errorSummary?: { text: string; href: string }[];
 	/** Changing the check page's project - the search form carries it, and the ruleset it keeps. */
 	changingProject?: { step: 'project'; rulesetId: string };
+	/** Refresh cases was just pressed - the page says CBOS's cases are being imported. */
+	refreshing?: true;
 }
 
 export interface ProjectGeometry {

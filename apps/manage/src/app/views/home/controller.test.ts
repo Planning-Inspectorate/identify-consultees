@@ -2,7 +2,7 @@ import { mockLogger } from '@planning-inspectorate/core/testing';
 import assert from 'node:assert';
 import { describe, it, mock } from 'node:test';
 import { configureNunjucks } from '../../nunjucks.ts';
-import { buildHomePage } from './controller.ts';
+import { buildHomePage, buildRefreshCases } from './controller.ts';
 
 function newRow(overrides: Partial<{ id: string; caseReference: string; caseName: string }> = {}) {
 	return {
@@ -288,5 +288,72 @@ describe('home page', () => {
 
 		assert.strictEqual(mockRes.render.mock.callCount(), 0);
 		assert.strictEqual(mockRes.redirect.mock.calls[0].arguments[0], '/?pageSize=25&page=3');
+	});
+
+	it('should say cases are being refreshed just after Refresh cases is pressed', async () => {
+		const nunjucks = configureNunjucks();
+		const mockRes = { render: mock.fn((view, data) => nunjucks.render(view, data)) };
+		const homePage = buildHomePage({ logger: mockLogger(), db: createMockDb() });
+		await homePage({ query: { q: 'EN01', refreshing: '1' } }, mockRes);
+
+		assert.strictEqual(mockRes.render.mock.calls[0].arguments[1].refreshing, true);
+		assert.match(mockRes.render.mock.calls[0].result, /Refreshing cases from CBOS/);
+	});
+
+	it('should offer Refresh cases, carrying the search, and not say it is under way before it is pressed', async () => {
+		const nunjucks = configureNunjucks();
+		const mockRes = { render: mock.fn((view, data) => nunjucks.render(view, data)) };
+		const homePage = buildHomePage({ logger: mockLogger(), db: createMockDb() });
+		await homePage({ query: { q: 'EN01', change: 'project', ruleset: 'england-wales-post-20240430' } }, mockRes);
+
+		const html = mockRes.render.mock.calls[0].result;
+		assert.strictEqual(mockRes.render.mock.calls[0].arguments[1].refreshing, undefined);
+		assert.doesNotMatch(html, /Refreshing cases from CBOS/);
+		const form = /<form method="post" action="\/refresh-cases"[\s\S]*?<\/form>/.exec(html)?.[0] ?? '';
+		assert.match(form, /Refresh cases/);
+		assert.match(form, /name="q" value="EN01"/);
+		assert.match(form, /name="pageSize" value="25"/);
+		assert.match(form, /name="change" value="project"/);
+		assert.match(form, /name="ruleset" value="england-wales-post-20240430"/);
+	});
+});
+
+describe('refresh cases', () => {
+	function newRefresh(started = true) {
+		return { start: mock.fn(() => started) };
+	}
+
+	it('starts a refresh and goes back to the same search, saying so', () => {
+		const logger = mockLogger();
+		const refresh = newRefresh();
+		const mockRes = { redirect: mock.fn() };
+		buildRefreshCases({ logger }, refresh)(
+			{ body: { _csrf: 'token', q: 'EN01', pageSize: '50', change: 'project', ruleset: 'england-wales' } },
+			mockRes
+		);
+
+		assert.strictEqual(refresh.start.mock.callCount(), 1);
+		assert.strictEqual(
+			mockRes.redirect.mock.calls[0].arguments[0],
+			'/?q=EN01&pageSize=50&change=project&ruleset=england-wales&refreshing=1'
+		);
+		assert.strictEqual(logger.info.mock.calls[0].arguments[1], 'Refreshing cases from CBOS');
+	});
+
+	it('leaves out search fields that are blank or missing', () => {
+		const mockRes = { redirect: mock.fn() };
+		buildRefreshCases({ logger: mockLogger() }, newRefresh())({ body: { q: '', pageSize: ['25', '50'] } }, mockRes);
+		assert.strictEqual(mockRes.redirect.mock.calls[0].arguments[0], '/?pageSize=25&refreshing=1');
+
+		buildRefreshCases({ logger: mockLogger() }, newRefresh())({}, mockRes);
+		assert.strictEqual(mockRes.redirect.mock.calls[1].arguments[0], '/?refreshing=1');
+	});
+
+	it('says the same when a refresh is already running', () => {
+		const logger = mockLogger();
+		const mockRes = { redirect: mock.fn() };
+		buildRefreshCases({ logger }, newRefresh(false))({ body: {} }, mockRes);
+		assert.strictEqual(mockRes.redirect.mock.calls[0].arguments[0], '/?refreshing=1');
+		assert.strictEqual(logger.info.mock.calls[0].arguments[1], 'Cases are already being refreshed');
 	});
 });
