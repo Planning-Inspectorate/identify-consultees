@@ -160,6 +160,14 @@ export function groupForCategory(
 	return category ? config.groups.find((group) => group.categories.has(category)) : undefined;
 }
 
+/** Every category a dataset, or a subcategory of one, loads as - the categories there's data for. */
+export function loadedCategories(config: ReferenceDataConfig = REFERENCE_DATA_CONFIG): Set<string> {
+	return new Set([
+		...config.datasets.values(),
+		...[...config.subcategories.values()].flatMap((subcategories) => [...subcategories.values()])
+	]);
+}
+
 /** The group a slug names - from a file or URL - if there is one. */
 export function groupBySlug(
 	slug: unknown,

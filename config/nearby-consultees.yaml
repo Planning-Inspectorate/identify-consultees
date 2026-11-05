@@ -3,7 +3,7 @@
 # condition identified - and the maps draw them faintly, under the identified ones.
 #
 # Read when the app starts (apps/manage/src/app/nearby-consultees.ts), which refuses to start if a
-# value here is invalid - so a change is checked by `npm test` and takes effect on the next deploy.
+# value here is invalid - so a change is checked by `npm run check-config` and takes effect on the next deploy.
 #
 #   defaultRadiusKm  - the distance for any category not listed below. More than 0.
 #   categories       - a distance in km for each consultee category. 0 means never show that

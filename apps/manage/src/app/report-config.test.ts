@@ -7,6 +7,7 @@ import {
 	REPORT_COLUMNS,
 	REPORT_CONFIG,
 	REPORT_TABS,
+	summaryLabelProblems,
 	summaryLines,
 	tabForCategorySettings,
 	tabSettings
@@ -142,10 +143,16 @@ tabs:
 		// config/report.yaml labels every tab's categories in the Summary's order - every category in
 		// config/reference-data.yaml, so none is left to show under its bare name
 		assert.equal(summaryLines('Administrative boundaries')[0].label, 'Parish, Town and Community Councils');
-		const labelled = new Set(REPORT_TABS.flatMap((tab) => summaryLines(tab).flatMap((line) => line.categories)));
-		for (const category of REFERENCE_DATA_CONFIG.groups.flatMap((group) => [...group.categories])) {
-			assert.ok(labelled.has(category), `${category} has no summary label in config/report.yaml`);
-		}
+		assert.deepStrictEqual(summaryLabelProblems(), []);
+		// every category but the three that file labels
+		const labelled = ['Police', 'Internal Drainage Board', 'Internal Drainage District'];
+		assert.deepStrictEqual(
+			summaryLabelProblems(config),
+			REFERENCE_DATA_CONFIG.groups
+				.flatMap((group) => [...group.categories])
+				.filter((category) => !labelled.includes(category))
+				.map((category) => `${category} has no summary label - give it one under its tab's categories`)
+		);
 		assert.deepStrictEqual(summaryLines('NSIPs'), [
 			{ label: 'National infrastructure projects', categories: ['NSIPs'] }
 		]);

@@ -19,10 +19,58 @@ Each file explains its settings at the top.
 ## Changing a setting
 
 1. Edit the file.
-2. Run `npm test`. The app refuses to start with an invalid value, naming the file and setting, and the tests load the real files, so mistakes fail there first.
-3. Open a PR. The change takes effect when it's deployed.
+2. Run `npm run check-config`. In about a second, it loads every file as the app does and checks the files against each other. It names the file and setting of anything wrong:
 
-Settings are keyed by consultee category (`Parish Council`, `Hospital`...), which must match `consultee_area.consulteeCategory` exactly: see [`kt-docs/data/reference-data.md`](../kt-docs/data/reference-data.md).
+   ```
+   ✔ config/reference-data.yaml
+   ✔ config/rulesets/
+   ✔ config/report.yaml
+   ✖ config/nearby-consultees.yaml
+       nearby-consultees.yaml: categories.Hospitl isn't a consultee category - use a name config/reference-data.yaml's groups list
+   ```
+
+3. Run `npm test` before opening a PR. The tests load the real files too.
+4. Open a PR. The change takes effect when it's deployed. The app refuses to start with an invalid value, so a mistake can't reach an environment silently.
+
+A setting a file doesn't have, such as a misspelt `nsipRadiusKM`, is refused rather than ignored.
+
+Settings are keyed by consultee category (`Parish Council`, `Hospital`...), which must match `consultee_area.consulteeCategory` exactly. The categories are the ones `reference-data.yaml` loads its datasets as: see [`kt-docs/data/reference-data.md`](../kt-docs/data/reference-data.md).
+
+## Common changes
+
+`npm run check-config` says when one of these steps has been missed.
+
+### Add a reference dataset, or a new consultee category
+
+1. **`reference-data.yaml`**: under `datasets`, add the dataset code and the category it loads as (`HSP_EN: Hospital`). Then add the category to one of the `groups`, which decides its report tab.
+2. **`report.yaml`**: under its tab's `categories`, give it a `summary` label for the Summary tab, and any `metadata` columns it exports.
+3. **`rulesets/rulesets.yaml`**: if a ruleset row names it, map the row's Consultee Type(s) wording to the category under `consulteeTypes`. If a ruleset already names the category under `categoriesAwaitingData`, take it out.
+4. **`nearby-consultees.yaml`**: only if it needs a distance other than `defaultRadiusKm`.
+5. After it's deployed, upload and load the group's file on the admin pages (see [Data model and loading](../kt-docs/data/data-model.md)).
+
+### Rename a category
+
+Change the name in every file above that has it, then load the group's file again: the rows already in the database keep the old name until it's reloaded.
+
+### Change a ruleset
+
+Save the sheet over its `<name>_ruleset.csv`, then run `npm run check-config`. A row with a Consultee Type(s) or Logic wording that's new is named, with its file and row. Add the wording to `rulesets.yaml`. See [Rulesets](#rulesets).
+
+### Change the report's columns
+
+In `report.yaml`, change `columns` for the fixed columns (the list is at the top of the file), or `metadata` for the source data's attributes. Set them under `defaults`, a tab or a category: the nearest one wins.
+
+### Change how far the maps look
+
+- Nearby consultees: `defaultRadiusKm`, or a category's distance, in `nearby-consultees.yaml`.
+- Nearby NSIPs: `nsipRadiusKm` in `nearby-consultees.yaml`. Also change the NSIPs tab's `mapKm` in `report.yaml`, so its map shows every case found.
+- How much each map shows around the site: `mapKm` in `report.yaml`, or `boundaryMapKm` in `map-view.yaml` for the project boundary page.
+
+Larger distances mean a slower search: it reaches out to the largest distance set.
+
+### Change the boundary map's colours
+
+Edit `map-styles/boundary-map.yaml`. Quote colours (`'#ff0000'`), since YAML reads `#` as the start of a comment, and update each style's `description`, which screen readers announce in the map key.
 
 ## Rulesets
 
@@ -36,7 +84,7 @@ Each ruleset is a sheet of the rulesets workbook saved as UTF-8 CSV, with the co
 
 - **To update a ruleset**, save its sheet over its file. **To add one**, save it as `<name>_ruleset.csv`; the app offers every one in the folder.
 - **Its name** comes from the file name, unless `names` in `rulesets.yaml` gives another.
-- **A new Consultee Type(s) or Logic wording** must be added to `consulteeTypes` or `logic` in `rulesets.yaml`. Until it is, the app won't start, and `npm test` names the row.
+- **A new Consultee Type(s) or Logic wording** must be added to `consulteeTypes` or `logic` in `rulesets.yaml`. Until it is, the app won't start, and `npm run check-config` names the file and row.
 - **The `Group` column** decides the report tab a consultee goes on: Administrative boundaries, Public bodies, Energy, Transport or Other (anything else goes on Other).
 
 More: [`kt-docs/data/screening-engine.md`](../kt-docs/data/screening-engine.md#rulesets).

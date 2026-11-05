@@ -17,10 +17,18 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 	return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
+const DOCUMENT_KEYS = ['version', 'boundingBoxAbovePoints'];
+
 export function parseScreeningConfig(text: string): ScreeningConfig {
 	const document = text.trim() === '' ? null : load(text);
 	if (!isRecord(document) || document.version !== 1) {
 		throw new Error('screening.yaml must be a version 1 document');
+	}
+	const unknown = Object.keys(document).filter((key) => !DOCUMENT_KEYS.includes(key));
+	if (unknown.length > 0) {
+		throw new Error(
+			`screening.yaml: the document has ${unknown.map((key) => `"${key}"`).join(', ')} - it can only have ${DOCUMENT_KEYS.join(', ')}`
+		);
 	}
 	const points = document.boundingBoxAbovePoints;
 	if (typeof points !== 'number' || !Number.isInteger(points) || points < 0) {

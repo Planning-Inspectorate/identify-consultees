@@ -47,7 +47,13 @@ describe('boundary map styles', () => {
 		['a zero stroke width', VALID.replace('strokeWidth: 3', 'strokeWidth: 0'), /mostRecent\.strokeWidth/],
 		['a three-part dash', VALID.replace('[4, 2]', '[4, 2, 1]'), /earlier\[0\]\.strokeDash/],
 		['a negative dash', VALID.replace('[4, 2]', '[4, -2]'), /earlier\[0\]\.strokeDash/],
-		['a missing description', VALID.replace(', description: orange', ''), /earlier\[1\]\.description/]
+		['a missing description', VALID.replace(', description: orange', ''), /earlier\[1\]\.description/],
+		[
+			'a misspelt style setting',
+			VALID.replace('[4, 2]', '[4, 2], strokedash: [1, 1]'),
+			/earlier\[0\] has "strokedash" - it can only have colour, fillOpacity, strokeWidth, strokeDash, description/
+		],
+		['a misspelt top-level setting', `${VALID}\nlatest: {}`, /the document has "latest" - it can only have version/]
 	];
 	for (const [name, text, error] of invalid) {
 		it(`rejects ${name}`, () => {

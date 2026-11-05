@@ -22,10 +22,18 @@ function marginMetres(value: unknown, name: string): number {
 	return value * 1000;
 }
 
+const DOCUMENT_KEYS = ['version', 'boundaryMapKm'];
+
 export function parseMapView(text: string): MapView {
 	const document = (text.trim() === '' ? null : load(text)) as Record<string, unknown> | null;
 	if (typeof document !== 'object' || document === null || document.version !== 1) {
 		throw new Error('map-view.yaml must be a version 1 document');
+	}
+	const unknown = Object.keys(document).filter((key) => !DOCUMENT_KEYS.includes(key));
+	if (unknown.length > 0) {
+		throw new Error(
+			`map-view.yaml: the document has ${unknown.map((key) => `"${key}"`).join(', ')} - it can only have ${DOCUMENT_KEYS.join(', ')}`
+		);
 	}
 	return {
 		boundaryMapMarginMetres: marginMetres(document.boundaryMapKm, 'boundaryMapKm')

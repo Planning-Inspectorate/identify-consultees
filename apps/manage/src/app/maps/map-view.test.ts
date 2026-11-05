@@ -26,4 +26,11 @@ describe('map view config', () => {
 			assert.throws(() => parseMapView(text), /map-view.yaml: boundaryMapKm must be a number of km from 0 to 500/);
 		}
 	});
+
+	test('refuses a setting it does not have, so a misspelt one is not ignored', () => {
+		assert.throws(
+			() => parseMapView('version: 1\nboundaryMapKm: 1\nboundaryMapkm: 2'),
+			/map-view.yaml: the document has "boundaryMapkm" - it can only have version, boundaryMapKm/
+		);
+	});
 });

@@ -2,6 +2,8 @@ import { load } from 'js-yaml';
 import { readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { CONFIG_DIR } from '../config-dir.ts';
+import type { ReferenceDataConfig } from '../seed/reference-data.ts';
+import { loadedCategories, REFERENCE_DATA_CONFIG } from '../seed/reference-data.ts';
 import type { ConsulteeAreaSummary } from './consultee-areas.ts';
 import type { Geometry } from './wkt.ts';
 
@@ -464,16 +466,21 @@ export function loadRulesets(dir: string = RULESETS_DIR, settings: RulesetSettin
 			);
 		}
 	}
-	const rulesets = files.map((file) =>
-		buildRulesetFromCsv(
-			rulesetIdFromFileName(file),
-			Object.hasOwn(settings.names, rulesetStem(file))
-				? settings.names[rulesetStem(file)]
-				: rulesetNameFromFileName(file),
-			readFileSync(path.join(dir, file), 'utf8'),
-			settings
-		)
-	);
+	const rulesets = files.map((file) => {
+		try {
+			return buildRulesetFromCsv(
+				rulesetIdFromFileName(file),
+				Object.hasOwn(settings.names, rulesetStem(file))
+					? settings.names[rulesetStem(file)]
+					: rulesetNameFromFileName(file),
+				readFileSync(path.join(dir, file), 'utf8'),
+				settings
+			);
+		} catch (error) {
+			// a row's error names the row, not which of the files it's in
+			throw new Error(`${file}: ${(error as Error).message}`, { cause: error });
+		}
+	});
 	const names = rulesets.map((ruleset) => ruleset.name);
 	const repeated = names.find((name, index) => names.indexOf(name) !== index);
 	if (repeated) {
@@ -492,6 +499,41 @@ export const RULESETS: Ruleset[] = loadRulesets();
 
 export function getRuleset(id: string): Ruleset | undefined {
 	return RULESETS.find((ruleset) => ruleset.id === id);
+}
+
+/**
+ * What's wrong between the rulesets and config/reference-data.yaml, in words - nothing, normally. A
+ * condition naming a category no dataset loads as matches nothing, so must be listed as awaiting
+ * data; and a category listed as awaiting data that has data, or that no ruleset names, is stale.
+ */
+export function rulesetCategoryProblems(
+	rulesets: Ruleset[] = RULESETS,
+	settings: RulesetSettings = RULESET_SETTINGS,
+	reference: ReferenceDataConfig = REFERENCE_DATA_CONFIG
+): string[] {
+	const loaded = loadedCategories(reference);
+	const named = new Set<string>();
+	const problems = new Set<string>();
+	for (const ruleset of rulesets) {
+		for (const rule of ruleset.rules) {
+			for (const category of [...rule.categories, ...(rule.hostCategory ? [rule.hostCategory] : [])]) {
+				named.add(category);
+				if (!loaded.has(category) && !settings.categoriesAwaitingData.has(category)) {
+					problems.add(
+						`${ruleset.name}, ${rule.name}: matches ${category}, which no dataset in reference-data.yaml loads as - add its dataset there, or list it under categoriesAwaitingData in rulesets.yaml`
+					);
+				}
+			}
+		}
+	}
+	for (const category of settings.categoriesAwaitingData) {
+		if (loaded.has(category)) {
+			problems.add(`rulesets.yaml: categoriesAwaitingData lists ${category}, which has data now - take it out`);
+		} else if (!named.has(category)) {
+			problems.add(`rulesets.yaml: categoriesAwaitingData lists ${category}, which no ruleset names - take it out`);
+		}
+	}
+	return [...problems];
 }
 
 /**
