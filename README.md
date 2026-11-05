@@ -159,6 +159,7 @@ On Apple Silicon, SQL Server runs under `linux/amd64` emulation (Azure SQL Edge 
 | `npm run db-seed` | Load the sample data (replaces the consultee areas in use) |
 | `npm run db-import -- --type=<consultee-areas\|case-boundaries> --file=<path>` | Import a GeoJSON file |
 | `npm run db-import-from-blob -- --type=<...> --blob=<name>` | Import a GeoJSON blob from the app's storage |
+| `npm run check-config` | Check the files in `config/` in about a second, naming anything wrong. See [`config/README.md`](./config/README.md) |
 | `npm run lint`, `npm run check-types`, `npm run format-prettier-check` | Static checks |
 | `npm test` | Unit tests, the 100% coverage gate and Playwright (needs the seeded database) |
 | `npm run playwright:install` | Install the Playwright browsers, once |
@@ -166,7 +167,8 @@ On Apple Silicon, SQL Server runs under `linux/amd64` emulation (Azure SQL Edge 
 ## Read next
 
 - [`kt-docs/`](./kt-docs/README.md): how the service works, starting with the [overview](./kt-docs/overview.md)
-- [`CONTRIBUTING.md`](./CONTRIBUTING.md): branches, commits and PRs
+- [`CONTRIBUTING.md`](./CONTRIBUTING.md): where to make a change, what to update with it, and how to open a PR
+- [`config/README.md`](./config/README.md): change a ruleset, the report or a distance, without a code change
 - [`AGENTS.md`](./AGENTS.md): GDS, maps, toolchain and PR rules, for agents and people
 - [`ACCESSIBILITY.md`](./ACCESSIBILITY.md), [`SECURITY.md`](./SECURITY.md)
 

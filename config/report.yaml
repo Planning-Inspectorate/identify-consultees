@@ -1,7 +1,7 @@
 # Report: which columns each tab of the downloaded workbook shows, how much each category's map
 # shows around the site, and the lines of its Summary tab. Read when the app starts
 # (apps/manage/src/app/report-config.ts), which refuses to start if a value here is invalid - so a
-# change is checked by `npm test` and takes effect on the next deploy.
+# change is checked by `npm run check-config` and takes effect on the next deploy.
 #
 # A tab's columns are its `columns`, then the metadata its consultees export:
 #

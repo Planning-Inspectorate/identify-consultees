@@ -3,6 +3,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { describe, test } from 'node:test';
+import { parseReferenceDataConfig } from '../seed/reference-data.ts';
 import {
 	acceptedConsulteeTypes,
 	buildRulesetFromCsv,
@@ -13,6 +14,7 @@ import {
 	parseRulesetCsv,
 	parseRulesetSettings,
 	RULESET_SETTINGS,
+	rulesetCategoryProblems,
 	rulesetIdFromFileName,
 	rulesetNameFromFileName,
 	RULESETS,
@@ -370,6 +372,20 @@ describe('loadRulesets', () => {
 		});
 	});
 
+	test('names the file a bad row is in', () => {
+		const dir = mkdtempSync(path.join(tmpdir(), 'rulesets-'));
+		try {
+			writeFileSync(path.join(dir, 'a_ruleset.csv'), `${HEADER}\n${row}\n`);
+			writeFileSync(path.join(dir, 'b_ruleset.csv'), `${HEADER}\n${row.replace('Intersects', 'Intersect')}\n`);
+			assert.throws(
+				() => loadRulesets(dir, settings({ default: 'a' })),
+				/^Error: b_ruleset.csv: Unknown logic "Intersect application site buffer" in ruleset row 2 \("Railways"\)/
+			);
+		} finally {
+			rmSync(dir, { recursive: true, force: true });
+		}
+	});
+
 	test('fails loudly rather than starting with no rulesets', () => {
 		withRulesets([], (dir) => {
 			assert.throws(() => loadRulesets(dir), /No ruleset exports/);
@@ -410,53 +426,51 @@ describe('rulesets registry', () => {
 	});
 
 	test('every condition matches a category the reference data has, or one deliberately awaiting data', () => {
-		// the consultee_area categories in the reference data today (see kt-docs/data/reference-data.md)
-		const referenceCategories = new Set([
-			'Ambulance Trust',
-			'Canal',
-			'Cheshire Brine Area',
-			'Coal Mining Reporting Area',
-			'Corporate Joint Committee',
-			'DNO',
-			'Dock or Harbour',
-			'Electricity Generator',
-			'Fire and Rescue Authority',
-			'Greater London Authority',
-			'Hospital',
-			'ICB',
-			'Integrated Transport Authority',
-			'Interconnector',
-			'Internal Drainage Board',
-			'Internal Drainage District',
-			'Local Health Board',
-			'Local Resilience Forum',
-			'Lower Tier Authority',
-			'MOD Low Flying Area',
-			'MOD Safeguarding Area',
-			'National Landscape',
-			'National Park',
-			'ONR Site',
-			'Offshore Wind Export Cable',
-			'Offshore Wind Site',
-			'Parish Council',
-			'Passenger Transport Executive',
-			'Police',
-			'Railway',
-			'Unitary Authority',
-			'Upper Tier Authority'
+		// from config/reference-data.yaml, so a new dataset needs no change here
+		assert.deepEqual(rulesetCategoryProblems(), []);
+	});
+
+	test('names each condition matching a category with no data, and each stale category awaiting data', () => {
+		const reference = parseReferenceDataConfig(`version: 1
+datasets:
+  PAR_EW: Parish Council
+  OWF_EW: { category: Offshore Wind Site, subcategories: { Export Cables: Offshore Wind Export Cable } }
+groups:
+  Administrative boundaries: [Parish Council, Canal, Railway]
+  Energy: [Offshore Wind Site, Offshore Wind Export Cable]
+`);
+		const rule = (name: string, categories: string[], hostCategory?: string) => ({
+			id: name,
+			name,
+			group: 'Other',
+			logicType: 'intersection' as const,
+			categories,
+			...(hostCategory ? { hostCategory } : {})
+		});
+		const rulesets = [
+			{
+				id: 'a',
+				name: 'Ruleset A',
+				rules: [
+					rule('Parishes', ['Parish Council']),
+					// a subcategory's category has data too
+					rule('Cables', ['Offshore Wind Export Cable']),
+					rule('Canals', ['Canal']),
+					rule('Bordering', ['Parish Council'], 'Hospital'),
+					rule('Rail', ['Railway'])
+				]
+			}
+		];
+		const settings = {
+			...RULESET_SETTINGS,
+			categoriesAwaitingData: new Set(['Canal', 'Parish Council', 'Dock or Harbour'])
+		};
+		assert.deepEqual(rulesetCategoryProblems(rulesets, settings, reference), [
+			'Ruleset A, Bordering: matches Hospital, which no dataset in reference-data.yaml loads as - add its dataset there, or list it under categoriesAwaitingData in rulesets.yaml',
+			'Ruleset A, Rail: matches Railway, which no dataset in reference-data.yaml loads as - add its dataset there, or list it under categoriesAwaitingData in rulesets.yaml',
+			'rulesets.yaml: categoriesAwaitingData lists Parish Council, which has data now - take it out',
+			'rulesets.yaml: categoriesAwaitingData lists Dock or Harbour, which no ruleset names - take it out'
 		]);
-		const categories = RULESETS.flatMap((ruleset) =>
-			ruleset.rules.flatMap((rule) => [...rule.categories, ...(rule.hostCategory ? [rule.hostCategory] : [])])
-		);
-		const unknown = categories.filter(
-			(category) => !referenceCategories.has(category) && !RULESET_SETTINGS.categoriesAwaitingData.has(category)
-		);
-		assert.deepEqual([...new Set(unknown)], []);
-		// and everything awaiting data is still used, so the list doesn't go stale
-		assert.deepEqual(
-			[...RULESET_SETTINGS.categoriesAwaitingData].filter((category) => !categories.includes(category)),
-			[]
-		);
 	});
 
 	test("every condition id fits the screening function's 200-character limit", () => {

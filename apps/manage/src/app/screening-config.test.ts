@@ -22,7 +22,12 @@ describe('screening config', () => {
 		['no limit', 'version: 1', /boundingBoxAbovePoints must be/],
 		['a negative limit', 'version: 1\nboundingBoxAbovePoints: -1', /boundingBoxAbovePoints must be/],
 		['a fraction', 'version: 1\nboundingBoxAbovePoints: 2.5', /boundingBoxAbovePoints must be/],
-		['words', 'version: 1\nboundingBoxAbovePoints: lots', /boundingBoxAbovePoints must be/]
+		['words', 'version: 1\nboundingBoxAbovePoints: lots', /boundingBoxAbovePoints must be/],
+		[
+			'a misspelt setting',
+			'version: 1\nboundingBoxAbovePoints: 10\nboundingboxAbovePoints: 5',
+			/the document has "boundingboxAbovePoints" - it can only have version, boundingBoxAbovePoints/
+		]
 	] as const) {
 		it(`rejects ${name}`, () => {
 			assert.throws(() => parseScreeningConfig(text), error);

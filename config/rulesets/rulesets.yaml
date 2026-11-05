@@ -1,6 +1,6 @@
 # Ruleset settings: everything about the rulesets that isn't in their CSVs. Read when the app starts
 # (packages/database/src/geospatial/rulesets.ts), which refuses to start if a value here is invalid -
-# so a change is checked by `npm test` and takes effect on the next deploy.
+# so a change is checked by `npm run check-config` and takes effect on the next deploy.
 #
 # Each ruleset is one sheet of the rulesets workbook, saved here as <name>_ruleset.csv. Saving a new
 # sheet is all it takes for the app to offer it - nothing here needs changing unless the sheet uses
@@ -25,7 +25,7 @@
 #                              bordering     shares a border with the host area the site is in
 #                            Wordings are compared ignoring case and repeated spaces.
 #   categoriesAwaitingData - categories the rulesets name that no reference data has yet. Their
-#                            conditions match nothing until the data is loaded; `npm test` checks
+#                            conditions match nothing until the data is loaded; `npm run check-config` checks
 #                            every other category the rulesets name is in the reference data.
 #
 # A file name under default or names that isn't a ruleset in this folder stops the app starting,

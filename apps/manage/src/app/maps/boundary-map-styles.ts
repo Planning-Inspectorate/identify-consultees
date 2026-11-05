@@ -37,10 +37,21 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 	return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
+/** Refuse keys `section` doesn't have - a misspelt optional one (strokeDash) would otherwise be ignored. */
+function onlyKeys(section: Record<string, unknown>, allowed: string[], name: string): void {
+	const unknown = Object.keys(section).filter((key) => !allowed.includes(key));
+	if (unknown.length > 0) {
+		throw new Error(
+			`config/map-styles/boundary-map.yaml: ${name} has ${unknown.map((key) => `"${key}"`).join(', ')} - it can only have ${allowed.join(', ')}`
+		);
+	}
+}
+
 function parseStyle(value: unknown, path: string): BoundaryFileStyle {
 	if (!isRecord(value)) {
 		throw new Error(`${path} must be a style`);
 	}
+	onlyKeys(value, ['colour', 'fillOpacity', 'strokeWidth', 'strokeDash', 'description'], path);
 	const { colour, fillOpacity, strokeWidth, strokeDash, description } = value;
 	if (typeof colour !== 'string' || !HEX_COLOUR.test(colour)) {
 		throw new Error(`${path}.colour must be a 6-digit hex colour, like '#C44E52'`);
@@ -78,6 +89,7 @@ export function parseBoundaryMapStyles(text: string): BoundaryMapStyles {
 	if (!isRecord(document) || document.version !== 1) {
 		throw new Error('config/map-styles/boundary-map.yaml must be a version 1 document');
 	}
+	onlyKeys(document, ['version', 'mostRecent', 'earlier'], 'the document');
 	if (!Array.isArray(document.earlier) || document.earlier.length === 0) {
 		throw new Error('config/map-styles/boundary-map.yaml: earlier must list at least one style');
 	}

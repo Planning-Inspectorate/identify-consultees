@@ -1,5 +1,6 @@
 import { CONFIG_DIR } from '@pins/identify-consultees-database/src/config-dir.ts';
-import { groupForCategory } from '@pins/identify-consultees-database/src/seed/reference-data.ts';
+import type { ReferenceDataConfig } from '@pins/identify-consultees-database/src/seed/reference-data.ts';
+import { groupForCategory, REFERENCE_DATA_CONFIG } from '@pins/identify-consultees-database/src/seed/reference-data.ts';
 import { load } from 'js-yaml';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
@@ -258,6 +259,21 @@ export function parseReportConfig(text: string): ReportConfig {
 /** A tab's lines on the Summary tab, in order - none if its categories set no `summary`. */
 export function summaryLines(tab: ReportTab, config: ReportConfig = REPORT_CONFIG): SummaryLine[] {
 	return config.summaryLines[tab] ?? [];
+}
+
+/**
+ * Each category config/reference-data.yaml's groups list that has no Summary label here, in words -
+ * it would show under its bare name, after its tab's labelled lines. None, normally.
+ */
+export function summaryLabelProblems(
+	config: ReportConfig = REPORT_CONFIG,
+	reference: ReferenceDataConfig = REFERENCE_DATA_CONFIG
+): string[] {
+	const labelled = new Set(REPORT_TABS.flatMap((tab) => summaryLines(tab, config).flatMap((line) => line.categories)));
+	return reference.groups
+		.flatMap((group) => [...group.categories])
+		.filter((category) => !labelled.has(category))
+		.map((category) => `${category} has no summary label - give it one under its tab's categories`);
 }
 
 /** A tab's settings: its own, or the defaults. */

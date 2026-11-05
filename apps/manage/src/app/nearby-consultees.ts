@@ -1,4 +1,5 @@
 import { CONFIG_DIR } from '@pins/identify-consultees-database/src/config-dir.ts';
+import { groupForCategory } from '@pins/identify-consultees-database/src/seed/reference-data.ts';
 import { load } from 'js-yaml';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
@@ -43,14 +44,30 @@ function radiusMetres(value: unknown, name: string, allowZero: boolean): number 
 	return value * 1000;
 }
 
+const DOCUMENT_KEYS = ['version', 'defaultRadiusKm', 'nsipRadiusKm', 'categories'];
+
 export function parseNearbyConsultees(text: string): NearbyConsultees {
 	const document = text.trim() === '' ? null : load(text);
 	if (!isRecord(document) || document.version !== 1) {
 		throw new Error('nearby-consultees.yaml must be a version 1 document');
 	}
+	// a misspelt setting would otherwise be ignored, and its default used
+	const unknown = Object.keys(document).filter((key) => !DOCUMENT_KEYS.includes(key));
+	if (unknown.length > 0) {
+		throw new Error(
+			`nearby-consultees.yaml: the document has ${unknown.map((key) => `"${key}"`).join(', ')} - it can only have ${DOCUMENT_KEYS.join(', ')}`
+		);
+	}
 	const categories = document.categories ?? {};
 	if (!isRecord(categories)) {
 		throw new Error('nearby-consultees.yaml: categories must map each category to a distance in km');
+	}
+	// and a misspelt category, its distance
+	const notCategories = Object.keys(categories).filter((category) => !groupForCategory(category));
+	if (notCategories.length > 0) {
+		throw new Error(
+			`nearby-consultees.yaml: ${notCategories.map((category) => `categories.${category}`).join(', ')} isn't a consultee category - use a name config/reference-data.yaml's groups list`
+		);
 	}
 	return {
 		defaultRadiusMetres: radiusMetres(document.defaultRadiusKm, 'defaultRadiusKm', false),

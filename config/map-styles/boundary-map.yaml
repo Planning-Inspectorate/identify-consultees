@@ -1,6 +1,6 @@
 # Boundary map styles: the project boundary page, the first map in the journey. Read when the app
 # starts (apps/manage/src/app/maps/boundary-map-styles.ts), which refuses to start if a value here is invalid - so a
-# change is checked by `npm test` and takes effect on the next deploy.
+# change is checked by `npm run check-config` and takes effect on the next deploy.
 #
 # The map draws one layer per boundary file the case holds, under "GIS shapefiles" in the Layers
 # menu: the most recent in one style, every earlier file in the other. "Most recent" is the file

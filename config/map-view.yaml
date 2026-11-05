@@ -1,6 +1,6 @@
 # Map view: how much the project boundary page's map shows around the case's shapefiles when it
 # opens. Read when the app starts (apps/manage/src/app/maps/map-view.ts), which refuses to start if
-# a value here is invalid - so a change is checked by `npm test` and takes effect on the next deploy.
+# a value here is invalid - so a change is checked by `npm run check-config` and takes effect on the next deploy.
 #
 #   boundaryMapKm - the least distance, in km, shown around the shapefiles on every side. Maps zoom
 #                   in whole levels, so the map opens at the closest zoom that shows at least this.

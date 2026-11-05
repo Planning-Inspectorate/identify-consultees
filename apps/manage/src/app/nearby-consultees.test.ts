@@ -48,7 +48,17 @@ describe('nearby consultees', () => {
 		['a distance in words', 'version: 1\ndefaultRadiusKm: 20\ncategories:\n  Hospital: ten', /categories\.Hospital/],
 		['a distance over 500km', 'version: 1\ndefaultRadiusKm: 501', /to 500/],
 		['a negative Nearby NSIPs distance', 'version: 1\ndefaultRadiusKm: 20\nnsipRadiusKm: -1', /nsipRadiusKm/],
-		['a Nearby NSIPs distance in words', 'version: 1\ndefaultRadiusKm: 20\nnsipRadiusKm: ten', /nsipRadiusKm/]
+		['a Nearby NSIPs distance in words', 'version: 1\ndefaultRadiusKm: 20\nnsipRadiusKm: ten', /nsipRadiusKm/],
+		[
+			'a misspelt setting',
+			'version: 1\ndefaultRadiusKm: 20\nnsipRadiusKM: 5',
+			/the document has "nsipRadiusKM" - it can only have version, defaultRadiusKm, nsipRadiusKm, categories/
+		],
+		[
+			'a category the reference data has no group for',
+			'version: 1\ndefaultRadiusKm: 20\ncategories:\n  Parish Councl: 5\n  Hospital: 1',
+			/categories\.Parish Councl isn't a consultee category - use a name config\/reference-data\.yaml's groups list/
+		]
 	];
 	for (const [name, text, error] of invalid) {
 		it(`rejects ${name}`, () => {

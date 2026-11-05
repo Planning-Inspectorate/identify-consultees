@@ -1,7 +1,7 @@
 # Reference data: which consultee category each of the reference data's source datasets loads
 # as. Read when the app starts, and by every import (packages/database/src/seed/reference-data.ts),
 # which refuses to start or import if a value here is invalid - so a change is checked by
-# `npm test` and takes effect on the next deploy.
+# `npm run check-config` and takes effect on the next deploy.
 #
 # Each feature's id names its dataset: health_AMB_EW_00001 is from AMB_EW, the ambulance trusts
 # of England and Wales. The file's own consultee_category is a broad group (Health, Transport,

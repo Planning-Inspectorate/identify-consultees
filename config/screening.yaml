@@ -1,6 +1,6 @@
 # Screening: how a site too detailed to screen in time is handled. Read when the app starts
 # (apps/manage/src/app/screening-config.ts), which refuses to start if a value here is invalid - so
-# a change is checked by `npm test` and takes effect on the next deploy.
+# a change is checked by `npm run check-config` and takes effect on the next deploy.
 #
 #   boundingBoxAbovePoints - a site whose outline, simplified to 10m as the reference data is, has
 #                            more points than this is too detailed to screen in time. It's
