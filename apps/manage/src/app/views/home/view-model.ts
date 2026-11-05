@@ -27,6 +27,6 @@ export interface ProjectGeometry {
 	href: string;
 	reference: string;
 	caseName: string;
-	/** The case's stage (Pre-Examination), shown as a tag - case_boundary.acceptance, set by a CBOS import. */
+	/** The case's stage (Pre-Examination), shown as plain text - case_boundary.acceptance, set by a CBOS import. */
 	stage: string | null;
 }
