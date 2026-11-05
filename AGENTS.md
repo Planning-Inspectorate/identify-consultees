@@ -89,6 +89,7 @@ When the feature branch has diverged or accumulated noise:
 - Still only commit / push / open PRs when the user asks (or existing user rules already authorize that step); when they do, apply the practices above.
 - When the request that started the work names a JIRA ticket (e.g. `GIS-159`), always mention it in the PR body and link it (`https://pins-ds.atlassian.net/browse/<TICKET-ID>`), so the change can be tracked and tested against the ticket.
 - Follow the AI identification rules above: do not identify as an AI or add AI co-authorship in any GitHub-visible content.
+- Devin: pass the PR body to `gh pr create` with `--body-file <file>` — write it to a scratch file first. Inline heredocs (`--body "$(cat <<'EOF' … EOF)"`) get mangled by Devin's shell quoting and break the command. Other agents can use whatever works for them.
 
 ### Verifying changes before opening a PR
 
