@@ -222,6 +222,12 @@ describe('report consultees change page', () => {
 			mockRes.render.mock.calls[0].arguments[1].rows.map((row: { name: string }) => row.name),
 			['Little Snoring Parish Council (Breckland)', 'Little Snoring Parish Council (North Norfolk)']
 		);
+		// and the map names them the same way
+		const map = JSON.parse(mockRes.render.mock.calls[0].arguments[1].mapConfigJson);
+		assert.deepStrictEqual(
+			map.consulteeGeojson.features.map((feature: { properties: { name: string } }) => feature.properties.name).sort(),
+			['Little Snoring Parish Council (Breckland)', 'Little Snoring Parish Council (North Norfolk)']
+		);
 	});
 
 	it('should list every condition a consultee met, but not the nearby search', async () => {

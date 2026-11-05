@@ -45,6 +45,25 @@ const E2E_ADDED_CONSULTEES = ['First Test Consultee', 'Second Test Consultee'].m
 	properties: { consulteeCategory: 'Parish Council', consultee }
 }));
 
+// two parish councils of the same name, far from the sample case like the ones above, for the add
+// page to tell apart - by region, as no council area reaches them
+const E2E_TWIN_PARISH = 'E2E Twin Parish';
+const E2E_TWIN_CONSULTEES = [
+	{ coordinates: [-1.3, 60.5], region: 'E2E North' },
+	{ coordinates: [-1.1, 60.6], region: 'E2E South' }
+].map(({ coordinates, region }, i) => ({
+	id: `e2e00000-0000-0000-0002-${String(i + 1).padStart(12, '0')}`,
+	type: 'Feature' as const,
+	geometry: { type: 'Point' as const, coordinates },
+	properties: { consulteeCategory: 'Parish Council', consultee: E2E_TWIN_PARISH, region }
+}));
+
+async function deleteE2eTwinConsultees(db: ReturnType<typeof newDatabaseClient>) {
+	for (const { id } of E2E_TWIN_CONSULTEES) {
+		await db.$executeRaw`DELETE FROM consultee_area WHERE id = ${id}`;
+	}
+}
+
 const JOURNEY_TITLE = 'choosing a project starts the boundary-ruleset-check journey';
 
 async function deleteE2eAddedConsultees(db: ReturnType<typeof newDatabaseClient>) {
@@ -455,6 +474,52 @@ test.describe('manage journeys', () => {
 		await expect(page.getByRole('rowheader', { name: 'Railway lines' })).toBeVisible();
 		await expect(page.getByRole('rowheader', { name: 'Road network' })).toBeVisible();
 		await expect(page.locator('.app-map-layers-demo')).toBeVisible();
+	});
+
+	test('two parish councils of the same name are offered at once, then listed and mapped apart', async ({ page }) => {
+		const db = newDatabaseClient(connectionString);
+		try {
+			await deleteE2eTwinConsultees(db);
+			await loadConsulteeAreas(db, { type: 'FeatureCollection', features: E2E_TWIN_CONSULTEES });
+
+			await page.goto(
+				`/consultees/${SAMPLE_CASE_ID}/report/consultees/add?ruleset=${SAMPLE_RULESET_ID}&category=Parish+Council`
+			);
+			const nameInput = page.getByLabel('Name', { exact: true });
+			const options = page.locator('.autocomplete__option');
+			for (const expected of [/There is more than one E2E Twin Parish/, /E2E Twin Parish is already listed/]) {
+				await nameInput.fill(E2E_TWIN_PARISH);
+				await page.getByLabel('Reason for adding').fill('Same name as another');
+				await page.getByRole('button', { name: 'Add consultee' }).click();
+				await expect(page.locator('.govuk-error-summary')).toContainText(expected);
+				// the name comes back with what it matches already showing - no keystroke needed
+				await expect(nameInput).toHaveValue(E2E_TWIN_PARISH);
+				await expect(options.first()).toBeVisible();
+				await options.first().click();
+				await page.getByLabel('Reason for adding').fill('Same name as another');
+				await page.getByRole('button', { name: 'Add consultee' }).click();
+				await expect(page).toHaveURL(/\/report\/consultees\?.*add=/);
+				await page.getByRole('button', { name: 'Add a consultee' }).click();
+			}
+
+			// both listed, each with what tells it apart - and named the same way on the map
+			await page.getByRole('link', { name: 'Back', exact: true }).click();
+			const twins = page.getByRole('rowheader', { name: /^E2E Twin Parish \(/ });
+			await expect(twins).toHaveCount(2);
+			const listed = await twins.allInnerTexts();
+			expect(listed.map((text) => text.trim()).sort()).toEqual([
+				'E2E Twin Parish (E2E North)',
+				'E2E Twin Parish (E2E South)'
+			]);
+			const mapConfig = JSON.parse((await page.locator('#case-map-data').textContent()) ?? '{}');
+			const mapped = mapConfig.consulteeGeojson.features
+				.filter((feature: { id: string }) => E2E_TWIN_CONSULTEES.some(({ id }) => id === feature.id))
+				.map((feature: { properties: { name: string } }) => feature.properties.name);
+			expect(mapped.sort()).toEqual(listed.map((text) => text.trim()).sort());
+		} finally {
+			await deleteE2eTwinConsultees(db);
+			await db.$disconnect();
+		}
 	});
 
 	test('the admin upload page sends a file in parts, with the CSRF token, and says why it failed', async ({ page }) => {

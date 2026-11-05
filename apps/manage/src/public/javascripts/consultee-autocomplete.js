@@ -90,7 +90,8 @@ export function enhanceConsulteeInput(input, accessibleAutocomplete) {
 		element: container,
 		id: input.id,
 		name: input.name,
-		defaultValue: input.value,
+		// the input's value is typed in below instead, so what matches it shows at once
+		defaultValue: '',
 		minLength: 1,
 		// a typed name that matches no suggestion is still a name to add - don't swap it on blur, or
 		// say "No results found"
@@ -103,7 +104,25 @@ export function enhanceConsulteeInput(input, accessibleAutocomplete) {
 			suggestion: suggestionHtml
 		}
 	});
+	showMatchesFor(container, input.value);
 	return true;
+}
+
+/**
+ * Put `value` - a name typed back, when the page is shown again with an error - into the autocomplete
+ * as if typed, so its matches show without another keystroke: given it as its default value, the
+ * library only looks for them once the text changes ("There is more than one Newton - choose the one
+ * you mean from the list" would show no list).
+ * @param {HTMLElement} container
+ * @param {string} value
+ */
+function showMatchesFor(container, value) {
+	const rendered = container.querySelector('input');
+	if (!value || !rendered) {
+		return;
+	}
+	rendered.value = value;
+	rendered.dispatchEvent(new container.ownerDocument.defaultView.Event('input', { bubbles: true }));
 }
 
 /**

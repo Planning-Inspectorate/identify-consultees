@@ -80,7 +80,8 @@ describe('consultee autocomplete', () => {
 		assert.equal(options.element.parentElement.tagName, 'FORM');
 		assert.equal(options.id, 'consultee-name');
 		assert.equal(options.name, 'name');
-		assert.equal(options.defaultValue, 'Bar');
+		// the value is typed in once it's rendered instead (see the next test)
+		assert.equal(options.defaultValue, '');
 		assert.equal(options.inputClasses, 'govuk-input govuk-input--error');
 		// any name can be typed - nothing replaces it on blur, and no "No results found"
 		assert.equal(options.confirmOnBlur, false);
@@ -94,6 +95,34 @@ describe('consultee autocomplete', () => {
 		assert.equal(options.templates.inputValue('typed'), 'typed');
 		assert.equal(options.templates.inputValue(undefined), '');
 		assert.equal(options.templates.suggestion, suggestionHtml);
+	});
+
+	test('types the input value into the rendered autocomplete, so its matches show at once', () => {
+		const document = documentWith();
+		const typed = [];
+		const accessibleAutocomplete = mock.fn(({ element }) => {
+			const rendered = document.createElement('input');
+			rendered.addEventListener('input', () => typed.push(rendered.value));
+			element.append(rendered);
+		});
+		enhanceConsulteeInput(document.getElementById('consultee-name'), accessibleAutocomplete);
+		assert.deepEqual(typed, ['Bar']);
+		assert.equal(document.querySelector('.pins-autocomplete input').value, 'Bar');
+	});
+
+	test('types nothing in when the input is empty, or nothing was rendered', () => {
+		const document = documentWith(FORM.replace(' value="Bar"', ''));
+		const typed = [];
+		const accessibleAutocomplete = mock.fn(({ element }) => {
+			const rendered = document.createElement('input');
+			rendered.addEventListener('input', () => typed.push(rendered.value));
+			element.append(rendered);
+		});
+		enhanceConsulteeInput(document.getElementById('consultee-name'), accessibleAutocomplete);
+		assert.deepEqual(typed, []);
+
+		// a library that renders nothing leaves nothing to type into
+		assert.equal(enhanceConsulteeInput(documentWith().getElementById('consultee-name'), mock.fn()), true);
 	});
 
 	test('leaves the input as it is without its datalist or the library', () => {

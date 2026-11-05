@@ -6,6 +6,7 @@ import type { ConsulteeMatch, Ruleset } from '@pins/identify-consultees-database
 import { isIdentified } from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
 import type { AsyncRequestHandler } from '@planning-inspectorate/core/util';
 import type { Request, Response } from 'express';
+import type { MapMatch } from '../../../../maps/case-geojson.ts';
 import { addedBeyondRun, buildCaseMapConfig, markAddedByHand } from '../../../../maps/case-geojson.ts';
 import { MAP_VIEWPORT } from '../../../../maps/sample-geojson.ts';
 import { categorySettings } from '../../../../report-config.ts';
@@ -120,6 +121,16 @@ async function listLabels(
 	return distinguishedLabels(rows, category, details);
 }
 
+/** `matches` named as `labels` has them - "Newton (Ribble Valley)" - for the map. */
+function labelledMatches(matches: MapMatch[], labels: ReadonlyMap<string, string>): MapMatch[] {
+	return matches.map((match) => {
+		const label = labels.get(match.feature.id);
+		return label === undefined || label === match.feature.properties.consultee
+			? match
+			: { ...match, feature: { ...match.feature, properties: { ...match.feature.properties, consultee: label } } };
+	});
+}
+
 /** The page: map, the category's identified consultees, and the removed-consultees section. */
 async function renderCategoryPage(
 	service: ManageService,
@@ -159,18 +170,6 @@ async function renderCategoryPage(
 		screenedBoundingBox ? 'boundingBox' : 'outline',
 		categoryBufferMetres(ruleset, category, service.nearbyNsipRadiusMetres)
 	);
-	const map = {
-		...buildCaseMapConfig(
-			project,
-			drawn,
-			category,
-			searchArea,
-			{ src: staticMapSrc, alt: staticMapAlt },
-			categorySettings(category).mapMarginMetres
-		),
-		...(buffers.length > 0 ? { bufferGeojson: siteBufferGeojson(buffers) } : {})
-	};
-
 	// consultees alphabetically by name, ruleset matches and hand-added ones together - every
 	// Remove link opens the "Remove consultee" page, which records the reason before excluding
 	// the match or dropping the add
@@ -199,8 +198,25 @@ async function renderCategoryPage(
 			];
 		})
 	];
-	// two of the same name - two Middletons - each read with what tells it apart (consultee-labels.ts)
-	const labels = await listLabels(service, category, listedRows);
+	// two of the same name - two Middletons - each read with what tells it apart (consultee-labels.ts),
+	// on the map as in the list. The map's fainter nearby ones count too: a Newton listed beside one
+	// only mapped is told apart from it
+	const listedIds = new Set(listedRows.map(({ id }) => id));
+	const mappedOnly = drawn
+		.filter((match) => !listedIds.has(match.feature.id))
+		.map((match) => ({ id: match.feature.id, name: consulteeName(match), distanceMetres: match.distanceMetres }));
+	const labels = await listLabels(service, category, [...listedRows, ...mappedOnly]);
+	const map = {
+		...buildCaseMapConfig(
+			project,
+			labelledMatches(drawn, labels),
+			category,
+			searchArea,
+			{ src: staticMapSrc, alt: staticMapAlt },
+			categorySettings(category).mapMarginMetres
+		),
+		...(buffers.length > 0 ? { bufferGeojson: siteBufferGeojson(buffers) } : {})
+	};
 	const rows: ConsulteeRow[] = listedRows
 		.map(({ id, identified: reasons, removeUrl }) => ({ name: labels.get(id)!, identified: reasons, removeUrl }))
 		.sort((a, b) => a.name.localeCompare(b.name, 'en-GB'));
