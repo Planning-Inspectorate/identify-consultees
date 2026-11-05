@@ -7,24 +7,36 @@ export interface CbosCaseRefresh {
 }
 
 /**
- * The search page's Refresh cases button: imports every CBOS boundary straight from CBOS, as the admin
- * import does, without waiting for the schedule or a Service Bus event. It runs in the background - it
- * can take several minutes, longer than Front Door waits for a response - and one at a time, however
- * often the button is pressed. Failures are logged, never thrown.
+ * The search page's Refresh cases button: imports CBOS's new and changed boundaries straight from CBOS,
+ * without waiting for the schedule or a Service Bus event - those already saved at their version
+ * aren't fetched again, so it's quick when little has changed. It runs in the background - a first
+ * import can take several minutes, longer than Front Door waits for a response - and one at a time,
+ * however often the button is pressed. Failures are logged, never thrown.
  */
 export function createCbosCaseRefresh(
 	service: Pick<ManageService, 'db' | 'logger' | 'pythonFunctionUrl' | 'pythonFunctionApiKey'>,
 	runImport: typeof importCaseBoundariesFromCbos = importCaseBoundariesFromCbos
 ): CbosCaseRefresh {
 	const { db, logger } = service;
-	const options = { pythonFunctionUrl: service.pythonFunctionUrl, apiKey: service.pythonFunctionApiKey };
+	// only what's new or changed since the last import - the schedule and the admin import fetch
+	// every file again, so a boundary saved wrongly is put right there
+	const options = {
+		pythonFunctionUrl: service.pythonFunctionUrl,
+		apiKey: service.pythonFunctionApiKey,
+		onlyNewOrChanged: true
+	};
 	let running = false;
 
 	const refresh = async () => {
 		try {
 			const result = await runImport(db, options);
 			logger.info(
-				{ filesFound: result.filesFound, imported: result.imported, casesImported: result.casesImported },
+				{
+					filesFound: result.filesFound,
+					unchanged: result.unchanged,
+					imported: result.imported,
+					casesImported: result.casesImported
+				},
 				'Refreshed cases from CBOS'
 			);
 			if (result.failures.length > 0) {

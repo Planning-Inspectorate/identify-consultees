@@ -4,7 +4,7 @@ import { describe, it, mock } from 'node:test';
 import type { CbosImportResult } from './cbos-boundaries.ts';
 import { createCbosCaseRefresh } from './refresh-cases.ts';
 
-const RESULT: CbosImportResult = { filesFound: 3, imported: 3, casesImported: 2, failures: [] };
+const RESULT: CbosImportResult = { filesFound: 5, unchanged: 2, imported: 3, casesImported: 2, failures: [] };
 
 function newService() {
 	return {
@@ -32,7 +32,7 @@ function controlledImport() {
 const settle = () => new Promise((resolve) => setImmediate(resolve));
 
 describe('refreshing cases from CBOS', () => {
-	it('starts an import of every case with the function settings, without waiting for it', async () => {
+	it("starts an import of every case's new and changed files, without waiting for it", async () => {
 		const service = newService();
 		const { runImport, finish } = controlledImport();
 		const refresh = createCbosCaseRefresh(service, runImport);
@@ -41,14 +41,14 @@ describe('refreshing cases from CBOS', () => {
 		assert.strictEqual(runImport.mock.callCount(), 1);
 		assert.deepStrictEqual(runImport.mock.calls[0].arguments, [
 			service.db,
-			{ pythonFunctionUrl: 'https://function.example/api/consultee-areas', apiKey: 'key' }
+			{ pythonFunctionUrl: 'https://function.example/api/consultee-areas', apiKey: 'key', onlyNewOrChanged: true }
 		]);
 
 		finish();
 		await settle();
 		const [logged, message] = service.logger.info.mock.calls[0].arguments;
 		assert.strictEqual(message, 'Refreshed cases from CBOS');
-		assert.deepStrictEqual(logged, { filesFound: 3, imported: 3, casesImported: 2 });
+		assert.deepStrictEqual(logged, { filesFound: 5, unchanged: 2, imported: 3, casesImported: 2 });
 		assert.strictEqual(service.logger.warn.mock.callCount(), 0);
 	});
 

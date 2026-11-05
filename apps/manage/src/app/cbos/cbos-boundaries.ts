@@ -2,7 +2,7 @@ import type { PrismaClient } from '@pins/identify-consultees-database/src/client
 import type { CaseBoundaryFeature } from '@pins/identify-consultees-database/src/geospatial/case-boundaries.ts';
 import { loadCaseBoundaries } from '@pins/identify-consultees-database/src/geospatial/case-boundaries.ts';
 import type { Geometry, PolygonGeometry, Position } from '@pins/identify-consultees-database/src/geospatial/wkt.ts';
-import { toCaseBoundary } from '@pins/identify-consultees-database/src/seed/geojson-import.ts';
+import { deterministicId, toCaseBoundary } from '@pins/identify-consultees-database/src/seed/geojson-import.ts';
 import { fetchWithTimeout } from '@planning-inspectorate/core/util';
 
 /**
@@ -59,6 +59,15 @@ export interface CbosFunctionOptions {
 	caseReference?: string;
 }
 
+export interface CbosImportOptions extends CbosFunctionOptions {
+	/**
+	 * Fetch only the files not already saved at the version CBOS has - what's new or changed since
+	 * the last import. The rest keep their geometry; only their case's title and stage are brought
+	 * up to date. Every file is fetched again when absent.
+	 */
+	onlyNewOrChanged?: boolean;
+}
+
 export interface CbosImportFailure {
 	caseReference: string;
 	fileName: string | null;
@@ -70,6 +79,8 @@ export interface CbosImportResult {
 	imported: number;
 	/** How many cases the imported boundaries are for. */
 	casesImported: number;
+	/** How many were already saved at their version, so weren't fetched - with `onlyNewOrChanged`. */
+	unchanged?: number;
 	failures: CbosImportFailure[];
 }
 
@@ -80,6 +91,8 @@ const CHECK_TIMEOUT_MS = 30_000;
 const FILE_TIMEOUT_MS = 120_000;
 // enough to overlap the function's database and blob round trips without crowding it
 const FETCH_CONCURRENCY = 4;
+// well under SQL Server's 2,100 parameters a query
+const LOOKUP_BATCH_SIZE = 1000;
 
 function functionUrl(pythonFunctionUrl: string, path: string): string {
 	// PYTHON_FUNCTION_URL names the consultee-areas route, so CBOS routes are its siblings under
@@ -278,6 +291,65 @@ function describe(error: unknown): string {
 	return error instanceof Error ? error.message : String(error);
 }
 
+/** The case_boundary row a named file is saved to - the id toCaseBoundary gives it. */
+function boundaryId(file: CbosBoundaryFile & { fileName: string }): string {
+	return deterministicId(`case-boundary:${file.caseReference}:${file.fileName}`);
+}
+
+interface SavedBoundary {
+	file: CbosBoundaryFile;
+	caseName: string;
+	acceptance: string | null;
+}
+
+/**
+ * The files already saved, at the version CBOS has, to the row their name gives them - by id. A
+ * file without a name can't be looked up (its row's name is in its GeoJSON), so is never one. Nor
+ * is a version that's lost the name to a newer one: its row now holds the newer one.
+ */
+async function savedUnchanged(db: PrismaClient, files: CbosBoundaryFile[]): Promise<Map<string, SavedBoundary>> {
+	const byId = new Map(
+		files.flatMap((file) => (file.fileName ? [[boundaryId({ ...file, fileName: file.fileName }), file] as const] : []))
+	);
+	const ids = [...byId.keys()];
+	const unchanged = new Map<string, SavedBoundary>();
+	for (let i = 0; i < ids.length; i += LOOKUP_BATCH_SIZE) {
+		const rows = await db.caseBoundary.findMany({
+			where: { id: { in: ids.slice(i, i + LOOKUP_BATCH_SIZE) } },
+			select: { id: true, caseName: true, acceptance: true, metadata: true }
+		});
+		for (const row of rows) {
+			// SQL Server may give a uniqueidentifier in capitals
+			const file = byId.get(row.id.toLowerCase());
+			const saved = parseMetadata(row.metadata);
+			if (file && saved.cbosDocumentGuid === file.documentGuid && saved.cbosVersion === file.version) {
+				unchanged.set(row.id, { file, caseName: row.caseName, acceptance: row.acceptance });
+			}
+		}
+	}
+	return unchanged;
+}
+
+function parseMetadata(metadata: string): { cbosDocumentGuid?: unknown; cbosVersion?: unknown } {
+	try {
+		return JSON.parse(metadata) ?? {};
+	} catch {
+		return {};
+	}
+}
+
+/**
+ * Brings an unchanged file's row up to CBOS's case title and stage, as a fresh import would - only
+ * when either has changed. A case without a title keeps the name it has.
+ */
+async function updateCaseDetails(db: PrismaClient, id: string, saved: SavedBoundary): Promise<void> {
+	const caseName = saved.file.caseTitle ?? saved.caseName;
+	const acceptance = caseStageLabel(saved.file.caseStage);
+	if (caseName !== saved.caseName || acceptance !== saved.acceptance) {
+		await db.caseBoundary.update({ where: { id }, data: { caseName, acceptance, lastUpdated: new Date() } });
+	}
+}
+
 export interface CbosImportDependencies {
 	listFiles: typeof listCbosBoundaryFiles;
 	fetchGeoJson: typeof fetchCbosBoundaryGeoJson;
@@ -295,13 +367,20 @@ const DEFAULT_DEPENDENCIES: CbosImportDependencies = {
  * - to case_boundary. It merges: rows are upserted by id and nothing is
  * deleted, so boundaries loaded from elsewhere stay. A file that can't be fetched or read is
  * reported and skipped rather than failing the rest; failing to list the files rejects.
+ * With `options.onlyNewOrChanged`, files already saved at their version aren't fetched again.
  */
 export async function importCaseBoundariesFromCbos(
 	db: PrismaClient,
-	options: CbosFunctionOptions,
+	options: CbosImportOptions,
 	dependencies: CbosImportDependencies = DEFAULT_DEPENDENCIES
 ): Promise<CbosImportResult> {
-	const files = distinctFileNames(await dependencies.listFiles(options));
+	const listed = distinctFileNames(await dependencies.listFiles(options));
+	const unchanged = options.onlyNewOrChanged ? await savedUnchanged(db, listed) : new Map<string, SavedBoundary>();
+	const unchangedFiles = new Set([...unchanged.values()].map(({ file }) => file));
+	const files = listed.filter((file) => !unchangedFiles.has(file));
+	for (const [id, saved] of unchanged) {
+		await updateCaseDetails(db, id, saved);
+	}
 	const boundaries: CaseBoundaryFeature[] = [];
 	const failures: CbosImportFailure[] = [];
 
@@ -321,5 +400,11 @@ export async function importCaseBoundariesFromCbos(
 	const imported =
 		boundaries.length > 0 ? await dependencies.load(db, { type: 'FeatureCollection', features: boundaries }) : 0;
 	const casesImported = new Set(boundaries.map((boundary) => boundary.properties.caseReference)).size;
-	return { filesFound: files.length, imported, casesImported, failures };
+	return {
+		filesFound: listed.length,
+		imported,
+		casesImported,
+		...(options.onlyNewOrChanged ? { unchanged: unchanged.size } : {}),
+		failures
+	};
 }
