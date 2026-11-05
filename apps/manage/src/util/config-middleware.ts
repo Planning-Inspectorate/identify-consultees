@@ -11,7 +11,7 @@ export function addLocalsConfiguration(options: { devPagesEnabled?: boolean } = 
 			govukFrontendJs: 'assets/js/govuk-frontend.min-0391e416.js',
 			consulteesMapJs: 'javascripts/consultees-map-c7f25d7b.js',
 			mapLayersDemoJs: 'javascripts/map-layers-demo-c45988a4.js',
-			consulteeAutocompleteJs: 'javascripts/consultee-autocomplete-8efbbdc4.js',
+			consulteeAutocompleteJs: 'javascripts/consultee-autocomplete-c649c327.js',
 			blobUploadJs: 'javascripts/blob-upload-cfe8ea96.js',
 			accessibleAutocompleteJs: 'assets/js/accessible-autocomplete.min-876870ee.js',
 			accessibleAutocompleteCss: 'assets/css/accessible-autocomplete.min-4b7a52dc.css',
