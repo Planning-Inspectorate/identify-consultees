@@ -51,7 +51,7 @@
 		{% endif %}
 	</form>
 
-	{# imports every case from CBOS now, rather than at the next scheduled import - then back to this search #}
+	{# imports what is new or changed in CBOS now, rather than at the next scheduled import - then back to this search #}
 	<form method="post" action="/refresh-cases" class="govuk-!-margin-top-4" novalidate>
 		<input type="hidden" name="_csrf" value="{{ _csrf }}">
 		{% if searchQuery %}

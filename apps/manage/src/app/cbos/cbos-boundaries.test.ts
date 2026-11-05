@@ -339,6 +339,126 @@ describe('CBOS boundaries', () => {
 			assert.strictEqual(result.imported, 0);
 		});
 
+		describe('only new or changed files', () => {
+			const idFor = (fileName: string, caseReference = FILE.caseReference) =>
+				deterministicId(`case-boundary:${caseReference}:${fileName}`);
+			const savedRow = (id: string, guid: string, version: number, extra: object = {}) => ({
+				id,
+				caseName: 'Example Solar Farm',
+				acceptance: 'Pre-Examination',
+				metadata: JSON.stringify({ source: 'cbos', cbosDocumentGuid: guid, cbosVersion: version }),
+				...extra
+			});
+			const dbWith = (rows: object[]) => ({
+				caseBoundary: {
+					findMany: mock.fn(async () => rows),
+					update: mock.fn(async () => ({}))
+				}
+			});
+
+			it("fetches only files not saved at CBOS's version, and counts the rest", async () => {
+				const files = [
+					FILE,
+					{ ...FILE, documentGuid: 'changed', fileName: 'access.geojson', version: 3 },
+					{ ...FILE, documentGuid: 'new', fileName: 'cable.geojson' },
+					{ ...FILE, documentGuid: 'unnamed', fileName: null }
+				];
+				const fakeDb = dbWith([
+					// in capitals, as SQL Server may return them
+					savedRow(idFor('site.geojson').toUpperCase(), FILE.documentGuid, FILE.version),
+					savedRow(idFor('access.geojson'), 'changed', 2)
+				]);
+				const fetchGeoJson = mock.fn(async () => collection({ geometry: SQUARE }));
+				const load = mock.fn(async (_db: unknown, features: { features: unknown[] }) => features.features.length);
+				const result = await importCaseBoundariesFromCbos(
+					fakeDb as never,
+					{ ...OPTIONS, onlyNewOrChanged: true },
+					{ listFiles: async () => files, fetchGeoJson, load: load as never }
+				);
+
+				assert.deepStrictEqual(
+					fetchGeoJson.mock.calls.map(
+						(call) => (call.arguments as unknown as [unknown, CbosBoundaryFile])[1].documentGuid
+					),
+					['changed', 'new', 'unnamed']
+				);
+				assert.deepStrictEqual(result, { filesFound: 4, imported: 3, casesImported: 1, unchanged: 1, failures: [] });
+				const [query] = fakeDb.caseBoundary.findMany.mock.calls[0].arguments as unknown as [
+					{ where: { id: { in: string[] } } }
+				];
+				assert.deepStrictEqual(query.where.id.in, [
+					idFor('site.geojson'),
+					idFor('access.geojson'),
+					idFor('cable.geojson')
+				]);
+				// the unchanged one's title and stage are as CBOS has them
+				assert.strictEqual(fakeDb.caseBoundary.update.mock.callCount(), 0);
+			});
+
+			it("brings an unchanged file's case title and stage up to date", async () => {
+				const id = idFor('site.geojson');
+				const fakeDb = dbWith([
+					savedRow(id, FILE.documentGuid, FILE.version, { caseName: 'Old title', acceptance: 'Acceptance' })
+				]);
+				const fetchGeoJson = mock.fn(async () => collection({ geometry: SQUARE }));
+				const result = await importCaseBoundariesFromCbos(
+					fakeDb as never,
+					{ ...OPTIONS, onlyNewOrChanged: true },
+					{ listFiles: async () => [FILE], fetchGeoJson, load: (async () => 0) as never }
+				);
+
+				assert.strictEqual(fetchGeoJson.mock.callCount(), 0);
+				assert.strictEqual(result.unchanged, 1);
+				const [update] = fakeDb.caseBoundary.update.mock.calls[0].arguments as unknown as [
+					{ where: object; data: { caseName: string; acceptance: string } }
+				];
+				assert.deepStrictEqual(update.where, { id });
+				assert.strictEqual(update.data.caseName, 'Example Solar Farm');
+				assert.strictEqual(update.data.acceptance, 'Pre-Examination');
+			});
+
+			it('keeps the saved name of a case CBOS gives no title', async () => {
+				const fakeDb = dbWith([savedRow(idFor('site.geojson'), FILE.documentGuid, FILE.version)]);
+				await importCaseBoundariesFromCbos(
+					fakeDb as never,
+					{ ...OPTIONS, onlyNewOrChanged: true },
+					{
+						listFiles: async () => [{ ...FILE, caseTitle: null }],
+						fetchGeoJson: async () => collection(),
+						load: (async () => 0) as never
+					}
+				);
+
+				assert.strictEqual(fakeDb.caseBoundary.update.mock.callCount(), 0);
+			});
+
+			it('fetches again a version whose name a newer one has taken, or one saved without CBOS details', async () => {
+				// version 2 was saved as site.geojson; version 4 now has that name, and 2 is "(version 2)"
+				const fakeDb = dbWith([savedRow(idFor('site.geojson'), FILE.documentGuid, 2)]);
+				const fileImported = dbWith([{ ...savedRow(idFor('site.geojson'), '', 0), metadata: '{}' }]);
+				// nor one whose details can't be read, nor a row for some other file
+				const unreadable = dbWith([
+					{ ...savedRow(idFor('site.geojson'), '', 0), metadata: 'not json' },
+					{ ...savedRow(idFor('site.geojson (version 2)'), '', 0), metadata: 'null' },
+					savedRow(idFor('other.geojson'), FILE.documentGuid, 2)
+				]);
+				const files = [
+					{ ...FILE, version: 2, createdAt: '2026-01-01T09:00:00+00:00' },
+					{ ...FILE, version: 4, createdAt: '2026-05-01T09:00:00+00:00' }
+				];
+				for (const db of [fakeDb, fileImported, unreadable]) {
+					const fetchGeoJson = mock.fn(async () => collection({ geometry: SQUARE }));
+					const result = await importCaseBoundariesFromCbos(
+						db as never,
+						{ ...OPTIONS, onlyNewOrChanged: true },
+						{ listFiles: async () => files, fetchGeoJson, load: (async () => 2) as never }
+					);
+					assert.strictEqual(fetchGeoJson.mock.callCount(), 2);
+					assert.strictEqual(result.unchanged, 0);
+				}
+			});
+		});
+
 		it('rejects when the files cannot be listed', async () => {
 			await assert.rejects(
 				importCaseBoundariesFromCbos(db, OPTIONS, {

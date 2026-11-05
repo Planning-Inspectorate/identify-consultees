@@ -129,9 +129,9 @@ export function buildHomePage(service: ManageService): AsyncRequestHandler {
 }
 
 /**
- * The search page's Refresh cases button: starts importing every case from CBOS (see
+ * The search page's Refresh cases button: starts importing what's new or changed in CBOS (see
  * cbos/refresh-cases.ts) and goes straight back to the same search, which says it's under way - the
- * import takes minutes, so the search is run again once it's done.
+ * import can take minutes, so the search is run again once it's done.
  */
 export function buildRefreshCases(service: Pick<ManageService, 'logger'>, refresh: CbosCaseRefresh) {
 	return (req: Request, res: Response) => {
