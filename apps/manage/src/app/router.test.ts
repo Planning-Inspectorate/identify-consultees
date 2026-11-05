@@ -566,7 +566,7 @@ describe('manage router wiring', () => {
 	test('GET /components/:component renders the fixture examples', async () => {
 		const response = await request(authDisabledApp).get('/components/tag');
 		assert.equal(response.status, 200);
-		assert.match(response.text, /<h1 class="govuk-heading-xl">\s*Tag/);
+		assert.match(response.text, /<h1 class="govuk-heading-l">\s*Tag/);
 		assert.match(response.text, /govuk-tag/);
 		assert.match(response.text, /pins-component-example/);
 	});
