@@ -53,7 +53,7 @@ describe('ruleset picker page', () => {
 		assert.strictEqual(current.checked, true);
 
 		const html = mockRes.render.mock.calls[0].result;
-		assert.match(html, /govuk-caption-xl">\s*Real Test Project/);
+		assert.match(html, /govuk-caption-l">\s*Real Test Project/);
 		assert.match(html, /Identify consultees/);
 	});
 

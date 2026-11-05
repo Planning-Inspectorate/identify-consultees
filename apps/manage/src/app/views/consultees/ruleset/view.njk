@@ -12,7 +12,7 @@
 
 {% block pageContent %}
 	{# the case name sits inside the legend's h1 as its caption, as the layout renders it #}
-	{% set legendHtml %}<span class="govuk-caption-xl">{{ pageCaption }}</span>{{ pageHeading }}{% endset %}
+	{% set legendHtml %}<span class="govuk-caption-l">{{ pageCaption }}</span>{{ pageHeading }}{% endset %}
 	<form method="post" action="{{ formAction }}" novalidate>
 		<input type="hidden" name="_csrf" value="{{ _csrf }}">
 		{{ govukRadios({
@@ -22,7 +22,7 @@
 				legend: {
 					html: legendHtml,
 					isPageHeading: true,
-					classes: "govuk-fieldset__legend--xl"
+					classes: "govuk-fieldset__legend--l"
 				}
 			},
 			errorMessage: rulesetError,

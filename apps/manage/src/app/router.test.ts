@@ -197,7 +197,7 @@ describe('manage router wiring', () => {
 		// the fieldset legend is the page heading, with the case name as its caption
 		assert.match(
 			response.text,
-			/<legend[^>]*>\s*<h1[^>]*>\s*<span class="govuk-caption-xl">[^<]*<\/span>Ruleset\s*<\/h1>\s*<\/legend>/
+			/<legend[^>]*>\s*<h1[^>]*>\s*<span class="govuk-caption-l">[^<]*<\/span>Ruleset\s*<\/h1>\s*<\/legend>/
 		);
 		assert.match(response.text, /Router Test Fixture Wind Farm/);
 		assert.match(response.text, /type="radio"[^>]*value="england-wales-post-20240430"/);
