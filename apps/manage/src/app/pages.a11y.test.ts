@@ -100,6 +100,22 @@ describe('manage page accessibility smoke', () => {
 		await assertNoSeriousA11yViolations(html);
 	});
 
+	test('home page refreshing cases has no serious a11y violations', async () => {
+		const html = nunjucks.render('views/home/view.njk', {
+			...pageLocals,
+			pageHeading: 'Identify consultees for a national infrastructure project',
+			searchQuery: '',
+			pageSize: 25,
+			resultsFrom: 0,
+			resultsTo: 0,
+			resultsTotal: 0,
+			geometries: [],
+			pagination: null,
+			refreshing: true
+		});
+		await assertNoSeriousA11yViolations(html);
+	});
+
 	test('home page with a blank search error has no serious a11y violations', async () => {
 		const html = nunjucks.render('views/home/view.njk', {
 			...pageLocals,

@@ -71,8 +71,18 @@ test.describe('manage journeys', () => {
 	test('home page keeps the requested page size across searches', async ({ page }) => {
 		await page.goto('/?pageSize=50');
 		// the choice rides along as a hidden input so a fresh search keeps it
-		await expect(page.locator('input[name="pageSize"]')).toHaveValue('50');
+		await expect(page.locator('form[action="/"] input[name="pageSize"]')).toHaveValue('50');
 		await expect(page.getByText(/Showing 1 to \d+ of \d+ results/)).toBeVisible();
+	});
+
+	test('home page refreshes cases from CBOS and comes back to the same search', async ({ page }) => {
+		await page.goto(`/?q=${SAMPLE_CASE_REFERENCE}&pageSize=50`);
+		await page.getByRole('button', { name: 'Refresh cases' }).click();
+
+		// the import runs in the background - the page says so, and keeps the search
+		await expect(page).toHaveURL(`/?q=${SAMPLE_CASE_REFERENCE}&pageSize=50&refreshing=1`);
+		await expect(page.locator('.govuk-notification-banner')).toContainText('Refreshing cases from CBOS');
+		await expect(page.locator('#q')).toHaveValue(SAMPLE_CASE_REFERENCE);
 	});
 
 	test('home search paginates when results exceed one page', async ({ page }) => {
