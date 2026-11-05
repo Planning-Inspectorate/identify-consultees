@@ -300,7 +300,7 @@ describe('consultee report check page', () => {
 				group.consultees.map((row) => [row.name, row.names])
 			]),
 			[
-				['NSIPs', [['NSIPs', []]]],
+				['National infrastructure projects', [['NSIPs', []]]],
 				['Administrative boundaries', [['Parish Council', []]]]
 			]
 		);
@@ -319,7 +319,11 @@ describe('consultee report check page', () => {
 			}
 		]);
 		// not looked for, there's no row for them
-		assert.ok(!groupedConsultees(ruleset, realProjectId, [], none).some((group) => group.name === 'NSIPs'));
+		assert.ok(
+			!groupedConsultees(ruleset, realProjectId, [], none).some(
+				(group) => group.name === 'National infrastructure projects'
+			)
+		);
 	});
 
 	it('should warn when the site was screened against its bounding box, so the list gets reviewed', async () => {

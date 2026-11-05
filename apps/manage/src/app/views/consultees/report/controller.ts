@@ -42,6 +42,11 @@ import type {
  * ruleset's full coverage. Excluded consultees (removed on a category's Change page) don't
  * appear and hand-added ones do. Groups with no categories at all are left out.
  */
+/** The check page's group headings: the export tab's name, with "NSIPs" spelled out. */
+const GROUP_HEADINGS: Record<string, string> = {
+	[NEARBY_NSIPS]: 'National infrastructure projects'
+};
+
 export function groupedConsultees(
 	ruleset: Ruleset,
 	caseId: string,
@@ -76,7 +81,7 @@ export function groupedConsultees(
 		byGroup.set(group, [...(byGroup.get(group) ?? []), row(category)]);
 	}
 	return [NEARBY_NSIPS, ...GROUP_TABS.filter((tab) => tab !== NEARBY_NSIPS)]
-		.map((tab) => ({ name: tab, consultees: byGroup.get(tab) ?? [] }))
+		.map((tab) => ({ name: GROUP_HEADINGS[tab] ?? tab, consultees: byGroup.get(tab) ?? [] }))
 		.filter((group) => group.consultees.length > 0);
 }
 
