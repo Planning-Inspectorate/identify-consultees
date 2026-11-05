@@ -11,7 +11,7 @@ export interface IdentifiedConsultee {
  * workbook's tabs use (see export/workbook.ts's GROUP_TABS), so the page reads like the report.
  */
 export interface ConsulteeGroup {
-	/** The group's heading - an export tab's name. */
+	/** The group's heading - an export tab's name, spelled out for Nearby NSIPs. */
 	name: string;
 	consultees: IdentifiedConsultee[];
 }
