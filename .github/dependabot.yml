@@ -31,3 +31,17 @@ updates:
       day: 'tuesday' # day after npm updates
     cooldown:
       default-days: 7
+  - package-ecosystem: 'pip'
+    directory: '/apps/function-python' # Python function dependencies (pinned requirements.txt)
+    schedule:
+      interval: 'weekly'
+      day: 'wednesday' # day after terraform updates
+    cooldown:
+      default-days: 7
+  - package-ecosystem: 'docker'
+    directory: '/apps/manage' # apps/manage/Dockerfile - major-only node:24-alpine tag, so this only proposes major bumps
+    schedule:
+      interval: 'weekly'
+      day: 'wednesday'
+    cooldown:
+      default-days: 7
