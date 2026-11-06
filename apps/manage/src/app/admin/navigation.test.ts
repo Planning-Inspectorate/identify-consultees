@@ -21,7 +21,7 @@ describe('admin navigation', () => {
 		assert.deepEqual(currentOf('/admin/'), ['Overview']);
 		assert.deepEqual(currentOf('/admin/database'), ['Database']);
 		assert.deepEqual(currentOf('/admin/database/consultee-areas/abc'), ['Database']);
-		assert.deepEqual(currentOf('/admin/upload-to-blob/run'), ['Upload to blob storage']);
+		assert.deepEqual(currentOf('/admin/upload-to-blob/run'), ['Reference data files']);
 		// a page whose name starts like another's isn't it
 		assert.deepEqual(currentOf('/admin/databases'), []);
 		assert.deepEqual(currentOf('/'), []);

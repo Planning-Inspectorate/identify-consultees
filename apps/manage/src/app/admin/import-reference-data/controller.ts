@@ -11,7 +11,6 @@ import {
 	parseGroupBlobName,
 	quarterOf
 } from '@pins/identify-consultees-database/src/seed/consultee-area-groups.ts';
-import { importCaseBoundaries } from '@pins/identify-consultees-database/src/seed/geojson-import.ts';
 import type { StoredBlob } from '@pins/identify-consultees-database/src/seed/import-from-blob.ts';
 import { downloadBlobToTempFile, listBlobs } from '@pins/identify-consultees-database/src/seed/import-from-blob.ts';
 import type { ReferenceDataGroup } from '@pins/identify-consultees-database/src/seed/reference-data.ts';
@@ -26,11 +25,7 @@ import { formatFileSize } from '../../views/consultees/report/export/report-zip.
 import type { GroupStatus, ImportReferenceDataViewModel } from './view-model.ts';
 
 const VIEW = 'admin/import-reference-data/view.njk';
-const PAGE_HEADING = 'Import reference data into the database';
-
-// the case boundaries' blob - the DB Seed pipeline's loadFullReferenceData option looks for it too
-// (.azure/pipelines/db-seed.yml), as it does combined_reference_data_v1.geojson for a full import
-export const CASE_BOUNDARIES_BLOB_NAME = 'all-project-boundaries.geojson';
+const PAGE_HEADING = 'Load into database';
 
 /** Where the page finds, and fetches, the files it loads - blob storage, but for tests. */
 export interface BlobFiles {
@@ -283,35 +278,6 @@ export function buildClearConsulteeAreas(
 			logger.error({ error, quarter }, 'Failed to clear a consultee area dataset');
 			viewModel.error = 'Could not clear the consultee areas.';
 		}
-		return res.render(VIEW, await withStatus(service, files, viewModel));
-	};
-}
-
-export function buildRunImportCaseBoundaries(
-	service: ManageService,
-	files: BlobFiles = BLOB_STORAGE,
-	runImport: typeof importCaseBoundaries = importCaseBoundaries
-): AsyncRequestHandler {
-	const { logger } = service;
-	// loads run on the bulk client - their statements can take minutes (see ManageService.bulkDb)
-	const db = service.bulkDb ?? service.db;
-
-	return async (req, res) => {
-		const viewModel: ImportReferenceDataViewModel = { pageHeading: PAGE_HEADING };
-
-		try {
-			const { filePath, cleanup } = await files.download(CASE_BOUNDARIES_BLOB_NAME);
-			try {
-				// merged by id, not replacing the table: that would delete every boundary CBOS imported
-				viewModel.caseBoundariesImported = await runImport(db, filePath);
-			} finally {
-				await cleanup();
-			}
-		} catch (error) {
-			logger.error({ error }, 'Failed to import case boundaries from blob storage');
-			viewModel.error = 'Could not import case boundaries from blob storage.';
-		}
-
 		return res.render(VIEW, await withStatus(service, files, viewModel));
 	};
 }

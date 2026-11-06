@@ -64,12 +64,7 @@ describe('admin section', () => {
 		assert.match(response.text, /<h1 class="govuk-heading-l">Admin<\/h1>/);
 		assert.match(response.text, /href="\/admin" aria-current="page">Overview<\/a>/);
 		assert.match(response.text, /<a class="govuk-service-navigation__link" href="\/admin" aria-current="true">/);
-		for (const page of [
-			'/admin/database',
-			'/admin/upload-to-blob',
-			'/admin/import-reference-data',
-			'/admin/import-from-cbos'
-		]) {
+		for (const page of ['/admin/database', '/admin/upload-to-blob', '/admin/import-reference-data']) {
 			assert.match(response.text, new RegExp(`<h2[^>]*><a class="govuk-link" href="${page}">`));
 		}
 	});
@@ -129,8 +124,14 @@ describe('admin section', () => {
 	test('GET /admin/upload-to-blob renders the upload form in the admin layout', async () => {
 		const response = await request(app).get('/admin/upload-to-blob');
 		assert.equal(response.status, 200);
-		assert.match(response.text, /Upload a file to blob storage/);
-		assert.match(response.text, /aria-current="page">Upload to blob storage<\/a>/);
+		assert.match(response.text, /<h1 class="govuk-heading-l">Reference data files<\/h1>/);
+		assert.match(response.text, /aria-current="page">Reference data files<\/a>/);
+		// no copying set up here, so no Copy section, and no route to start one
+		assert.doesNotMatch(response.text, /Copy from/);
+		const agent = request.agent(app);
+		const token = /data-csrf-token="([^"]+)"/.exec((await agent.get('/admin/upload-to-blob')).text)?.[1];
+		assert.ok(token);
+		assert.equal((await agent.post('/admin/upload-to-blob/copy').type('form').send({ _csrf: token })).status, 404);
 	});
 
 	test("POST /admin/upload-to-blob/blocks and /commit take a file's parts with the page's CSRF token", async () => {

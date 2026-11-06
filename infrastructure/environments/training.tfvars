@@ -95,3 +95,6 @@ waf_rate_limits = {
 web_domains = {
   web = "consultees-training.planninginspectorate.gov.uk"
 }
+
+# the admin files page copies the reference data files from here (the Promote reference data pipeline)
+reference_data_copy_from = "Test"

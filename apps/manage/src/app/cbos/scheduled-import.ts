@@ -1,5 +1,5 @@
 import type { ManageService } from '#service';
-import { importCaseBoundariesFromCbos, importDb } from '../../cbos/cbos-boundaries.ts';
+import { importCaseBoundariesFromCbos, importDb } from './cbos-boundaries.ts';
 
 // how often the clock is looked at - an import starts within a minute of its hour
 const CHECK_EVERY_MS = 60_000;
@@ -44,8 +44,8 @@ const DEFAULT_DEPENDENCIES: ScheduledImportDependencies = {
 };
 
 /**
- * Import every CBOS boundary at each of `service.cbosImportHours` (UK time), as the admin page's
- * button does, so new cases, boundaries and stages arrive without anyone pressing it. Each hour's
+ * Import every CBOS boundary at each of `service.cbosImportHours` (UK time), so new cases,
+ * boundaries and stages arrive without anyone pressing Refresh cases on the search page. Each hour's
  * import runs once; one still running when the next is due isn't started again. Failures are
  * logged, never thrown - the next hour tries again. Returns a stop function, or undefined when no
  * hours are set (off).

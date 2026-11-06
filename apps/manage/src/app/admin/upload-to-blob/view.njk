@@ -2,9 +2,13 @@
 
 {% from "govuk/components/button/macro.njk" import govukButton %}
 {% from "govuk/components/date-input/macro.njk" import govukDateInput %}
+{% from "govuk/components/details/macro.njk" import govukDetails %}
 {% from "govuk/components/error-message/macro.njk" import govukErrorMessage %}
 {% from "govuk/components/file-upload/macro.njk" import govukFileUpload %}
 {% from "govuk/components/notification-banner/macro.njk" import govukNotificationBanner %}
+{% from "govuk/components/summary-list/macro.njk" import govukSummaryList %}
+{% from "govuk/components/tag/macro.njk" import govukTag %}
+{% from "govuk/components/warning-text/macro.njk" import govukWarningText %}
 
 {% block pageTitle %}
     {{ pageHeading }} - {{ config.headerTitle }}
@@ -36,7 +40,7 @@
                 id: "date-" ~ id,
                 namePrefix: "date",
                 fieldset: { legend: { text: "Date the data is from", classes: "govuk-fieldset__legend--s" } },
-                hint: { text: "Filled in from the file's name if it starts with the date, as the pipeline names its files: 20261020_" ~ group.slug ~ ".geojson." }
+                hint: { text: "Filled in from the file's name, as in 20261020_" ~ group.slug ~ ".geojson." }
             }) }}
         {% endif %}
 
@@ -48,40 +52,71 @@
 
 {% block adminContent %}
     <h1 class="govuk-heading-l">{{ pageHeading }}</h1>
-
     <p class="govuk-body">
-        Internal tool - uploads files to the application's own blob storage container
-        (<code>infrastructure/storage.tf</code>), using the app's managed identity, ready for
-        <a class="govuk-link" href="/admin/import-reference-data">loading into the database</a>.
+        The files in this environment's blob storage, one per group. Load them on
+        <a class="govuk-link" href="/admin/import-reference-data">Load into database</a>.
     </p>
 
     {% if uploadedBlobName %}
+        {{ govukNotificationBanner({ type: "success", titleText: "Success", text: "Uploaded " ~ uploadedBlobName ~ "." }) }}
+    {% endif %}
+    {% if copy.notice == "started" %}
         {{ govukNotificationBanner({
             type: "success",
             titleText: "Success",
-            text: "Uploaded \"" + uploadedBlobName + "\" to blob storage."
+            text: "Started copying the files from " ~ copy.from ~ "." ~ (" It needs approving in Azure DevOps first." if copy.needsApproval else "")
         }) }}
+    {% elif copy.notice == "running" %}
+        {{ govukNotificationBanner({ titleText: "Important", text: "A copy from " ~ copy.from ~ " is already running." }) }}
     {% endif %}
 
     {% if error %}
         {{ govukErrorMessage({ text: error }) }}
     {% endif %}
 
-    <h2 class="govuk-heading-m">Consultee areas, by group</h2>
-    <p class="govuk-body">
-        The reference data comes as a file per group - the report's tabs, as
-        <code>config/reference-data.yaml</code> sets them. Each is saved named for the date its data is
-        from and its group, replacing any file of that name.
-    </p>
+    {% if copy %}
+        <h2 class="govuk-heading-m">Copy from {{ copy.from }}</h2>
+        <p class="govuk-body">
+            Copies the files {{ copy.from }} loaded for the quarter it's using into this environment's blob
+            storage, through the Promote reference data pipeline. Nothing is loaded until you load it.
+        </p>
 
+        {% if copy.error %}
+            {{ govukWarningText({ text: copy.error, iconFallbackText: "Warning" }) }}
+        {% endif %}
+
+        {% if copy.latest %}
+            {{ govukSummaryList({
+                classes: "govuk-summary-list--no-border",
+                rows: [
+                    { key: { text: "Last copy" }, value: { html: govukTag({ text: copy.latest.status.text, classes: "govuk-tag--" ~ copy.latest.status.colour }) } },
+                    { key: { text: "Started" }, value: { text: copy.latest.queuedAt } },
+                    { key: { text: "Finished" }, value: { text: copy.latest.finishedAt or "Not yet" } },
+                    { key: { text: "Run" }, value: { html: '<a class="govuk-link" href="' ~ (copy.latest.url | escape) ~ '">View in Azure DevOps</a>' } }
+                ]
+            }) }}
+        {% endif %}
+
+        {% if not copy.running %}
+            <form method="post" action="/admin/upload-to-blob/copy" novalidate>
+                <input type="hidden" name="_csrf" value="{{ _csrf }}">
+                {{ govukButton({ text: "Copy the files from " ~ copy.from, classes: "govuk-button--secondary", preventDoubleClick: true }) }}
+            </form>
+        {% endif %}
+    {% endif %}
+
+    <h2 class="govuk-heading-m">Upload a file</h2>
     {% for group in groups %}
-        <h3 class="govuk-heading-s">{{ group.name }}</h3>
-        <p class="govuk-body-s">{{ group.categories }}</p>
-        {{ uploadForm(group.slug, "Upload " ~ group.name, "Upload the " ~ group.name ~ " file", "Up to 1GB.", group) }}
+        {% set form %}
+            <p class="govuk-body-s">{{ group.categories }}</p>
+            {{ uploadForm(group.slug, "Upload " ~ group.name, "The " ~ group.name ~ " file", "Up to 1GB.", group) }}
+        {% endset %}
+        {{ govukDetails({ summaryText: group.name, html: form }) }}
     {% endfor %}
-
-    <h2 class="govuk-heading-m">Another file</h2>
-    {{ uploadForm("another", "Upload", "Upload a file", "Up to 1GB. Saved under its own name - the case boundaries as all-project-boundaries.geojson.") }}
+    {% set another %}
+        {{ uploadForm("another", "Upload", "A file", "Up to 1GB. Saved under its own name.") }}
+    {% endset %}
+    {{ govukDetails({ summaryText: "Another file", html: another }) }}
 {% endblock %}
 
 {% block bodyEnd %}

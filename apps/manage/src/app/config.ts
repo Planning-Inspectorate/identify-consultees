@@ -38,6 +38,11 @@ export interface Config extends BaseConfig {
 	// CBOS_SUBSCRIBER_ENABLED=true and the namespace and subscription are set: the staging slot has
 	// it off (infrastructure/app-web.tf), so only the live app takes the messages
 	cbosSubscriber?: CbosSubscriberSettings;
+	// the environment this one's reference data files are copied from, on the admin files page -
+	// Training's from Test, Prod's from Training - by starting the Promote reference data pipeline
+	// (admin/upload-to-blob/copy-pipeline.ts). Undefined - no Copy section - unless
+	// REFERENCE_DATA_COPY_FROM and AZURE_DEVOPS_PROJECT_URL are set
+	referenceDataCopy?: ReferenceDataCopySettings;
 	// whether the prototype/debug pages are mounted (/map-layers-demo, /components,
 	// /consultee-areas-python, /consultee-areas-direct). On by default outside production; set
 	// ENABLE_DEV_PAGES=true to enable them on a deployed environment running NODE_ENV=production
@@ -49,8 +54,8 @@ export interface Config extends BaseConfig {
 	// NODE_ENV=production, so that alone can't gate them. TEMPORARY - remove before go-live
 	// (see kt-docs/overview.md's "Before go-live").
 	testFaultsEnabled: boolean;
-	// the hours of the day, UK time, the app imports every CBOS boundary on its own - as the admin
-	// page's button does (admin/import-from-cbos/scheduled-import.ts). From CBOS_IMPORT_HOURS
+	// the hours of the day, UK time, the app imports every CBOS boundary on its own
+	// (cbos/scheduled-import.ts). From CBOS_IMPORT_HOURS
 	// ("7,10,13,16,19"); empty - off - unless set, and the staging slot has it off
 	// (infrastructure/app-web.tf), so only the live app imports
 	cbosImportHours: number[];
@@ -100,6 +105,28 @@ export function cbosSubscriberSettings(env: NodeJS.ProcessEnv): CbosSubscriberSe
 		return undefined;
 	}
 	return { namespace, topic: env.CBOS_SERVICE_BUS_TOPIC?.trim() || 'nsip-document', subscription };
+}
+
+/** Where the Promote reference data pipeline copies this environment's files from, and the project it's in. */
+export interface ReferenceDataCopySettings {
+	/** The Azure DevOps project, as https://dev.azure.com/planninginspectorate/identify-consultees. */
+	projectUrl: string;
+	/** The pipeline's routes: Test to Training, Training to Prod. */
+	from: 'Test' | 'Training';
+	to: 'Training' | 'Prod';
+}
+
+/** Where this environment's reference data files are copied from, when set; a route the pipeline doesn't have throws. */
+export function referenceDataCopySettings(env: NodeJS.ProcessEnv): ReferenceDataCopySettings | undefined {
+	const from = env.REFERENCE_DATA_COPY_FROM?.trim();
+	const projectUrl = env.AZURE_DEVOPS_PROJECT_URL?.trim().replace(/\/+$/, '');
+	if (!from || !projectUrl) {
+		return undefined;
+	}
+	if (from !== 'Test' && from !== 'Training') {
+		throw new Error(`REFERENCE_DATA_COPY_FROM must be Test or Training, not "${from}"`);
+	}
+	return { projectUrl, from, to: from === 'Test' ? 'Training' : 'Prod' };
 }
 
 // cache the config
@@ -201,6 +228,7 @@ export function loadConfig(): Config {
 		testFaultsEnabled: ENVIRONMENT !== 'prod',
 		cbosImportHours: parseImportHours(CBOS_IMPORT_HOURS),
 		cbosSubscriber: cbosSubscriberSettings(process.env),
+		referenceDataCopy: referenceDataCopySettings(process.env),
 		auth: {
 			authority: `https://login.microsoftonline.com/${AUTH_TENANT_ID}`,
 			clientId: AUTH_CLIENT_ID || '',

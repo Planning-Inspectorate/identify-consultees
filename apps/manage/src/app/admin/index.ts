@@ -10,7 +10,6 @@ import {
 	buildConsulteeAreasPage,
 	buildDatabaseOverviewPage
 } from './database/controller.ts';
-import { createRoutes as createImportFromCbosRoutes } from './import-from-cbos/index.ts';
 import { createRoutes as createImportReferenceDataRoutes } from './import-reference-data/index.ts';
 import { ADMIN_PAGES, adminNavigation } from './navigation.ts';
 import { createRoutes as createUploadToBlobRoutes } from './upload-to-blob/index.ts';
@@ -47,7 +46,6 @@ export function createAdminRoutes(service: ManageService): IRouter {
 	router.get('/database/case-boundaries/:id', asyncHandler(buildCaseBoundaryRowPage(service)));
 	router.use('/upload-to-blob', createUploadToBlobRoutes(service));
 	router.use('/import-reference-data', createImportReferenceDataRoutes(service));
-	router.use('/import-from-cbos', createImportFromCbosRoutes(service));
 
 	return router;
 }

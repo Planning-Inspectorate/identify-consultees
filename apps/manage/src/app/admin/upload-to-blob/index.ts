@@ -11,8 +11,12 @@ import {
 	buildStageBlock,
 	buildUploadToBlobPage,
 	CHUNK_BYTES,
-	MAX_UPLOAD_BYTES
+	MAX_UPLOAD_BYTES,
+	renderWithCopyError
 } from './controller.ts';
+import type { CopyPipeline } from './copy-pipeline.ts';
+import { azureDevOpsCopyPipeline } from './copy-pipeline.ts';
+import { buildStartCopy } from './copy.ts';
 
 // disk, not memory storage - a multi-hundred-MB file shouldn't be held in process memory. The
 // temp file is removed by the controller after the blob upload completes, whether it succeeds or
@@ -29,13 +33,23 @@ const part = express.raw({ type: 'application/octet-stream', limit: CHUNK_BYTES 
 export function createRoutes(
 	service: ManageService,
 	uploadFile?: BlobUploader,
-	uploadsFor?: (blobStoreConfig: BlobStoreConfig) => BlockUploads
+	uploadsFor?: (blobStoreConfig: BlobStoreConfig) => BlockUploads,
+	copyPipeline: CopyPipeline | undefined = service.referenceDataCopy
+		? azureDevOpsCopyPipeline(service.referenceDataCopy)
+		: undefined
 ): IRouter {
 	const router = createRouter({ mergeParams: true });
-	const uploadToBlobPage = buildUploadToBlobPage();
+	const uploadToBlobPage = buildUploadToBlobPage(service, copyPipeline);
 	const runUploadToBlob = buildRunUploadToBlob(service, uploadFile);
 
 	router.get('/', asyncHandler(uploadToBlobPage));
+	// start the Promote reference data pipeline, copying the previous environment's files here -
+	// only where it's set up: Training and Prod
+	const copySettings = service.referenceDataCopy;
+	if (copySettings && copyPipeline) {
+		const renderPage = renderWithCopyError(service, copyPipeline);
+		router.post('/copy', asyncHandler(buildStartCopy(copySettings, copyPipeline, service, renderPage)));
+	}
 	// without JavaScript: the whole file in one request - fine for a small one
 	router.post('/run', upload.single('file'), asyncHandler(runUploadToBlob));
 	// with it (public/javascripts/blob-upload.js): the file a part at a time, then committed

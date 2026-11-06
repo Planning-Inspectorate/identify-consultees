@@ -532,6 +532,8 @@ test.describe('manage journeys', () => {
 			}
 		});
 		await page.goto('/admin/upload-to-blob');
+		// each form is folded away under its group's name
+		await page.getByText('Another file', { exact: true }).click();
 		const form = page.locator('form[data-chunked-upload]:not([data-blob-group])');
 		// once the script has taken the form over - else it posts the whole file
 		await expect(form).toHaveAttribute('data-upload-enhanced', '');
@@ -561,6 +563,7 @@ test.describe('manage journeys', () => {
 			}
 		});
 		await page.goto('/admin/upload-to-blob');
+		await page.getByText('Energy', { exact: true }).click();
 		const form = page.locator('form[data-blob-group="energy"]');
 		await expect(form).toHaveAttribute('data-upload-enhanced', '');
 		await page.setInputFiles('#file-energy', {
