@@ -53,7 +53,7 @@ describe('fingerprint-assets', () => {
 		await mkdir(path.join(tempDir, 'javascripts'), { recursive: true });
 		await writeFile(path.join(tempDir, 'assets', 'js', 'govuk-frontend.min.js'), 'console.log("govuk");\n');
 		await writeFile(path.join(tempDir, 'javascripts', 'consultees-map.js'), 'export const ok = true;\n');
-		await writeFile(path.join(tempDir, 'javascripts', 'map-layers-demo.js'), 'export const demo = true;\n');
+		await writeFile(path.join(tempDir, 'javascripts', 'example-app.js'), 'export const demo = true;\n');
 		await writeFile(path.join(tempDir, 'style-aabbccdd.css'), 'body{color:red}');
 		await writeFile(path.join(tempDir, 'assets', 'images', 'keep.png'), Buffer.from([1, 2, 3]));
 		await mkdir(path.join(tempDir, 'vendor', 'map-key-plugin', 'js'), { recursive: true });
@@ -64,7 +64,7 @@ describe('fingerprint-assets', () => {
 
 		assert.match(manifest.assets['assets/js/govuk-frontend.min.js'], /govuk-frontend\.min-[0-9a-f]{8}\.js/);
 		assert.match(manifest.assets['javascripts/consultees-map.js'], /consultees-map-[0-9a-f]{8}\.js/);
-		assert.match(manifest.assets['javascripts/map-layers-demo.js'], /map-layers-demo-[0-9a-f]{8}\.js/);
+		assert.match(manifest.assets['javascripts/example-app.js'], /example-app-[0-9a-f]{8}\.js/);
 		assert.equal(manifest.assets['style.css'], 'style-aabbccdd.css');
 		assert.match(manifest.assets['vendor/map-key-plugin/js/index.js'], /index-[0-9a-f]{8}\.js/);
 		assert.equal(manifest.assets['vendor/map-key-plugin/js/6924.js'], undefined);
@@ -88,7 +88,7 @@ describe('fingerprint-assets', () => {
 			styleFile: 'style.css',
 			govukFrontendJs: 'assets/js/govuk-frontend.min.js',
 			consulteesMapJs: 'javascripts/consultees-map.js',
-			mapLayersDemoJs: 'javascripts/map-layers-demo.js',
+			blobUploadJs: 'javascripts/blob-upload.js',
 			vendorMapKeyPluginJs: 'vendor/map-key-plugin/js/index.js',
 			headerTitle: 'Identify consultees',
 			footerLinks: []
@@ -104,7 +104,7 @@ describe('fingerprint-assets', () => {
 				'style.css': 'style-deadbeef.css',
 				'assets/js/govuk-frontend.min.js': 'assets/js/govuk-frontend.min-cafebabe.js',
 				'javascripts/consultees-map.js': 'javascripts/consultees-map-01234567.js',
-				'javascripts/map-layers-demo.js': 'javascripts/map-layers-demo-89abcdef.js',
+				'javascripts/blob-upload.js': 'javascripts/blob-upload-89abcdef.js',
 				'vendor/map-key-plugin/js/index.js': 'vendor/map-key-plugin/js/index-13579bdf.js'
 			}
 		});
@@ -113,20 +113,20 @@ describe('fingerprint-assets', () => {
 		assert.match(updated, /styleFile: 'style-deadbeef\.css'/);
 		assert.match(updated, /govukFrontendJs: 'assets\/js\/govuk-frontend\.min-cafebabe\.js'/);
 		assert.match(updated, /consulteesMapJs: 'javascripts\/consultees-map-01234567\.js'/);
-		assert.match(updated, /mapLayersDemoJs: 'javascripts\/map-layers-demo-89abcdef\.js'/);
+		assert.match(updated, /blobUploadJs: 'javascripts\/blob-upload-89abcdef\.js'/);
 		assert.match(updated, /vendorMapKeyPluginJs: 'vendor\/map-key-plugin\/js\/index-13579bdf\.js'/);
 	});
 
 	test('fingerprintAndCompressStaticAssets skips test files, sidecars, and already-hashed assets', async () => {
 		tempDir = await mkdtemp(path.join(tmpdir(), 'fingerprint-skip-'));
 		await mkdir(path.join(tempDir, 'javascripts'), { recursive: true });
-		await writeFile(path.join(tempDir, 'javascripts', 'map-layers-demo.test.js'), 'export const test = true;\n');
+		await writeFile(path.join(tempDir, 'javascripts', 'example-app.test.js'), 'export const test = true;\n');
 		await writeFile(path.join(tempDir, 'javascripts', 'already-aabbccdd.js'), 'export const hashed = true;\n');
 		await writeFile(path.join(tempDir, 'javascripts', 'already-aabbccdd.js.br'), 'br');
 		await writeFile(path.join(tempDir, 'readme.txt'), 'plain text');
 
 		const manifest = await fingerprintAndCompressStaticAssets(tempDir);
-		assert.equal(manifest.assets['javascripts/map-layers-demo.test.js'], undefined);
+		assert.equal(manifest.assets['javascripts/example-app.test.js'], undefined);
 		assert.equal(manifest.assets['javascripts/already-aabbccdd.js'], undefined);
 		assert.equal(manifest.assets['readme.txt'], undefined);
 	});

@@ -14,10 +14,10 @@ import { createHash } from 'node:crypto';
  * rate-limit aggressive clients. Prefer long reuse plus validators over
  * re-fetching tiles on every noscript / progressive-enhancement hit.
  *
- * `public` is only for images whose contents are not access-controlled
- * (the /components showcase examples): a shared cache (Front Door, which
- * caches this route - see infrastructure/front-door.tf) may serve them to
- * anyone holding the URL, without a session.
+ * `public` is only for images whose contents are not access-controlled:
+ * a shared cache (Front Door, which caches this route - see
+ * infrastructure/front-door.tf) may serve them to anyone holding the URL,
+ * without a session.
  */
 export const STATIC_MAP_CACHE_CONTROL = 'public, max-age=3600, stale-while-revalidate=86400';
 

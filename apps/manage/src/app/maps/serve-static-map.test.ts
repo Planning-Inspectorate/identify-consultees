@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { afterEach, describe, it, mock } from 'node:test';
-import { buildConsulteeAreaGeojson, buildProjectSiteGeojson } from './sample-geojson.ts';
+import type { GeoJsonFeatureCollection } from './sample-geojson.ts';
 import { buildConsulteeStaticMapResponse } from './serve-static-map.ts';
 import { clearOsmTileCacheForTests, osmTileCacheSizeForTests } from './static-map.ts';
 
@@ -8,6 +8,63 @@ const tinyPng = Buffer.from(
 	'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
 	'base64'
 );
+
+function squareAround(lng: number, lat: number, halfSizeDegrees: number): number[][][] {
+	return [
+		[
+			[lng - halfSizeDegrees, lat - halfSizeDegrees],
+			[lng + halfSizeDegrees, lat - halfSizeDegrees],
+			[lng + halfSizeDegrees, lat + halfSizeDegrees],
+			[lng - halfSizeDegrees, lat + halfSizeDegrees],
+			[lng - halfSizeDegrees, lat - halfSizeDegrees]
+		]
+	];
+}
+
+// prototype polygons near the Dorset coast (Navitus Bay area)
+function buildProjectSiteGeojson(reference: string, caseName: string): GeoJsonFeatureCollection {
+	return {
+		type: 'FeatureCollection',
+		features: [
+			{
+				type: 'Feature',
+				id: 'project-site',
+				properties: {
+					name: caseName,
+					reference,
+					layer: 'project-site'
+				},
+				geometry: {
+					type: 'Polygon',
+					coordinates: squareAround(-1.78, 50.62, 0.04)
+				}
+			}
+		]
+	};
+}
+
+function buildConsulteeAreaGeojson(
+	category: string,
+	areas: { name: string; code: string; offsetLng: number; offsetLat: number; size: number }[]
+): GeoJsonFeatureCollection {
+	return {
+		type: 'FeatureCollection',
+		features: areas.map((area, index) => ({
+			type: 'Feature',
+			id: `${category}-${index}`,
+			properties: {
+				name: area.name,
+				referenceAreaCode: area.code,
+				referenceAreaName: area.name,
+				consulteeCategory: category
+			},
+			geometry: {
+				type: 'Polygon',
+				coordinates: squareAround(-1.78 + area.offsetLng, 50.62 + area.offsetLat, area.size)
+			}
+		}))
+	};
+}
 
 function requestHostname(input: RequestInfo | URL): string {
 	const href = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;

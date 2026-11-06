@@ -468,14 +468,6 @@ test.describe('manage journeys', () => {
 		await expect(page.getByRole('link', { name: 'Back', exact: true })).toBeVisible();
 	});
 
-	test('map layers demo page renders layer summaries', async ({ page }) => {
-		await page.goto('/map-layers-demo');
-		await expect(page.getByRole('heading', { level: 1 })).toHaveText('Map layers demo');
-		await expect(page.getByRole('rowheader', { name: 'Railway lines' })).toBeVisible();
-		await expect(page.getByRole('rowheader', { name: 'Road network' })).toBeVisible();
-		await expect(page.locator('.app-map-layers-demo')).toBeVisible();
-	});
-
 	test('two parish councils of the same name are offered at once, then listed and mapped apart', async ({ page }) => {
 		const db = newDatabaseClient(connectionString);
 		try {

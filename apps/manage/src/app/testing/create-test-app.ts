@@ -30,8 +30,6 @@ export function buildManageTestConfig(authDisabled = true, overrides: Partial<Co
 		nearbyConsulteeRadiusMetres: 20_000,
 		cbosImportHours: [],
 		nearbyNsipRadiusMetres: 10_000,
-		devPagesEnabled: true,
-		testFaultsEnabled: true,
 		auth: {
 			authority: 'https://login.microsoftonline.com/tenant-id',
 			clientId: 'client-id',
@@ -77,10 +75,7 @@ export function createManageTestApp(service: ManageService, options: CreateManag
 		service,
 		configureNunjucks,
 		router: buildRouter(service, { authRateLimiter }),
-		middlewares: [
-			createStaticAssetsMiddleware(service.assetsStaticDir),
-			addLocalsConfiguration({ devPagesEnabled: service.devPagesEnabled })
-		],
+		middlewares: [createStaticAssetsMiddleware(service.assetsStaticDir), addLocalsConfiguration()],
 		multiPartFormRoutes: ADMIN_MULTIPART_ROUTES
 	});
 }

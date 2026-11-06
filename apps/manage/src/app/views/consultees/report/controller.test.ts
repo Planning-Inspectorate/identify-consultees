@@ -571,45 +571,6 @@ describe('report created page', () => {
 		assert.match(mockRes.render.mock.calls[0].result, /\(ZIP, [\d.]+[KM]B\)/);
 	});
 
-	it('should fail to build the report while the test-fail=download fault is set', async () => {
-		const db = dbReturning([[realProjectRow()]]);
-		const nunjucks = configureNunjucks();
-		const mockRes = {
-			status: mock.fn(() => mockRes),
-			render: mock.fn((view, data) => nunjucks.render(view, data))
-		};
-		const handler = buildReportCreatedPage({
-			db,
-			logger: mockLogger(),
-			nearbyConsulteeRadiusMetres: 20_000,
-			nearbySearchRadiusMetres: 20_000,
-			rulesetRunner: rulesetRunnerReturning([parishRow()]),
-			testFaultsEnabled: true
-		});
-		await handler(
-			{
-				params: { caseId: realProjectId },
-				// a URL no other test uses - a kept copy would hide that the build was skipped
-				query: { exclude: 'abababab-0000-0000-0000-000000000042', 'test-fail': 'download' },
-				session: {}
-			},
-			mockRes
-		);
-
-		// the build never ran, so nothing is kept for the download, and the page shows the
-		// failure state straight away - error summary, error, no download link
-		assert.strictEqual(db.consulteeArea.findMany.mock.callCount(), 0);
-		const viewModel = mockRes.render.mock.calls[0].arguments[1];
-		assert.strictEqual(rememberedReportZip(viewModel.downloadUrl), undefined);
-		assert.strictEqual(viewModel.downloadFailed, true);
-		assert.strictEqual(viewModel.pageHeading, 'Report could not be created');
-		const html = mockRes.render.mock.calls[0].result;
-		assert.match(html, /govuk-error-summary/);
-		assert.match(html, /The report could not be created – try again/);
-		assert.doesNotMatch(html, /govuk-panel/);
-		assert.doesNotMatch(html, /report\/download/);
-	});
-
 	it('should show a govuk error summary, and no download link, when the download itself failed', async () => {
 		const { handler, mockRes } = createdPage([parishRow()]);
 		await handler(

@@ -9,7 +9,6 @@
 import { fetchWithTimeout } from '@planning-inspectorate/core/util';
 import type { Response } from 'express';
 import {
-	STATIC_MAP_CACHE_CONTROL,
 	STATIC_MAP_CACHE_CONTROL_PRIVATE,
 	buildStaticMapFingerprint,
 	etagFromFingerprint,
@@ -73,14 +72,6 @@ export type BuildConsulteeStaticMapOptions = {
 	googleMapsApiKey?: string;
 	ifNoneMatch?: string;
 	accept?: string;
-	/**
-	 * True only for images that are safe for shared caches (Front Door) to
-	 * serve without a session - i.e. content that isn't access-controlled,
-	 * such as the /components showcase examples. Case-derived images must
-	 * stay `private` (the default): a shared-cached copy would bypass the
-	 * auth guards for anyone holding the URL.
-	 */
-	sharedCache?: boolean;
 };
 
 async function fetchGoogleBasemap(url: string): Promise<Buffer | undefined> {
@@ -107,7 +98,7 @@ export async function buildConsulteeStaticMapResponse(
 	const width = options.map.width ?? 960;
 	const height = options.map.height ?? 516;
 
-	const cacheControl = options.sharedCache === true ? STATIC_MAP_CACHE_CONTROL : STATIC_MAP_CACHE_CONTROL_PRIVATE;
+	const cacheControl = STATIC_MAP_CACHE_CONTROL_PRIVATE;
 
 	const fingerprintInput: StaticMapFingerprintInput = {
 		geometryId: options.geometryId,

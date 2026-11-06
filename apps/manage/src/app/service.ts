@@ -108,16 +108,6 @@ export class ManageService extends BaseService<PrismaClient> {
 		});
 	}
 
-	/** Whether the prototype/debug pages are mounted - see Config.devPagesEnabled. */
-	get devPagesEnabled(): boolean {
-		return this.#config.devPagesEnabled;
-	}
-
-	/** Whether the ?test-fail= fault triggers are honoured - see Config.testFaultsEnabled. */
-	get testFaultsEnabled(): boolean {
-		return this.#config.testFaultsEnabled;
-	}
-
 	/**
 	 * Built asset root (fingerprinted + Brotli sidecars). Used by our static middleware.
 	 */

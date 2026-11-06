@@ -15,7 +15,6 @@ import { getRuleset, RULESETS } from '@pins/identify-consultees-database/src/geo
 import type { Geometry } from '@pins/identify-consultees-database/src/geospatial/wkt.ts';
 import type { MapMatch, SearchAreaDisplay } from '../../maps/case-geojson.ts';
 import { findNearbyNsips, isNearbyNsip } from './nearby-nsips.ts';
-import { activeTestFault } from './test-faults.ts';
 
 /**
  * Shared plumbing for the consultee pages that run a ruleset (the project map page and the
@@ -81,7 +80,7 @@ function storedRun(
 
 /** What a ruleset run needs from the service. No Nearby NSIPs distance means none are looked for. */
 export type RulesetRunService = Pick<ManageService, 'db' | 'logger' | 'rulesetRunner' | 'nearbyConsulteeRadiusMetres'> &
-	Partial<Pick<ManageService, 'nearbyNsipRadiusMetres' | 'testFaultsEnabled'>>;
+	Partial<Pick<ManageService, 'nearbyNsipRadiusMetres'>>;
 
 /**
  * Run the ruleset in the Python function (see ruleset-runner.ts), and add the Nearby NSIPs - other
@@ -103,12 +102,6 @@ export async function runRulesetSafely(
 	ruleset: Ruleset,
 	store?: RulesetRunStore
 ): Promise<RulesetRun> {
-	// the QA fault trigger (test-faults.ts) wins over a kept run: an outage hits whatever the
-	// session holds - and a forced failure is never kept, so clearing it runs the ruleset again
-	if (activeTestFault(service, store) === 'ruleset') {
-		service.logger.error({ caseId: project.id, rulesetId: ruleset.id }, 'test-fail=ruleset: forced ruleset failure');
-		return { consultees: [], failed: true, siteScreenedAs: 'outline' };
-	}
 	const stored = storedRun(store, project, ruleset);
 	if (stored) {
 		return { consultees: stored.consultees, failed: false, siteScreenedAs: stored.siteScreenedAs ?? 'outline' };

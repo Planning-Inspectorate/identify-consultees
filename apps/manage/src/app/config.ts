@@ -7,7 +7,7 @@ import { loadScreeningConfig } from './screening-config.ts';
 export interface Config extends BaseConfig {
 	appHostname: string;
 	// the URL of the Python function app's consultee-areas endpoint - see apps/function-python
-	// undefined if not configured; only the consultee-areas-python page needs this, so its absence
+	// undefined if not configured - the screening pages degrade to a setup note, so its absence
 	// shouldn't crash the whole app at boot (see its controller for the fallback behaviour)
 	pythonFunctionUrl: string | undefined;
 	// shared secret the Python function requires on its data route (sent as x-api-key) - see
@@ -43,19 +43,8 @@ export interface Config extends BaseConfig {
 	// (admin/upload-to-blob/copy-pipeline.ts). Undefined - no Copy section - unless
 	// REFERENCE_DATA_COPY_FROM and AZURE_DEVOPS_PROJECT_URL are set
 	referenceDataCopy?: ReferenceDataCopySettings;
-	// whether the prototype/debug pages are mounted (/map-layers-demo, /components,
-	// /consultee-areas-python, /consultee-areas-direct). On by default outside production; set
-	// ENABLE_DEV_PAGES=true to enable them on a deployed environment running NODE_ENV=production
-	// (e.g. reviewing component examples on test/training).
-	devPagesEnabled: boolean;
-	// whether the ?test-fail= triggers (views/consultees/test-faults.ts) are honoured, for QA
-	// exercising the service's error states. On everywhere but the prod deployment (the
-	// ENVIRONMENT app setting - infrastructure/app-web.tf); test and training run
-	// NODE_ENV=production, so that alone can't gate them. TEMPORARY - remove before go-live
-	// (see kt-docs/overview.md's "Before go-live").
-	testFaultsEnabled: boolean;
-	// the hours of the day, UK time, the app imports every CBOS boundary on its own
-	// (cbos/scheduled-import.ts). From CBOS_IMPORT_HOURS
+	// the hours of the day, UK time, the app imports every CBOS boundary on its own - as the admin
+	// page's button does (admin/import-from-cbos/scheduled-import.ts). From CBOS_IMPORT_HOURS
 	// ("7,10,13,16,19"); empty - off - unless set, and the staging slot has it off
 	// (infrastructure/app-web.tf), so only the live app imports
 	cbosImportHours: number[];
@@ -163,8 +152,6 @@ export function loadConfig(): Config {
 		CBOS_IMPORT_HOURS,
 		BLOB_STORE_CONTAINER,
 		CACHE_CONTROL_MAX_AGE,
-		ENABLE_DEV_PAGES,
-		ENVIRONMENT,
 		GIT_SHA,
 		LOG_LEVEL,
 		PORT,
@@ -224,8 +211,6 @@ export function loadConfig(): Config {
 		nearbyRadiusMetresByCategory: nearbyConsultees.radiusMetresByCategory,
 		nearbyNsipRadiusMetres: nearbyConsultees.nsipRadiusMetres,
 		boundingBoxAbovePoints: screening.boundingBoxAbovePoints,
-		devPagesEnabled: !isProduction || ENABLE_DEV_PAGES === 'true',
-		testFaultsEnabled: ENVIRONMENT !== 'prod',
 		cbosImportHours: parseImportHours(CBOS_IMPORT_HOURS),
 		cbosSubscriber: cbosSubscriberSettings(process.env),
 		referenceDataCopy: referenceDataCopySettings(process.env),

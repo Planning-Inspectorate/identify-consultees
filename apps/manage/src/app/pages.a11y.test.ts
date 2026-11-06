@@ -1,12 +1,5 @@
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
-import {
-	createGovukNunjucksEnvironment,
-	getVisibleFixtures,
-	loadComponentCatalogue,
-	renderGovukComponent,
-	scopeFixtureIds
-} from './govuk-frontend-components.ts';
 import { configureNunjucks } from './nunjucks.ts';
 import { assertNoSeriousA11yViolations, pageLocals } from './testing/a11y.ts';
 import { helpViewModel } from './views/help/index.ts';
@@ -42,23 +35,6 @@ describe('manage page accessibility smoke', () => {
 		const html = nunjucks.render('views/errors/500.njk', {
 			...pageLocals,
 			pageHeading: 'Sorry, there is a problem with the service'
-		});
-		await assertNoSeriousA11yViolations(html);
-	});
-
-	test('error scenarios index page has no serious a11y violations', async () => {
-		const html = nunjucks.render('views/error-test/view.njk', {
-			...pageLocals,
-			pageHeading: 'Error scenarios',
-			statusPages: [
-				{ href: '/error-test/401', label: '401', description: 'the login problem page' },
-				{ href: '/error-test/500', label: '500', description: 'deliberately throws' }
-			],
-			livePages: [{ href: '/unauthenticated', label: 'Login problem', description: 'the real 401 route' }],
-			csrfCheckAction: '/error-test/csrf-check',
-			rateLimitedHref: '/error-test/rate-limited',
-			// render the success banner too so both states are covered
-			csrfAccepted: true
 		});
 		await assertNoSeriousA11yViolations(html);
 	});
@@ -508,150 +484,10 @@ describe('manage page accessibility smoke', () => {
 		await assertNoSeriousA11yViolations(html);
 	});
 
-	test('components index page has no serious a11y violations', async () => {
-		const html = nunjucks.render('views/components/view.njk', {
-			...pageLocals,
-			pageHeading: 'GOV.UK Frontend components',
-			interactiveMapHref: '/components/interactive-map',
-			components: [
-				{ name: 'button', title: 'Button', href: '/components/button', exampleCount: 22 },
-				{ name: 'tag', title: 'Tag', href: '/components/tag', exampleCount: 9 }
-			]
-		});
-		await assertNoSeriousA11yViolations(html);
-	});
-
-	test('component detail page has no serious a11y violations', async () => {
-		const env = createGovukNunjucksEnvironment();
-		const entry = loadComponentCatalogue().find((item) => item.component === 'checkboxes');
-		assert.ok(entry);
-		const examples = getVisibleFixtures(entry).map((fixture, index) => ({
-			name: fixture.name,
-			html: scopeFixtureIds(renderGovukComponent(env, 'checkboxes', fixture.options), `checkboxes-${index}`)
-		}));
-
-		const html = nunjucks.render('views/components/component.njk', {
-			...pageLocals,
-			pageHeading: 'Checkboxes',
-			componentName: 'checkboxes',
-			backLinkUrl: '/components',
-			backLinkText: 'Back to components',
-			examples
-		});
-		await assertNoSeriousA11yViolations(html);
-	});
-
-	test('interactive map examples index page has no serious a11y violations', async () => {
-		const html = nunjucks.render('views/interactive-map-examples/view.njk', {
-			...pageLocals,
-			pageHeading: 'Interactive map',
-			backLinkUrl: '/components?components=true',
-			backLinkText: 'Back to components',
-			examples: [
-				{
-					id: 'basic',
-					title: 'Basic map',
-					summary: 'A minimal inline map.',
-					href: '/components/interactive-map/basic?components=true',
-					behaviourLabel: 'Inline',
-					pluginsLabel: 'None'
-				}
-			]
-		});
-		await assertNoSeriousA11yViolations(html);
-	});
-
-	test('interactive map example page has no serious a11y violations', async () => {
-		const html = nunjucks.render('views/interactive-map-examples/example.njk', {
-			...pageLocals,
-			pageHeading: 'Basic map',
-			backLinkUrl: '/components/interactive-map?components=true',
-			backLinkText: 'Back to interactive map examples',
-			summary: 'A minimal inline map on the default OpenFreeMap basemap.',
-			interaction: 'Pan with the mouse or arrow keys.',
-			mapId: 'interactive-map-example-basic',
-			mapRegionLabel: 'Map of the Dorset coast around the demo project site',
-			staticMapSrc: '/components/interactive-map/basic/static-map',
-			staticMapAlt: 'Static map of the Dorset coast centred on the demo project site.',
-			mapWidth: 960,
-			mapHeight: 516,
-			mapConfigJson: '{"kind":"basic","center":[-1.78,50.62],"zoom":11}',
-			pluginStylesheets: [],
-			pluginScripts: [],
-			behaviourLabel: 'Inline',
-			pluginsLabel: 'None'
-		});
-		await assertNoSeriousA11yViolations(html);
-		assert.match(html, /role="region"/);
-		assert.match(html, /<noscript>[\s\S]*<img/);
-	});
-
-	test('map layers demo page has no serious a11y violations', async () => {
-		const html = nunjucks.render('views/map-layers-demo/view.njk', {
-			...pageLocals,
-			pageHeading: 'Map layers demo',
-			mapId: 'map-layers-demo',
-			mapRegionLabel: 'Interactive map with toggleable overlay layers',
-			mapWidth: 960,
-			mapHeight: 516,
-			mapConfigJson: '{"center":[-1.78,50.62],"zoom":11}',
-			layerSummaries: [
-				{ label: 'Project site', description: 'Polygon overlay for the indicative project boundary.' },
-				{ label: 'Railway lines', description: 'Line overlays representing train tracks.' },
-				{ label: 'Road network', description: 'Line overlays representing roads.' },
-				{ label: 'Flood risk area', description: 'Polygon overlay for a constraint.' }
-			]
-		});
-		await assertNoSeriousA11yViolations(html);
-	});
-
 	test('firewall error page has no serious a11y violations', async () => {
 		const html = nunjucks.render('views/static/error/firewall-error.njk', {
 			...pageLocals,
 			pageHeading: 'Sorry, there is a problem with the service'
-		});
-		await assertNoSeriousA11yViolations(html);
-	});
-
-	test('consultee areas python page has no serious a11y violations', async () => {
-		const html = nunjucks.render('views/consultee-areas-python/view.njk', {
-			...pageLocals,
-			pageHeading: 'Consultee areas (Python function)',
-			_csrf: 'test-csrf',
-			rows: [
-				{
-					id: '1',
-					geometryType: 'Polygon',
-					sourceId: 'health_AMB_EW_00001',
-					consulteeCategory: 'Statutory',
-					consulteeGroup: 'Health',
-					consultee: 'Example Trust',
-					region: 'South West',
-					metadata: '{}',
-					lastUpdated: '2026-01-01',
-					geometryWkt: 'POLYGON((0 0,1 0,1 1,0 1,0 0))'
-				}
-			]
-		});
-		await assertNoSeriousA11yViolations(html);
-	});
-
-	test('consultee areas python page with an error has no serious a11y violations', async () => {
-		const html = nunjucks.render('views/consultee-areas-python/view.njk', {
-			...pageLocals,
-			pageHeading: 'Consultee areas (Python function)',
-			_csrf: 'test-csrf',
-			error: 'PYTHON_FUNCTION_URL is not configured'
-		});
-		await assertNoSeriousA11yViolations(html);
-	});
-
-	test('consultee areas python page with empty rows has no serious a11y violations', async () => {
-		const html = nunjucks.render('views/consultee-areas-python/view.njk', {
-			...pageLocals,
-			pageHeading: 'Consultee areas (Python function)',
-			_csrf: 'test-csrf',
-			rows: []
 		});
 		await assertNoSeriousA11yViolations(html);
 	});
