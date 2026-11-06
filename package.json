@@ -139,10 +139,5 @@
     "@defra/interactive-map": {
       "govuk-frontend": "^6.6.0"
     }
-  },
-  "allowScripts": {
-    "prisma@7.10.1": true,
-    "@prisma/engines@7.10.1": true,
-    "@parcel/watcher@2.6.0": true
   }
 }
