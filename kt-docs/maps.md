@@ -1,6 +1,6 @@
 # Maps
 
-"The map" means the interactive Defra Interactive Map. The "static map" is the server-rendered image shown without JavaScript or when the interactive map fails. The rules (static map caching, Defra gotchas, GIS styling) are in the Maps section of [AGENTS.md](../AGENTS.md); this page explains how the project maps are built.
+"The map" means the interactive Defra Interactive Map. The "static map" is the server-rendered image shown without JavaScript or when the interactive map fails. The rules (static map caching, Defra gotchas, GIS styling) are in [`docs/maps.md`](../docs/maps.md); this page explains how the project maps are built.
 
 | Mode        | How                                                                                                                                                                                                                                                                                                                                           |
 | ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

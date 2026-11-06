@@ -18,4 +18,4 @@ Terraform for the service's Azure resources, in four environments: **Dev**, **Te
 ## Pipelines
 
 - **Infrastructure** (`pipelines/`): `terraform-ci.yaml` and `terraform-ci-commit.yaml` check PRs, and `terraform-cd.yaml` plans and applies.
-- **Application** (`.azure/pipelines/`): build, deploy, rollback and data seed. Schema migrations and reference data loads run separately from app deploys: see "Database operations without redeploying the app" in [`AGENTS.md`](../AGENTS.md).
+- **Application** (`.azure/pipelines/`): build, deploy, rollback and data seed. Schema migrations and reference data loads run separately from app deploys: see "Database operations without redeploying the app" in [`kt-docs/deployment.md`](../kt-docs/deployment.md).
