@@ -23,6 +23,7 @@ import { buildConsulteeStaticMapResponse } from '../../../../maps/serve-static-m
 import { consulteeColours, projectColours } from '../../../../maps/static-map.ts';
 import { categorySettings } from '../../../../report-config.ts';
 import { isNearbyNsip, NEARBY_NSIPS } from '../../nearby-nsips.ts';
+import type { SearchAreaCache } from '../../run-ruleset.ts';
 import { buildSearchAreaSafely, RULESET_RUN_MAX_AGE_MS } from '../../run-ruleset.ts';
 import type { SiteBufferCache } from '../../site-buffers.ts';
 import { categoryBufferMetres, formatBufferDistance, siteBufferGeojson, siteBuffers } from '../../site-buffers.ts';
@@ -111,10 +112,14 @@ const MAP_FRAME_PADDING = 0.05;
 // about 1.75 times the OSM tiles of a plain map
 const MAP_PIXEL_RATIO = 1.5;
 
-/** A report being built: its context, and the buffers its maps have drawn, by distance - shared by its maps. */
+/**
+ * A report being built: its context, and the buffers and search areas its maps have drawn, by
+ * distance - shared by its maps.
+ */
 interface ReportMapsContext extends ReportZipContext {
 	siteScreenedAs: SiteScreenedAs;
 	buffers: SiteBufferCache;
+	searchAreas: SearchAreaCache;
 }
 
 /**
@@ -180,7 +185,8 @@ async function categoryMap(
 		project,
 		drawn,
 		service.nearbySearchRadiusMetres,
-		service.logger
+		service.logger,
+		context.searchAreas
 	);
 	const buffers = await siteBuffers(
 		service,
@@ -306,7 +312,8 @@ export async function buildReportZip({
 		consultees,
 		selection,
 		siteScreenedAs,
-		buffers: new Map()
+		buffers: new Map(),
+		searchAreas: new Map()
 	};
 	// one at a time: the maps frame the same view, so they share basemap tiles - fetched once,
 	// then cached (see AGENTS.md)

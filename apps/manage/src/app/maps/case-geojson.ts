@@ -31,6 +31,30 @@ function roundGeometry(geometry: Geometry): Geometry {
 	return { ...geometry, coordinates: roundCoordinates(geometry.coordinates as Coordinates) } as Geometry;
 }
 
+// a site is drawn whole up to this many points - about 1MB of a page. Past it, as the run screened
+// it, simplified to 10m: a 1,000,000-point linear scheme made a 24MB page, which a browser takes
+// seconds to download and draw, for detail no map shows
+export const SITE_DISPLAY_MAX_POINTS = 50_000;
+
+function pointCount(geometry: Geometry): number {
+	if (geometry.type === 'GeometryCollection') {
+		return geometry.geometries.reduce((total, part) => total + pointCount(part), 0);
+	}
+	// a position is an array of numbers; anything else, an array of positions or of their arrays
+	const count = (value: Coordinates): number =>
+		Array.isArray(value) && typeof value[0] !== 'number'
+			? value.reduce<number>((total, part) => total + count(part), 0)
+			: 1;
+	return count(geometry.coordinates as Coordinates);
+}
+
+/** The geometry the maps draw a site with: its own, or - past SITE_DISPLAY_MAX_POINTS - its simplified one. */
+export function siteDisplayGeometry(site: Pick<CaseBoundaryFeature, 'geometry' | 'simplifiedGeometry'>): Geometry {
+	return site.simplifiedGeometry && pointCount(site.geometry) > SITE_DISPLAY_MAX_POINTS
+		? site.simplifiedGeometry
+		: site.geometry;
+}
+
 export function buildProjectGeojson(project: CaseBoundaryFeature): GeoJsonFeatureCollection {
 	return {
 		type: 'FeatureCollection',
@@ -43,7 +67,7 @@ export function buildProjectGeojson(project: CaseBoundaryFeature): GeoJsonFeatur
 					reference: project.properties.caseReference,
 					layer: 'project-site'
 				},
-				geometry: roundGeometry(project.geometry)
+				geometry: roundGeometry(siteDisplayGeometry(project))
 			}
 		]
 	};

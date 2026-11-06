@@ -1,3 +1,4 @@
+import type { ManageService } from '#service';
 import type { PrismaClient } from '@pins/identify-consultees-database/src/client/client.ts';
 import type { CaseBoundaryFeature } from '@pins/identify-consultees-database/src/geospatial/case-boundaries.ts';
 import { loadCaseBoundaries } from '@pins/identify-consultees-database/src/geospatial/case-boundaries.ts';
@@ -91,6 +92,10 @@ const CHECK_TIMEOUT_MS = 30_000;
 const FILE_TIMEOUT_MS = 120_000;
 // enough to overlap the function's database and blob round trips without crowding it
 const FETCH_CONCURRENCY = 4;
+// how many points of boundary one statement saves, about. A 1,000,000-point linear scheme takes
+// ~16s on its own, locally; a few hundred files at once, as one statement, ran past the app's
+// request timeout and saved nothing. One larger than this is saved on its own
+const BATCH_POINTS = 100_000;
 // well under SQL Server's 2,100 parameters a query
 const LOOKUP_BATCH_SIZE = 1000;
 
@@ -350,6 +355,15 @@ async function updateCaseDetails(db: PrismaClient, id: string, saved: SavedBound
 	}
 }
 
+/**
+ * The database client a CBOS import runs on: the bulk one, whose statements may run for minutes -
+ * one very large boundary can take longer to save than the app's request timeout - where there is
+ * one. Asked for when an import runs, so the bulk client is only made when one does.
+ */
+export function importDb(service: Pick<ManageService, 'db'> & Partial<Pick<ManageService, 'bulkDb'>>): PrismaClient {
+	return service.bulkDb ?? service.db;
+}
+
 export interface CbosImportDependencies {
 	listFiles: typeof listCbosBoundaryFiles;
 	fetchGeoJson: typeof fetchCbosBoundaryGeoJson;
@@ -365,8 +379,10 @@ const DEFAULT_DEPENDENCIES: CbosImportDependencies = {
 /**
  * Save every CBOS boundary file - every version of each, of every case or of `options.caseReference`'s
  * - to case_boundary. It merges: rows are upserted by id and nothing is
- * deleted, so boundaries loaded from elsewhere stay. A file that can't be fetched or read is
- * reported and skipped rather than failing the rest; failing to list the files rejects.
+ * deleted, so boundaries loaded from elsewhere stay. A file that can't be fetched, read or saved
+ * is reported and skipped rather than failing the rest; failing to list the files rejects. Run it
+ * on the bulk client (ManageService.bulkDb): one very large boundary can take longer to save than
+ * the app's request timeout allows.
  * With `options.onlyNewOrChanged`, files already saved at their version aren't fetched again.
  */
 export async function importCaseBoundariesFromCbos(
@@ -381,25 +397,65 @@ export async function importCaseBoundariesFromCbos(
 	for (const [id, saved] of unchanged) {
 		await updateCaseDetails(db, id, saved);
 	}
-	const boundaries: CaseBoundaryFeature[] = [];
 	const failures: CbosImportFailure[] = [];
+	const casesSaved = new Set<string>();
+	let imported = 0;
+
+	// saved a batch at a time as the files arrive, each batch up to BATCH_POINTS points, one at a
+	// time - so neither the app's memory nor one statement's run grows with the whole import. A
+	// batch that can't be saved fails its own files, not the rest
+	const saveBatch = async (batch: { file: CbosBoundaryFile; boundary: CaseBoundaryFeature }[]) => {
+		try {
+			imported += await dependencies.load(db, {
+				type: 'FeatureCollection',
+				features: batch.map(({ boundary }) => boundary)
+			});
+			for (const { file } of batch) {
+				casesSaved.add(file.caseReference);
+			}
+		} catch (error) {
+			const reason = `it couldn't be saved: ${describe(error)}`;
+			failures.push(
+				...batch.map(({ file }) => ({ caseReference: file.caseReference, fileName: file.fileName, reason }))
+			);
+		}
+	};
+	let saving = Promise.resolve();
+	let pending: { file: CbosBoundaryFile; boundary: CaseBoundaryFeature }[] = [];
+	let pendingPoints = 0;
+	const flush = () => {
+		const batch = pending;
+		pending = [];
+		pendingPoints = 0;
+		saving = saving.then(() => saveBatch(batch));
+		return saving;
+	};
 
 	let next = 0;
 	const worker = async () => {
 		while (next < files.length) {
 			const file = files[next++];
 			try {
-				boundaries.push(toCaseBoundaryFromCbos(file, await dependencies.fetchGeoJson(options, file)));
+				const boundary = toCaseBoundaryFromCbos(file, await dependencies.fetchGeoJson(options, file));
+				pending.push({ file, boundary });
+				pendingPoints += positions(boundary.geometry).length;
 			} catch (error) {
 				failures.push({ caseReference: file.caseReference, fileName: file.fileName, reason: describe(error) });
+				continue;
+			}
+			// waiting for the save before fetching more keeps only a batch or two in memory
+			if (pendingPoints >= BATCH_POINTS) {
+				await flush();
 			}
 		}
 	};
 	await Promise.all(Array.from({ length: Math.min(FETCH_CONCURRENCY, files.length) }, worker));
+	if (pending.length > 0) {
+		await flush();
+	}
+	await saving;
 
-	const imported =
-		boundaries.length > 0 ? await dependencies.load(db, { type: 'FeatureCollection', features: boundaries }) : 0;
-	const casesImported = new Set(boundaries.map((boundary) => boundary.properties.caseReference)).size;
+	const casesImported = casesSaved.size;
 	return {
 		filesFound: listed.length,
 		imported,

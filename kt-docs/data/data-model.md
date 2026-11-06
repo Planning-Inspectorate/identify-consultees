@@ -60,7 +60,7 @@ Defined in `packages/database/src/schema.prisma`; spatial indexes, `CHECK` const
 | `fileName`, `receivedDate`              | Which submission                                                                 |
 | `acceptance`, `metadata`, `lastUpdated` | `acceptance`: the case's stage (Pre-Examination), from CBOS - the name is older  |
 
-Spatial indexes (`GEOGRAPHY_AUTO_GRID`): `consultee_area_geometry_simplified_sidx` (every screening query, forced by hint), `consultee_area_geometry_sidx`, `case_boundary_geometry_sidx`. B-tree indexes on `consulteeCategory` and `caseReference`.
+Spatial indexes (`GEOGRAPHY_AUTO_GRID`): `consultee_area_geometry_simplified_sidx` (every screening query, forced by hint) and `consultee_area_geometry_sidx`. B-tree indexes on `consulteeCategory` and `caseReference`. `case_boundary` has no spatial index. No query used the one it had, and saving a long linear scheme's boundary into it took minutes, so it was dropped (`20261106100000_drop_case_boundary_geometry_index`).
 
 ## Spatial conventions
 

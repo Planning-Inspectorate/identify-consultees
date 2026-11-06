@@ -1,5 +1,5 @@
 import type { ManageService } from '#service';
-import { importCaseBoundariesFromCbos } from './cbos-boundaries.ts';
+import { importCaseBoundariesFromCbos, importDb } from './cbos-boundaries.ts';
 
 export interface CbosCaseRefresh {
 	/** Starts an import of every CBOS boundary, unless one is running - false then. Never waits for it. */
@@ -14,10 +14,11 @@ export interface CbosCaseRefresh {
  * however often the button is pressed. Failures are logged, never thrown.
  */
 export function createCbosCaseRefresh(
-	service: Pick<ManageService, 'db' | 'logger' | 'pythonFunctionUrl' | 'pythonFunctionApiKey'>,
+	service: Pick<ManageService, 'db' | 'logger' | 'pythonFunctionUrl' | 'pythonFunctionApiKey'> &
+		Partial<Pick<ManageService, 'bulkDb'>>,
 	runImport: typeof importCaseBoundariesFromCbos = importCaseBoundariesFromCbos
 ): CbosCaseRefresh {
-	const { db, logger } = service;
+	const { logger } = service;
 	// only what's new or changed since the last import - the schedule and the admin import fetch
 	// every file again, so a boundary saved wrongly is put right there
 	const options = {
@@ -29,7 +30,7 @@ export function createCbosCaseRefresh(
 
 	const refresh = async () => {
 		try {
-			const result = await runImport(db, options);
+			const result = await runImport(importDb(service), options);
 			logger.info(
 				{
 					filesFound: result.filesFound,

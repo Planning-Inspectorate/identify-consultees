@@ -3,7 +3,7 @@ import { DefaultAzureCredential } from '@azure/identity';
 import type { ProcessErrorArgs, ServiceBusReceivedMessage } from '@azure/service-bus';
 import { ServiceBusClient } from '@azure/service-bus';
 import type { CbosSubscriberSettings } from '../config.ts';
-import { importCaseBoundariesFromCbos } from './cbos-boundaries.ts';
+import { importCaseBoundariesFromCbos, importDb } from './cbos-boundaries.ts';
 
 /**
  * Keeps case boundaries in step with CBOS. CBOS publishes an event on its `nsip-document` Service
@@ -57,7 +57,8 @@ export function boundaryCaseReference(body: unknown): string | undefined {
 	return event.documentType === GIS_SHAPEFILE_DOCUMENT_TYPE || inGisFolder ? event.caseRef.trim() : undefined;
 }
 
-type SubscriberService = Pick<ManageService, 'db' | 'logger' | 'pythonFunctionUrl' | 'pythonFunctionApiKey'>;
+type SubscriberService = Pick<ManageService, 'db' | 'logger' | 'pythonFunctionUrl' | 'pythonFunctionApiKey'> &
+	Partial<Pick<ManageService, 'bulkDb'>>;
 
 /**
  * Handles one event: imports its case's boundaries, if it's about one. A failed import throws, so
@@ -74,7 +75,7 @@ export function buildCbosEventHandler(
 		if (!caseReference) {
 			return;
 		}
-		const result = await runImport(service.db, {
+		const result = await runImport(importDb(service), {
 			pythonFunctionUrl: service.pythonFunctionUrl,
 			apiKey: service.pythonFunctionApiKey,
 			caseReference

@@ -99,6 +99,9 @@ const PROJECT: CaseBoundaryFeature = {
 describe('the site the buffers grow from', () => {
 	it("is the site's outline, or the rectangle around it grown by 1km, as the function screens it", () => {
 		assert.strictEqual(screenedSite(PROJECT, 'outline'), PROJECT.geometry);
+		// the outline simplified to 10m, as the run sends it, where the row has one
+		const simplifiedGeometry = { type: 'Point' as const, coordinates: [-1.5, 52.5] as [number, number] };
+		assert.strictEqual(screenedSite({ ...PROJECT, simplifiedGeometry }, 'outline'), simplifiedGeometry);
 		const box = screenedSite(PROJECT, 'boundingBox');
 		assert.strictEqual(box.type, 'Polygon');
 		const [ring] = (box as { coordinates: number[][][] }).coordinates;
