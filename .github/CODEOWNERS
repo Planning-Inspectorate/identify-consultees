@@ -1,0 +1,24 @@
+# Replicated from Planning-Inspectorate/back-office/.github/CODEOWNERS, adapted to
+# this repo's layout (.azure/ pipelines instead of azure-pipelines-*; no Jest).
+# GitHub silently ignores owners it can't resolve, so if a rule assigns nobody,
+# check the team handles in the repo's "Code owners" settings.
+
+# any GitHub configuration
+.github @Planning-Inspectorate/pins-developer-leads
+
+# commit hook configuration
+.husky/ @Planning-Inspectorate/pins-developer-leads
+
+# Azure DevOps pipeline definitions
+.azure/ @Planning-Inspectorate/pins-devops
+infrastructure/pipelines/ @Planning-Inspectorate/pins-devops
+
+# ESLint configuration
+eslint.config.js @Planning-Inspectorate/pins-developer-leads
+
+# Commit lint configuration
+commitlint.config.js @Planning-Inspectorate/pins-developer-leads
+
+# Prettier and stylelint configuration
+prettier.config.js @Planning-Inspectorate/pins-developer-leads
+stylelint.config.js @Planning-Inspectorate/pins-developer-leads
