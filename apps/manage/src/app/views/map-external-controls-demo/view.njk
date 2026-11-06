@@ -1,0 +1,124 @@
+{% extends "views/layouts/main.njk" %}
+
+{% from "govuk/components/back-link/macro.njk" import govukBackLink %}
+{% from "govuk/components/button/macro.njk" import govukButton %}
+{% from "govuk/components/details/macro.njk" import govukDetails %}
+{% from "govuk/components/inset-text/macro.njk" import govukInsetText %}
+{% from "govuk/components/notification-banner/macro.njk" import govukNotificationBanner %}
+{% from "govuk/components/radios/macro.njk" import govukRadios %}
+
+{% block pageTitle %}
+	{% if errorSummary %}Error: {% endif %}{{ pageHeading }} - {{ config.headerTitle }}
+{% endblock %}
+
+{% block head %}
+	{{ super() }}
+	<link rel="stylesheet" href="/{{ config.vendorInteractiveMapCss }}">
+	<link rel="stylesheet" href="/{{ config.vendorDatasetsPluginCss }}">
+	<link rel="stylesheet" href="/{{ config.vendorMapKeyPluginCss }}">
+{% endblock %}
+
+{% block beforeContent %}
+	{{ govukBackLink({
+		text: "Back to home",
+		href: "/"
+	}) }}
+{% endblock %}
+
+{% block pageContent %}
+	{{ govukInsetText({
+		text: "Prototype page — all data is fictional. The links below switch the same fictional case between externalControls plugin configurations, so the options can be compared. One map per page is deliberate: the Defra datasets plugin keeps its dataset registry and layer adapter as module-level singletons, so two interactive maps on one page share mutable state — keep a single bound map per page."
+	}) }}
+
+	{% if submittedBanner %}
+		{{ govukNotificationBanner({
+			type: "success",
+			titleText: "Form submitted",
+			text: submittedBanner
+		}) }}
+	{% endif %}
+
+	<p class="govuk-body">
+		This page pairs a Defra interactive map with ordinary GOV.UK radios — the
+		<strong>Confirm shapefile for report</strong> question from the project boundary page.
+		Picking a radio highlights the matching shape on the map; clicking a shape on the map checks
+		the matching radio. The radios are plain form fields — they submit with the form and work
+		without JavaScript.
+	</p>
+	<p class="govuk-body">
+		The binding convention: a radio’s <code>value</code> equals its feature’s
+		<code>fileKey</code> property, and each file’s dataset id is <code>shapefile-&lt;value&gt;</code>.
+		The plugin is <code>external-controls-plugin.mjs</code>; expand “How this map is configured”
+		below the demo to see the exact options it received.
+	</p>
+
+	<nav class="govuk-!-margin-top-6 govuk-!-margin-bottom-6" aria-label="Demo configurations">
+		<ul class="govuk-list">
+			{% for mode in modes %}
+				<li class="govuk-!-margin-bottom-1">
+					{% if mode.current %}
+						<strong>{{ mode.label }}</strong> <span class="govuk-body-s">(current)</span>
+					{% else %}
+						<a class="govuk-link" href="{{ mode.href }}">{{ mode.label }}</a>
+					{% endif %}
+				</li>
+			{% endfor %}
+		</ul>
+	</nav>
+
+	<section class="govuk-!-margin-top-8" aria-labelledby="{{ section.slug }}-heading">
+		<h2 class="govuk-heading-l" id="{{ section.slug }}-heading">{{ section.title }}</h2>
+		<p class="govuk-body">{{ section.description }}</p>
+
+		<span class="govuk-caption-m">{{ pageCaption }}</span>
+		<h3 class="govuk-heading-m govuk-!-margin-bottom-2">Project boundary</h3>
+
+		{% set mapId = section.mapId %}
+		{% set mapRegionLabel = section.mapRegionLabel %}
+		{% set staticMapSrc = section.staticMapSrc %}
+		{% set staticMapAlt = section.staticMapAlt %}
+		{% set mapWidth = mapWidth %}
+		{% set mapHeight = mapHeight %}
+		{% set mapConfigJson = section.mapConfigJson %}
+		{% include "views/partials/consultee-map-region.njk" %}
+
+		<form id="{{ section.formId }}" method="post" action="/map-external-controls-demo" novalidate class="govuk-!-margin-top-6">
+			<input type="hidden" name="_csrf" value="{{ _csrf }}">
+			<input type="hidden" name="demo" value="{{ section.slug }}">
+			{{ govukRadios({
+				idPrefix: section.radiosIdPrefix,
+				name: "shapefile",
+				fieldset: {
+					legend: {
+						text: "Confirm shapefile for report",
+						classes: "govuk-fieldset__legend--m"
+					}
+				},
+				errorMessage: section.radiosError,
+				items: section.radioItems
+			}) }}
+
+			{{ govukButton({
+				text: "Continue"
+			}) }}
+		</form>
+
+		{% set configHtml %}
+			<p class="govuk-body-s">Passed to <code>createExternalControlsPlugin</code> alongside the map’s <code>datasets</code> array:</p>
+			<pre class="pins-config-snippet"><code>{{ section.configSnippet }}</code></pre>
+		{% endset %}
+		{{ govukDetails({
+			summaryText: "How this map is configured",
+			html: configHtml
+		}) }}
+	</section>
+{% endblock %}
+
+{% block bodyEnd %}
+	<script defer src="/{{ config.vendorInteractiveMapJs }}"></script>
+	<script defer src="/{{ config.vendorMaplibreProviderJs }}"></script>
+	<script defer src="/{{ config.vendorDatasetsPluginJs }}"></script>
+	<script defer src="/{{ config.vendorMapKeyPluginJs }}"></script>
+	<script defer src="/{{ config.vendorInteractPluginJs }}"></script>
+	<script type="module" src="/{{ config.consulteesMapJs }}"></script>
+{% endblock %}
