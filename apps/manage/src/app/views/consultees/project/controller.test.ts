@@ -3,7 +3,6 @@ import assert from 'node:assert';
 import { describe, it, mock } from 'node:test';
 import { BOUNDARY_MAP_STYLES } from '../../../maps/boundary-map-styles.ts';
 import { configureNunjucks } from '../../../nunjucks.ts';
-import { TEST_FAULT_SESSION_FIELD } from '../test-faults.ts';
 import { buildBoundaryStaticMap, buildBoundarySubmit, buildConsulteeProjectPage } from './controller.ts';
 
 const realProjectId = '44444444-4444-4444-4444-444444444444';
@@ -222,56 +221,6 @@ describe('consultee project boundary page', () => {
 		assert.match(html, />Try again</);
 		assert.doesNotMatch(html, /app-consultee-map/);
 	});
-
-	it('should force the map failure only while ?test-fail=map is on the request', async () => {
-		const nunjucks = configureNunjucks();
-		const mockRes = {
-			status: mock.fn(() => mockRes),
-			render: mock.fn((view, data) => nunjucks.render(view, data))
-		};
-		const db = dbReturning([
-			[realProjectRow()],
-			[boundaryFile(realProjectRow())],
-			[realProjectRow()],
-			[boundaryFile(realProjectRow())],
-			[realProjectRow()],
-			[boundaryFile(realProjectRow())]
-		]);
-		const handler = buildConsulteeProjectPage({ db, logger: mockLogger(), testFaultsEnabled: true });
-		// the fault is per-request: a request carrying it fails, the next one draws the map
-		for (const query of [{ 'test-fail': 'map' }, { 'test-fail': 'map' }]) {
-			await handler({ params: { caseId: realProjectId }, query, session: {} }, mockRes);
-		}
-		await handler({ params: { caseId: realProjectId }, query: {}, session: {} }, mockRes);
-
-		for (const call of mockRes.render.mock.calls.slice(0, 2)) {
-			assert.strictEqual(call.arguments[1].mapFailed, true);
-			assert.match(call.result, /govuk-error-message/);
-			assert.match(call.result, /problem loading the map/);
-			assert.doesNotMatch(call.result, /app-consultee-map/);
-		}
-		const plain = mockRes.render.mock.calls[2];
-		assert.strictEqual(plain.arguments[1].mapFailed, undefined);
-		assert.match(plain.result, /app-consultee-map/);
-	});
-
-	it('should ignore a map fault left in the session - it is never stored there', async () => {
-		const nunjucks = configureNunjucks();
-		const mockRes = {
-			status: mock.fn(() => mockRes),
-			render: mock.fn((view, data) => nunjucks.render(view, data))
-		};
-		const db = dbReturning([[realProjectRow()], [boundaryFile(realProjectRow())]]);
-		const handler = buildConsulteeProjectPage({ db, logger: mockLogger(), testFaultsEnabled: true });
-		await handler(
-			{ params: { caseId: realProjectId }, query: {}, session: { [TEST_FAULT_SESSION_FIELD]: 'map' } },
-			mockRes
-		);
-
-		assert.strictEqual(mockRes.render.mock.calls[0].arguments[1].mapFailed, undefined);
-		assert.match(mockRes.render.mock.calls[0].result, /app-consultee-map/);
-	});
-
 	it('should render radios without hints when the files have no upload date', async () => {
 		const mockRes = { status: mock.fn(() => mockRes), render: mock.fn() };
 		const undatedRow = realProjectRow({ receivedDate: null });
@@ -380,23 +329,6 @@ describe('project boundary submit', () => {
 			assert.deepStrictEqual(call.arguments[1].errorSummary, [{ text: 'Select a shapefile', href: '#shapefile' }]);
 			assert.deepStrictEqual(call.arguments[1].shapefileError, { text: 'Select a shapefile' });
 		}
-	});
-
-	it('should show the map failure on the submit re-render while ?test-fail=map is on the request', async () => {
-		const nunjucks = configureNunjucks();
-		const mockRes = {
-			status: mock.fn(() => mockRes),
-			render: mock.fn((view, data) => nunjucks.render(view, data)),
-			redirect: mock.fn()
-		};
-		const db = dbReturning([[realProjectRow()], [boundaryFile(realProjectRow())]]);
-		const handler = buildBoundarySubmit({ db, logger: mockLogger(), testFaultsEnabled: true });
-		await handler({ params: { caseId: realProjectId }, query: { 'test-fail': 'map' }, body: {}, session: {} }, mockRes);
-
-		const viewModel = mockRes.render.mock.calls[0].arguments[1];
-		assert.strictEqual(viewModel.mapFailed, true);
-		assert.deepStrictEqual(viewModel.shapefileError, { text: 'Select a shapefile' });
-		assert.match(mockRes.render.mock.calls[0].result, /problem loading the map/);
 	});
 
 	it('should 404 for a malformed or unknown case', async () => {

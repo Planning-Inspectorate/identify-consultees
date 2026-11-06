@@ -110,15 +110,6 @@ describe('manage router wiring', () => {
 	test('the footer lists the support links on every page', async () => {
 		const response = await request(authDisabledApp).get('/');
 		assert.equal(response.status, 200);
-		// T&Cs and the accessibility statement stay routed but their links are hidden (CSS)
-		// until their content has had a proper audit
-		for (const href of ['/terms-and-conditions', '/accessibility-statement']) {
-			assert.match(
-				response.text,
-				new RegExp(`govuk-footer__inline-list-item pins-footer__item--hidden">\\s*<a[^>]*href="${escapeRegExp(href)}"`)
-			);
-		}
-		assert.equal(response.text.match(/pins-footer__item--hidden/g)?.length, 2);
 		for (const [text, href] of [
 			['Help', '/help'],
 			['Terms and conditions', '/terms-and-conditions'],
@@ -178,17 +169,6 @@ describe('manage router wiring', () => {
 		assert.match(response.text, /type="radio"[^>]*value="33333333-3333-3333-3333-333333333333"/);
 		assert.doesNotMatch(response.text, /type="radio"[^>]*checked/);
 		assert.doesNotMatch(response.text, /:placeholder/);
-	});
-
-	test('GET /consultees/:id?test-fail=map fails that request only', async () => {
-		const agent = request.agent(authDisabledApp);
-		const forced = await agent.get(`/consultees/${homePageTestCaseId}?test-fail=map`);
-		assert.equal(forced.status, 200);
-		assert.match(forced.text, /problem loading the map/);
-
-		// the fault is per-request - the very next load draws the map again, nothing stored
-		const again = await agent.get(`/consultees/${homePageTestCaseId}`);
-		assert.match(again.text, /app-consultee-map/);
 	});
 
 	test('GET /consultees/:id/ruleset renders the ruleset radios, none pre-selected', async () => {
@@ -544,90 +524,6 @@ describe('manage router wiring', () => {
 		}
 	});
 
-	test('GET /map-layers-demo renders the layer toggles prototype', async () => {
-		const response = await request(authDisabledApp).get('/map-layers-demo');
-		assert.equal(response.status, 200);
-		assert.match(response.text, /Map layers demo/);
-		assert.match(response.text, /Railway lines/);
-		assert.match(response.text, /Road network/);
-		assert.match(response.text, /Flood risk area/);
-		assert.match(response.text, /map-layers-demo(?:-[0-9a-f]{8})?\.js/);
-		assert.match(response.text, /app-map-layers-demo/);
-	});
-
-	test('GET /components lists every GOV.UK Frontend component', async () => {
-		const response = await request(authDisabledApp).get('/components');
-		assert.equal(response.status, 200);
-		assert.match(response.text, /GOV.UK Frontend components/);
-		assert.match(response.text, /href="\/components\/button"/);
-		assert.match(response.text, /href="\/components\/warning-text"/);
-	});
-
-	test('GET /components/:component renders the fixture examples', async () => {
-		const response = await request(authDisabledApp).get('/components/tag');
-		assert.equal(response.status, 200);
-		assert.match(response.text, /<h1 class="govuk-heading-l">\s*Tag/);
-		assert.match(response.text, /govuk-tag/);
-		assert.match(response.text, /pins-component-example/);
-	});
-
-	test('GET /components/:component 404s for an unknown component', async () => {
-		const response = await request(authDisabledApp).get('/components/not-a-component');
-		assert.equal(response.status, 404);
-	});
-
-	test('GET /components/interactive-map lists the Defra map examples', async () => {
-		const response = await request(authDisabledApp).get('/components/interactive-map');
-		assert.equal(response.status, 200);
-		assert.match(response.text, /Interactive map/);
-		assert.match(response.text, /href="\/components\/interactive-map\/basic"/);
-		assert.match(response.text, /href="\/components\/interactive-map\/style-switcher"/);
-	});
-
-	test('GET /components/interactive-map/:example renders a map region with a noscript fallback', async () => {
-		const response = await request(authDisabledApp).get('/components/interactive-map/polygons');
-		assert.equal(response.status, 200);
-		assert.match(response.text, /Polygon overlay/);
-		assert.match(response.text, /role="region"/);
-		assert.match(response.text, /app-interactive-map-example/);
-		assert.match(response.text, /<noscript>[\s\S]*src="\/components\/interactive-map\/polygons\/static-map"/);
-		// only the plugins this example uses are loaded
-		assert.match(response.text, /datasets-plugin\/js\/index(?:-[0-9a-f]{8})?\.js/);
-		assert.doesNotMatch(response.text, /draw-plugin\/js\/index/);
-	});
-
-	test('GET /components/interactive-map/select-feature renders the numbered feature legend', async () => {
-		const response = await request(authDisabledApp).get('/components/interactive-map/select-feature');
-		assert.equal(response.status, 200);
-		assert.match(response.text, /Parcels shown on the map/);
-		// once inside noscript (JS disabled) and once in the hidden block the
-		// client reveals on init failure
-		assert.match(response.text, /<noscript>[\s\S]*Permanent grassland/);
-		assert.match(response.text, /id="interactive-map-example-select-feature-fallback"[^>]*hidden/);
-		assert.match(response.text, /Land use/);
-	});
-
-	test('GET /components/interactive-map/button-first collapses the fixed-height map box', async () => {
-		const response = await request(authDisabledApp).get('/components/interactive-map/button-first');
-		assert.equal(response.status, 200);
-		assert.match(response.text, /app-case-map app-interactive-map-example app-case-map--button-first/);
-		// interaction instructions are JS-only — hidden when JavaScript is off
-		assert.match(response.text, /<noscript><style>\.app-js-only \{ display: none; \}<\/style><\/noscript>/);
-		assert.match(response.text, /govuk-inset-text app-js-only/);
-	});
-
-	test('GET /components/interactive-map/:example keeps the fixed-height box for inline maps', async () => {
-		const response = await request(authDisabledApp).get('/components/interactive-map/basic');
-		assert.equal(response.status, 200);
-		assert.match(response.text, /class="app-case-map app-interactive-map-example"/);
-		assert.doesNotMatch(response.text, /app-case-map--button-first/);
-	});
-
-	test('GET /components/interactive-map/:example 404s for an unknown example', async () => {
-		const response = await request(authDisabledApp).get('/components/interactive-map/not-an-example');
-		assert.equal(response.status, 404);
-	});
-
 	test('GET /vendor webpack lazy chunks revalidate rather than cache under a stable name', async () => {
 		// im-core.js keeps its name across package versions; a stale copy crashing against
 		// a new fingerprinted entry was the "o[e] is not a function" map outage. The br
@@ -644,82 +540,6 @@ describe('manage router wiring', () => {
 			.get(chunk)
 			.set({ ...br, 'If-None-Match': response.headers.etag });
 		assert.equal(revalidated.status, 304);
-	});
-
-	test('GET /components/interactive-map/:example/static-map negotiates and caches the image', async () => {
-		const originalFetch = globalThis.fetch;
-		globalThis.fetch = async () =>
-			new Response(
-				Buffer.from(
-					'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
-					'base64'
-				),
-				{ status: 200, headers: { 'content-type': 'image/png' } }
-			);
-
-		try {
-			const webp = await request(authDisabledApp)
-				.get('/components/interactive-map/basic/static-map')
-				.set('Accept', 'image/webp');
-			assert.equal(webp.status, 200);
-			assert.match(webp.headers['content-type'] || '', /image\/webp/);
-			assert.equal(webp.headers.vary, 'Accept');
-			// showcase images are not access-controlled - shared caches (Front Door) may serve them
-			assert.match(webp.headers['cache-control'] || '', /^public, max-age=/);
-			assert.ok(webp.headers.etag);
-
-			const cached = await request(authDisabledApp)
-				.get('/components/interactive-map/basic/static-map')
-				.set('Accept', 'image/webp')
-				.set('If-None-Match', webp.headers.etag);
-			assert.equal(cached.status, 304);
-		} finally {
-			globalThis.fetch = originalFetch;
-		}
-	});
-
-	test('the Components nav link only renders with ?components=true', async () => {
-		const withoutFlag = await request(authDisabledApp).get('/components');
-		assert.doesNotMatch(withoutFlag.text, />\s*Components\s*<\/a>/);
-		assert.doesNotMatch(withoutFlag.text, /href="\/components\/button\?components=true"/);
-
-		const withFlag = await request(authDisabledApp).get('/components?components=true');
-		assert.match(
-			withFlag.text,
-			/govuk-service-navigation__link" href="\/components\?components=true">\s*Components\s*<\/a>/
-		);
-		assert.match(withFlag.text, /href="\/components\/button\?components=true"/);
-	});
-
-	test('prototype/debug pages are not mounted when devPagesEnabled is false', async () => {
-		const service = createManageTestService(true, { devPagesEnabled: false });
-		const app = createManageTestApp(service);
-		try {
-			for (const path of [
-				'/error-test',
-				'/error-test/500',
-				'/error-test/403',
-				'/error-test/rate-limited',
-				'/map-layers-demo',
-				'/components',
-				'/components/interactive-map/basic',
-				'/consultee-areas-python',
-				'/consultee-areas-direct'
-			]) {
-				const response = await request(app).get(path);
-				assert.equal(response.status, 404, `expected ${path} to 404 with dev pages disabled`);
-			}
-
-			// the nav link must not appear either - it would just 404
-			const home = await request(app).get('/?components=true');
-			assert.doesNotMatch(home.text, />\s*Components\s*<\/a>/);
-
-			// and the real service routes still work
-			const home2 = await request(app).get('/');
-			assert.equal(home2.status, 200);
-		} finally {
-			await service.db.$disconnect().catch(() => undefined);
-		}
 	});
 
 	test('GET /consultees/:id/results/static-map returns a cached image', async () => {
@@ -791,88 +611,6 @@ describe('manage router wiring', () => {
 		const response = await request(authDisabledApp).get('/error/firewall-error');
 		assert.equal(response.status, 200);
 		assert.match(response.text, /Sorry, there is a problem with the service/);
-	});
-
-	test('GET /error-test renders the error scenario index', async () => {
-		const response = await request(authDisabledApp).get('/error-test');
-		assert.equal(response.status, 200);
-		assert.match(response.text, /Error scenarios/);
-		assert.match(response.text, /href="\/error-test\/401"/);
-		assert.match(response.text, /href="\/error-test\/403"/);
-		assert.match(response.text, /href="\/error-test\/404"/);
-		assert.match(response.text, /href="\/error-test\/500"/);
-		assert.match(response.text, /href="\/unauthenticated"/);
-		assert.match(response.text, /href="\/error\/firewall-error"/);
-		assert.match(response.text, /href="\/error-test\/not-a-page"/);
-		assert.match(response.text, /href="\/error-test\/rate-limited"/);
-		// the CSRF demo posts two forms to the check endpoint; only one carries a token
-		assert.match(response.text, /action="\/error-test\/csrf-check"/);
-		assert.match(response.text, /Submit without a token/);
-		assert.match(response.text, /Submit with a token/);
-		assert.match(response.text, /name="_csrf" value="[^"]+"/);
-	});
-
-	test('GET /error-test/:status renders the real error template with that status', async () => {
-		const unauthorised = await request(authDisabledApp).get('/error-test/401');
-		assert.equal(unauthorised.status, 401);
-		assert.match(unauthorised.text, /Sorry, there is a problem with your login/);
-
-		const forbidden = await request(authDisabledApp).get('/error-test/403');
-		assert.equal(forbidden.status, 403);
-		assert.match(forbidden.text, /You are not permitted to access this URL/);
-
-		const notFound = await request(authDisabledApp).get('/error-test/404');
-		assert.equal(notFound.status, 404);
-		assert.match(notFound.text, /Page not found/);
-	});
-
-	test('GET /error-test/500 fails deliberately and renders the sanitised 500 page', async () => {
-		const response = await request(authDisabledApp).get('/error-test/500');
-		assert.equal(response.status, 500);
-		assert.match(response.text, /Sorry, there is a problem with the service/);
-		// the thrown error's detail stays in the logs, off the page
-		assert.doesNotMatch(response.text, /deliberate test error/);
-	});
-
-	test('GET /error-test/not-a-page exercises the catch-all not-found handler', async () => {
-		const response = await request(authDisabledApp).get('/error-test/not-a-page');
-		assert.equal(response.status, 404);
-		assert.match(response.text, /Page not found/);
-	});
-
-	test('POST /error-test/csrf-check without a token shows the CSRF failure page', async () => {
-		const response = await request(authDisabledApp).post('/error-test/csrf-check').type('form').send({});
-		assert.equal(response.status, 500);
-		assert.match(response.text, /CSRF token missing/);
-	});
-
-	test('POST /error-test/csrf-check with a token confirms the check passed', async () => {
-		const agent = request.agent(authDisabledApp);
-		const page = await agent.get('/error-test');
-		const csrf = /name="_csrf" value="([^"]+)"/.exec(page.text)?.[1];
-		assert.ok(csrf, 'expected the CSRF demo form to carry a token');
-
-		const response = await agent.post('/error-test/csrf-check').type('form').send({ _csrf: csrf });
-		assert.equal(response.status, 200);
-		assert.match(response.text, /The CSRF token was accepted/);
-	});
-
-	test('GET /error-test/rate-limited returns the plain-text 429 past the limit', async () => {
-		// a dedicated app so the shared one never trips the demo limiter
-		const service = createManageTestService(true);
-		const app = createManageTestApp(service);
-		try {
-			for (let i = 0; i < 3; i++) {
-				const response = await request(app).get('/error-test/rate-limited');
-				assert.equal(response.status, 200);
-				assert.match(response.text, /Not rate limited yet/);
-			}
-			const response = await request(app).get('/error-test/rate-limited');
-			assert.equal(response.status, 429);
-			assert.match(response.text, /Too many requests/);
-		} finally {
-			await service.db.$disconnect().catch(() => undefined);
-		}
 	});
 
 	test('GET /help needs signing in, unlike the footer policy pages', async () => {

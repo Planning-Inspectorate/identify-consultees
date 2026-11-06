@@ -162,7 +162,7 @@ The main journey is **database-backed**: there are no fixtures. Locally the data
 
 ## Before go-live
 
-- [ ] Remove the temporary dev and QA code: the dev pages (`/components/*`, `/map-layers-demo`, `/error-test`, `/consultee-areas-*`), the `?test-fail=` fault triggers and the hidden footer links — the full inventory is in [README.md → Before go-live: code to remove](../README.md#before-go-live-code-to-remove), and every item is marked `TEMPORARY - remove before go-live` in the code
+- [x] ~~Remove the temporary dev and QA code~~ — done: the dev pages, `?test-fail=` fault triggers and hidden footer links are removed
 - [ ] Add the visual regression tests to the PR pipeline once screens are final, with Linux baselines (see [Testing](./testing.md))
 - [ ] Get sign-off for the consultee category map colours (interim, see [Maps](./maps.md))
 - [ ] Size the Prod database for screening and load-test it (see [Screening issues](./data/screening-issues.md))

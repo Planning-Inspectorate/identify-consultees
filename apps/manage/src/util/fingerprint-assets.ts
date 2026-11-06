@@ -159,7 +159,6 @@ export async function applyAssetManifestToLocalsFile(localsFile: string, manifes
 	const replacements: { logical: string; property: string }[] = [
 		{ logical: 'assets/js/govuk-frontend.min.js', property: 'govukFrontendJs' },
 		{ logical: 'javascripts/consultees-map.js', property: 'consulteesMapJs' },
-		{ logical: 'javascripts/map-layers-demo.js', property: 'mapLayersDemoJs' },
 		{ logical: 'javascripts/consultee-autocomplete.js', property: 'consulteeAutocompleteJs' },
 		{ logical: 'javascripts/blob-upload.js', property: 'blobUploadJs' },
 		{ logical: 'assets/js/accessible-autocomplete.min.js', property: 'accessibleAutocompleteJs' },
@@ -174,8 +173,7 @@ export async function applyAssetManifestToLocalsFile(localsFile: string, manifes
 		{ logical: 'vendor/interact-plugin/js/index.js', property: 'vendorInteractPluginJs' },
 		{ logical: 'vendor/draw-plugin/js/index.js', property: 'vendorDrawPluginJs' },
 		{ logical: 'vendor/map-styles-plugin/js/index.js', property: 'vendorMapStylesPluginJs' },
-		{ logical: 'vendor/map-styles-plugin/css/index.css', property: 'vendorMapStylesPluginCss' },
-		{ logical: 'javascripts/interactive-map-examples.js', property: 'interactiveMapExamplesJs' }
+		{ logical: 'vendor/map-styles-plugin/css/index.css', property: 'vendorMapStylesPluginCss' }
 	];
 
 	for (const { logical, property } of replacements) {

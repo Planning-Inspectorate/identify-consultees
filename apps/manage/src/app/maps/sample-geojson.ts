@@ -1,4 +1,4 @@
-import type { Geometry, Position } from '@pins/identify-consultees-database/src/geospatial/wkt.ts';
+import type { Geometry } from '@pins/identify-consultees-database/src/geospatial/wkt.ts';
 
 export const MAP_VIEWPORT = {
 	width: 960,
@@ -16,65 +16,3 @@ export type GeoJsonFeature = {
 	properties: Record<string, string>;
 	geometry: Geometry;
 };
-
-function squareAround(lng: number, lat: number, halfSizeDegrees: number): Position[][] {
-	return [
-		[
-			[lng - halfSizeDegrees, lat - halfSizeDegrees],
-			[lng + halfSizeDegrees, lat - halfSizeDegrees],
-			[lng + halfSizeDegrees, lat + halfSizeDegrees],
-			[lng - halfSizeDegrees, lat + halfSizeDegrees],
-			[lng - halfSizeDegrees, lat - halfSizeDegrees]
-		]
-	];
-}
-
-/**
- * Prototype polygons near the Dorset coast (Navitus Bay area).
- * TEMPORARY - demo-map builders only; remove before go-live (the MAP_VIEWPORT
- * constant and GeoJson types above stay - the real maps use them). See
- * README.md's "Before go-live: code to remove".
- */
-export function buildProjectSiteGeojson(reference: string, caseName: string): GeoJsonFeatureCollection {
-	return {
-		type: 'FeatureCollection',
-		features: [
-			{
-				type: 'Feature',
-				id: 'project-site',
-				properties: {
-					name: caseName,
-					reference,
-					layer: 'project-site'
-				},
-				geometry: {
-					type: 'Polygon',
-					coordinates: squareAround(-1.78, 50.62, 0.04)
-				}
-			}
-		]
-	};
-}
-
-export function buildConsulteeAreaGeojson(
-	category: string,
-	areas: { name: string; code: string; offsetLng: number; offsetLat: number; size: number }[]
-): GeoJsonFeatureCollection {
-	return {
-		type: 'FeatureCollection',
-		features: areas.map((area, index) => ({
-			type: 'Feature',
-			id: `${category}-${index}`,
-			properties: {
-				name: area.name,
-				referenceAreaCode: area.code,
-				referenceAreaName: area.name,
-				consulteeCategory: category
-			},
-			geometry: {
-				type: 'Polygon',
-				coordinates: squareAround(-1.78 + area.offsetLng, 50.62 + area.offsetLat, area.size)
-			}
-		}))
-	};
-}

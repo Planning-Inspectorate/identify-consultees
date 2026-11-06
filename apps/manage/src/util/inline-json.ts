@@ -1,7 +1,7 @@
 /**
  * Serialise a value to JSON for embedding inside an inline
  * `<script type="application/json">` block rendered with `| safe` (see
- * views/partials/consultee-map-region.njk and views/map-layers-demo/view.njk).
+ * views/partials/consultee-map-region.njk).
  *
  * `JSON.stringify` does not escape `<`, so a stored value containing
  * `</script>` (case names, consultee names and references all come from

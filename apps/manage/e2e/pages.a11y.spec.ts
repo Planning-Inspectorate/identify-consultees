@@ -30,25 +30,12 @@ const pages = [
 		name: 'report consultee remove'
 	},
 	{ path: `/consultees/${SAMPLE_CASE_ID}/report/created?ruleset=${SAMPLE_RULESET_ID}`, name: 'report created' },
-	{ path: '/map-layers-demo', name: 'map layers demo' },
-	{ path: '/components?components=true', name: 'components index' },
-	{ path: '/components/checkboxes?components=true', name: 'component detail' },
-	{
-		path: '/components/interactive-map?components=true',
-		name: 'interactive map examples index'
-	},
-	{
-		path: '/components/interactive-map/polygons?components=true',
-		name: 'interactive map example'
-	},
 	{ path: '/signed-out', name: 'signed out' },
 	{ path: '/terms-and-conditions', name: 'terms and conditions' },
 	{ path: '/accessibility-statement', name: 'accessibility statement' },
 	{ path: '/help', name: 'help' },
 	{ path: '/cookies', name: 'cookies' },
 	{ path: '/contact', name: 'contact' },
-	{ path: '/error-test', name: 'error scenarios index' },
-	{ path: '/consultee-areas-python', name: 'consultee areas python' },
 	{ path: '/admin', name: 'admin overview' },
 	{ path: '/admin/database', name: 'admin database' },
 	{ path: '/admin/database/consultee-areas', name: 'admin database consultee areas' },
@@ -106,26 +93,6 @@ test.describe('browser accessibility landmarks and skip link', () => {
 
 		await expect(page.locator('.app-consultee-map[role="region"]').first()).toBeAttached();
 		await expect(page.locator('.app-consultee-map').first()).toHaveAttribute('aria-label', /.+/);
-
-		await expectNoSeriousAxeViolations(page);
-	});
-
-	test('interactive map example host remains an accessible region', async ({ page }) => {
-		await page.goto('/components/interactive-map/basic?components=true');
-
-		const host = page.locator('.app-interactive-map-example[role="region"]');
-		await expect(host).toBeAttached();
-		await expect(host).toHaveAttribute('aria-label', /.+/);
-
-		await expectNoSeriousAxeViolations(page);
-	});
-
-	test('map layers demo map host remains an accessible region', async ({ page }) => {
-		await page.goto('/map-layers-demo');
-
-		const host = page.locator('.app-map-layers-demo[role="region"]');
-		await expect(host).toBeAttached();
-		await expect(host).toHaveAttribute('aria-label', /.+/);
 
 		await expectNoSeriousAxeViolations(page);
 	});

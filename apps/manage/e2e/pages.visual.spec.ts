@@ -23,7 +23,7 @@ import { SAMPLE_CASE_ID, SAMPLE_CASE_REFERENCE, SAMPLE_RULESET_ID } from './fixt
 
 // every interactive map host class/attribute in the app: the map canvas itself is
 // masked, everything around it (chrome, tables, keys/legends) is still compared
-const MAP_MASK = '.app-case-map, .app-consultee-map, .app-map-layers-demo, .app-interactive-map-example';
+const MAP_MASK = '.app-case-map, .app-consultee-map';
 
 const pages = [
 	{ path: '/', name: 'home' },
@@ -46,23 +46,11 @@ const pages = [
 		path: `/consultees/${SAMPLE_CASE_ID}/report/created?ruleset=${SAMPLE_RULESET_ID}`,
 		name: 'report-created'
 	},
-	{ path: '/map-layers-demo', name: 'map-layers-demo', mask: MAP_MASK },
-	{ path: '/components?components=true', name: 'components-index' },
-	{ path: '/components/checkboxes?components=true', name: 'component-detail' },
-	{ path: '/components/interactive-map?components=true', name: 'interactive-map-examples-index' },
-	{
-		path: '/components/interactive-map/polygons?components=true',
-		name: 'interactive-map-example',
-		mask: MAP_MASK
-	},
 	{ path: '/signed-out', name: 'signed-out' },
 	{ path: '/terms-and-conditions', name: 'terms-and-conditions' },
 	{ path: '/accessibility-statement', name: 'accessibility-statement' },
 	{ path: '/cookies', name: 'cookies' },
 	{ path: '/contact', name: 'contact' },
-	{ path: '/error-test', name: 'error-scenarios-index' },
-	{ path: '/consultee-areas-python', name: 'consultee-areas-python' },
-	{ path: '/consultee-areas-direct', name: 'consultee-areas-direct' },
 	{ path: '/admin', name: 'admin-overview' },
 	{ path: '/admin/upload-to-blob', name: 'admin-upload-to-blob' },
 	{ path: '/admin/import-reference-data', name: 'admin-import-reference-data' },

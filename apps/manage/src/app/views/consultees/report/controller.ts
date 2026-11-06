@@ -5,7 +5,6 @@ import type { AsyncRequestHandler } from '@planning-inspectorate/core/util';
 import { NEARBY_NSIPS } from '../nearby-nsips.ts';
 import { resolveCase } from '../resolve-case.ts';
 import { firstQueryValue, requestedRuleset, runRulesetSafely } from '../run-ruleset.ts';
-import { requestTestFault } from '../test-faults.ts';
 import { reportCategories } from './categories.ts';
 import { buildReportZip, formatFileSize, rememberedReportZip, rememberReportZip } from './export/report-zip.ts';
 import { GROUP_TABS, tabForCategory } from './export/workbook.ts';
@@ -171,10 +170,6 @@ export function buildReportCreatedPage(service: ManageService): AsyncRequestHand
 		let buildFailed = false;
 		if (!failed) {
 			try {
-				// the QA fault trigger (test-faults.ts): the build fails as if generation were down
-				if (requestTestFault(service, req.query) === 'download') {
-					throw new Error('test-fail=download: forced report build failure');
-				}
 				const report =
 					rememberedReportZip(downloadUrl) ??
 					(await buildReportZip({ service, project, ruleset, consultees, selection, siteScreenedAs }));

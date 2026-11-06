@@ -10,19 +10,7 @@ Finds who must be consulted about a Nationally Significant Infrastructure Projec
 | `config` | **What the service does**: rulesets, report, map and distance settings. See [`config/README.md`](./config/README.md) |
 | `infrastructure` | Terraform for Azure |
 
-## Before go-live: code to remove
-
-> **The code below is temporary — it exists for development and QA, not for the live service.** Each item is already gated off in production, but delete it before go-live so nothing temporary ships in the image. The wider go-live checklist (data, sizing, sign-offs) is in [`kt-docs/overview.md` → Before go-live](./kt-docs/overview.md#before-go-live).
-
-Every item is marked in the code with `TEMPORARY - remove before go-live` — `grep -rn "remove before go-live"` finds them all. Delete each item's tests, e2e entries and docs notes with it; the 100% coverage gate will flag any that are missed.
-
-| What                                                                                                                            | Gated by                                                                              |
-| ------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
-| [Dev pages](#dev-pages): component showcase, map demos, error-scenario and query-comparison pages                               | `devPagesEnabled` — off when `NODE_ENV=production` unless `ENABLE_DEV_PAGES=true`       |
-| [`?test-fail=` fault triggers](#qa-fault-triggers): forced map/ruleset/download failures for QA                                  | `testFaultsEnabled` — off where `ENVIRONMENT=prod` (`infrastructure/app-web.tf`)        |
-| [Hidden footer links](#hidden-footer-links): terms and accessibility statement hidden pending content audit                     | not gated — pages are reachable, their footer links are hidden by CSS                 |
-
-### Dev pages
+## Dev pages
 
 Prototype and debug pages under `apps/manage/src/app/views/`, mounted only while `devPagesEnabled` is on (`config.ts`; on locally, on deployed environments via `ENABLE_DEV_PAGES`):
 

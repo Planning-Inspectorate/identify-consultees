@@ -88,36 +88,6 @@ const pages = [
 		mustSee: [/Consultee List report/i]
 	},
 	{
-		path: '/map-layers-demo',
-		name: 'map layers demo',
-		heading: /Map layers demo/i,
-		mustSee: [/Railway lines/i, /Road network/i]
-	},
-	{
-		path: '/components?components=true',
-		name: 'components index',
-		heading: /GOV.UK Frontend components/i,
-		mustSee: [/Accordion/i, /Warning text/i, /Components/i]
-	},
-	{
-		path: '/components/tag?components=true',
-		name: 'component detail',
-		heading: /Tag/i,
-		mustSee: [/default/i]
-	},
-	{
-		path: '/components/interactive-map?components=true',
-		name: 'interactive map examples index',
-		heading: /Interactive map/i,
-		mustSee: [/Basic map/i, /Style switcher/i]
-	},
-	{
-		path: '/components/interactive-map/polygons?components=true',
-		name: 'interactive map example',
-		heading: /Polygon overlay/i,
-		mustSee: [/About this example/i]
-	},
-	{
 		path: '/signed-out',
 		name: 'signed out',
 		heading: /You have signed out/i,
@@ -152,12 +122,6 @@ const pages = [
 		name: 'contact',
 		heading: /Contact us/i,
 		mustSee: [/General enquiries/i, /0303 444 5000/i, /Planning Inspectorate/i]
-	},
-	{
-		path: '/error-test',
-		name: 'error scenarios index',
-		heading: /Error scenarios/i,
-		mustSee: [/Rendered error pages/i, /CSRF check/i, /Needs the environment/i]
 	},
 	{
 		path: '/this-page-does-not-exist',
@@ -232,31 +196,5 @@ test.describe('cross-browser render completeness', () => {
 		expect(config.fallback.src).toMatch(/\/static-map/);
 		expect(config.fallback.width).toBe(960);
 		expect(config.fallback.height).toBe(516);
-	});
-
-	test('interactive map example host is present for progressive enhancement', async ({ page }) => {
-		await page.goto('/components/interactive-map/basic?components=true', { waitUntil: 'domcontentloaded' });
-		const host = page.locator('.app-interactive-map-example.app-case-map');
-		await expect(host).toBeAttached();
-		await expect(host).toHaveAttribute('role', 'region');
-		await expect(host).toHaveAttribute('aria-label', /.+/);
-		// the noscript fallback carries the heavily-cached static map — assert on
-		// the raw HTML since noscript children never enter the DOM under JS
-		const html = await (await page.request.get('/components/interactive-map/basic?components=true')).text();
-		expect(html).toContain('<noscript>');
-		expect(html).toContain('src="/components/interactive-map/basic/static-map"');
-		// the page config block feeds the client module (including the fallback details)
-		const configJson = await page.locator('#interactive-map-example-basic-data').textContent();
-		expect(JSON.parse(configJson).fallback.src).toBe('/components/interactive-map/basic/static-map');
-	});
-
-	test('map layers demo host is present for progressive enhancement', async ({ page }) => {
-		await page.goto('/map-layers-demo', { waitUntil: 'domcontentloaded' });
-		const host = page.locator('.app-map-layers-demo.app-case-map');
-		await expect(host).toBeAttached();
-		await expect(host).toHaveAttribute('role', 'region');
-		await expect(host).toHaveAttribute('aria-label', /overlay layers/i);
-		expect(await serverRenderedOpeningTag(page, '/map-layers-demo', 'app-map-layers-demo')).not.toMatch(/\sdata-/);
-		await expect(page.locator('#map-layers-demo-data')).toBeAttached();
 	});
 });

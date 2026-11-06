@@ -10,7 +10,7 @@ apps/manage/
     server.ts          # listen, trust proxy
     app/
       app.ts           # createApp: static assets, security headers, Nunjucks, router
-      router.ts        # mounts feature routers (dev pages behind devPagesEnabled)
+      router.ts        # mounts feature routers
       config.ts        # env → typed config
       service.ts       # ManageService: db, logger, rulesetRunner, blob client
       maps/            # static map render, cache and serve; Defra vendor assets; results map config
@@ -45,15 +45,6 @@ A request goes: `server.ts` → `createApp` → `buildRouter` (monitoring, `/ven
 | `/terms-and-conditions`, `/accessibility-statement`, `/cookies`, `/contact` | Footer pages, reachable signed out. Terms and conditions and the accessibility statement are hidden from the footer (CSS) until their content has had a proper audit                                                                                                                                                                                     |
 | `/auth/*`, `/signed-out`, `/unauthenticated`, `/error/*`                    | Entra sign-in and error pages                                                                                                                                                                                                                                                                                                                            |
 | `/vendor/*`                                                                 | Defra map bundles, rate limited, lazy Brotli                                                                                                                                                                                                                                                                                                             |
-
-Dev pages mount only when `devPagesEnabled` is on (not production, or `ENABLE_DEV_PAGES=true`):
-
-| Path                                                 | What it is                                                                                                             |
-| ---------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| `/components`, `/components/interactive-map`         | GOV.UK component showcase and worked Defra map examples. Remove before go-live                                         |
-| `/map-layers-demo`                                   | Layer toggle experiment                                                                                                |
-| `/error-test`                                        | Error-scenario index for QA: renders each error page, throws for the sanitised 500, demos CSRF and rate-limit failures |
-| `/consultee-areas-python`, `/consultee-areas-direct` | Nearby-area query through the Python function, or straight from Node                                                   |
 
 ## The journey
 

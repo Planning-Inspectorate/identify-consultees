@@ -9,15 +9,10 @@ import { buildAdminHeaderLink } from './admin/access.ts';
 import { createAdminRoutes } from './admin/index.ts';
 import { buildSanitisingErrorHandler } from './error-handler.ts';
 import { createDefraVendorRouter } from './maps/vendor.ts';
-import { createRoutes as createComponentRoutes } from './views/components/index.ts';
-import { createRoutes as createConsulteeAreasDirectRoutes } from './views/consultee-areas-direct/index.ts';
-import { createRoutes as createConsulteeAreasPythonRoutes } from './views/consultee-areas-python/index.ts';
 import { createRoutes as createConsulteeRoutes } from './views/consultees/index.ts';
-import { createRoutes as createErrorTestRoutes } from './views/error-test/index.ts';
 import { createFooterRoutes } from './views/footer/index.ts';
 import { createRoutes as createHelpRoutes } from './views/help/index.ts';
 import { createRoutes as createHomeRoutes } from './views/home/index.ts';
-import { createRoutes as createMapLayersDemoRoutes } from './views/map-layers-demo/index.ts';
 import { createErrorRoutes } from './views/static/error/index.ts';
 
 export type AuthRateLimiterOptions = {
@@ -53,11 +48,7 @@ export function buildRouter(service: ManageService, options: BuildRouterOptions 
 	const { router: authRoutes, guards: authGuards } = createAuthRoutesAndGuards(service);
 	const homeRoutes = createHomeRoutes(service);
 	const consulteeRoutes = createConsulteeRoutes(service);
-	const mapLayersDemoRoutes = createMapLayersDemoRoutes();
-	const errorTestRoutes = createErrorTestRoutes(service);
-	const componentRoutes = createComponentRoutes();
-	const consulteeAreasPythonRoutes = createConsulteeAreasPythonRoutes(service);
-	const consulteeAreasDirectRoutes = createConsulteeAreasDirectRoutes(service);
+
 	const adminRoutes = createAdminRoutes(service);
 	const authRateLimiter = options.authRateLimiter ?? buildAuthRateLimiter();
 
@@ -116,16 +107,6 @@ export function buildRouter(service: ManageService, options: BuildRouterOptions 
 	router.use('/consultees', consulteeRoutes);
 	// the user guide - behind sign-in, as it describes how rulesets are changed
 	router.use('/help', createHelpRoutes());
-	// prototype/debug pages - not part of the service; only mounted when enabled
-	// (dev builds by default, deployed envs via ENABLE_DEV_PAGES - see config.ts).
-	// TEMPORARY - remove before go-live (see README.md's "Before go-live: code to remove")
-	if (service.devPagesEnabled) {
-		router.use('/map-layers-demo', mapLayersDemoRoutes);
-		router.use('/error-test', errorTestRoutes);
-		router.use('/components', componentRoutes);
-		router.use('/consultee-areas-python', consulteeAreasPythonRoutes);
-		router.use('/consultee-areas-direct', consulteeAreasDirectRoutes);
-	}
 	// the admin section - see admin/index.ts
 	router.use('/admin', adminRoutes);
 	router.use('/error', createErrorRoutes(service));

@@ -42,7 +42,6 @@ module "app_web" {
     APPLICATIONINSIGHTS_CONNECTION_STRING      = local.key_vault_refs["app-insights-connection-string"]
     ApplicationInsightsAgent_EXTENSION_VERSION = "~3"
     NODE_ENV                                   = var.apps_config.node_environment
-    ENVIRONMENT                                = var.environment
     APP_HOSTNAME                               = var.web_domains.web
     AUTH_GROUP_APPLICATION_ACCESS              = var.apps_config.auth.group_application_access
     AUTH_GROUP_ADMIN                           = var.apps_config.auth.group_admin
