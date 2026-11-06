@@ -194,7 +194,7 @@ test.describe('manage journeys', () => {
 		await expect(page.getByRole('heading', { level: 3, name: 'National infrastructure projects' })).toBeVisible();
 		// first, above the consultee groups - the other projects near the site are checked first
 		await expect(page.locator('.govuk-summary-card__title').first()).toHaveText('National infrastructure projects');
-		await expect(page.getByRole('link', { name: 'Change NSIPs' })).toBeVisible();
+		await expect(page.getByRole('link', { name: 'Change National infrastructure projects' })).toBeVisible();
 
 		const parishChange = page.getByRole('link', { name: 'Change Parish Council' });
 		const parishValue = page
