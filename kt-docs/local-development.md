@@ -9,7 +9,7 @@ Start with the [README](../README.md): `nvm use`, `npm ci`, `npm start`. This pa
 1. Creates `packages/database/.env` and `apps/manage/.env` from their `.env.example` files if missing (auth disabled, SQL pointed at Docker)
 2. Starts SQL Server in Docker (`docker compose up -d`) on **localhost:1434** and waits for it
 3. Runs migrations and seeds the sample dataset (`npm run db-seed`): it replaces the consultee areas in use with the 80-area sample, and merges the case boundaries
-4. Starts the Python function on **localhost:7071**: creates `apps/function-python/.venv` (Python 3.12) if missing, installs `requirements.txt`, and gives the function and the web app the same local API key
+4. Starts the Python function on **localhost:7071**: creates `apps/function-python/.venv` (Python 3.14) if missing, installs `requirements.txt`, and gives the function and the web app the same local API key
 5. Starts the web app in watch mode on **localhost:8090**
 
 `Ctrl+C` stops the app and the function. `docker compose down` stops SQL.
@@ -23,7 +23,7 @@ The function needs Azure Functions Core Tools (`npm install -g azure-functions-c
 | Node.js | 24.x, from `.nvmrc`. `engines` enforces `^24.22.1` (October 2026 security release floor)                    |
 | npm     | 11+, bundled with Node 24                                                                                   |
 | Docker  | Recent; SQL Server needs `GEOGRAPHY`, so not Azure SQL Edge. On Apple Silicon it runs under amd64 emulation |
-| Python  | 3.12, for the function                                                                                      |
+| Python  | 3.14, for the function                                                                                      |
 
 Don't regenerate `package-lock.json` under another Node or npm major. `react`, `react-dom` and `scheduler` (optional dependencies) and the `preact` override aren't a UI stack: they satisfy peer dependencies of the Prisma CLI and the Defra map so Azure's `npm ci` passes. See the toolchain section of [AGENTS.md](../AGENTS.md).
 
