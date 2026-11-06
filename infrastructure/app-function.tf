@@ -166,7 +166,7 @@ resource "azurerm_linux_function_app" "function_orchestrator" {
     http2_enabled = true
 
     application_stack {
-      python_version = "3.12"
+      python_version = "3.14"
     }
 
     application_insights_key = azurerm_application_insights.main.instrumentation_key
