@@ -40,6 +40,12 @@ export interface InteractiveMapExampleViewModel {
 	 */
 	isButtonFirst: boolean;
 	/**
+	 * True for `inline` behaviour — only inline maps render the loading
+	 * overlay: a sibling overlay can't cover buttonFirst's collapsed launcher
+	 * or a fullscreen app.
+	 */
+	isInline: boolean;
+	/**
 	 * Feature details for the static fallback — rendered inside <noscript> and
 	 * in a hidden block the client reveals when interactive init fails.
 	 * `head`/`rows` are already in govukTable shape.
