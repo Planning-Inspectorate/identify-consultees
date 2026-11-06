@@ -90,13 +90,21 @@ module "app_web" {
     CBOS_SERVICE_BUS_NAMESPACE    = var.cbos_subscriber_enabled ? "${data.azurerm_servicebus_namespace.idas[0].name}.servicebus.windows.net" : ""
     CBOS_SERVICE_BUS_TOPIC        = var.cbos_subscriber_enabled ? data.azurerm_servicebus_topic.idas_nsip_document[0].name : ""
     CBOS_SERVICE_BUS_SUBSCRIPTION = var.cbos_subscriber_enabled ? azurerm_servicebus_subscription.web_nsip_document[0].name : ""
+
+    # the admin files page's Copy section: starts the Promote reference data pipeline, copying the
+    # previous environment's reference data files here (apps/manage - admin/upload-to-blob/copy.ts),
+    # as the app's managed identity - which DevOps adds to the Azure DevOps project. Off in the
+    # staging slot (below), whose identity isn't
+    AZURE_DEVOPS_PROJECT_URL = "https://dev.azure.com/planninginspectorate/identify-consultees"
+    REFERENCE_DATA_COPY_FROM = var.reference_data_copy_from
   }
 
   # sticky to its slot: only the live app imports from CBOS or takes its events - a staging slot
   # running the next release mustn't do either (and has no access to the subscription)
   slot_setting_overrides = {
-    CBOS_IMPORT_HOURS       = ""
-    CBOS_SUBSCRIBER_ENABLED = "false"
+    CBOS_IMPORT_HOURS        = ""
+    CBOS_SUBSCRIBER_ENABLED  = "false"
+    REFERENCE_DATA_COPY_FROM = ""
   }
 
   providers = {

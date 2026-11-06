@@ -53,7 +53,6 @@ const pages = [
 	{ path: '/admin/database', name: 'admin database' },
 	{ path: '/admin/database/consultee-areas', name: 'admin database consultee areas' },
 	{ path: '/admin/database/case-boundaries', name: 'admin database case boundaries' },
-	{ path: '/admin/import-from-cbos', name: 'admin import cases from CBOS' },
 	{ path: '/unauthenticated', name: '401 unauthenticated' },
 	{ path: '/error/firewall-error', name: 'firewall error' },
 	{ path: '/this-page-does-not-exist', name: '404' }

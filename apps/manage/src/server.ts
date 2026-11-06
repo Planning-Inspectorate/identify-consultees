@@ -1,7 +1,7 @@
 import { ManageService } from '#service';
 import { sleep } from '@planning-inspectorate/core/util';
-import { startScheduledCbosImport } from './app/admin/import-from-cbos/scheduled-import.ts';
 import { createApp, prepareStaticAssetServing } from './app/app.ts';
+import { startScheduledCbosImport } from './app/cbos/scheduled-import.ts';
 import { startCbosSubscriber } from './app/cbos/subscriber.ts';
 import { loadConfig } from './app/config.ts';
 

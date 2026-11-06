@@ -52,6 +52,17 @@ variable "cbos_import_hours" {
   default     = "7,10,13,16,19"
 }
 
+variable "reference_data_copy_from" {
+  description = "The environment whose reference data files the admin page copies here - Test (for Training) or Training (for Prod) - or empty for none"
+  type        = string
+  default     = ""
+
+  validation {
+    condition     = contains(["", "Test", "Training"], var.reference_data_copy_from)
+    error_message = "reference_data_copy_from must be \"\", \"Test\" or \"Training\": the Promote reference data pipeline's routes."
+  }
+}
+
 variable "cbos_subscriber_enabled" {
   description = "Subscribe the web app to CBOS's nsip-document Service Bus topic, so a case's boundaries are imported when CBOS converts a new one (see idas-back-office.tf)"
   type        = bool

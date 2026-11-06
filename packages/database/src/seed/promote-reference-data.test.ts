@@ -8,22 +8,20 @@ import { after, afterEach, before, beforeEach, describe, mock, test } from 'node
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import type { PrismaClient } from '../client/client.ts';
 import { loadConfig } from '../configuration/config.ts';
-import { datasetInUse } from '../geospatial/consultee-areas.ts';
 import { newDatabaseClient } from '../index.ts';
-import type { GroupLoad, LatestGroupLoad } from './consultee-area-groups.ts';
+import type { LatestGroupLoad } from './consultee-area-groups.ts';
 import type { Dataset, FileStore, Manifest } from './promote-reference-data.ts';
 import {
 	blobFileStore,
+	copyQuarter,
 	databaseDataset,
 	exportQuarter,
-	importQuarter,
 	MANIFEST_FILE,
 	parseManifest,
 	parsePromotionArgs,
 	PromotionError,
 	run
 } from './promote-reference-data.ts';
-import { groupBySlug } from './reference-data.ts';
 
 const ADMIN = '20261020_administrative_boundaries.geojson';
 const PUBLIC = '20261020_public_bodies.geojson';
@@ -44,38 +42,13 @@ function load(blobName: string, rowsLoaded: number): LatestGroupLoad {
 }
 
 /** A database whose quarter `inUse` holds `rows` of each group, as `loads` loaded them. */
-function fakeDataset(options: {
-	inUse: string[];
-	loads?: Map<string, LatestGroupLoad>;
-	rows?: Map<string, number>;
-	loadedRows?: Record<string, number>;
-	waitingFor?: string[];
-}) {
-	const inUse = [...options.inUse];
-	const loaded: string[] = [];
-	const used: string[] = [];
+function fakeDataset(options: { inUse: string; loads?: Map<string, LatestGroupLoad>; rows?: Map<string, number> }) {
 	const dataset: Dataset = {
-		// each call takes the next answer, staying on the last
-		inUse: async () => (inUse.length > 1 ? inUse.shift()! : inUse[0]),
+		inUse: async () => options.inUse,
 		latestLoads: async () => options.loads ?? new Map(),
-		rowCounts: async () => options.rows ?? new Map(),
-		stillToLoad: async () => (options.waitingFor ?? []).map((slug) => groupBySlug(slug)!),
-		loadGroup: async (_filePath, blobName) => {
-			loaded.push(blobName);
-			const slug = blobName.slice(9, -'.geojson'.length);
-			return {
-				group: groupBySlug(slug)!,
-				quarter: '2026Q4',
-				rowsLoaded: options.loadedRows?.[blobName] ?? 0,
-				datasetInUse: '2026Q4',
-				waitingFor: []
-			} satisfies GroupLoad;
-		},
-		use: async (quarter) => {
-			used.push(quarter);
-		}
+		rowCounts: async () => options.rows ?? new Map()
 	};
-	return { dataset, loaded, used };
+	return { dataset };
 }
 
 function fakeStore(existing: Record<string, 'same' | 'different'> = {}) {
@@ -134,7 +107,7 @@ const BLOB_ENV = { BLOB_STORE_HOST: 'https://blob.example.test', BLOB_STORE_CONT
 describe('exportQuarter', () => {
 	test("writes the quarter's group files and what each loaded, skipping a group with no data", async () => {
 		const { dataset } = fakeDataset({
-			inUse: ['2026Q4'],
+			inUse: '2026Q4',
 			loads: new Map([
 				['administrative_boundaries', load(ADMIN, 9_000)],
 				['public_bodies', load(PUBLIC, 316)]
@@ -162,18 +135,29 @@ describe('exportQuarter', () => {
 		assert.equal(readFileSync(path.join(dir, PUBLIC), 'utf8'), `{"name":"${PUBLIC}"}`);
 	});
 
-	test('promotes only the dataset in use, as it was loaded, and something', async () => {
+	test('copies the dataset in use when no quarter is given', async () => {
+		const { dataset } = fakeDataset({
+			inUse: '2026Q4',
+			loads: new Map([['public_bodies', load(PUBLIC, 316)]]),
+			rows: new Map([['public_bodies', 316]])
+		});
+		const manifest = await exportQuarter(dataset, fakeStore().store, undefined, dir);
+		assert.equal(manifest.quarter, '2026Q4');
+		assert.deepEqual(manifest.files, [{ group: 'public_bodies', blobName: PUBLIC, rowsLoaded: 316 }]);
+	});
+
+	test('copies only the dataset in use, as it was loaded, and something', async () => {
 		const { store, downloaded } = fakeStore();
 		await assert.rejects(
-			exportQuarter(fakeDataset({ inUse: ['2026Q4'] }).dataset, store, '2026-Q4', dir),
+			exportQuarter(fakeDataset({ inUse: '2026Q4' }).dataset, store, '2026-Q4', dir),
 			/isn't a quarter/
 		);
 		await assert.rejects(
-			exportQuarter(fakeDataset({ inUse: ['2026Q3'] }).dataset, store, '2026Q4', dir),
+			exportQuarter(fakeDataset({ inUse: '2026Q3' }).dataset, store, '2026Q4', dir),
 			/this environment uses 2026Q3, not 2026Q4/
 		);
 		const edited = fakeDataset({
-			inUse: ['2026Q4'],
+			inUse: '2026Q4',
 			loads: new Map([['public_bodies', load(PUBLIC, 316)]]),
 			rows: new Map([['public_bodies', 300]])
 		});
@@ -181,14 +165,14 @@ describe('exportQuarter', () => {
 			exportQuarter(edited.dataset, store, '2026Q4', dir),
 			/300 rows in 2026Q4, but its last load .* put in 316/
 		);
-		const unlogged = fakeDataset({ inUse: ['2026Q4'], rows: new Map([['energy', 12]]) });
+		const unlogged = fakeDataset({ inUse: '2026Q4', rows: new Map([['energy', 12]]) });
 		await assert.rejects(
 			exportQuarter(unlogged.dataset, store, '2026Q4', dir),
 			/Energy has 12 rows in 2026Q4 but no load on record/
 		);
 		await assert.rejects(
-			exportQuarter(fakeDataset({ inUse: ['2026Q4'] }).dataset, store, '2026Q4', dir),
-			/nothing to promote/
+			exportQuarter(fakeDataset({ inUse: '2026Q4' }).dataset, store, '2026Q4', dir),
+			/nothing to copy/
 		);
 		assert.deepEqual(downloaded, []);
 	});
@@ -233,146 +217,88 @@ describe('parseManifest', () => {
 	});
 });
 
-describe('importQuarter', () => {
-	test('uploads and loads each group, and checks the quarter is now in use', async () => {
+describe('copyQuarter', () => {
+	test("uploads each group's file, saying which were already there", async () => {
 		writeExport(FILES);
-		const { dataset, loaded, used } = fakeDataset({
-			inUse: ['2026Q3', '2026Q4'],
-			loadedRows: { [ADMIN]: 9_000, [PUBLIC]: 316 }
-		});
 		const { store, uploaded } = fakeStore({ [ADMIN]: 'same' });
 		const lines: string[] = [];
 
-		await importQuarter(dataset, store, dir, (line) => lines.push(line));
+		const manifest = await copyQuarter(store, dir, (line) => lines.push(line));
 
+		assert.equal(manifest.quarter, '2026Q4');
 		assert.deepEqual(uploaded, [ADMIN, PUBLIC]);
-		assert.deepEqual(loaded, [ADMIN, PUBLIC]);
-		assert.deepEqual(used, []);
-		assert.deepEqual(lines, [
-			`${ADMIN}: already in blob storage`,
-			`${PUBLIC}: uploaded`,
-			'Administrative boundaries: 9000 rows (9000 on the source)',
-			'Public bodies: 316 rows (316 on the source)',
-			'2026Q4 is the dataset in use'
-		]);
+		assert.deepEqual(lines, [`${ADMIN}: already in blob storage`, `${PUBLIC}: copied`]);
 	});
 
-	test('goes back to the dataset it was using when a group loads a different number of rows', async () => {
+	test('stops at a different file already there under the same name', async () => {
 		writeExport(FILES);
-		const { dataset, used } = fakeDataset({
-			inUse: ['2026Q3', '2026Q4'],
-			loadedRows: { [ADMIN]: 9_000, [PUBLIC]: 300 }
-		});
-
+		const { store, uploaded } = fakeStore({ [ADMIN]: 'different' });
 		await assert.rejects(
-			importQuarter(dataset, fakeStore().store, dir, () => undefined),
-			/Public bodies loaded 300 rows, not 316 .* back on 2026Q3/
-		);
-		assert.deepEqual(used, ['2026Q3']);
-	});
-
-	test("says what it's waiting for when the quarter isn't in use yet, and loads nothing over a different file", async () => {
-		writeExport(FILES);
-		const waiting = fakeDataset({
-			inUse: ['2026Q3'],
-			loadedRows: { [ADMIN]: 9_000, [PUBLIC]: 316 },
-			waitingFor: ['energy']
-		});
-		await assert.rejects(
-			importQuarter(waiting.dataset, fakeStore().store, dir, () => undefined),
-			/still waiting for Energy; this environment still uses 2026Q3/
-		);
-
-		const clash = fakeDataset({ inUse: ['2026Q3'] });
-		await assert.rejects(
-			importQuarter(clash.dataset, fakeStore({ [PUBLIC]: 'different' }).store, dir, () => undefined),
+			copyQuarter(store, dir, () => undefined),
 			/isn't the same file/
 		);
-		assert.deepEqual(clash.loaded, []);
-	});
-
-	test('says it is waiting for nothing when the quarter may just be older than the one in use', async () => {
-		writeExport(FILES);
-		const { dataset } = fakeDataset({
-			inUse: ['2026Q3'],
-			loadedRows: { [ADMIN]: 9_000, [PUBLIC]: 316 },
-			waitingFor: []
-		});
-
-		await assert.rejects(
-			importQuarter(dataset, fakeStore().store, dir, () => undefined),
-			/still waiting for nothing \(it may be older than the dataset in use\)/
-		);
-	});
-
-	test('reports a load mismatch without switching back when the quarter was already in use', async () => {
-		writeExport(FILES);
-		const { dataset, used } = fakeDataset({
-			inUse: ['2026Q4'],
-			loadedRows: { [ADMIN]: 9_000, [PUBLIC]: 300 }
-		});
-
-		await assert.rejects(
-			importQuarter(dataset, fakeStore().store, dir, () => undefined),
-			(error: Error) => {
-				assert.match(error.message, /loaded 300 rows, not 316/);
-				assert.doesNotMatch(error.message, /back on/);
-				return true;
-			}
-		);
-		assert.deepEqual(used, []);
+		assert.deepEqual(uploaded, []);
 	});
 });
 
 describe('parsePromotionArgs', () => {
-	test('reads export and import', () => {
+	test('reads export and copy - a quarter only if one is given', () => {
 		assert.deepEqual(parsePromotionArgs(['export', '--quarter=2026Q4', '--dir=/tmp/x']), {
 			command: 'export',
 			dir: '/tmp/x',
 			quarter: '2026Q4'
 		});
-		assert.deepEqual(parsePromotionArgs(['import', 'stray', '--dir=/tmp/x']), {
-			command: 'import',
+		// the pipeline's default, the dataset in use
+		assert.deepEqual(parsePromotionArgs(['export', '--quarter=', '--dir=/tmp/x']), {
+			command: 'export',
+			dir: '/tmp/x',
+			quarter: undefined
+		});
+		assert.deepEqual(parsePromotionArgs(['copy', 'stray', '--dir=/tmp/x']), {
+			command: 'copy',
 			dir: '/tmp/x',
 			quarter: undefined
 		});
 	});
 
-	test('refuses a missing command, directory or quarter', () => {
-		assert.throws(() => parsePromotionArgs(['--dir=/tmp/x']), /"export" or "import"/);
-		assert.throws(() => parsePromotionArgs(['import']), /--dir is required/);
-		assert.throws(() => parsePromotionArgs(['export', '--dir=/tmp/x']), /needs --quarter/);
+	test('refuses a missing command or directory', () => {
+		assert.throws(() => parsePromotionArgs(['--dir=/tmp/x']), /"export" or "copy"/);
+		assert.throws(() => parsePromotionArgs(['import', '--dir=/tmp/x']), /"export" or "copy"/);
+		assert.throws(() => parsePromotionArgs(['copy']), /--dir is required/);
 	});
 });
 
 describe('run', () => {
 	test('exports the quarter in use and logs the manifest it wrote', async () => {
 		const { dataset } = fakeDataset({
-			inUse: ['2026Q4'],
+			inUse: '2026Q4',
 			loads: new Map([['public_bodies', load(PUBLIC, 316)]]),
 			rows: new Map([['public_bodies', 316]])
 		});
 		const lines: string[] = [];
 
-		await run(['export', '--quarter=2026Q4', `--dir=${dir}`], dataset, fakeStore().store, (line) => lines.push(line));
+		await run(
+			['export', '--quarter=2026Q4', `--dir=${dir}`],
+			() => dataset,
+			fakeStore().store,
+			(line) => lines.push(line)
+		);
 
 		assert.deepEqual(lines, ['Exported 2026Q4:', `  ${PUBLIC}: 316 rows`]);
 	});
 
-	test('imports the export in the directory and logs the manifest', async () => {
+	test('copies the export in the directory, never opening the database, and logs the manifest', async () => {
 		writeExport(FILES);
-		const { dataset } = fakeDataset({ inUse: ['2026Q4'], loadedRows: { [ADMIN]: 9_000, [PUBLIC]: 316 } });
 		const lines: string[] = [];
+		const openDataset = mock.fn((): Dataset => assert.fail('a copy reads no database'));
 
-		await run(['import', `--dir=${dir}`], dataset, fakeStore().store, (line) => lines.push(line));
+		await run(['copy', `--dir=${dir}`], openDataset, fakeStore().store, (line) => lines.push(line));
 
+		assert.equal(openDataset.mock.callCount(), 0);
 		assert.deepEqual(lines, [
-			`${ADMIN}: uploaded`,
-			`${PUBLIC}: uploaded`,
-			'Administrative boundaries: 9000 rows (9000 on the source)',
-			'Public bodies: 316 rows (316 on the source)',
-			'2026Q4 is the dataset in use',
-			'Imported 2026Q4:',
+			`${ADMIN}: copied`,
+			`${PUBLIC}: copied`,
+			'Copied 2026Q4:',
 			`  ${ADMIN}: 9000 rows`,
 			`  ${PUBLIC}: 316 rows`
 		]);
@@ -381,7 +307,6 @@ describe('run', () => {
 
 describe('databaseDataset', () => {
 	test('answers the promotion questions from the database', async () => {
-		const executed: unknown[][] = [];
 		const client = {
 			$queryRaw: async (strings: TemplateStringsArray) => {
 				const sql = strings.join(' ');
@@ -392,10 +317,6 @@ describe('databaseDataset', () => {
 					return [{ count: 3 }];
 				}
 				return [];
-			},
-			$executeRaw: async (...args: unknown[]) => {
-				executed.push(args);
-				return 0;
 			}
 		} as unknown as PrismaClient;
 
@@ -406,11 +327,6 @@ describe('databaseDataset', () => {
 		const counts = await dataset.rowCounts('2026Q4');
 		assert.ok(counts.size > 0);
 		assert.ok([...counts.values()].every((count) => count === 3));
-		assert.deepEqual(await dataset.stillToLoad('2026Q4'), []);
-		await dataset.use('2026Q4');
-		assert.equal(executed.length, 1);
-		assert.ok(executed[0].includes('2026Q4'));
-		await assert.rejects(() => dataset.loadGroup('/tmp/nope.geojson', 'notes.txt'), /isn't a group's file/);
 	});
 });
 
@@ -499,19 +415,16 @@ after(async () => {
 });
 
 describe('running as a script (requires a local SQL Server - see docker-compose.yml)', () => {
-	test('imports a manifest with nothing to load, logging what it did', async (t) => {
-		if (!dbAvailable) return t.skip('SQL Server database not available');
-		// an empty manifest for the quarter already in use promotes successfully, changing nothing
-		const quarter = await datasetInUse(dbClient);
-		writeFileSync(path.join(dir, MANIFEST_FILE), JSON.stringify({ version: 1, quarter, files: [] }));
+	test('copies a manifest with nothing to copy, with no database, logging what it did', () => {
+		writeFileSync(path.join(dir, MANIFEST_FILE), JSON.stringify({ version: 1, quarter: '2026Q4', files: [] }));
+		const { SQL_CONNECTION_STRING: _none, ...env } = process.env;
 
-		const stdout = execFileSync(process.execPath, ['--experimental-strip-types', cliPath, 'import', `--dir=${dir}`], {
-			env: { ...process.env, SQL_CONNECTION_STRING: connectionString!, ...BLOB_ENV },
+		const stdout = execFileSync(process.execPath, ['--experimental-strip-types', cliPath, 'copy', `--dir=${dir}`], {
+			env: { ...env, ...BLOB_ENV },
 			encoding: 'utf8'
 		});
 
-		assert.match(stdout, new RegExp(`${quarter} is the dataset in use`));
-		assert.match(stdout, new RegExp(`Imported ${quarter}:`));
+		assert.match(stdout, /Copied 2026Q4:/);
 	});
 
 	test('fails with the PromotionError a real export raises', async (t) => {

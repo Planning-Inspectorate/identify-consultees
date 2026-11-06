@@ -11,45 +11,66 @@ describe('admin page accessibility smoke', () => {
 	const nunjucks = configureNunjucks();
 	const navFor = (path: string) => ({ adminNav: adminNavigation(path) });
 
-	test('admin import from CBOS page has no serious a11y violations', async () => {
-		const html = nunjucks.render('admin/import-from-cbos/view.njk', {
+	test('admin files page, copying from the previous environment, has no serious a11y violations', async () => {
+		const groups = [{ name: 'Energy', slug: 'energy', categories: 'DNO, Interconnector' }];
+		const html = nunjucks.render('admin/upload-to-blob/view.njk', {
 			...adminLocals,
-			...navFor('/admin/import-from-cbos'),
-			pageHeading: 'Import cases from CBOS',
+			...navFor('/admin/upload-to-blob'),
+			pageHeading: 'Reference data files',
 			_csrf: 'test-csrf',
-			loaded: { cases: 270, boundaries: 300, casesFromCbos: 110, boundariesFromCbos: 120 }
-		});
-		await assertNoSeriousA11yViolations(html);
-	});
-
-	test('admin import from CBOS page with a result has no serious a11y violations', async () => {
-		const html = nunjucks.render('admin/import-from-cbos/view.njk', {
-			...adminLocals,
-			...navFor('/admin/import-from-cbos'),
-			pageHeading: 'Import cases from CBOS',
-			_csrf: 'test-csrf',
-			filesFound: 3,
-			imported: 2,
-			casesImported: 2,
-			failures: [{ caseReference: 'EN010001', fileName: 'broken.geojson', reason: 'status 500' }]
-		});
-		await assertNoSeriousA11yViolations(html);
-	});
-
-	test('admin import from CBOS page with an error has no serious a11y violations', async () => {
-		const html = nunjucks.render('admin/import-from-cbos/view.njk', {
-			...adminLocals,
-			...navFor('/admin/import-from-cbos'),
-			pageHeading: 'Import cases from CBOS',
-			_csrf: 'test-csrf',
-			error: 'Could not import case boundaries from CBOS.',
-			cause: 'Python function cbos/boundary-files responded with status 500',
-			connection: {
-				database: { status: 'ERROR', detail: "Error: Login failed for user '<token-identified principal>'" },
-				storage: { status: 'OK', detail: 'listed 5 blob name(s) in document-service-uploads' }
+			chunkBytes: 8,
+			maxUploadBytes: 64,
+			groups,
+			copy: {
+				from: 'Training',
+				to: 'Prod',
+				needsApproval: true,
+				running: false,
+				notice: 'started',
+				latest: {
+					status: { text: 'Copied', colour: 'green' },
+					queuedAt: '09:00, 6 Nov 2026',
+					finishedAt: '09:04, 6 Nov 2026',
+					url: 'https://dev.azure.com/org/project/_build/results?buildId=1'
+				},
+				error: "Couldn't reach Azure DevOps to see the last copy: status 401"
 			}
 		});
+		assert.match(html, /<h2 class="govuk-heading-m">Copy from Training<\/h2>/);
+		assert.match(html, /It needs approving in Azure DevOps first/);
+		assert.match(html, /Copy the files from Training/);
 		await assertNoSeriousA11yViolations(html);
+	});
+
+	test('admin files page with a copy running, or no copying, has no serious a11y violations', async () => {
+		const base = {
+			...adminLocals,
+			...navFor('/admin/upload-to-blob'),
+			pageHeading: 'Reference data files',
+			_csrf: 'test-csrf',
+			groups: [{ name: 'Energy', slug: 'energy', categories: 'DNO' }]
+		};
+		const running = nunjucks.render('admin/upload-to-blob/view.njk', {
+			...base,
+			copy: {
+				from: 'Test',
+				to: 'Training',
+				needsApproval: false,
+				running: true,
+				notice: 'running',
+				latest: { status: { text: 'Running', colour: 'blue' }, queuedAt: '09:00, 6 Nov 2026', url: 'https://x.test/1' }
+			}
+		});
+		// no button while one runs
+		assert.doesNotMatch(running, /Copy the files from/);
+		assert.match(running, /A copy from Test is already running/);
+		await assertNoSeriousA11yViolations(running);
+		const none = nunjucks.render('admin/upload-to-blob/view.njk', {
+			...base,
+			uploadedBlobName: '20261020_energy.geojson'
+		});
+		assert.doesNotMatch(none, /Copy from/);
+		await assertNoSeriousA11yViolations(none);
 	});
 
 	test('admin home lists every admin page beside the menu, with no serious a11y violations', async () => {

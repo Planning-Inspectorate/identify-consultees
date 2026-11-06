@@ -13,9 +13,13 @@ import {
 	CHUNK_BYTES,
 	isBlobName,
 	MAX_BLOCKS,
+	renderWithCopyError,
 	uploadBlobName,
 	uploadFileToBlob
 } from './controller.ts';
+import { createRoutes } from './index.ts';
+
+const NO_COPY = { referenceDataCopy: undefined, logger: mockLogger() };
 
 describe('admin upload to blob', () => {
 	const nunjucks = configureNunjucks();
@@ -25,7 +29,7 @@ describe('admin upload to blob', () => {
 
 	it('renders the page with no prior result', async () => {
 		const res = newRes();
-		const page = buildUploadToBlobPage();
+		const page = buildUploadToBlobPage(NO_COPY);
 		await page({}, res);
 		assert.strictEqual(res.render.mock.callCount(), 1);
 		assert.strictEqual(res.render.mock.calls[0].arguments[0], 'admin/upload-to-blob/view.njk');
@@ -37,7 +41,7 @@ describe('admin upload to blob', () => {
 	});
 
 	it('says which file was uploaded when the script lands back on the page, ignoring any other name', async () => {
-		const page = buildUploadToBlobPage();
+		const page = buildUploadToBlobPage(NO_COPY);
 		const res = newRes();
 		await page({ query: { uploaded: '20261020_combined_reference_data (1).geojson' } }, res);
 		assert.strictEqual(
@@ -46,7 +50,7 @@ describe('admin upload to blob', () => {
 		);
 		assert.match(
 			res.render.mock.calls[0].result as string,
-			/Uploaded &quot;20261020_combined_reference_data \(1\)\.geojson&quot;/
+			/Uploaded 20261020_combined_reference_data \(1\)\.geojson\./
 		);
 
 		const odd = newRes();
@@ -91,7 +95,7 @@ describe('admin upload to blob', () => {
 
 	it("has a form for each group of the reference data, with the date it's from, and one for any other file", async () => {
 		const res = newRes();
-		await buildUploadToBlobPage()({}, res);
+		await buildUploadToBlobPage(NO_COPY)({}, res);
 		const html = res.render.mock.calls[0].result as string;
 		for (const slug of ['administrative_boundaries', 'public_bodies', 'energy', 'transport', 'other']) {
 			assert.match(html, new RegExp(`data-blob-group="${slug}"`));
@@ -326,6 +330,50 @@ describe('admin upload to blob', () => {
 			blobBlockUploads(config);
 			blobBlockUploads({ ...config, container: 'other' });
 			assert.strictEqual(getContainerClient.mock.callCount(), 2);
+		});
+	});
+
+	describe('copying from the previous environment', () => {
+		const COPY = { projectUrl: 'https://dev.azure.com/org/project', from: 'Test', to: 'Training' } as const;
+		const pipeline = {
+			latestRun: mock.fn(async () => undefined),
+			start: mock.fn(async () => ({ id: 1, status: 'running' as const, queuedAt: new Date(), url: '' }))
+		};
+
+		it('shows the Copy section where copying is set up, saying a copy started', async () => {
+			const res = newRes();
+			await buildUploadToBlobPage({ referenceDataCopy: COPY, logger: mockLogger() }, pipeline)(
+				{ query: { copy: 'started' } },
+				res
+			);
+			const [, viewModel] = res.render.mock.calls[0].arguments;
+			assert.strictEqual(viewModel.copy.from, 'Test');
+			assert.strictEqual(viewModel.copy.notice, 'started');
+			assert.match(res.render.mock.calls[0].result as string, /Started copying the files from Test\./);
+		});
+
+		it('shows the page again with the Copy section saying why a copy could not start', async () => {
+			const res = newRes();
+			await renderWithCopyError({ referenceDataCopy: COPY, logger: mockLogger() }, pipeline)(
+				res as never,
+				"Couldn't start the copy from Test: status 403"
+			);
+			const [, viewModel] = res.render.mock.calls[0].arguments;
+			assert.strictEqual(viewModel.copy.error, "Couldn't start the copy from Test: status 403");
+			assert.ok(viewModel.groups.length > 0);
+			assert.match(res.render.mock.calls[0].result as string, /status 403/);
+		});
+
+		it('has a route to start one only where copying is set up', () => {
+			const routes = (router: ReturnType<typeof createRoutes>) =>
+				(router as unknown as { stack: { route?: { path: string } }[] }).stack.flatMap((layer) =>
+					layer.route ? [layer.route.path] : []
+				);
+			const service = (referenceDataCopy?: typeof COPY) => ({ referenceDataCopy, logger: mockLogger() }) as never;
+			assert.ok(routes(createRoutes(service(COPY), undefined, undefined, pipeline)).includes('/copy'));
+			// the real pipeline, made from the settings - nothing is asked of Azure DevOps until the page is
+			assert.ok(routes(createRoutes(service(COPY))).includes('/copy'));
+			assert.ok(!routes(createRoutes(service())).includes('/copy'));
 		});
 	});
 });

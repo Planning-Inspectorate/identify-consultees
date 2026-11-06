@@ -77,6 +77,11 @@ export class ManageService extends BaseService<PrismaClient> {
 		return this.#rulesetRunner;
 	}
 
+	/** Where this environment's reference data files are copied from, if anywhere - see config.ts. */
+	get referenceDataCopy(): Config['referenceDataCopy'] {
+		return this.#config.referenceDataCopy;
+	}
+
 	get blobStoreConfig(): Config['blobStore'] {
 		return this.#config.blobStore;
 	}

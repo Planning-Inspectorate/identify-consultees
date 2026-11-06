@@ -1,23 +1,22 @@
 /**
- * Promote a quarter's reference data from one environment to the next - Test to Training,
- * Training to Prod - as the files that were loaded, not as a copy of the database: the target loads
- * them exactly as its own admin page would (importConsulteeAreaGroup), so its case boundaries and
- * everything else stay its own. Run by .azure/pipelines/promote-reference-data.yml, a job per
+ * Copy a quarter's reference data files from one environment's blob storage to the next's - Test
+ * to Training, Training to Prod - ready for its admin page to load (/admin/import-reference-data).
+ * Only the files the source loaded are copied, not its database, so the target's case boundaries
+ * and everything else stay its own. Run by .azure/pipelines/promote-reference-data.yml, a job per
  * environment, each signed in to its own environment only:
  *
- *   npm run promote-reference-data -- export --quarter=2026Q4 --dir=<dir>   (on the source)
- *   npm run promote-reference-data -- import --dir=<dir>                     (on the target)
+ *   npm run promote-reference-data -- export [--quarter=2026Q4] --dir=<dir>   (on the source)
+ *   npm run promote-reference-data -- copy --dir=<dir>                        (on the target)
  *
- * `export` promotes only what the source is using: the quarter must be its dataset in use, and
- * each group's rows there must be what its last load put in. It downloads each group's file into
- * <dir> with a manifest of what each loaded. `import` uploads the files to the target's blob
- * storage, loads each group, and fails unless each loads as many rows as it did on the source and
- * the quarter becomes the target's dataset in use. Until every group is in, the target keeps
- * using its previous quarter, so a failed promotion changes nothing anyone sees.
+ * `export` copies only what the source is using - its dataset in use, or `--quarter` if that's
+ * it - and only if each group's rows there are what its last load put in. It downloads each
+ * group's file into <dir> with a manifest of what each loaded. `copy` uploads the files to the
+ * target's blob storage, refusing one already there under the same name but different; nothing is
+ * loaded until someone loads it on the target's admin page.
  *
- * Needs SQL_CONNECTION_STRING, BLOB_STORE_HOST and BLOB_STORE_CONTAINER for the environment it
- * runs against, and an Azure identity with Storage Blob Data Contributor on that container (see
- * import-from-blob.ts).
+ * `export` needs SQL_CONNECTION_STRING; both need BLOB_STORE_HOST and BLOB_STORE_CONTAINER for the
+ * environment they run against, and an Azure identity with Storage Blob Data Contributor on that
+ * container (see import-from-blob.ts).
  */
 import { readFile, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
@@ -26,17 +25,10 @@ import type { PrismaClient } from '../client/client.ts';
 import { loadConfig } from '../configuration/config.ts';
 import { datasetInUse } from '../geospatial/consultee-areas.ts';
 import { newDatabaseClient, withExtendedTimeout } from '../index.ts';
-import type { GroupLoad, LatestGroupLoad } from './consultee-area-groups.ts';
-import {
-	groupRowCounts,
-	groupsStillToLoad,
-	importConsulteeAreaGroup,
-	latestGroupLoads,
-	parseGroupBlobName,
-	quarterOf
-} from './consultee-area-groups.ts';
+import type { LatestGroupLoad } from './consultee-area-groups.ts';
+import { groupRowCounts, latestGroupLoads, parseGroupBlobName, quarterOf } from './consultee-area-groups.ts';
 import { referenceDataContainer } from './import-from-blob.ts';
-import type { ReferenceDataConfig, ReferenceDataGroup } from './reference-data.ts';
+import type { ReferenceDataConfig } from './reference-data.ts';
 import { REFERENCE_DATA_CONFIG } from './reference-data.ts';
 
 // see withExtendedTimeout in import-cli.ts
@@ -63,15 +55,11 @@ export interface Manifest {
 /** A promotion refused or failed - its message says why, and what to do. */
 export class PromotionError extends Error {}
 
-/** The reference data in one environment's database. Stands in for it in tests. */
+/** The reference data in the source environment's database. Stands in for it in tests. */
 export interface Dataset {
 	inUse(): Promise<string>;
 	latestLoads(quarter: string): Promise<Map<string, LatestGroupLoad>>;
 	rowCounts(quarter: string): Promise<Map<string, number>>;
-	stillToLoad(quarter: string): Promise<ReferenceDataGroup[]>;
-	loadGroup(filePath: string, blobName: string): Promise<GroupLoad>;
-	/** Make `quarter` the dataset in use again. */
-	use(quarter: string): Promise<void>;
 }
 
 /** One environment's blob container. Stands in for it in tests. */
@@ -85,12 +73,7 @@ export function databaseDataset(dbClient: PrismaClient, config: ReferenceDataCon
 	return {
 		inUse: () => datasetInUse(dbClient),
 		latestLoads: (quarter) => latestGroupLoads(dbClient, quarter),
-		rowCounts: (quarter) => groupRowCounts(dbClient, config, quarter),
-		stillToLoad: (quarter) => groupsStillToLoad(dbClient, quarter, config),
-		loadGroup: (filePath, blobName) => importConsulteeAreaGroup(dbClient, filePath, blobName, { config }),
-		use: async (quarter) => {
-			await dbClient.$executeRaw`EXEC dbo.use_consultee_area_dataset ${quarter}`;
-		}
+		rowCounts: (quarter) => groupRowCounts(dbClient, config, quarter)
 	};
 }
 
@@ -110,7 +93,7 @@ export function blobFileStore(): FileStore {
 					return 'unchanged';
 				}
 				throw new PromotionError(
-					`${blobName} is already in ${container.containerName} but isn't the same file (${contentLength} bytes, not ${size}). Nothing was loaded`
+					`${blobName} is already in ${container.containerName} but isn't the same file (${contentLength} bytes, not ${size}) - nothing more was copied`
 				);
 			}
 			await blob.uploadFile(filePath);
@@ -120,23 +103,24 @@ export function blobFileStore(): FileStore {
 }
 
 /**
- * Write `quarter`'s group files and their manifest to `dir`, from the source environment - only
- * if it's the dataset in use there, and each group's rows are what its last load put in.
+ * Write the dataset in use's group files and their manifest to `dir`, from the source environment -
+ * only if each group's rows are what its last load put in. A `quarter` given must be the one in
+ * use: a check that it's the one that was meant.
  */
 export async function exportQuarter(
 	dataset: Dataset,
 	store: FileStore,
-	quarter: string,
+	requested: string | undefined,
 	dir: string,
 	config: ReferenceDataConfig = REFERENCE_DATA_CONFIG
 ): Promise<Manifest> {
-	if (!QUARTER.test(quarter)) {
-		throw new PromotionError(`"${quarter}" isn't a quarter - write it as in 2026Q4`);
+	if (requested !== undefined && !QUARTER.test(requested)) {
+		throw new PromotionError(`"${requested}" isn't a quarter - write it as in 2026Q4`);
 	}
-	const inUse = await dataset.inUse();
-	if (inUse !== quarter) {
+	const quarter = await dataset.inUse();
+	if (requested !== undefined && requested !== quarter) {
 		throw new PromotionError(
-			`Only the dataset in use can be promoted, so it's what was checked: this environment uses ${inUse}, not ${quarter}`
+			`Only the dataset in use can be copied, so it's what was checked: this environment uses ${quarter}, not ${requested}`
 		);
 	}
 	const loads = await dataset.latestLoads(quarter);
@@ -148,7 +132,7 @@ export async function exportQuarter(
 		if (!load) {
 			if (rows > 0) {
 				throw new PromotionError(
-					`${group.name} has ${rows} rows in ${quarter} but no load on record, so there's no file to promote - load it again here first`
+					`${group.name} has ${rows} rows in ${quarter} but no load on record, so there's no file to copy - load it again here first`
 				);
 			}
 			continue;
@@ -161,7 +145,7 @@ export async function exportQuarter(
 		files.push({ group: group.slug, blobName: load.blobName, rowsLoaded: load.rowsLoaded });
 	}
 	if (files.length === 0) {
-		throw new PromotionError(`${quarter} has no groups loaded, so there's nothing to promote`);
+		throw new PromotionError(`${quarter} has no groups loaded, so there's nothing to copy`);
 	}
 	for (const file of files) {
 		await store.download(file.blobName, path.join(dir, file.blobName));
@@ -192,61 +176,33 @@ export function parseManifest(text: string, config: ReferenceDataConfig = REFERE
 }
 
 /**
- * Upload and load the files `export` wrote to `dir` into the target environment, and check it now
- * uses the quarter with every group loading as many rows as on the source. If one loads a
- * different number, the target goes back to the dataset it was using, so nobody screens against
- * data that differs from what was checked.
+ * Upload the files `export` wrote to `dir` to the target environment's blob storage, ready to load
+ * on its admin page. A file already there under the same name must be the same file.
  */
-export async function importQuarter(
-	dataset: Dataset,
+export async function copyQuarter(
 	store: FileStore,
 	dir: string,
 	log: (line: string) => void = console.log,
 	config: ReferenceDataConfig = REFERENCE_DATA_CONFIG
 ): Promise<Manifest> {
 	const manifest = parseManifest(await readFile(path.join(dir, MANIFEST_FILE), 'utf8'), config);
-	const usedBefore = await dataset.inUse();
 	for (const file of manifest.files) {
 		const uploaded = await store.upload(path.join(dir, file.blobName), file.blobName);
-		log(`${file.blobName}: ${uploaded === 'uploaded' ? 'uploaded' : 'already in blob storage'}`);
+		log(`${file.blobName}: ${uploaded === 'uploaded' ? 'copied' : 'already in blob storage'}`);
 	}
-	const mismatched: string[] = [];
-	for (const file of manifest.files) {
-		const load = await dataset.loadGroup(path.join(dir, file.blobName), file.blobName);
-		log(`${load.group.name}: ${load.rowsLoaded} rows (${file.rowsLoaded} on the source)`);
-		if (load.rowsLoaded !== file.rowsLoaded) {
-			mismatched.push(`${load.group.name} loaded ${load.rowsLoaded} rows, not ${file.rowsLoaded}`);
-		}
-	}
-	if (mismatched.length > 0) {
-		const switchedBack = usedBefore !== manifest.quarter && (await dataset.inUse()) === manifest.quarter;
-		if (switchedBack) {
-			await dataset.use(usedBefore);
-		}
-		throw new PromotionError(
-			`${mismatched.join('; ')} - is the same release deployed to both environments? config/reference-data.yaml decides which rows load.${
-				switchedBack ? ` This environment is back on ${usedBefore}` : ''
-			}`
-		);
-	}
-	const inUse = await dataset.inUse();
-	if (inUse !== manifest.quarter) {
-		const waiting = (await dataset.stillToLoad(manifest.quarter)).map((group) => group.name);
-		throw new PromotionError(
-			`${manifest.quarter} isn't in use yet - still waiting for ${waiting.join(', ') || 'nothing (it may be older than the dataset in use)'}; this environment still uses ${inUse}`
-		);
-	}
-	log(`${manifest.quarter} is the dataset in use`);
 	return manifest;
 }
 
-export type PromotionArgs =
-	{ command: 'export'; dir: string; quarter: string } | { command: 'import'; dir: string; quarter: string | undefined };
+export interface PromotionArgs {
+	command: 'export' | 'copy';
+	dir: string;
+	quarter: string | undefined;
+}
 
 export function parsePromotionArgs(argv: string[]): PromotionArgs {
 	const [command, ...rest] = argv;
-	if (command !== 'export' && command !== 'import') {
-		throw new Error('the first argument must be "export" or "import"');
+	if (command !== 'export' && command !== 'copy') {
+		throw new Error('the first argument must be "export" or "copy"');
 	}
 	const values = Object.fromEntries(
 		rest.flatMap((arg) => {
@@ -257,28 +213,26 @@ export function parsePromotionArgs(argv: string[]): PromotionArgs {
 	if (!values.dir) {
 		throw new Error('--dir is required');
 	}
-	if (command === 'export') {
-		if (!values.quarter) {
-			throw new Error('export needs --quarter, as in --quarter=2026Q4');
-		}
-		return { command, dir: values.dir, quarter: values.quarter };
-	}
-	return { command, dir: values.dir, quarter: values.quarter };
+	// an empty --quarter= (the pipeline's default) means the one in use
+	return { command, dir: values.dir, quarter: values.quarter || undefined };
 }
 
-/** Run the export or import `argv` asks for against `dataset` and `store`, logging what it did. */
+/**
+ * Run the export or copy `argv` asks for against `store` - and, for an export, the database
+ * `openDataset` opens - logging what it did.
+ */
 export async function run(
 	argv: string[],
-	dataset: Dataset,
+	openDataset: () => Dataset,
 	store: FileStore,
 	log: (line: string) => void = console.log
 ): Promise<void> {
 	const args = parsePromotionArgs(argv);
 	const manifest =
 		args.command === 'export'
-			? await exportQuarter(dataset, store, args.quarter, args.dir)
-			: await importQuarter(dataset, store, args.dir, log);
-	log(`${args.command === 'export' ? 'Exported' : 'Imported'} ${manifest.quarter}:`);
+			? await exportQuarter(openDataset(), store, args.quarter, args.dir)
+			: await copyQuarter(store, args.dir, log);
+	log(`${args.command === 'export' ? 'Exported' : 'Copied'} ${manifest.quarter}:`);
 	for (const file of manifest.files) {
 		log(`  ${file.blobName}: ${file.rowsLoaded} rows`);
 	}
@@ -287,10 +241,15 @@ export async function run(
 const isMain = process.argv[1] !== undefined && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
 
 if (isMain) {
-	const dbClient = newDatabaseClient(withExtendedTimeout(loadConfig().db, IMPORT_REQUEST_TIMEOUT_MS));
+	// only an export reads the database - the copy job has no connection string
+	let dbClient: PrismaClient | undefined;
+	const openDataset = () => {
+		dbClient = newDatabaseClient(withExtendedTimeout(loadConfig().db, IMPORT_REQUEST_TIMEOUT_MS));
+		return databaseDataset(dbClient);
+	};
 	try {
-		await run(process.argv.slice(2), databaseDataset(dbClient), blobFileStore());
+		await run(process.argv.slice(2), openDataset, blobFileStore());
 	} finally {
-		await dbClient.$disconnect();
+		await dbClient?.$disconnect();
 	}
 }

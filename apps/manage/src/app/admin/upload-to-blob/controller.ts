@@ -10,10 +10,12 @@ import {
 import { groupBySlug, REFERENCE_DATA_CONFIG } from '@pins/identify-consultees-database/src/seed/reference-data.ts';
 import type { AsyncRequestHandler } from '@planning-inspectorate/core/util';
 import { unlink } from 'node:fs/promises';
+import type { CopyPipeline } from './copy-pipeline.ts';
+import { copySection } from './copy.ts';
 import type { UploadToBlobViewModel } from './view-model.ts';
 
 const VIEW = 'admin/upload-to-blob/view.njk';
-const PAGE_HEADING = 'Upload a file to blob storage';
+const PAGE_HEADING = 'Reference data files';
 
 export type BlobStoreConfig = { host: string; container: string };
 export type BlobUploader = (filePath: string, blobName: string, blobStoreConfig: BlobStoreConfig) => Promise<void>;
@@ -96,17 +98,35 @@ export async function uploadFileToBlob(
 }
 
 /**
- * The page. `?uploaded=<name>` - where the script goes once a file's parts are committed - shows
- * that it was uploaded.
+ * The page: the Copy section, where there is one, and a form per group. `?uploaded=<name>` - where
+ * the script goes once a file's parts are committed - shows that it was uploaded; `?copy=` that a
+ * copy was started, or was running already.
  */
-export function buildUploadToBlobPage(): AsyncRequestHandler {
+export function buildUploadToBlobPage(
+	service: Pick<ManageService, 'referenceDataCopy' | 'logger'>,
+	pipeline?: CopyPipeline
+): AsyncRequestHandler {
 	return async (req, res) => {
 		const uploaded = req.query?.uploaded;
+		const copy = await copySection(service, pipeline, req.query?.copy);
 		const viewModel: UploadToBlobViewModel = {
 			...pageViewModel(),
+			...(copy ? { copy } : {}),
 			...(isBlobName(uploaded) ? { uploadedBlobName: uploaded } : {})
 		};
 		return res.render(VIEW, viewModel);
+	};
+}
+
+/** The page again, with the Copy section saying why a copy couldn't be started. */
+export function renderWithCopyError(
+	service: Pick<ManageService, 'referenceDataCopy' | 'logger'>,
+	pipeline: CopyPipeline
+) {
+	return async (res: Parameters<AsyncRequestHandler>[1], copyError: string) => {
+		const copy = (await copySection(service, pipeline))!;
+		const viewModel: UploadToBlobViewModel = { ...pageViewModel(), copy: { ...copy, error: copyError } };
+		res.render(VIEW, viewModel);
 	};
 }
 

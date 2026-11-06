@@ -15,18 +15,13 @@ export const ADMIN_PAGES: readonly AdminPage[] = [
 	},
 	{
 		href: '/admin/upload-to-blob',
-		text: 'Upload to blob storage',
-		description: 'Upload a reference data or case boundary file to this environment’s blob storage.'
+		text: 'Reference data files',
+		description: 'The files in blob storage: upload one, or copy them from the previous environment.'
 	},
 	{
 		href: '/admin/import-reference-data',
-		text: 'Import reference data',
-		description: 'Load the consultee areas, or import case boundaries, from a file uploaded to blob storage.'
-	},
-	{
-		href: '/admin/import-from-cbos',
-		text: 'Import cases from CBOS',
-		description: 'How many cases are in the database, and import every case boundary CBOS holds.'
+		text: 'Load into database',
+		description: 'Load each group’s file into the consultee areas, and see each quarter’s dataset.'
 	}
 ];
 

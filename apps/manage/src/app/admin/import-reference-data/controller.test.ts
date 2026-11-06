@@ -7,9 +7,7 @@ import { configureNunjucks } from '../../nunjucks.ts';
 import {
 	buildClearConsulteeAreas,
 	buildImportReferenceDataPage,
-	buildRunImportCaseBoundaries,
 	buildRunImportConsulteeAreaGroup,
-	CASE_BOUNDARIES_BLOB_NAME,
 	loadOutcome
 } from './controller.ts';
 
@@ -117,7 +115,8 @@ describe('admin import reference data', () => {
 		assert.strictEqual(viewModelOf(res).pending, undefined);
 		assert.match(html, /11548 consultee areas in 2026Q4/);
 		assert.match(html, /Clear consultee areas/);
-		assert.match(html, /Import case boundaries/);
+		// case boundaries come from CBOS, not a file
+		assert.doesNotMatch(html, /Import case boundaries/);
 	});
 
 	it('still renders the page with what it could read, logging what it could not', async () => {
@@ -244,7 +243,6 @@ describe('admin import reference data', () => {
 				waitingFor: []
 			}));
 			const clear = mock.fn(async () => 1);
-			const importBoundaries = mock.fn(async () => 1);
 			const service = { db: databaseWith(), bulkDb, logger: mockLogger() } as never;
 			await buildRunImportConsulteeAreaGroup(
 				service,
@@ -252,10 +250,8 @@ describe('admin import reference data', () => {
 				runImport
 			)({ body: { group: 'public_bodies' } } as never, newRes());
 			await buildClearConsulteeAreas(service, files(), clear)({ body: { quarter: '2026Q4' } } as never, newRes());
-			await buildRunImportCaseBoundaries(service, files(), importBoundaries)({}, newRes());
 			assert.strictEqual(runImport.mock.calls[0].arguments[0], bulkDb);
 			assert.strictEqual(clear.mock.calls[0].arguments[0], bulkDb);
-			assert.strictEqual(importBoundaries.mock.calls[0].arguments[0], bulkDb);
 		});
 
 		it('says when the load is into the dataset in use', async () => {
@@ -411,44 +407,6 @@ describe('admin import reference data', () => {
 				clear
 			)({ body: { quarter: '2026Q4' } } as never, res);
 			assert.strictEqual(viewModelOf(res).error, 'Could not clear the consultee areas.');
-		});
-	});
-
-	describe('buildRunImportCaseBoundaries', () => {
-		it('downloads the known blob and reports the imported count on success', async () => {
-			const res = newRes();
-			const blobFiles = files([], '/tmp/case-boundaries.geojson');
-			const runImport = mock.fn(async () => 433);
-			const run = buildRunImportCaseBoundaries(
-				{ db: databaseWith(), logger: mockLogger() } as never,
-				blobFiles,
-				runImport
-			);
-			await run({}, res);
-
-			assert.strictEqual(blobFiles.download.mock.calls[0].arguments[0], CASE_BOUNDARIES_BLOB_NAME);
-			// merged, never replacing the table - that would delete the boundaries CBOS imported
-			assert.deepStrictEqual(runImport.mock.calls[0].arguments.slice(1), ['/tmp/case-boundaries.geojson']);
-			const { error, caseBoundariesImported } = viewModelOf(res);
-			assert.strictEqual(error, undefined);
-			assert.strictEqual(caseBoundariesImported, 433);
-			assert.match(htmlOf(res), /Imported case boundaries: 433/);
-		});
-
-		it('renders an error when the download fails, without throwing', async () => {
-			const res = newRes();
-			const blobFiles = files();
-			blobFiles.download = mock.fn(async () => {
-				throw new Error('AuthorizationPermissionMismatch');
-			});
-			const runImport = mock.fn(async () => 0);
-			await buildRunImportCaseBoundaries(
-				{ db: databaseWith(), logger: mockLogger() } as never,
-				blobFiles,
-				runImport
-			)({}, res);
-			assert.strictEqual(runImport.mock.callCount(), 0);
-			assert.match(viewModelOf(res).error, /Could not import case boundaries/);
 		});
 	});
 });

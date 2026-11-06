@@ -16,14 +16,8 @@
     <h1 class="govuk-heading-l">{{ pageHeading }}</h1>
 
     <p class="govuk-body">
-        Internal tool - loads files already uploaded to blob storage
-        (<a class="govuk-link" href="/admin/upload-to-blob">/admin/upload-to-blob</a>) into the
-        database, using the app's own managed identity.
-    </p>
-
-    <p class="govuk-body">
-        A load can take several minutes. If the page times out, the load carries on - wait a few
-        minutes, then reload this page and check the counts rather than submitting again.
+        Loads each group's newest file in <a class="govuk-link" href="/admin/upload-to-blob">Reference data files</a>.
+        A load can take minutes: if the page times out, it carries on - reload later and check the counts.
     </p>
 
     {% if error %}
@@ -42,13 +36,6 @@
         }) }}
     {% endif %}
 
-    {% if caseBoundariesImported != undefined %}
-        {{ govukNotificationBanner({
-            type: "success",
-            titleText: "Success",
-            text: "Imported case boundaries: " ~ caseBoundariesImported ~ "."
-        }) }}
-    {% endif %}
 
     {% if loadedConsulteeAreas != undefined %}
         <h2 class="govuk-heading-m">Currently loaded</h2>
@@ -180,11 +167,4 @@
     {% else %}
         <p class="govuk-body">There's no dataset to clear.</p>
     {% endif %}
-
-    <h2 class="govuk-heading-m">Case boundaries</h2>
-    <p class="govuk-body">Imports the case boundaries in <code>all-project-boundaries.geojson</code> from blob storage. Boundaries already here are updated, and nothing is deleted - including those imported from CBOS.</p>
-    <form method="post" action="/admin/import-reference-data/run-case-boundaries" novalidate>
-        <input type="hidden" name="_csrf" value="{{ _csrf }}">
-        {{ govukButton({ text: "Import case boundaries" }) }}
-    </form>
 {% endblock %}

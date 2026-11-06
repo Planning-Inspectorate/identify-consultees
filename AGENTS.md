@@ -546,16 +546,18 @@ job:
   `replaceExistingData=true` to clear each table first when the source's ids or areas changed -
   otherwise old rows stay as stale or duplicate consultees. Each table is cleared only once its
   blob has downloaded and parsed with features. The pipeline reads the blobs as its own identity,
-  which has no data-plane role on the container (Terraform can't grant one: the pipeline identity's
-  role-assignment rights carry an ABAC condition that refuses it), so this route fails with 403
-  until the platform team grants it Storage Blob Data Reader - use the in-app import meanwhile.
+  which has Storage Blob Data Contributor on Test's, Training's and Prod's storage accounts, granted
+  by hand (Terraform can't: the pipeline identity's role-assignment rights carry an ABAC condition
+  that refuses it). Dev's has none, so this route fails there with 403 - use the in-app import.
 - **Promoting a checked quarter**: `.azure/pipelines/promote-reference-data.yml` (`trigger: none`,
-  parameterised by `quarter` and `route`: Test to Training, or Training to Prod) exports the
-  source's dataset in use - its group files and the rows each loaded - and loads the same files
-  into the target, failing unless the counts match and the quarter becomes the target's dataset in
-  use. Case boundaries are never promoted. It needs Storage Blob Data Contributor on each
-  environment's `consultees-data` container for the same identity. See "Promoting a quarter" in
-  `kt-docs/data/data-model.md`.
+  parameterised by `route` - Test to Training, or Training to Prod - and an optional `quarter`)
+  exports the source's dataset in use - its group files and the rows each loaded - and copies the
+  files into the target's blob storage. It loads nothing: each group is loaded on the target's
+  `/admin/import-reference-data` page. Training's and Prod's `/admin/upload-to-blob` page starts it
+  (the Copy section), as the web app's managed identity, which needs adding to the Azure DevOps
+  project with queue and view rights on the pipeline. Case boundaries are never promoted. It needs
+  Storage Blob Data Contributor on each environment's `consultees-data` container for the same
+  identity. See "Promoting a quarter" in `kt-docs/data/data-model.md`.
 - **In-app import**: the same blobs can be imported from the manage app itself at
   `/admin/import-reference-data` (with `/admin/upload-to-blob` for getting files into the
   container) - the app's managed identity has Storage Blob Data Contributor. Consultee areas load a
