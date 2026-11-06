@@ -4,7 +4,7 @@
 # azure-functions 2.x requires Python >=3.13; the Function App runtime is 3.12 and CI
 # lint/test uses the agent's system Python 3.10, so we stay on the latest 1.x release.
 azure-functions==1.25.0
-pymssql==2.4.2
+pymssql==2.4.6
 # CBOS (the IDAS back office) is reached as the app's managed identity - see cbos/. mssql-python
 # bundles its own ODBC driver and accepts an azure-identity credential, which pymssql can't.
 azure-identity==1.26.0
