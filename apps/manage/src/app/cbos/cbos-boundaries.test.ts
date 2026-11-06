@@ -9,6 +9,7 @@ import {
 	distinctFileNames,
 	fetchCbosBoundaryGeoJson,
 	importCaseBoundariesFromCbos,
+	importDb,
 	listCbosBoundaryFiles,
 	toCaseBoundaryFromCbos
 } from './cbos-boundaries.ts';
@@ -339,6 +340,65 @@ describe('CBOS boundaries', () => {
 			assert.strictEqual(result.imported, 0);
 		});
 
+		// a ring of `points` points, each file's own
+		const ringOf = (points: number) => ({
+			type: 'Polygon' as const,
+			coordinates: [
+				[
+					...Array.from({ length: points - 1 }, (_, i) => [Math.cos(i) / 100, Math.sin(i) / 100] as [number, number]),
+					[1 / 100, 0] as [number, number]
+				]
+			]
+		});
+		const threeFiles = ['a.geojson', 'b.geojson', 'c.geojson'].map((fileName, i) => ({
+			...FILE,
+			documentGuid: `guid-${i}`,
+			caseReference: `EN01000${i}`,
+			fileName
+		}));
+
+		it('saves the files a batch of about 100,000 points at a time, as they arrive', async () => {
+			const batches: string[][] = [];
+			const result = await importCaseBoundariesFromCbos(db, OPTIONS, {
+				listFiles: async () => threeFiles,
+				fetchGeoJson: async () => collection({ geometry: ringOf(60_000) }),
+				load: (async (_db: unknown, features: { features: { properties: { fileName: string } }[] }) => {
+					batches.push(features.features.map((feature) => feature.properties.fileName));
+					return features.features.length;
+				}) as never
+			});
+
+			assert.deepStrictEqual(batches, [['a.geojson', 'b.geojson'], ['c.geojson']]);
+			assert.strictEqual(result.imported, 3);
+			assert.strictEqual(result.casesImported, 3);
+		});
+
+		it("fails only the files of a batch that can't be saved", async () => {
+			let calls = 0;
+			const result = await importCaseBoundariesFromCbos(db, OPTIONS, {
+				listFiles: async () => threeFiles,
+				fetchGeoJson: async () => collection({ geometry: ringOf(60_000) }),
+				load: (async (_db: unknown, features: { features: unknown[] }) => {
+					if (calls++ === 0) {
+						throw new Error('Timeout: Request failed to complete in 45000ms');
+					}
+					return features.features.length;
+				}) as never
+			});
+
+			assert.strictEqual(result.imported, 1);
+			// only the case whose boundary was saved
+			assert.strictEqual(result.casesImported, 1);
+			assert.deepStrictEqual(
+				result.failures,
+				['a.geojson', 'b.geojson'].map((fileName, i) => ({
+					caseReference: `EN01000${i}`,
+					fileName,
+					reason: "it couldn't be saved: Timeout: Request failed to complete in 45000ms"
+				}))
+			);
+		});
+
 		describe('only new or changed files', () => {
 			const idFor = (fileName: string, caseReference = FILE.caseReference) =>
 				deterministicId(`case-boundary:${caseReference}:${fileName}`);
@@ -470,6 +530,15 @@ describe('CBOS boundaries', () => {
 				}),
 				/status 500/
 			);
+		});
+	});
+
+	describe('importDb', () => {
+		it('is the bulk client, whose statements may run for minutes, where there is one', () => {
+			const db = { name: 'app' } as never;
+			const bulkDb = { name: 'bulk' } as never;
+			assert.strictEqual(importDb({ db, bulkDb }), bulkDb);
+			assert.strictEqual(importDb({ db }), db);
 		});
 	});
 

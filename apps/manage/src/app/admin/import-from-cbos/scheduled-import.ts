@@ -1,5 +1,5 @@
 import type { ManageService } from '#service';
-import { importCaseBoundariesFromCbos } from '../../cbos/cbos-boundaries.ts';
+import { importCaseBoundariesFromCbos, importDb } from '../../cbos/cbos-boundaries.ts';
 
 // how often the clock is looked at - an import starts within a minute of its hour
 const CHECK_EVERY_MS = 60_000;
@@ -51,10 +51,11 @@ const DEFAULT_DEPENDENCIES: ScheduledImportDependencies = {
  * hours are set (off).
  */
 export function startScheduledCbosImport(
-	service: Pick<ManageService, 'db' | 'logger' | 'pythonFunctionUrl' | 'pythonFunctionApiKey' | 'cbosImportHours'>,
+	service: Pick<ManageService, 'db' | 'logger' | 'pythonFunctionUrl' | 'pythonFunctionApiKey' | 'cbosImportHours'> &
+		Partial<Pick<ManageService, 'bulkDb'>>,
 	dependencies: ScheduledImportDependencies = DEFAULT_DEPENDENCIES
 ): (() => void) | undefined {
-	const { db, logger, cbosImportHours: hours } = service;
+	const { logger, cbosImportHours: hours } = service;
 	if (hours.length === 0) {
 		return undefined;
 	}
@@ -70,7 +71,7 @@ export function startScheduledCbosImport(
 		lastImport = due;
 		running = true;
 		try {
-			const result = await dependencies.runImport(db, options);
+			const result = await dependencies.runImport(importDb(service), options);
 			logger.info(
 				{ filesFound: result.filesFound, imported: result.imported, casesImported: result.casesImported },
 				'Scheduled CBOS import finished'

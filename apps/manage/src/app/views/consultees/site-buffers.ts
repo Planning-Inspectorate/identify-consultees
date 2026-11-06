@@ -40,13 +40,14 @@ export function formatBufferDistance(metres: number): string {
 }
 
 /**
- * What a run screened, to grow the buffers from: the site's outline, or the rectangle around it
- * (grown by BOUNDING_BOX_MARGIN_METRES) for a site too detailed to screen in time - as the
- * function's bounding_box builds it.
+ * What a run screened, to grow the buffers from: the site's outline - simplified to 10m, as the run
+ * sends it (see run-ruleset.ts), which grows in a fraction of the time the original takes - or
+ * the rectangle around it (grown by BOUNDING_BOX_MARGIN_METRES) for a site too detailed to screen
+ * in time, as the function's bounding_box builds it.
  */
 export function screenedSite(project: CaseBoundaryFeature, siteScreenedAs: SiteScreenedAs): Geometry {
 	if (siteScreenedAs !== 'boundingBox') {
-		return project.geometry;
+		return project.simplifiedGeometry ?? project.geometry;
 	}
 	const bounds = computeBounds({ features: [{ geometry: project.geometry }] })!;
 	const latitudeMargin = BOUNDING_BOX_MARGIN_METRES / METRES_PER_DEGREE;

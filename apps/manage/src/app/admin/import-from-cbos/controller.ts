@@ -1,6 +1,6 @@
 import type { ManageService } from '#service';
 import type { AsyncRequestHandler } from '@planning-inspectorate/core/util';
-import { checkCbosConnection, importCaseBoundariesFromCbos } from '../../cbos/cbos-boundaries.ts';
+import { checkCbosConnection, importCaseBoundariesFromCbos, importDb } from '../../cbos/cbos-boundaries.ts';
 import type { ImportFromCbosViewModel } from './view-model.ts';
 
 const VIEW = 'admin/import-from-cbos/view.njk';
@@ -58,14 +58,14 @@ export function buildRunImportFromCbos(
 	runImport: typeof importCaseBoundariesFromCbos = importCaseBoundariesFromCbos,
 	checkConnection: typeof checkCbosConnection = checkCbosConnection
 ): AsyncRequestHandler {
-	const { db, logger } = service;
+	const { logger } = service;
 
 	return async (req, res) => {
 		const viewModel = newViewModel(service);
 		const options = { pythonFunctionUrl: service.pythonFunctionUrl, apiKey: service.pythonFunctionApiKey };
 
 		try {
-			const result = await runImport(db, options);
+			const result = await runImport(importDb(service), options);
 			Object.assign(viewModel, result);
 			if (result.failures.length > 0) {
 				logger.warn({ failures: result.failures }, 'Some CBOS boundary files could not be imported');

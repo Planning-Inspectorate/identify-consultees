@@ -13,7 +13,9 @@ import {
 	NEARBY_LOCAL_FILL_OPACITY,
 	NEARBY_REGIONAL_FILL_OPACITY,
 	nsipColours,
-	REGIONAL_FILL_OPACITY
+	REGIONAL_FILL_OPACITY,
+	SITE_DISPLAY_MAX_POINTS,
+	siteDisplayGeometry
 } from './case-geojson.ts';
 import { CONSULTEE_CATEGORY_COLOURS, UNCATEGORISED } from './category-colours.ts';
 import { computeFittedMapView } from './geometry-bounds.ts';
@@ -40,6 +42,35 @@ function match(id: string): ConsulteeMatch {
 		reasons: [{ type: 'condition', conditionId: 'railways_10km' }]
 	} as ConsulteeMatch;
 }
+
+describe('siteDisplayGeometry', () => {
+	const line = (points: number): Geometry => ({
+		type: 'LineString',
+		coordinates: Array.from({ length: points }, (_, i) => [i / 1e6, 52] as [number, number])
+	});
+	const simplifiedGeometry: Geometry = { type: 'Point', coordinates: [0, 52] };
+
+	it('draws a site whole up to the limit, and simplified past it - where it has a simplified geometry', () => {
+		const whole = line(SITE_DISPLAY_MAX_POINTS);
+		assert.strictEqual(siteDisplayGeometry({ geometry: whole, simplifiedGeometry }), whole);
+		const large = line(SITE_DISPLAY_MAX_POINTS + 1);
+		assert.strictEqual(siteDisplayGeometry({ geometry: large, simplifiedGeometry }), simplifiedGeometry);
+		assert.strictEqual(siteDisplayGeometry({ geometry: large }), large);
+	});
+
+	it('counts the points of every part of a collection', () => {
+		const half = line(SITE_DISPLAY_MAX_POINTS / 2);
+		const collection: Geometry = {
+			type: 'GeometryCollection',
+			geometries: [
+				half,
+				{ type: 'MultiPolygon', coordinates: [[(half as { coordinates: [number, number][] }).coordinates]] },
+				simplifiedGeometry
+			]
+		};
+		assert.strictEqual(siteDisplayGeometry({ geometry: collection, simplifiedGeometry }), simplifiedGeometry);
+	});
+});
 
 describe('buildCaseMapConfig', () => {
 	it('draws a match with no category under the uncategorised colour', () => {

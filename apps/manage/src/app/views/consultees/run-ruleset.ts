@@ -12,6 +12,7 @@ import type {
 	SiteScreenedAs
 } from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
 import { getRuleset, RULESETS } from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
+import type { Geometry } from '@pins/identify-consultees-database/src/geospatial/wkt.ts';
 import type { MapMatch, SearchAreaDisplay } from '../../maps/case-geojson.ts';
 import { findNearbyNsips, isNearbyNsip } from './nearby-nsips.ts';
 import { activeTestFault } from './test-faults.ts';
@@ -149,25 +150,35 @@ function screenedGeometry(project: CaseBoundaryFeature) {
 	return project.simplifiedGeometry ?? project.geometry;
 }
 
+/** Search areas already grown, by radius - so the maps of one report grow the site only once. */
+export type SearchAreaCache = Map<number, Promise<Geometry>>;
+
 /**
  * The interactive map's search area - the site grown by the nearby radius - and the display
  * geometry of every consultee touching it: consultee areas', and Nearby NSIPs' boundaries. A
  * consultee added by hand is drawn wherever it is - it may be one the run never found, further
  * away (see addedBeyondRun). The map is an extra: if this fails, the page still lists every
- * consultee in its tables.
+ * consultee in its tables. A report's maps share `cache`: growing a large site by 35km takes
+ * seconds, and a report has a map for each of its categories.
  */
 export async function buildSearchAreaSafely(
 	db: ManageService['db'],
 	project: CaseBoundaryFeature,
 	matches: MapMatch[],
 	nearbyRadiusMetres: number,
-	logger: ManageService['logger']
+	logger: ManageService['logger'],
+	cache: SearchAreaCache = new Map()
 ): Promise<SearchAreaDisplay | undefined> {
 	if (matches.length === 0) {
 		return undefined;
 	}
 	try {
-		const area = await bufferGeometryForDisplay(db, screenedGeometry(project), nearbyRadiusMetres);
+		let grown = cache.get(nearbyRadiusMetres);
+		if (!grown) {
+			grown = bufferGeometryForDisplay(db, screenedGeometry(project), nearbyRadiusMetres);
+			cache.set(nearbyRadiusMetres, grown);
+		}
+		const area = await grown;
 		const ids = (nearbyNsips: boolean, addedByHand: boolean) => [
 			...new Set(
 				matches

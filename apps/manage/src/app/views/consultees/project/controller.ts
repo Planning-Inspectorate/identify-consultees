@@ -10,7 +10,7 @@ import type { AsyncRequestHandler, AsyncRequestHandlerWithBody } from '@planning
 import { recencyRanks, styleForRank } from '../../../maps/boundary-map-styles.ts';
 import type { BoundaryMapFile } from '../../../maps/boundary-map.ts';
 import { buildBoundaryMapConfig } from '../../../maps/boundary-map.ts';
-import { buildProjectGeojson } from '../../../maps/case-geojson.ts';
+import { buildProjectGeojson, siteDisplayGeometry } from '../../../maps/case-geojson.ts';
 import { computeFittedMapView } from '../../../maps/geometry-bounds.ts';
 import { MAP_VIEW } from '../../../maps/map-view.ts';
 import type { GeoJsonFeature, GeoJsonFeatureCollection } from '../../../maps/sample-geojson.ts';
@@ -46,13 +46,13 @@ async function mapFiles(
 ): Promise<BoundaryMapFile[]> {
 	const files: BoundaryMapFile[] = [];
 	for (const option of options) {
-		const geometry = (option.id === project.id ? project : await getCaseBoundaryById(db, option.id))?.geometry;
-		if (geometry) {
+		const row = option.id === project.id ? project : await getCaseBoundaryById(db, option.id);
+		if (row) {
 			files.push({
 				id: option.id,
 				label: option.label,
 				receivedDate: option.receivedDate,
-				geometry
+				geometry: siteDisplayGeometry(row)
 			});
 		}
 	}
@@ -247,10 +247,12 @@ async function allBoundaryFilesGeojson(
 	// highest rank (oldest) first, so the most recent is drawn over the rest
 	for (const index of files.map((_file, i) => i).sort((a, b) => ranks[b] - ranks[a])) {
 		const file = files[index];
-		const geometry = (file.id === project.id ? project : await getCaseBoundaryById(db, file.id))?.geometry;
-		if (geometry) {
+		const row = file.id === project.id ? project : await getCaseBoundaryById(db, file.id);
+		if (row) {
 			const style = styleForRank(ranks[index]);
-			const [feature] = buildProjectGeojson({ ...project, id: file.id, geometry }).features;
+			// each file drawn with its own geometry - and simplified one, if it's that large
+			const { geometry, simplifiedGeometry } = row;
+			const [feature] = buildProjectGeojson({ ...project, id: file.id, geometry, simplifiedGeometry }).features;
 			features.push({
 				...feature,
 				properties: { ...feature.properties, colour: style.colour, fillOpacity: String(style.fillOpacity) }

@@ -173,6 +173,8 @@ describe("the report's maps", () => {
 		assert.ok(
 			buffers.every(([wkt]) => String(wkt) !== 'POLYGON((-1.6 52.4, -1.4 52.4, -1.4 52.6, -1.6 52.6, -1.6 52.4))')
 		);
+		// and the maps' search area once, not once a map - for a large site, it takes seconds
+		assert.strictEqual(queries.filter((values) => values.includes(20_000)).length, 1);
 		// the nearby-only consultee's area is never looked up to draw
 		const drawn = queries.filter((values) =>
 			values.some((value) => typeof value === 'string' && /^[ah]\d$/.test(value))
