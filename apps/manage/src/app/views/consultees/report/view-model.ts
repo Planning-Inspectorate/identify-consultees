@@ -1,5 +1,5 @@
 export interface IdentifiedConsultee {
-	/** The consultee category (e.g. "Parish Council") the row is for. */
+	/** The row's label: the consultee category, with "NSIPs" spelled out. */
 	name: string;
 	/** Every consultee name in the category - the page shows the first few, then "Show more". */
 	names: string[];

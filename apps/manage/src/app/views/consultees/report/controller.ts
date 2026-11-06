@@ -41,7 +41,7 @@ import type {
  * ruleset's full coverage. Excluded consultees (removed on a category's Change page) don't
  * appear and hand-added ones do. Groups with no categories at all are left out.
  */
-/** The check page's group headings: the export tab's name, with "NSIPs" spelled out. */
+/** "NSIPs" spelled out - the check page's group heading, and its row label inside that card. */
 const GROUP_HEADINGS: Record<string, string> = {
 	[NEARBY_NSIPS]: 'National infrastructure projects'
 };
@@ -66,7 +66,7 @@ export function groupedConsultees(
 		names.set(add.category, [...(names.get(add.category) ?? []), add.name]);
 	}
 	const row = (category: string): IdentifiedConsultee => ({
-		name: category,
+		name: GROUP_HEADINGS[category] ?? category,
 		names: names.get(category) ?? [],
 		changeUrl: consulteesUrl(caseId, ruleset.id, category, selection)
 	});

@@ -300,7 +300,7 @@ describe('consultee report check page', () => {
 				group.consultees.map((row) => [row.name, row.names])
 			]),
 			[
-				['National infrastructure projects', [['NSIPs', []]]],
+				['National infrastructure projects', [['National infrastructure projects', []]]],
 				['Administrative boundaries', [['Parish Council', []]]]
 			]
 		);
@@ -312,7 +312,7 @@ describe('consultee report check page', () => {
 		const found = groupedConsultees(ruleset, realProjectId, [nearbyNsip], none, true);
 		assert.deepStrictEqual(found[0]?.consultees, [
 			{
-				name: 'NSIPs',
+				name: 'National infrastructure projects',
 				names: ['Neighbour (EN010200)'],
 				changeUrl:
 					'/consultees/44444444-4444-4444-4444-444444444444/report/consultees?ruleset=test-ruleset&category=NSIPs'
