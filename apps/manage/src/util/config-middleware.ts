@@ -26,17 +26,17 @@ export function addLocalsConfiguration(): Handler {
 			vendorMapStylesPluginJs: 'vendor/map-styles-plugin/js/index-c9ffb685.js',
 			vendorMapStylesPluginCss: 'vendor/map-styles-plugin/css/index-d8fa9e70.css',
 			headerTitle: 'Identify consultees',
-			// the support links the site footer lists - generic Planning Inspectorate pages
+			// the support links the site footer lists - generic Planning Inspectorate pages.
+			// Help and Contact are deliberately left out until their content has had a proper
+			// audit; the pages themselves stay routed.
 			footerLinks: [
-				{ text: 'Help', link: '/help' },
 				{ text: 'Terms and conditions', link: '/terms-and-conditions' },
 				{ text: 'Accessibility statement', link: '/accessibility-statement' },
 				{
 					text: 'Privacy',
 					link: 'https://www.gov.uk/government/publications/planning-inspectorate-privacy-notices/customer-privacy-notice'
 				},
-				{ text: 'Cookies', link: '/cookies' },
-				{ text: 'Contact', link: '/contact' }
+				{ text: 'Cookies', link: '/cookies' }
 			]
 		};
 		next();
