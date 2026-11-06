@@ -135,7 +135,7 @@ remove_before_go_live:
 
 ## Run it locally
 
-You need Node.js 24 ([`.nvmrc`](./.nvmrc)), Docker, Python 3.12 and Azure Functions Core Tools (`npm install -g azure-functions-core-tools@4`).
+You need Node.js 24 ([`.nvmrc`](./.nvmrc)), Docker, Python 3.14 and Azure Functions Core Tools (`npm install -g azure-functions-core-tools@4`).
 
 ```bash
 nvm use

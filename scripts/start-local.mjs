@@ -143,10 +143,10 @@ function commandWorks(command, args) {
 	});
 }
 
-/** A Python 3.12 virtual environment (the Function App's runtime) with the function's dependencies. */
+/** A Python 3.14 virtual environment (the Function App's runtime) with the function's dependencies. */
 async function ensurePythonEnvironment() {
 	if (!(await exists(path.join(venvBin, process.platform === 'win32' ? 'python.exe' : 'python')))) {
-		const python = (await commandWorks('python3.12', ['--version'])) ? 'python3.12' : 'python3';
+		const python = (await commandWorks('python3.14', ['--version'])) ? 'python3.14' : 'python3';
 		console.log(`Creating apps/function-python/.venv with ${python}...`);
 		await run(python, ['-m', 'venv', venvDir]);
 	}
