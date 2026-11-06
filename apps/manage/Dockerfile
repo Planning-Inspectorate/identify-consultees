@@ -3,7 +3,7 @@
 # engines.node ^24.22.1) so the image picks up minor/patch releases without a code
 # change. engines.npm is a >=11 floor, so the bundled npm always satisfies
 # engine-strict - no EBADENGINE drift.
-FROM node:24-alpine AS base
+FROM node:25-alpine AS base
 
 # npm nags about newer npm releases on every command; the image ships whatever
 # npm the current Node 24.x bundles so the notice is never actionable here.
