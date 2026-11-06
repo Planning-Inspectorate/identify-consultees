@@ -118,3 +118,7 @@ local.settings.json
 /.devin/ecc
 /.agents
 .coverage
+
+# Repo-specific skills live in .devin/skills/; security-review is a local-only
+# copy, not shared (see the closed PR discussion - keep it out of the repo)
+/.devin/skills/security-review/
