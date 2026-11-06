@@ -50,7 +50,7 @@
     "@azure/msal-node": "^7.1.1",
     "@azure/storage-blob": "^12.29.0",
     "@defra/interactive-map": "^0.0.49-alpha",
-    "@planning-inspectorate/core": "^1.15.0",
+    "@planning-inspectorate/core": "^1.15.1",
     "@prisma/adapter-mssql": "^7.10.1",
     "@prisma/client": "^7.10.1",
     "accessible-autocomplete": "^3.0.2",
