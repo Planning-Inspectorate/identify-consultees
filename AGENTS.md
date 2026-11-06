@@ -101,7 +101,7 @@ Before a PR is opened or handed over for review, run the same checks the pipelin
 - `npm run commitlint` — confirms the commit subjects are Conventional Commits.
 - `apps/function-python` changes: `python3 -m ruff check .` and `python3 -m pytest --cov --cov-fail-under=100` there — the same 100% statement gate as the JavaScript suites.
 
-`test-coverage` needs the local database and Playwright browsers set up (see CONTRIBUTING.md). If the pipeline still fails, "Reading Azure DevOps CI logs" below explains how to pull the failing step's log.
+`test-coverage` needs the local database and Playwright browsers set up (see CONTRIBUTING.md). If the pipeline still fails, [`docs/azure-devops-ci-logs.md`](./docs/azure-devops-ci-logs.md) explains how to pull the failing step's log.
 
 ### PR description checklist
 
@@ -169,44 +169,6 @@ npm -v        # 11.x (bundled with Node 24)
 npm ci
 npm run check-toolchain
 ```
-
-## Reading Azure DevOps CI logs
-
-When a PR check fails, work down this ladder — anonymous access to the DevOps project is denied,
-so the API needs a token, and local reproduction is the fallback when auth isn't available.
-
-1. **Get the build id** — `gh pr checks <pr>` prints each check's URL; `buildId=N` in the
-   `dev.azure.com/planninginspectorate/…` link is the build run.
-2. **Fetch the log via the REST API.** A DevOps-resource token is required — a plain ARM token
-   (the `az` default) gets a 401. `499b84ac-1321-427f-aa17-267ca6975798` is Azure DevOps's fixed
-   resource id:
-
-   ```bash
-   TOKEN=$(az account get-access-token --resource 499b84ac-1321-427f-aa17-267ca6975798 --query accessToken -o tsv)
-   # per-task results, each with a log id — find the failed task first
-   curl -sH "Authorization: Bearer $TOKEN" \
-     "https://dev.azure.com/planninginspectorate/2420751a-9599-4d19-8e37-2e8514532e1e/_apis/build/builds/<buildId>/timeline?api-version=7.1"
-   # then that task's log text
-   curl -sH "Authorization: Bearer $TOKEN" \
-     "https://dev.azure.com/planninginspectorate/2420751a-9599-4d19-8e37-2e8514532e1e/_apis/build/builds/<buildId>/logs/<logId>?api-version=7.1"
-   ```
-
-   Equivalents: `az rest --resource 499b84ac-1321-427f-aa17-267ca6975798 --url …`, or a PAT
-   (`AZURE_DEVOPS_EXT_PAT` for `az devops`, or basic auth on curl). If `az` reports an expired
-   token, `az login` again or ask for a PAT.
-
-3. **If auth isn't available at all, reproduce locally.** `.azure/pipelines/pr.yml` lists every
-   step the job runs, in order — walk it until the failure reproduces. The usual suspect is
-   `npm run test-coverage`: the hard 100% line/function/branch gate in
-   `apps/manage/scripts/run-frontend-coverage.mjs` only runs through that script (and the root
-   `npm test`), never through plain `node --test` or `npm test --workspace` — so a green unit run
-   alone does not prove the gate passes.
-
-   Coverage report tip: the text report truncates the uncovered-lines column and lists only the
-   files under threshold, so several files can be failing while the log names just the first. To
-   pinpoint a stubborn uncovered **branch** (the report shows a sub-100% figure with no line
-   numbers), run the file's test under `NODE_V8_COVERAGE=<dir>` and read the zero-count ranges in
-   the emitted JSON.
 
 ## Building a GDS-compliant government service
 
@@ -288,221 +250,26 @@ Before implementing or opening a PR that affects users or architecture:
 - [ ] Security and privacy considered (auth, validation, data minimisation, no secrets).
 - [ ] Reused shared packages/patterns rather than introducing a parallel stack.
 - [ ] PR summary notes any Service Standard / TCoP impact when material.
-- [ ] Static / tile map usage follows the caching rules below (no uncached hot-linking of OSM or commercial static image servers).
-- [ ] Map overlay colours, fills, hatches, and label styling follow the GIS Tool Styling tables in the Maps section below.
+- [ ] Static / tile map usage follows the caching rules in [`docs/maps.md`](./docs/maps.md) (no uncached hot-linking of OSM or commercial static image servers).
+- [ ] Map overlay colours, fills, hatches, and label styling follow the GIS Styling tables in [`docs/maps.md`](./docs/maps.md).
 - [ ] No `!important` in authored Sass/CSS — stylelint `declaration-no-important` fails the lint; use `govuk-!-*` override classes, BEM specificity, or source order instead.
-- [ ] HTTP protocol changes follow the Front Door / origin guidance below (do not add experimental Node QUIC listeners).
-
-## HTTP protocols and Azure Front Door
-
-Public traffic reaches the manage app through **Azure Front Door**, then Azure App Service. Protocol choices must match that topology.
-
-### Current best practice
-
-| Hop                               | Protocol today                            | Notes                                                                |
-| --------------------------------- | ----------------------------------------- | -------------------------------------------------------------------- |
-| Browser → Azure Front Door        | HTTPS with **HTTP/2** (HTTP/1.1 fallback) | Front Door terminates TLS and speaks modern HTTP to clients.         |
-| Front Door → App Service (origin) | **HTTP/1.1**                              | Microsoft documents this for Front Door origins.                     |
-| Node / Express in the container   | **HTTP/1.1** `app.listen`                 | Correct for an origin behind Front Door; keep `trust proxy` enabled. |
-
-**Do not** add an in-process HTTP/3 or QUIC listener in the Node/TypeScript app:
-
-- Node’s `node:quic` / HTTP/3 server surface is still experimental, needs a specially built binary plus `--experimental-quic`, and is not available on ordinary Node 24 runtimes used here.
-- Third-party native QUIC packages are not appropriate for this Azure App Service origin: clients never reach Node’s UDP listener while Front Door is in front.
-- Optimum user-facing performance for HTTP/3 comes from enabling it **at the CDN edge**, not in the origin process.
-
-### HTTP/3 + QUIC — enable at Azure Front Door
-
-When Microsoft ships HTTP/3 (QUIC) on Azure Front Door Standard/Premium for this shared profile, enable it **on Front Door** (portal, ARM/Bicep, or Terraform once the provider exposes the setting). Until then:
-
-- Keep documenting the intent in `infrastructure/front-door.tf`.
-- Do not advertise a misleading `Alt-Svc: h3=…` from the origin while the edge cannot serve HTTP/3.
-- After edge HTTP/3 is on, verify UDP/443 path, TLS 1.3, and that browsers negotiate `h3` on the public hostname (Chrome DevTools Protocol column / `Alt-Svc`).
-
-App-level performance work that _does_ help today stays in the origin: fingerprinting, Brotli, cache headers, CSP, and keeping responses streamable — not a Node QUIC stack.
+- [ ] HTTP protocol changes follow the Front Door / origin guidance in [`docs/http-and-front-door.md`](./docs/http-and-front-door.md) (do not add experimental Node QUIC listeners).
 
 ## Maps (interactive and static)
 
-### Terminology (how the user talks about maps)
+"Map" unqualified means the **Defra interactive map**; "static map" or "non-interactive map" means the server-rendered image. The full rules — GIS Styling tables, static-map caching and size budgets, tile-server usage, and Defra integration gotchas — live in [`docs/maps.md`](./docs/maps.md); [`kt-docs/maps.md`](./kt-docs/maps.md) explains how the project maps are built. Hard rules, abbreviated:
 
-When the user mentions maps in conversation or tickets, interpret wording as follows:
+- Never invent overlay colours, fills, or hatch patterns — use the GIS Styling tables in `docs/maps.md` and match legend/key swatches to the layer.
+- Static maps are proxied and cached by our app; never hot-link tile hosts in page HTML/CSS/JS, and never put `data-*` attributes on the map container (the Defra constructor JSON-parses them).
 
-| User says                                 | Means                                                                                                                                                 |
-| ----------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **map** (unqualified)                     | The **JS-on interactive map** (Defra Interactive Map / client-side map when JavaScript works).                                                        |
-| **static map** or **non-interactive map** | A **server-rendered image** of a map (PNG/JPEG/SVG served by our app), used for noscript / progressive-enhancement failure — not the interactive map. |
+## Linked operational docs
 
-Do not assume “map” alone refers to the static fallback; only treat it as static when they say static or non-interactive (or clearly point at the image/fallback path).
+Procedural and reference material lives outside this file — linked here, not duplicated:
 
-### Shapefile upload and GIS report workflow (external)
-
-For Astun GIS shapefile packaging, upload, attribute population, and prescribed-consultee report generation, read:
-
-- [`docs/gis-shapefile-upload-and-report.md`](./docs/gis-shapefile-upload-and-report.md)
-
-Keep that procedural detail out of this file; link here when an agent needs the operational context.
-
-### GIS Styling — default values (map overlays — required)
-
-Source: **GIS Styling (default values)** (last updated 19/10/2026, Jo Gerulaitis), superseding the earlier **GIS Tool Styling** sheet (12/09/2024) wherever the two disagree — the MOD area fills moved to `0.2` opacity and the safeguarding purple to `#cd2380`. Agents and contributors **must** use these styles whenever implementing or changing map overlays (interactive layers, legends/keys, and static-map drawings of the same features). Do not invent new colours or fill patterns for these layer types.
-
-#### Geometry selection map
-
-Solid fill; fill opacity `0.2`; border opacity `1.0`; border width `1.5px`.
-
-| Layer             | Colour    | Description |
-| ----------------- | --------- | ----------- |
-| Selected geometry | `#ff0000` | Solid fill  |
-| Other geometries  | `#3c51ab` | Solid fill  |
-
-#### Consultee layers
-
-Solid fill; fill opacity `0.2`; border opacity `1.0`; border width `1.5px`. The five group layers key the same groups as the generated report's workbook tabs (`GROUP_TABS` in `apps/manage/src/app/views/consultees/report/export/workbook.ts`).
-
-| Layer                     | Colour    | Differentiation hints (design suggestions, not mandated)                         |
-| ------------------------- | --------- | -------------------------------------------------------------------------------- |
-| Latest project geometries | `#ff0000` |                                                                                  |
-| Administrative boundaries | `#007a7a` | Ranges of opacities or overlaid hatch patterns (`\`, `/`, `=`, `\|`)             |
-| Public bodies             | `#2a72b2` | `+` markers in `#2a72b2` for hospitals                                           |
-| Energy                    | `#330165` |                                                                                  |
-| Transport                 | `#444444` | Dashed lines; `.`, `+`, `*` port-type markers in `#330165`, `#2a72b2`, `#cd2380` |
-| Other                     | `#cd2380` | See the MOD layers below                                                         |
-
-The sheet's mock-up legend also sketches per-group fill patterns (administrative boundaries a diagonal hatch, public bodies horizontal lines, energy a diagonal hatch, transport a dashed line, other constraints a cross-dot). The mock-up is marked approximate and AI-generated — the tables above are the source of truth for colours and opacities; treat the patterns as a differentiation aid where one colour per group is not enough on its own.
-
-Consultee areas on the maps should ultimately follow these group colours — the per-category palette in `apps/manage/src/app/maps/category-colours.ts` is an interim placeholder until group colouring lands.
-
-#### All layers — labels and buffers
-
-Applies to label styling on all map overlays:
-
-| Property       | Value     |
-| -------------- | --------- |
-| Font name      | Arial     |
-| Font size      | 10pt      |
-| Colour         | `#424145` |
-| Buffer width   | 2mm       |
-| Buffer colour  | `#ffffff` |
-| Buffer opacity | `0.9`     |
-
-#### All projects layer — by `geometryStage`
-
-Solid fill; fill opacity `0.6`; border opacity `1`.
-
-| Layer                 | Column          | Colour    | Description |
-| --------------------- | --------------- | --------- | ----------- |
-| Scoping               | `geometryStage` | `#3c51ab` | Solid fill  |
-| Acceptance            | `geometryStage` | `#bd2327` | Solid fill  |
-| Consultation adequacy | `geometryStage` | `#ee853e` | Solid fill  |
-| DCO consent           | `geometryStage` | `#85a54e` | Solid fill  |
-| Built                 | `geometryStage` | `#4c888e` | Solid fill  |
-
-#### All projects — by type (`Sector`)
-
-Solid fill; fill opacity `0.6`; border opacity `1`.
-
-| Layer                  | Column   | Colour    | Description |
-| ---------------------- | -------- | --------- | ----------- |
-| Transport              | `Sector` | `#da7c7e` | Solid fill  |
-| Business or Commercial | `Sector` | `#782e98` | Solid fill  |
-| Energy                 | `Sector` | `#e0a620` | Solid fill  |
-| Waste                  | `Sector` | `#874927` | Solid fill  |
-| Waste water            | `Sector` | `#418335` | Solid fill  |
-| Water                  | `Sector` | `#85b6b1` | Solid fill  |
-| Other                  | `Sector` | `#77767b` | Solid fill  |
-
-#### Energy projects — by subtype (`subType`)
-
-Diagonal hatch (`Hatched /`); fill opacity `1`; border opacity `1`.
-
-| Layer             | Column    | Colour    | Description |
-| ----------------- | --------- | --------- | ----------- |
-| Natural gas       | `subType` | `#da7c7e` | Hatched /   |
-| Energy from waste | `subType` | `#782e98` | Hatched /   |
-| Solar             | `subType` | `#e0a620` | Hatched /   |
-| Offshore wind     | `subType` | `#3b629b` | Hatched /   |
-| Biomass           | `subType` | `#418335` | Hatched /   |
-| Nuclear           | `subType` | `#85a54e` | Hatched /   |
-| Tidal             | `subType` | `#4c888e` | Hatched /   |
-| Hydrogen          | `subType` | `#85b6b1` | Hatched /   |
-| Onshore wind      | `subType` | `#77767b` | Hatched /   |
-| Other             | `subType` | `#874927` | Hatched /   |
-
-#### MOD low flying areas
-
-Cross hatch (`Hatched X`); fill opacity `0.2`; border/hatch opacity `1.0`.
-
-| Layer | Colour    | Description |
-| ----- | --------- | ----------- |
-| Green | `#418335` | Hatched X   |
-| Amber | `#e0a620` | Hatched X   |
-| Red   | `#bd2327` | Hatched X   |
-| Blue  | `#2068e4` | Hatched X   |
-
-#### MOD safeguarding areas
-
-Cross hatch (`Hatched X`); fill opacity `0.2`; border/hatch opacity `1.0`.
-
-| Layer  | Colour    | Description |
-| ------ | --------- | ----------- |
-| Purple | `#cd2380` | Hatched X   |
-
-#### Agent rules for overlay styling
-
-- Prefer shared constants / a single style module over hard-coding hex values in multiple views.
-- Match legend/key swatches to the same colour and fill pattern as the map layer.
-- When a new overlay type is needed and is not listed above, ask product/design rather than inventing a palette.
-- Static-map fallbacks that draw the same features should use the same colours and opacities where the render path allows.
-
-### Architecture
-
-The manage app follows the PINS-data-spike pattern: **Defra Interactive Map** when JavaScript works, plus a **server-rendered static map** for noscript / progressive-enhancement failure.
-
-### Formats
-
-Non-JS / fallback maps are **not always SVG**. Depending on configuration they may be:
-
-| Format                | Typical source                                                                                                                   |
-| --------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
-| `image/avif`          | Default OSM-tile path composited with `sharp` and encoded as AVIF when the client accepts it                                     |
-| `image/webp`          | Same composited raster, encoded as WebP when AVIF is not accepted                                                                |
-| `image/png` (or JPEG) | Composited raster fallback for older clients, or Google Maps Static API when configured                                          |
-| `image/svg+xml`       | SVG with a single compressed basemap embedded (`renderSvgBasemapImage` — JPEG data URI) + vector overlay (explicit `.svg` route) |
-
-The default `/…/static-map` route negotiates AVIF → WebP → PNG from the request `Accept` header, so it must send `Vary: Accept`, and the negotiated format is part of the ETag fingerprint (`buildStaticMapFingerprint`). The `/…/static-map.svg` route always returns SVG.
-
-Treat static maps as **binary or markup images served by our app**, never as a reason for browsers to hit third-party tile hosts directly.
-
-### Static map / tile server usage (required)
-
-OpenStreetMap tile servers and commercial static-map APIs rate-limit and block abusive clients. Agents and contributors **must**:
-
-1. **Proxy through our app** — serve `/…/static-map` (and optional `/…/static-map.svg`) from Express; do not put `tile.openstreetmap.org` (or equivalent) URLs in page HTML/CSS/JS for the static fallback.
-2. **Cache heavily** — responses must send long-lived `Cache-Control` (and preferably `ETag`). Matching `If-None-Match` must return **`304` and skip upstream Google/OSM fetches**. Prefer an in-process tile cache so repeat renders of the same viewport do not re-hit tile servers.
-3. **Keep concurrency low** when fetching tiles (small batches; identifying `User-Agent` naming this service and repo).
-4. **Only load static `<img>` when needed** — put the image in `<noscript>` and/or inject it after interactive-map failure; never eager-load static images for JS-capable users who will use the interactive map. Pass fallback details via the page's `<script type="application/json">` config block, not `data-*` attributes on the map container (see the `data-*` hazard below).
-5. **Do not invent uncached polling or prefetch** of static maps or tiles (e.g. pre-warming every section on every page view without cache).
-6. **Keep every static-map response inside the size budget** — target ≤100KB and never exceed ~200KB; this service prioritises frontend performance and low data download. An SVG variant is only acceptable when compression keeps it inside that budget: never embed raw raster tiles (base64 PNG tiles produce ~900KB documents), embed a single compressed basemap instead (`renderSvgBasemapImage`), and don't repeat the data URI in a deprecated `xlink:href` attribute — it doubles the payload. If a variant cannot be brought inside budget, serve negotiated raster only.
-
-When changing static-map code, preserve ETag fingerprinting of framing + geometry so validators continue to avoid unnecessary upstream work. Every new input that affects the rendered image (markers, numbered badges, overlays, format) must be added to `buildStaticMapFingerprint`'s payload — otherwise stale cached variants keep serving after the config changes.
-
-The static fallback should carry the same feature information as the interactive map. For feature-based maps, draw numbered badges at each feature's centroid and pair them with a GOV.UK table below the map that keys the numbers to names/details.
-
-`sharp` gotcha in `static-map-raster.ts`: **`.composite()` replaces the input list, it does not append.** Tiles and the overlay must go into a single `.composite()` call — a second call silently drops the basemap, producing a background-only image (this exact bug shipped once because tile fetches also fail silently to an empty array, making the two failure modes indistinguishable). Tests should assert on output pixel stats, not just format signatures.
-
-### Defra component integration gotchas (learned from real bugs)
-
-- **`data-*` attributes are JSON-parsed.** The `InteractiveMap` constructor runs `JSON.parse` on every `data-*` attribute it finds on the map container. Plain strings like `data-static-map-src="/static-map"` log `SyntaxError`s to the console (harmless but noisy, and confusing to diagnose). Keep `data-*` off the container — put configuration in the page's `<script type="application/json">` block (the consultee maps carry their static-map fallback as `config.fallback`) and discover containers by a class selector (`.app-consultee-map`).
-- **Plugin API methods attach late.** The object returned by `defra.interactPlugin()` (and siblings) has no `enable`/`clear` methods at construction — the core attaches them when the plugin's init component mounts, around `map:ready`. Guard wiring on the plugin object existing, then call the API lazily: `map.on('map:ready', () => interactPlugin.enable?.())`. A jsdom mock that exposes `enable` immediately masks this and lets the bug ship — model the late attachment (plugin object without the API until `map:ready`) in tests.
-- **`mapStyles` entries need a `thumbnail`.** The `map-styles` plugin renders `mapStyle.thumbnail` as an `<img>`; an omitted field leaves an empty placeholder box in the style panel. Inline SVG `data:` URIs work well — zero requests, decorative `alt=""`, and CSP already allows `img-src data:`.
-- **Feature info is a panel, not a tooltip.** The component has no floating-tooltip API for clicked features (its internal tooltips are only control labels). The supported pattern is `interact` + `interact:selectionchange` writing into an `addPanel` side panel — also the more accessible option for keyboard and touch users. Escape property values (`escapeHtml`) before `innerHTML`.
-- **`buttonFirst`/`hybrid` fullscreen needs `hasExitButton: true`.** The shell ships a built-in Exit control (top-left, fullscreen only) but excludes it unless `appConfig.hasExitButton` is set — without it, a `buttonFirst` map opens fullscreen with no way out. Pass the flag through the page config; `inline` maps can leave it off since they never fullscreen.
-- **`mapStyle` must have an `id`.** The draw adapter builds per-style override properties (`user_fill<Id>` etc.) via `mapStyle.id.charAt(0)` and crashes at mount with `Cannot read properties of undefined (reading 'charAt')` when the style object lacks `id` — the draw control then silently never attaches. Give the shared style object `id: 'liberty'` ; style-switcher `mapStyles` entries already carry ids.
-- **`<noscript>` contents are not in the live DOM.** With JS enabled, browsers don't expose noscript markup to `querySelector` or Playwright — content needed for _both_ no-JS users and JS-users-on-init-failure must be rendered twice: inside `<noscript>` and again in a `hidden` block (`#<mapId>-fallback`) that `showStaticMapFallback` reveals on failure. Tests asserting the fallback must read the raw HTML response, not the live DOM.
-- **Verify plugin interactions with a real click, not DOM presence.** The draw adapter crashed during mount (`mapStyle.id` missing) while its toolbar markup still rendered — a presence assertion passes but the feature is dead. When touching plugin wiring, click through the actual interaction in a browser (Playwright against the dev server) and watch `pageerror`/`console` for mount-time exceptions.
-- **Never give vendor lazy chunks a nonzero `max-age`.** Webpack loads `im-core.js` and the numeric `NNNN.js` plugin chunks by literal filename — the URL never changes across package versions, unlike the fingerprinted `index-<hash>.js` entry. A cached stale chunk booting against a new entry throws `o[e] is not a function` inside webpack's module lookup and the map fails with "There was a problem loading the map" — seen in Chrome (warm cache) while Firefox (cold cache) worked, right after a `@defra/interactive-map` bump. `createDefraVendorRouter` is mounted with no `maxAge` → `max-age=0` + ETag/304 revalidation. Do not plumb `service.cacheControl.maxAge` back into it; `CACHE_CONTROL_MAX_AGE` still feeds core's static mount, which serves nothing (the app overrides `staticDir` with an empty mount).
-- **Draw tools need a consumer-added entry button.** The draw plugin only renders in-session controls (Cancel/Add point/Done); nothing starts a session until the consumer wires a button: `map.on('map:ready', () => map.addButton('drawPolygon', { label: 'Draw polygon', onClick: () => drawPlugin.newPolygon?.(crypto.randomUUID()) }))`. `newPolygon(featureId, options?)` is late-bound like `interact.enable` — call it with `?.` at click time.
-- **Viewport `aria-controls` is a dangling idref upstream (0.0.44+).** `Features` (`#<id>-features`) was replaced by `SpatialList` (`#<id>-spatial-list`) but the viewport's `aria-controls` still points at the old id — axe flags it as critical `aria-valid-attr-value`. `scripts/patch-im-aria-controls.ts` rewrites the idref in the installed `dist/{umd,esm}/im-core.js` at postinstall; it throws when the pattern disappears so a fixed upstream version fails loudly and the patch can be removed.
+- [`docs/azure-devops-ci-logs.md`](./docs/azure-devops-ci-logs.md) — pulling a failing PR check's DevOps log (token or local reproduction).
+- [`docs/http-and-front-door.md`](./docs/http-and-front-door.md) — HTTP/2, HTTP/3 and the Front Door → origin topology.
+- [`docs/maps.md`](./docs/maps.md) — GIS Styling tables, static-map rules, Defra component gotchas.
+- [`kt-docs/deployment.md`](./kt-docs/deployment.md) — pipelines, overlapping-deploy locking, and schema/data operations without redeploying the app.
 
 ## Asset fingerprinting and the local dev server
 
@@ -513,56 +280,3 @@ The static fallback should carry the same feature information as the interactive
 - **Kill old localhost servers before starting new ones.** A leftover process keeps its port and keeps serving stale code and hash manifest, so never leave two running. `npm start`/`npm run dev` free the app port automatically (`scripts/kill-port.ts` runs as `prestart` in `apps/manage`, including on every nodemon restart), and the root `npm start` frees the Python function's `:7071` too. Starting `node src/server.ts` — or any other local server — directly skips that check: find and kill the old listener yourself (`node scripts/kill-port.ts <port>`, or `lsof -nP -iTCP:<port> -sTCP:LISTEN`). If the listener's parent is nodemon, stop the nodemon session instead: killing only its child makes nodemon respawn it and retake the port.
 - **Stale servers render hybrid pages.** Controllers run from memory but Nunjucks views are read from disk per request, so a stale server pairs old view-models/routes with new templates. The signature is a page that mixes the two versions — e.g. the old heading text over a new form whose items never populate (the old view-model lacks the field) and whose POST 404s (the old router never had the route). Before debugging the code for impossible symptoms like that, check the serving process's start time (`ps -o lstart -p <pid>`) against when the code changed, and `curl` the page for old response shapes (e.g. stale field names in the map config JSON).
 - **Playwright e2e uses `reuseExistingServer: !CI`**, so a stale `e2e-server.mjs` left listening on `:8091` serves old code and produces confusing render failures. Kill it (`node scripts/kill-port.ts 8091`) before re-running e2e after source changes — and check for old `e2e-server.mjs` processes on other ports too (`lsof -nP -iTCP -sTCP:LISTEN | grep node`), they survive across sessions.
-
-## Overlapping deploys
-
-Merging to `main` triggers Build and then Deploy on their own, so merges close together start overlapping Deploy runs, and Infrastructure CD can run at the same time. Both deploy into the same Azure DevOps environments (Dev, Test, Training, Prod). Without a lock this went wrong on 9 Oct 2026: an older Deploy swapped Dev's slots after a newer one, leaving Dev a commit behind `main`, and Terraform's app-settings update failed with `409 Conflict` because a slot was mid-swap.
-
-- `deploy.yml` and `infrastructure/pipelines/terraform-cd.yaml` set `lockBehavior: runLatest`: only the newest waiting run takes an environment's lock and older queued runs are cancelled, so the latest commit lands last.
-- **It only takes effect once each environment has an "Exclusive lock" check** (Azure DevOps → Pipelines → Environments → the environment → Approvals and checks → Exclusive lock). That's a one-off admin step per environment.
-- Until then, don't queue Deploy by hand right after a merge - it already starts on its own - and check Dev's `/health` commit after a burst of merges.
-
-## Database operations without redeploying the app
-
-Schema migrations and data changes for a real environment (Dev/Test/Training/Prod) don't require
-shipping app code - two pipelines already handle this independently of `Build`/`Deploy`'s web-app
-job:
-
-- **Schema-only migration**: run the `Deploy` pipeline (`.azure/pipelines/deploy.yml`) with
-  `deployWeb=false` and `schemaMigration=true` (the default). Its `Migrate` and `Deploy Web` jobs
-  are siblings, not dependent on each other, so this applies `npm run migrate-prod` to the target
-  environment's real database without touching the running app or its slots at all.
-- **Data operations**: `.azure/pipelines/db-seed.yml` (`trigger: none`, manually run via
-  `az pipelines run` or the Azure DevOps UI, parameterised by `environment`) is a fully separate
-  pipeline for loading data. Its default is the small built-in sample dataset
-  (`npm run seed`/`seed-prod`); passing `loadFullReferenceData=true` (Dev/Test/Training only)
-  instead runs `npm run import-from-blob` for the two known reference-data blobs
-  (`combined_reference_data_v1.geojson`, `all-project-boundaries.geojson`) in the app's storage
-  container (`infrastructure/storage.tf`). Imports merge by id and never delete, so add
-  `replaceExistingData=true` to clear each table first when the source's ids or areas changed -
-  otherwise old rows stay as stale or duplicate consultees. Each table is cleared only once its
-  blob has downloaded and parsed with features. The pipeline reads the blobs as its own identity,
-  which has Storage Blob Data Contributor on Test's, Training's and Prod's storage accounts, granted
-  by hand (Terraform can't: the pipeline identity's role-assignment rights carry an ABAC condition
-  that refuses it). Dev's has none, so this route fails there with 403 - use the in-app import.
-- **Promoting a checked quarter**: `.azure/pipelines/promote-reference-data.yml` (`trigger: none`,
-  parameterised by `route` - Test to Training, or Training to Prod - and an optional `quarter`)
-  exports the source's dataset in use - its group files and the rows each loaded - and copies the
-  files into the target's blob storage. It loads nothing: each group is loaded on the target's
-  `/admin/import-reference-data` page. Training's and Prod's `/admin/upload-to-blob` page starts it
-  (the Copy section), as the web app's managed identity, which needs adding to the Azure DevOps
-  project with queue and view rights on the pipeline. Case boundaries are never promoted. It needs
-  Storage Blob Data Contributor on each environment's `consultees-data` container for the same
-  identity. See "Promoting a quarter" in `kt-docs/data/data-model.md`.
-- **In-app import**: the same blobs can be imported from the manage app itself at
-  `/admin/import-reference-data` (with `/admin/upload-to-blob` for getting files into the
-  container) - the app's managed identity has Storage Blob Data Contributor. Consultee areas load a
-  group at a time (`config/reference-data.yaml`'s `groups`, one file each) into its quarter's
-  table (`consultee_area_2026Q4`); the `consultee_area` synonym points at the newest quarter with
-  every group loaded, which everything else uses - and case
-  boundaries replace their table. The page shows the rows currently loaded, so a load that
-  outlasts Front Door's response timeout can be confirmed by reloading it. See
-  `kt-docs/data/data-model.md`.
-- **One-off local imports**: `npm run db-import -- --type=<consultee-areas|case-boundaries> --file=<path>`
-  works against any `SQL_CONNECTION_STRING` you can reach directly (e.g. from a machine with a
-  route to a real environment's database), independently of any pipeline.

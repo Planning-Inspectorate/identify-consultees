@@ -157,7 +157,7 @@ On Apple Silicon, SQL Server runs under `linux/amd64` emulation (Azure SQL Edge 
 - [`kt-docs/`](./kt-docs/README.md): how the service works, starting with the [overview](./kt-docs/overview.md)
 - [`CONTRIBUTING.md`](./CONTRIBUTING.md): where to make a change, what to update with it, and how to open a PR
 - [`config/README.md`](./config/README.md): change a ruleset, the report or a distance, without a code change
-- [`AGENTS.md`](./AGENTS.md): GDS, maps, toolchain and PR rules, for agents and people
+- [`AGENTS.md`](./AGENTS.md): GDS, toolchain and PR rules (map rules in [`docs/maps.md`](./docs/maps.md)), for agents and people
 - [`ACCESSIBILITY.md`](./ACCESSIBILITY.md), [`SECURITY.md`](./SECURITY.md)
 
 ## Editors

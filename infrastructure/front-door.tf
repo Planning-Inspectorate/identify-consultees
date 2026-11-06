@@ -59,7 +59,7 @@ resource "azurerm_cdn_frontdoor_custom_domain" "web" {
 # Front Door (portal / ARM / azurerm), enable it here (or on the shared tooling
 # profile that owns this endpoint) and verify UDP/443 + TLS 1.3 negotiation.
 # Until then, do not run experimental Node QUIC listeners or advertise Alt-Svc h3
-# from the origin. See AGENTS.md "HTTP protocols and Azure Front Door".
+# from the origin. See docs/http-and-front-door.md.
 resource "azurerm_cdn_frontdoor_route" "web" {
   name                          = "${local.org}-fd-${local.service_name}-web-${var.environment}"
   cdn_frontdoor_endpoint_id     = data.azurerm_cdn_frontdoor_endpoint.shared.id
