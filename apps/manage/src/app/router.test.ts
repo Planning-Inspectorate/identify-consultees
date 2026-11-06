@@ -110,16 +110,19 @@ describe('manage router wiring', () => {
 	test('the footer lists the support links on every page', async () => {
 		const response = await request(authDisabledApp).get('/');
 		assert.equal(response.status, 200);
+		// Help and Contact stay routed but are deliberately left out of the footer until
+		// their content has had a proper audit
+		const footer = response.text.slice(response.text.indexOf('<footer'));
+		assert.doesNotMatch(footer, /href="\/help"/);
+		assert.doesNotMatch(footer, /href="\/contact"/);
 		for (const [text, href] of [
-			['Help', '/help'],
 			['Terms and conditions', '/terms-and-conditions'],
 			['Accessibility statement', '/accessibility-statement'],
 			[
 				'Privacy',
 				'https://www.gov.uk/government/publications/planning-inspectorate-privacy-notices/customer-privacy-notice'
 			],
-			['Cookies', '/cookies'],
-			['Contact', '/contact']
+			['Cookies', '/cookies']
 		]) {
 			assert.match(response.text, new RegExp(`href="${escapeRegExp(href)}"[^>]*>\\s*${escapeRegExp(text)}`));
 		}
