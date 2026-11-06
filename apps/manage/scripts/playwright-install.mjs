@@ -4,7 +4,11 @@
  *
  * On shared Ubuntu agents, `playwright install --with-deps` races with
  * unattended-upgrades holding /var/lib/dpkg/lock-frontend and fails with
- * apt exit code 100. Wait for the lock / apt processes before installing.
+ * apt exit code 100. Wait for the lock / apt processes before installing,
+ * and repair any damage a killed upgrade left: dpkg --configure -a finishes
+ * half-configured packages, apt-get -f install resolves dependency versions
+ * that were never fetched (apt then refuses everything with "unmet
+ * dependencies" until they are).
  */
 import { spawnSync } from 'node:child_process';
 import { platform } from 'node:os';
@@ -99,8 +103,29 @@ function configureAptLockTimeout() {
 	}
 }
 
+/**
+ * A killed unattended-upgrades leaves dpkg with work it cannot finish alone: packages
+ * unpacked-but-unconfigured (--configure -a) or a metapackage waiting on dependency
+ * versions apt never fetched (-f install, which also removes what cannot be satisfied).
+ * Until both run, every apt-get exits 100 - playwright's included. Needs passwordless
+ * sudo (present on the CI agents); `sudo -n` skips silently everywhere else.
+ */
+function repairDpkg() {
+	if (platform() !== 'linux') {
+		return;
+	}
+
+	for (const args of [
+		['dpkg', '--configure', '-a'],
+		['apt-get', '-y', '-f', 'install']
+	]) {
+		spawnSync('sudo', ['-n', ...args], { stdio: 'inherit' });
+	}
+}
+
 configureAptLockTimeout();
 waitForAptLock();
+repairDpkg();
 
 let status = 1;
 for (let attempt = 1; attempt <= MAX_INSTALL_ATTEMPTS; attempt += 1) {
