@@ -83,31 +83,30 @@ which looks like an unannounced breaking change — a `request.nonce ?? payload.
 `ConfidentialClientApplication.acquireTokenByCode` would restore the old contract. Helpful to the
 ecosystem, but not required for our fix.
 
-## What didn't work, and why
+## The interim fix in this repo
 
-A `deps:patch-core-msal-nonce` postinstall script was tried (rewriting core's installed
-`dist/auth/auth-service.js` to add `nonce` to the request, matching the `deps:patch-maplibre` /
-`deps:patch-im-aria-controls` pattern). It fixed local checkouts and CI but **never reached the
-deployed image**: `apps/manage/Dockerfile` runs `npm ci --ignore-scripts` — the root postinstall
-does not run in the image build — and then invokes each patch script it needs by name
-(`RUN npm run deps:patch-maplibre && npm run deps:patch-im-aria-controls`). The nonce patch wasn't
-on that list, so the container shipped the unpatched file. Worse, the patch masks the bug locally:
-with it in place, a broken core upgrade can pass every local and CI check and still fail in
-production. It has been removed.
+Until a fixed core ships, `scripts/patch-core-msal-nonce.ts` rewrites the installed
+`dist/auth/auth-service.js` to add `nonce` to the request — the same one-line change the upstream
+fix needs. It runs from `postinstall` (`deps:patch-core-msal-nonce`) **and** is invoked by name on
+the image build's patch line in `apps/manage/Dockerfile`
+(`RUN npm run deps:patch-maplibre && npm run deps:patch-im-aria-controls && npm run deps:patch-core-msal-nonce`).
+Both are needed: the Dockerfile's `npm ci --ignore-scripts` skips postinstall, so a patch wired
+only into `postinstall` fixes local checkouts and CI but never reaches the deployed image — which
+is exactly why the first attempt at this (PR #368) left Dev/Test still broken. A patch that fixes
+auth silently in dev but not in the image is a trap, not a safety net.
 
-Two lessons:
-
-- Postinstall `node_modules` patches are dev/CI-only unless the Dockerfile's explicit `RUN` line
-  invokes them — and a patch that fixes auth silently in dev but not in the image is a trap, not a
-  safety net.
-- For a library PINS owns, fix the source package rather than patching its build output.
+Like the other `deps:patch-*` scripts it no-ops when already applied and throws when the expected
+pattern is gone, so a fixed core release fails loudly at install time and the patch — plus its
+postinstall entry and Dockerfile line — can be removed.
 
 ## Checklist for the next core upgrade
 
 - [ ] The core release's `AuthService.acquireTokenByCode` passes `nonce` on the request object
       (check `dist/auth/auth-service.js` — `acquireTokenByCode({ authority, code, nonce, ... })`).
-- [ ] No leftover `deps:patch-core-msal-nonce` script or postinstall entry (removed in the
-      documentation PR that recorded this issue).
+- [ ] Remove the interim patch: `scripts/patch-core-msal-nonce.ts` and its test, the
+      `deps:patch-core-msal-nonce` script and `postinstall` entry in `package.json`, and its
+      invocation on the patch `RUN` line in `apps/manage/Dockerfile`. (Postinstall will fail loudly
+      on the new core first — that failure is the reminder.)
 - [ ] After deploying to Dev, complete a real Entra sign-in before promoting — this class of
       failure is invisible to every automated check we currently run (`AUTH_DISABLED` locally, no
       live Entra in CI).

@@ -50,9 +50,11 @@ COPY --chown=node:node config ./config
 # here or the deployed image ships the vulnerable/broken bundles. The same goes
 # for any future deps:patch-* script: wiring it only into the root postinstall
 # fixes local installs and CI but never reaches this image - it must be added
-# to the RUN below by name.
+# to the RUN below by name. deps:patch-core-msal-nonce fixes core 1.15.x's
+# acquireTokenByCode call for msal-node 7 (docs/msal-node-7-nonce.md) - without
+# it the image ships the unpatched bundle and every Entra sign-in fails.
 RUN npm ci --loglevel notice --workspace=identify-consultees-manage --ignore-scripts
-RUN npm run deps:patch-maplibre && npm run deps:patch-im-aria-controls
+RUN npm run deps:patch-maplibre && npm run deps:patch-im-aria-controls && npm run deps:patch-core-msal-nonce
 
 ENV NODE_ENV=production
 ENV GIT_SHA=$GIT_SHA
