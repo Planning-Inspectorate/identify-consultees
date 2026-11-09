@@ -50,7 +50,7 @@ The `?test-fail=<map|ruleset|download>` triggers force the error states so QA ca
 
 ### Hidden footer links
 
-`/terms-and-conditions` and `/accessibility-statement` are live routes whose footer links are hidden until their content has had a proper audit — `hidden: true` in `footerLinks` in `apps/manage/src/util/config-middleware.ts`, styled by `.pins-footer__item--hidden` in `apps/manage/src/app/sass/style.scss` (mirrored in `apps/manage/src/app/testing/a11y.ts`). After the audit, remove the `hidden` flags; the CSS class can go once nothing uses it.
+`/accessibility-statement` is a live route whose footer link is hidden until its content has had a proper audit — `hidden: true` in `footerLinks` in `apps/manage/src/util/config-middleware.ts`, styled by `.pins-footer__item--hidden` in `apps/manage/src/app/sass/style.scss` (mirrored in `apps/manage/src/app/testing/a11y.ts`). After the audit, remove the `hidden` flag; the CSS class can go once nothing uses it.
 
 ### Machine-readable inventory
 
@@ -116,7 +116,7 @@ remove_before_go_live:
     gated_by: none
     action: un-hide after the content audit passes
     edit:
-      - apps/manage/src/util/config-middleware.ts # hidden: true on terms + accessibility-statement
+      - apps/manage/src/util/config-middleware.ts # hidden: true on accessibility-statement
       - apps/manage/src/app/sass/style.scss # .pins-footer__item--hidden (once unused)
       - apps/manage/src/app/testing/a11y.ts # footerLinks mirror
 ```

@@ -19,7 +19,7 @@ export const pageLocals = {
 		footerLinks: [
 			{ text: 'Help', link: '/help' },
 			{ text: 'Terms and conditions', link: '/terms-and-conditions' },
-			{ text: 'Accessibility statement', link: '/accessibility-statement' },
+			{ text: 'Accessibility statement', link: '/accessibility-statement', hidden: true },
 			{
 				text: 'Privacy',
 				link: 'https://www.gov.uk/government/publications/planning-inspectorate-privacy-notices/customer-privacy-notice'
