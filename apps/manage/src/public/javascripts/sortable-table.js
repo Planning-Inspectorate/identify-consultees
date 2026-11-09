@@ -7,9 +7,10 @@
  * cost far more than this file.
  *
  * Same contract, so the MoJ guidance applies:
- * - `table[data-module="moj-sortable-table"]` is enhanced; a button goes into
+ * - `table[data-module~="moj-sortable-table"]` is enhanced; a button goes into
  *   every column header carrying `aria-sort` (headers without it - an Actions
- *   column, say - stay plain text and never sort).
+ *   column, say - stay plain text and never sort). `data-module` is
+ *   space-separated, so the word match lets a table carry other modules too.
  * - `data-sort-value` on a cell overrides its text as the sort key; numeric
  *   values (key or text) sort by number, anything else sorts as text. Both
  *   apply to any column added later - marking its header sortable is all a
@@ -30,7 +31,7 @@
  * Without this script the table reads exactly as the server rendered it.
  */
 
-const SORTABLE_SELECTOR = 'table[data-module="moj-sortable-table"]';
+const SORTABLE_SELECTOR = 'table[data-module~="moj-sortable-table"]';
 /** Set once a table is enhanced - a second init pass must not re-wrap or duplicate. */
 const ENHANCED_ATTRIBUTE = 'data-sortable-table-ready';
 
@@ -153,7 +154,7 @@ function updateCaption(table) {
 }
 
 /**
- * Enhance one `data-module="moj-sortable-table"` table: heading buttons,
+ * Enhance one `data-module~="moj-sortable-table"` table: heading buttons,
  * indicators, live region and the click-to-sort wiring. A table without both
  * head and body, or one already enhanced, is left alone.
  * @param {HTMLTableElement} table
