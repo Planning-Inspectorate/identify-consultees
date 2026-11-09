@@ -54,12 +54,12 @@ METRES_PER_DEGREE = 111_319.49
 SAMPLE_BOUNDARIES = Path(__file__).parent.parent / "setup_database" / "sample_data" / "sample_application_boundaries.geojson"
 
 
-def _match(area_id: str, distance: float, category: str | None = "Hospital") -> AreaMatch:
+def _match(area_id: str, distance: float, category: str | None = "Hospitals operated by NHS trusts and NHS foundation trusts (England)") -> AreaMatch:
     return AreaMatch(ConsulteeArea(area_id, {"consulteeCategory": category}), distance)
 
 
 def _rule(**overrides) -> RuleCondition:
-    return RuleCondition(**{"id": "rule", "logic_type": "intersection", "categories": ("Hospital",), **overrides})
+    return RuleCondition(**{"id": "rule", "logic_type": "intersection", "categories": ("Hospitals operated by NHS trusts and NHS foundation trusts (England)",), **overrides})
 
 
 def _square(west: float, east: float) -> str:
@@ -118,9 +118,9 @@ def test_intersection_rules_within_the_nearby_radius_are_answered_from_the_nearb
     # needs a wider radius than the shared fetch covers
     assert not answerable_from_nearby(_rule(buffer_metres=30_000), 20_000)
     # bordering is a different query shape
-    assert not answerable_from_nearby(_rule(logic_type="bordering", host_category="Parish Council"), 20_000)
-    # Railway is left out of the shared fetch, and "every category" implicitly includes it
-    assert not answerable_from_nearby(_rule(categories=("Railway",)), 20_000)
+    assert not answerable_from_nearby(_rule(logic_type="bordering", host_category="Parish, town and community councils"), 20_000)
+    # Railways is left out of the shared fetch, and "every category" implicitly includes it
+    assert not answerable_from_nearby(_rule(categories=("Railways",)), 20_000)
     assert not answerable_from_nearby(_rule(categories=()), 20_000)
 
 
@@ -128,7 +128,7 @@ def test_meets_intersection_condition_mirrors_the_sql_category_and_widened_dista
     rule = _rule(buffer_metres=1_000)
     assert meets_intersection_condition(_match("a", 1_000 + DISTANCE_MARGIN_METRES), rule)
     assert not meets_intersection_condition(_match("a", 1_000 + DISTANCE_MARGIN_METRES + 1), rule)
-    assert not meets_intersection_condition(_match("a", 0, category="Police"), rule)
+    assert not meets_intersection_condition(_match("a", 0, category="Police and crime commissioners"), rule)
     assert not meets_intersection_condition(_match("a", 0, category=None), rule)
     # no categories means every category
     assert meets_intersection_condition(_match("a", 0, category=None), _rule(categories=()))
@@ -211,24 +211,24 @@ def _nearby(consultees: list[Consultee]) -> list[Consultee]:
 
 
 def test_only_matches_areas_in_a_conditions_categories_within_its_buffer(connection_params, areas):
-    areas((TEST_AREA_ID, "POINT(0 0)", "Railway", "Test Railway"))
-    railway = [_rule(categories=("Railway",), buffer_metres=10_000)]
+    areas((TEST_AREA_ID, "POINT(0 0)", "Railways", "Test Railway"))
+    railway = [_rule(categories=("Railways",), buffer_metres=10_000)]
 
     assert TEST_AREA_ID in _ids(_matched(run_ruleset(connection_params, "POINT(0.001 0.001)", railway, 20_000)))
-    hospital = [_rule(categories=("Hospital",), buffer_metres=10_000)]
+    hospital = [_rule(categories=("Hospitals operated by NHS trusts and NHS foundation trusts (England)",), buffer_metres=10_000)]
     assert TEST_AREA_ID not in _ids(_matched(run_ruleset(connection_params, "POINT(0.001 0.001)", hospital, 20_000)))
     assert TEST_AREA_ID not in _ids(_matched(run_ruleset(connection_params, "POINT(10 10)", railway, 20_000)))
 
 
 def test_combines_every_conditions_matches_deduplicated_without_geometry_or_metadata(connection_params, areas):
     areas(
-        (TEST_AREA_ID, "POINT(0 0)", "Railway", "Test Railway"),
-        (SECOND_AREA_ID, "POINT(0 0)", "Hospital", "Test Hospital"),
+        (TEST_AREA_ID, "POINT(0 0)", "Railways", "Test Railway"),
+        (SECOND_AREA_ID, "POINT(0 0)", "Hospitals operated by NHS trusts and NHS foundation trusts (England)", "Test Hospital"),
     )
     rules = [
-        _rule(id="railway", categories=("Railway",), buffer_metres=10_000),
-        _rule(id="hospital", categories=("Hospital",), buffer_metres=10_000),
-        _rule(id="railway-again", categories=("Railway",), buffer_metres=20_000),
+        _rule(id="railway", categories=("Railways",), buffer_metres=10_000),
+        _rule(id="hospital", categories=("Hospitals operated by NHS trusts and NHS foundation trusts (England)",), buffer_metres=10_000),
+        _rule(id="railway-again", categories=("Railways",), buffer_metres=20_000),
     ]
 
     matches = _matched(run_ruleset(connection_params, "POINT(0.001 0.001)", rules, 20_000))
@@ -248,10 +248,10 @@ def test_combines_every_conditions_matches_deduplicated_without_geometry_or_meta
 
 def test_orders_matches_tied_at_the_same_distance_by_id(connection_params, areas):
     areas(
-        (SECOND_AREA_ID, "POINT(0 0)", "Railway", "Test Railway 2"),
-        (TEST_AREA_ID, "POINT(0 0)", "Railway", "Test Railway"),
+        (SECOND_AREA_ID, "POINT(0 0)", "Railways", "Test Railway 2"),
+        (TEST_AREA_ID, "POINT(0 0)", "Railways", "Test Railway"),
     )
-    rules = [_rule(categories=("Railway",), buffer_metres=0)]
+    rules = [_rule(categories=("Railways",), buffer_metres=0)]
 
     orderings = {tuple(_ids(_matched(run_ruleset(connection_params, "POINT(0 0)", rules, 20_000)))) for _ in range(3)}
 
@@ -260,10 +260,10 @@ def test_orders_matches_tied_at_the_same_distance_by_id(connection_params, areas
 
 def test_finds_an_area_bordering_the_host_but_not_the_host_itself(connection_params, areas):
     areas(
-        (HOST_AREA_ID, _square(0, 1), "Parish Council", "Host Parish"),
-        (NEIGHBOUR_AREA_ID, _square(1, 2), "Parish Council", "Neighbour Parish"),
+        (HOST_AREA_ID, _square(0, 1), "Parish, town and community councils", "Host Parish"),
+        (NEIGHBOUR_AREA_ID, _square(1, 2), "Parish, town and community councils", "Neighbour Parish"),
     )
-    rules = [_rule(logic_type="bordering", categories=("Parish Council",), host_category="Parish Council")]
+    rules = [_rule(logic_type="bordering", categories=("Parish, town and community councils",), host_category="Parish, town and community councils")]
 
     matches = _matched(run_ruleset(connection_params, "POINT(0.5 0.5)", rules, 20_000))
 
@@ -276,12 +276,12 @@ def test_finds_an_area_bordering_the_host_but_not_the_host_itself(connection_par
 
 def test_counts_a_small_gap_in_the_data_as_bordering_but_not_a_clear_one(connection_params, areas):
     areas(
-        (HOST_AREA_ID, _square(0, 1), "Parish Council", "Host Parish"),
+        (HOST_AREA_ID, _square(0, 1), "Parish, town and community councils", "Host Parish"),
         # a real neighbour whose boundary, from a different source, stops 30m short
-        (NEIGHBOUR_AREA_ID, _square(1 + 30 / METRES_PER_DEGREE, 2), "Parish Council", "Neighbour Across A Gap"),
-        (TEST_AREA_ID, _square(-1, -300 / METRES_PER_DEGREE), "Parish Council", "Not A Neighbour"),
+        (NEIGHBOUR_AREA_ID, _square(1 + 30 / METRES_PER_DEGREE, 2), "Parish, town and community councils", "Neighbour Across A Gap"),
+        (TEST_AREA_ID, _square(-1, -300 / METRES_PER_DEGREE), "Parish, town and community councils", "Not A Neighbour"),
     )
-    rules = [_rule(logic_type="bordering", categories=("Parish Council",), host_category="Parish Council")]
+    rules = [_rule(logic_type="bordering", categories=("Parish, town and community councils",), host_category="Parish, town and community councils")]
 
     ids = _ids(_matched(run_ruleset(connection_params, "POINT(0.5 0.5)", rules, 20_000)))
 
@@ -291,8 +291,8 @@ def test_counts_a_small_gap_in_the_data_as_bordering_but_not_a_clear_one(connect
 
 def test_includes_an_area_just_past_a_cut_off_but_not_one_well_past_it(connection_params, areas):
     areas(
-        (TEST_AREA_ID, _point_at(1_015), "Hospital", "Just Past 1km"),
-        (SECOND_AREA_ID, _point_at(1_200), "Hospital", "Well Past 1km"),
+        (TEST_AREA_ID, _point_at(1_015), "Hospitals operated by NHS trusts and NHS foundation trusts (England)", "Just Past 1km"),
+        (SECOND_AREA_ID, _point_at(1_200), "Hospitals operated by NHS trusts and NHS foundation trusts (England)", "Well Past 1km"),
     )
 
     ids = _ids(_matched(run_ruleset(connection_params, _point_at(0), [_rule(buffer_metres=1_000)], 20_000)))
@@ -306,8 +306,8 @@ def test_drops_an_area_within_the_sites_convex_hull_reach_but_past_the_radius(co
     # search's convex hull reaches (see queries._reach) - but ~28km from either point
     site = "MULTIPOINT((0 0), (0.4 0))"
     areas(
-        (TEST_AREA_ID, "POINT(0 0.1)", "Hospital", "11km From One Point"),
-        (SECOND_AREA_ID, "POINT(0.2 0.15)", "Hospital", "Between The Points"),
+        (TEST_AREA_ID, "POINT(0 0.1)", "Hospitals operated by NHS trusts and NHS foundation trusts (England)", "11km From One Point"),
+        (SECOND_AREA_ID, "POINT(0.2 0.15)", "Hospitals operated by NHS trusts and NHS foundation trusts (England)", "Between The Points"),
     )
 
     ids = _ids(_matched(run_ruleset(connection_params, site, [_rule(buffer_metres=20_000)], 20_000)))
@@ -318,8 +318,8 @@ def test_drops_an_area_within_the_sites_convex_hull_reach_but_past_the_radius(co
 
 def test_each_consultee_carries_every_reason_it_qualified_in_ruleset_order(connection_params, areas):
     areas(
-        (TEST_AREA_ID, _point_at(500), "Hospital", "Near Hospital"),
-        (SECOND_AREA_ID, _point_at(5_000), "Electricity Generator", "Nearby Generator"),
+        (TEST_AREA_ID, _point_at(500), "Hospitals operated by NHS trusts and NHS foundation trusts (England)", "Near Hospital"),
+        (SECOND_AREA_ID, _point_at(5_000), "Electricity generators with compulsory purchase order powers", "Nearby Generator"),
     )
     rules = [
         _rule(id="hospital_10km", buffer_metres=10_000),
@@ -342,10 +342,10 @@ def test_each_consultee_carries_every_reason_it_qualified_in_ruleset_order(conne
 
 def test_a_bordering_match_beyond_the_nearby_search_has_only_its_condition_reason(connection_params, areas):
     areas(
-        (HOST_AREA_ID, _square(0, 1), "Parish Council", "Host Parish"),
-        (NEIGHBOUR_AREA_ID, _square(1, 2), "Parish Council", "Neighbour Parish"),
+        (HOST_AREA_ID, _square(0, 1), "Parish, town and community councils", "Host Parish"),
+        (NEIGHBOUR_AREA_ID, _square(1, 2), "Parish, town and community councils", "Neighbour Parish"),
     )
-    rules = [_rule(id="bordering", logic_type="bordering", categories=("Parish Council",), host_category="Parish Council")]
+    rules = [_rule(id="bordering", logic_type="bordering", categories=("Parish, town and community councils",), host_category="Parish, town and community councils")]
 
     result = run_ruleset(connection_params, "POINT(0.5 0.5)", rules, 1_000)
     [neighbour] = [match for match in result if match.area.id == NEIGHBOUR_AREA_ID]
@@ -356,14 +356,14 @@ def test_a_bordering_match_beyond_the_nearby_search_has_only_its_condition_reaso
 
 
 def test_a_bordering_condition_without_a_host_category_matches_nothing(connection_params):
-    rules = [_rule(logic_type="bordering", categories=("Parish Council",))]
+    rules = [_rule(logic_type="bordering", categories=("Parish, town and community councils",))]
     assert _matched(run_ruleset(connection_params, "POINT(0 0)", rules, 20_000)) == []
 
 
 def test_all_nearby_lists_every_category_within_the_radius_except_railway(connection_params, areas):
     areas(
-        (TEST_AREA_ID, "POINT(0 0)", "Electricity Generator", "Test Generator"),
-        (SECOND_AREA_ID, "POINT(0 0)", "Railway", "Test Railway"),
+        (TEST_AREA_ID, "POINT(0 0)", "Electricity generators with compulsory purchase order powers", "Test Generator"),
+        (SECOND_AREA_ID, "POINT(0 0)", "Railways", "Test Railway"),
     )
 
     nearby = _nearby(run_ruleset(connection_params, "POINT(0.001 0.001)", [], 1_000))
@@ -377,8 +377,8 @@ def test_all_nearby_lists_every_category_within_the_radius_except_railway(connec
 def test_a_categorys_own_nearby_radius_overrides_the_default_and_0_leaves_it_out(connection_params, areas):
     # the site is ~157m from both areas
     areas(
-        (TEST_AREA_ID, "POINT(0 0)", "Electricity Generator", "Test Generator"),
-        (SECOND_AREA_ID, "POINT(0 0)", "Hospital", "Test Hospital"),
+        (TEST_AREA_ID, "POINT(0 0)", "Electricity generators with compulsory purchase order powers", "Test Generator"),
+        (SECOND_AREA_ID, "POINT(0 0)", "Hospitals operated by NHS trusts and NHS foundation trusts (England)", "Test Hospital"),
     )
     site = "POINT(0.001 0.001)"
 
@@ -386,11 +386,11 @@ def test_a_categorys_own_nearby_radius_overrides_the_default_and_0_leaves_it_out
     assert {TEST_AREA_ID, SECOND_AREA_ID} <= set(_ids(by_default))
 
     # a smaller radius for one category leaves it out; 0 never shows it; others keep the default
-    shorter = run_ruleset(connection_params, site, [], 1_000, {"Electricity Generator": 100, "Hospital": 0})
+    shorter = run_ruleset(connection_params, site, [], 1_000, {"Electricity generators with compulsory purchase order powers": 100, "Hospitals operated by NHS trusts and NHS foundation trusts (England)": 0})
     assert set(_ids(_nearby(shorter))).isdisjoint({TEST_AREA_ID, SECOND_AREA_ID})
 
     # a larger one reaches past the default, with its own radius as the reason
-    wider = run_ruleset(connection_params, site, [], 50, {"Hospital": 1_000})
+    wider = run_ruleset(connection_params, site, [], 50, {"Hospitals operated by NHS trusts and NHS foundation trusts (England)": 1_000})
     hospital = next(consultee for consultee in wider if consultee.area.id == SECOND_AREA_ID)
     assert hospital.reasons == [NearbyReason(1_000)]
     assert TEST_AREA_ID not in _ids(_nearby(wider))
@@ -399,12 +399,12 @@ def test_a_categorys_own_nearby_radius_overrides_the_default_and_0_leaves_it_out
 def test_nearby_radius_for_uses_the_category_radius_with_the_distance_margin():
     assert nearby_radius_for(_match("a", 1_000 + DISTANCE_MARGIN_METRES), 1_000, {}) == 1_000
     assert nearby_radius_for(_match("a", 1_001 + DISTANCE_MARGIN_METRES), 1_000, {}) is None
-    assert nearby_radius_for(_match("a", 4_000), 1_000, {"Hospital": 5_000}) == 5_000
-    assert nearby_radius_for(_match("a", 0), 1_000, {"Hospital": 0}) is None
+    assert nearby_radius_for(_match("a", 4_000), 1_000, {"Hospitals operated by NHS trusts and NHS foundation trusts (England)": 5_000}) == 5_000
+    assert nearby_radius_for(_match("a", 0), 1_000, {"Hospitals operated by NHS trusts and NHS foundation trusts (England)": 0}) is None
     # an unmeasured match (a bordering one) isn't nearby
     assert nearby_radius_for(_match("a", None), 1_000, {}) is None
     # an uncategorised area takes the default
-    assert nearby_radius_for(_match("a", 10, category=None), 1_000, {"Hospital": 0}) == 1_000
+    assert nearby_radius_for(_match("a", 10, category=None), 1_000, {"Hospitals operated by NHS trusts and NHS foundation trusts (England)": 0}) == 1_000
 
 
 def _polygon_wkt(geometry: dict) -> str:
@@ -426,14 +426,14 @@ def test_finds_consultees_across_several_categories_for_a_real_project(connectio
     [project] = [feature for feature in features if feature["properties"].get("caseReference") == "EN0110019"]
     site_wkt = _polygon_wkt(project["geometry"])
     areas(
-        (TEST_AREA_ID, site_wkt, "Upper Tier Authority", "Suffolk County Council"),
-        (SECOND_AREA_ID, site_wkt, "Police", "Suffolk Constabulary"),
-        (HOST_AREA_ID, "POINT(1.1828714294908717 52.38917544689788)", "Hospital", "Hartismere Hospital"),
+        (TEST_AREA_ID, site_wkt, "County councils (upper-tier authorities)", "Suffolk County Council"),
+        (SECOND_AREA_ID, site_wkt, "Police and crime commissioners", "Suffolk Constabulary"),
+        (HOST_AREA_ID, "POINT(1.1828714294908717 52.38917544689788)", "Hospitals operated by NHS trusts and NHS foundation trusts (England)", "Hartismere Hospital"),
     )
     rules = [
-        _rule(id="county", categories=("Upper Tier Authority",), buffer_metres=0),
-        _rule(id="police", categories=("Police",), buffer_metres=0),
-        _rule(id="hospital", categories=("Hospital",), buffer_metres=10_000),
+        _rule(id="county", categories=("County councils (upper-tier authorities)",), buffer_metres=0),
+        _rule(id="police", categories=("Police and crime commissioners",), buffer_metres=0),
+        _rule(id="hospital", categories=("Hospitals operated by NHS trusts and NHS foundation trusts (England)",), buffer_metres=10_000),
     ]
 
     result = run_ruleset(connection_params, site_wkt, rules, 20_000)
@@ -470,9 +470,9 @@ def test_a_detailed_site_is_screened_around_a_covering_outline_identifying_what_
     connection_params, areas
 ):
     areas(
-        (TEST_AREA_ID, _point_at(1_015), "Hospital", "Just Past 1km"),
+        (TEST_AREA_ID, _point_at(1_015), "Hospitals operated by NHS trusts and NHS foundation trusts (England)", "Just Past 1km"),
         # within the covering outline's reach of 1km, but not the site's
-        (SECOND_AREA_ID, _point_at(1_400), "Hospital", "Well Past 1km"),
+        (SECOND_AREA_ID, _point_at(1_400), "Hospitals operated by NHS trusts and NHS foundation trusts (England)", "Well Past 1km"),
     )
     rules = [_rule(buffer_metres=1_000)]
     site = _point_at(0)
@@ -493,13 +493,13 @@ def test_a_bordering_match_the_covering_outline_brings_nearby_is_measured_from_t
     # from the site, though not from the covering outline
     site = _point_at(METRES_PER_DEGREE - 20_300).replace(" 0)", " 0.5)")
     areas(
-        (HOST_AREA_ID, _square(0, 1), "Parish Council", "Host Parish"),
-        (NEIGHBOUR_AREA_ID, _square(1, 2), "Parish Council", "Neighbour Parish"),
+        (HOST_AREA_ID, _square(0, 1), "Parish, town and community councils", "Host Parish"),
+        (NEIGHBOUR_AREA_ID, _square(1, 2), "Parish, town and community councils", "Neighbour Parish"),
     )
     rules = [
-        _rule(id="parish", logic_type="bordering", categories=("Parish Council",), host_category="Parish Council"),
+        _rule(id="parish", logic_type="bordering", categories=("Parish, town and community councils",), host_category="Parish, town and community councils"),
         # so the nearby search measures from the site only what an intersection condition needs
-        _rule(id="hospital", categories=("Hospital",), buffer_metres=1_000),
+        _rule(id="hospital", categories=("Hospitals operated by NHS trusts and NHS foundation trusts (England)",), buffer_metres=1_000),
     ]
 
     covered = screen(connection_params, site, rules, 20_000, bounding_box_above_points=0)
@@ -514,8 +514,8 @@ def test_a_detailed_site_with_no_covering_outline_or_when_asked_is_screened_agai
     connection_params, areas, monkeypatch
 ):
     # a long diagonal site, and an area in the corner of its bounding box, ~78km from the site itself
-    areas((TEST_AREA_ID, "POINT(0.9 0.1)", "Hospital", "Off The Diagonal"))
-    rules = [_rule(categories=("Hospital",), buffer_metres=1_000)]
+    areas((TEST_AREA_ID, "POINT(0.9 0.1)", "Hospitals operated by NHS trusts and NHS foundation trusts (England)", "Off The Diagonal"))
+    rules = [_rule(categories=("Hospitals operated by NHS trusts and NHS foundation trusts (England)",), buffer_metres=1_000)]
     site = "LINESTRING(0 0, 1 1)"
 
     asked = screen(connection_params, site, rules, 1_000, bounding_box=True)
@@ -566,11 +566,11 @@ def test_a_run_within_its_time_limit_is_unaffected(connection_params):
 
 def test_a_bordering_condition_on_a_bounding_box_finds_the_hosts_neighbours_in_two_queries(connection_params, areas):
     areas(
-        (HOST_AREA_ID, _square(0, 1), "Parish Council", "Host Parish"),
-        (NEIGHBOUR_AREA_ID, _square(1, 2), "Parish Council", "Neighbour Parish"),
-        (TEST_AREA_ID, _square(5, 6), "Parish Council", "Far Away Parish"),
+        (HOST_AREA_ID, _square(0, 1), "Parish, town and community councils", "Host Parish"),
+        (NEIGHBOUR_AREA_ID, _square(1, 2), "Parish, town and community councils", "Neighbour Parish"),
+        (TEST_AREA_ID, _square(5, 6), "Parish, town and community councils", "Far Away Parish"),
     )
-    rules = [_rule(logic_type="bordering", categories=("Parish Council",), host_category="Parish Council")]
+    rules = [_rule(logic_type="bordering", categories=("Parish, town and community councils",), host_category="Parish, town and community councils")]
 
     boxed = screen(connection_params, "POINT(0.5 0.5)", rules, 20_000, bounding_box=True)
 
@@ -613,7 +613,7 @@ def quarter_dataset(connection_params):
             """
             INSERT INTO dbo.consultee_area_2099Q4 (id, geometryType, geometry, geometrySimplified, consulteeCategory,
                 consultee, metadata)
-            SELECT %s, 'Point', g, g, 'Hospital', 'Next Quarter Hospital', '{}'
+            SELECT %s, 'Point', g, g, 'Hospitals operated by NHS trusts and NHS foundation trusts (England)', 'Next Quarter Hospital', '{}'
             FROM (SELECT geography::Point(0.001, 0.001, 4326) AS g) AS p
             """,
             (QUARTER_TABLE_AREA_ID,),
@@ -627,7 +627,7 @@ def quarter_dataset(connection_params):
 
 
 def test_screens_a_quarters_dataset_when_asked_rather_than_the_one_in_use(connection_params, quarter_dataset):
-    rules = [_rule(categories=("Hospital",), buffer_metres=1_000)]
+    rules = [_rule(categories=("Hospitals operated by NHS trusts and NHS foundation trusts (England)",), buffer_metres=1_000)]
 
     asked = screen(connection_params, "POINT(0 0)", rules, 1_000, dataset=quarter_dataset)
     assert _ids(_matched(asked.consultees)) == [QUARTER_TABLE_AREA_ID]
@@ -639,8 +639,8 @@ def test_screens_a_quarters_dataset_when_asked_rather_than_the_one_in_use(connec
 
 def test_bordering_queries_find_nothing_with_no_categories():
     # the categories guard returns before the database is asked anything
-    assert queries.find_areas_bordering(None, "POINT(0 0)", "Parish Council", []) == []
-    assert queries.find_areas_bordering_box(None, "POLYGON((0 0, 1 0, 1 1, 0 1, 0 0))", "Parish Council", []) == []
+    assert queries.find_areas_bordering(None, "POINT(0 0)", "Parish, town and community councils", []) == []
+    assert queries.find_areas_bordering_box(None, "POLYGON((0 0, 1 0, 1 1, 0 1, 0 0))", "Parish, town and community councils", []) == []
 
 
 def test_a_consultee_deleted_between_queries_is_dropped(monkeypatch):

@@ -27,50 +27,55 @@ describe('report url helpers', () => {
 		assert.strictEqual(reportUrl('case-1', 'rs-1'), '/consultees/case-1/report?ruleset=rs-1');
 		assert.strictEqual(reportCreatedUrl('case-1', 'rs-1'), '/consultees/case-1/report/created?ruleset=rs-1');
 		assert.strictEqual(
-			consulteesUrl('case-1', 'rs-1', 'Parish Council'),
-			'/consultees/case-1/report/consultees?ruleset=rs-1&category=Parish%20Council'
+			consulteesUrl('case-1', 'rs-1', 'Parish, town and community councils'),
+			'/consultees/case-1/report/consultees?ruleset=rs-1&category=Parish%2C%20town%20and%20community%20councils'
 		);
 		assert.strictEqual(
-			addConsulteeUrl('case-1', 'rs-1', 'Parish Council'),
-			'/consultees/case-1/report/consultees/add?ruleset=rs-1&category=Parish%20Council'
+			addConsulteeUrl('case-1', 'rs-1', 'Parish, town and community councils'),
+			'/consultees/case-1/report/consultees/add?ruleset=rs-1&category=Parish%2C%20town%20and%20community%20councils'
 		);
 		assert.strictEqual(
-			removeConsulteeUrl('case-1', 'rs-1', 'Parish Council', { matchId: 'm-1' }),
-			'/consultees/case-1/report/consultees/remove?ruleset=rs-1&category=Parish%20Council&match=m-1'
+			removeConsulteeUrl('case-1', 'rs-1', 'Parish, town and community councils', { matchId: 'm-1' }),
+			'/consultees/case-1/report/consultees/remove?ruleset=rs-1&category=Parish%2C%20town%20and%20community%20councils&match=m-1'
 		);
 		assert.strictEqual(
-			removeConsulteeUrl('case-1', 'rs-1', 'Parish Council', { addedIndex: 2 }),
-			'/consultees/case-1/report/consultees/remove?ruleset=rs-1&category=Parish%20Council&added=2'
+			removeConsulteeUrl('case-1', 'rs-1', 'Parish, town and community councils', { addedIndex: 2 }),
+			'/consultees/case-1/report/consultees/remove?ruleset=rs-1&category=Parish%2C%20town%20and%20community%20councils&added=2'
 		);
 		assert.strictEqual(
-			categoryStaticMapUrl('case-1', 'rs-1', 'Parish Council'),
-			'/consultees/case-1/results/static-map?ruleset=rs-1&category=Parish%20Council'
+			categoryStaticMapUrl('case-1', 'rs-1', 'Parish, town and community councils'),
+			'/consultees/case-1/results/static-map?ruleset=rs-1&category=Parish%2C%20town%20and%20community%20councils'
 		);
 	});
 
 	it('should append removals and adds in order, encoded', () => {
-		const removalJson = JSON.stringify({ i: 'a b', c: 'Parish Council', n: 'A Consultee', r: 'not needed' });
+		const removalJson = JSON.stringify({
+			i: 'a b',
+			c: 'Parish, town and community councils',
+			n: 'A Consultee',
+			r: 'not needed'
+		});
 		const selection = {
 			removed: [
-				{ id: 'a b', category: 'Parish Council', name: 'A Consultee', reason: 'not needed' },
+				{ id: 'a b', category: 'Parish, town and community councils', name: 'A Consultee', reason: 'not needed' },
 				// a hand-added consultee's removal has no match to exclude - no id
-				{ category: 'Parish Council', name: 'Added Consultee', reason: 'duplicate' },
+				{ category: 'Parish, town and community councils', name: 'Added Consultee', reason: 'duplicate' },
 				// an id-only entry (a bare exclude param read back) round-trips as a bare param
 				{ id: 'c', category: '', name: '', reason: '' }
 			],
-			adds: [{ category: 'Parish Council', name: 'A&B Consultee', reason: 'it borders' }]
+			adds: [{ category: 'Parish, town and community councils', name: 'A&B Consultee', reason: 'it borders' }]
 		};
 		assert.strictEqual(
 			rulesetUrl('case-1', 'rs-1', selection),
 			`/consultees/case-1/ruleset?ruleset=rs-1&exclude=${urlParam(removalJson)}&exclude=${urlParam(
-				JSON.stringify({ c: 'Parish Council', n: 'Added Consultee', r: 'duplicate' })
-			)}&exclude=c&add=${urlParam('{"c":"Parish Council","n":"A&B Consultee","r":"it borders"}')}`
+				JSON.stringify({ c: 'Parish, town and community councils', n: 'Added Consultee', r: 'duplicate' })
+			)}&exclude=c&add=${urlParam('{"c":"Parish, town and community councils","n":"A&B Consultee","r":"it borders"}')}`
 		);
 		// the static map carries exclusions only, as bare ids - hand-added consultees have no
 		// geometry to draw and reasons don't affect the map
 		assert.strictEqual(
-			categoryStaticMapUrl('case-1', 'rs-1', 'Parish Council', selection),
-			'/consultees/case-1/results/static-map?ruleset=rs-1&category=Parish%20Council&exclude=a%20b&exclude=c'
+			categoryStaticMapUrl('case-1', 'rs-1', 'Parish, town and community councils', selection),
+			'/consultees/case-1/results/static-map?ruleset=rs-1&category=Parish%2C%20town%20and%20community%20councils&exclude=a%20b&exclude=c'
 		);
 	});
 
@@ -79,10 +84,10 @@ describe('report url helpers', () => {
 		assert.strictEqual(
 			rulesetUrl('case-1', undefined, {
 				removed: [{ id: 'm-1', category: '', name: '', reason: '' }],
-				adds: [{ category: 'Parish Council', name: 'A Consultee', reason: 'borders' }]
+				adds: [{ category: 'Parish, town and community councils', name: 'A Consultee', reason: 'borders' }]
 			}),
 			`/consultees/case-1/ruleset?exclude=m-1&add=${urlParam(
-				JSON.stringify({ c: 'Parish Council', n: 'A Consultee', r: 'borders' })
+				JSON.stringify({ c: 'Parish, town and community councils', n: 'A Consultee', r: 'borders' })
 			)}`
 		);
 	});
@@ -107,21 +112,21 @@ describe('report url helpers', () => {
 		assert.deepStrictEqual(removedConsultees(undefined), []);
 		assert.deepStrictEqual(
 			removedConsultees([
-				'{"i":"m-1","c":"Parish Council","n":"A Consultee","r":"not needed"}',
-				'{"c":"Parish Council","n":"Added Consultee","r":"duplicate"}',
+				'{"i":"m-1","c":"Parish, town and community councils","n":"A Consultee","r":"not needed"}',
+				'{"c":"Parish, town and community councils","n":"Added Consultee","r":"duplicate"}',
 				'bare-id',
-				'{"i":"m-2","c":"Parish Council","n":"No Reason Given"}',
+				'{"i":"m-2","c":"Parish, town and community councils","n":"No Reason Given"}',
 				'not json {',
 				'{}',
 				'{"i":"m-3","n":"no category"}',
-				'{"c":"Parish Council","n":""}',
+				'{"c":"Parish, town and community councils","n":""}',
 				'[1,2]'
 			]),
 			[
-				{ id: 'm-1', category: 'Parish Council', name: 'A Consultee', reason: 'not needed' },
-				{ category: 'Parish Council', name: 'Added Consultee', reason: 'duplicate' },
+				{ id: 'm-1', category: 'Parish, town and community councils', name: 'A Consultee', reason: 'not needed' },
+				{ category: 'Parish, town and community councils', name: 'Added Consultee', reason: 'duplicate' },
 				{ id: 'bare-id', category: '', name: '', reason: '' },
-				{ id: 'm-2', category: 'Parish Council', name: 'No Reason Given', reason: '' },
+				{ id: 'm-2', category: 'Parish, town and community councils', name: 'No Reason Given', reason: '' },
 				{ id: 'not json {', category: '', name: '', reason: '' },
 				// a JSON value that isn't an object round-trips as a bare id too
 				{ id: '[1,2]', category: '', name: '', reason: '' }
@@ -133,8 +138,8 @@ describe('report url helpers', () => {
 		assert.deepStrictEqual(excludedIds(['x', 'y']), new Set(['x', 'y']));
 		assert.deepStrictEqual(
 			excludedIds([
-				'{"i":"m-1","c":"Parish Council","n":"A Consultee","r":"r"}',
-				'{"c":"Parish Council","n":"Added Consultee","r":"r"}',
+				'{"i":"m-1","c":"Parish, town and community councils","n":"A Consultee","r":"r"}',
+				'{"c":"Parish, town and community councils","n":"Added Consultee","r":"r"}',
 				'bare-id'
 			]),
 			new Set(['m-1', 'bare-id'])
@@ -143,15 +148,15 @@ describe('report url helpers', () => {
 
 	it('should read a request query into a selection', () => {
 		const selection = consulteeSelection({
-			exclude: '{"i":"m-1","c":"Parish Council","n":"A Consultee","r":"r"}',
-			add: '{"c":"Parish Council","n":"Added Consultee","r":"it borders"}',
+			exclude: '{"i":"m-1","c":"Parish, town and community councils","n":"A Consultee","r":"r"}',
+			add: '{"c":"Parish, town and community councils","n":"Added Consultee","r":"it borders"}',
 			ignored: 'not part of the selection'
 		});
 		assert.deepStrictEqual(selection.removed, [
-			{ id: 'm-1', category: 'Parish Council', name: 'A Consultee', reason: 'r' }
+			{ id: 'm-1', category: 'Parish, town and community councils', name: 'A Consultee', reason: 'r' }
 		]);
 		assert.deepStrictEqual(selection.adds, [
-			{ category: 'Parish Council', name: 'Added Consultee', reason: 'it borders' }
+			{ category: 'Parish, town and community councils', name: 'Added Consultee', reason: 'it borders' }
 		]);
 	});
 
@@ -163,23 +168,23 @@ describe('report url helpers', () => {
 		assert.deepStrictEqual(addedConsultees(undefined), []);
 		assert.deepStrictEqual(
 			addedConsultees([
-				'{"c":"Parish Council","n":"A Consultee","r":"borders"}',
-				'{"c":"Parish Council","n":"No Reason Given"}',
-				'{"i":"m-1","c":"Parish Council","n":"Picked Nearby","r":"borders"}',
-				'{"i":"","c":"Parish Council","n":"Empty Id","r":"r"}',
+				'{"c":"Parish, town and community councils","n":"A Consultee","r":"borders"}',
+				'{"c":"Parish, town and community councils","n":"No Reason Given"}',
+				'{"i":"m-1","c":"Parish, town and community councils","n":"Picked Nearby","r":"borders"}',
+				'{"i":"","c":"Parish, town and community councils","n":"Empty Id","r":"r"}',
 				'not json',
 				'{}',
 				'{"c":"","n":"empty category"}',
-				'{"c":"Parish Council","n":""}',
-				'{"c":"Parish Council","n":42}',
+				'{"c":"Parish, town and community councils","n":""}',
+				'{"c":"Parish, town and community councils","n":42}',
 				'[1,2]'
 			]),
 			[
-				{ category: 'Parish Council', name: 'A Consultee', reason: 'borders' },
-				{ category: 'Parish Council', name: 'No Reason Given', reason: '' },
+				{ category: 'Parish, town and community councils', name: 'A Consultee', reason: 'borders' },
+				{ category: 'Parish, town and community councils', name: 'No Reason Given', reason: '' },
 				// a typed name matched to one of the nearby consultees
-				{ id: 'm-1', category: 'Parish Council', name: 'Picked Nearby', reason: 'borders' },
-				{ category: 'Parish Council', name: 'Empty Id', reason: 'r' }
+				{ id: 'm-1', category: 'Parish, town and community councils', name: 'Picked Nearby', reason: 'borders' },
+				{ category: 'Parish, town and community councils', name: 'Empty Id', reason: 'r' }
 			]
 		);
 	});
@@ -188,27 +193,32 @@ describe('report url helpers', () => {
 		const selection = {
 			removed: [],
 			adds: [
-				{ id: 'm-1', category: 'Parish Council', name: 'Picked Nearby', reason: 'borders' },
-				{ id: 'm-2', category: 'Hospital', name: 'Picked Hospital', reason: 'r' },
-				{ category: 'Parish Council', name: 'Typed In', reason: 'r' }
+				{ id: 'm-1', category: 'Parish, town and community councils', name: 'Picked Nearby', reason: 'borders' },
+				{
+					id: 'm-2',
+					category: 'Hospitals operated by NHS trusts and NHS foundation trusts (England)',
+					name: 'Picked Hospital',
+					reason: 'r'
+				},
+				{ category: 'Parish, town and community councils', name: 'Typed In', reason: 'r' }
 			]
 		};
 		assert.strictEqual(
 			reportUrl('case-1', 'rs-1', { removed: [], adds: selection.adds.slice(0, 1) }),
-			`/consultees/case-1/report?ruleset=rs-1&add=${urlParam('{"i":"m-1","c":"Parish Council","n":"Picked Nearby","r":"borders"}')}`
+			`/consultees/case-1/report?ruleset=rs-1&add=${urlParam('{"i":"m-1","c":"Parish, town and community councils","n":"Picked Nearby","r":"borders"}')}`
 		);
 		assert.deepStrictEqual(addedMatchIds(selection.adds), new Set(['m-1', 'm-2']));
 		// only this category's picked consultees - one typed in by name has no area to draw
 		assert.strictEqual(
-			categoryStaticMapUrl('case-1', 'rs-1', 'Parish Council', selection),
-			'/consultees/case-1/results/static-map?ruleset=rs-1&category=Parish%20Council&include=m-1'
+			categoryStaticMapUrl('case-1', 'rs-1', 'Parish, town and community councils', selection),
+			'/consultees/case-1/results/static-map?ruleset=rs-1&category=Parish%2C%20town%20and%20community%20councils&include=m-1'
 		);
 	});
 
 	it("encodes each selection entry so the firewall in front of the service doesn't read it as an attack", () => {
 		const entry = {
 			i: 'm-1',
-			c: 'Parish Council',
+			c: 'Parish, town and community councils',
 			n: "O'Brien & Sons",
 			r: "Asked to be consulted - 'select' sites only"
 		};
@@ -217,16 +227,30 @@ describe('report url helpers', () => {
 		assert.match(encoded, /^eyJ[A-Za-z0-9_-]+$/);
 		assert.deepStrictEqual(JSON.parse(decodeSelectionEntry(encoded)), entry);
 		// read back from a request, whichever way the link carried it
-		const raw = JSON.stringify({ c: 'Parish Council', n: 'Plain Link', r: 'from before' });
+		const raw = JSON.stringify({ c: 'Parish, town and community councils', n: 'Plain Link', r: 'from before' });
 		assert.strictEqual(decodeSelectionEntry(raw), raw);
-		assert.deepStrictEqual(addedConsultees([encodeSelectionEntry({ c: 'Hospital', n: 'Encoded', r: 'r' }), raw]), [
-			{ category: 'Hospital', name: 'Encoded', reason: 'r' },
-			{ category: 'Parish Council', name: 'Plain Link', reason: 'from before' }
-		]);
+		assert.deepStrictEqual(
+			addedConsultees([
+				encodeSelectionEntry({
+					c: 'Hospitals operated by NHS trusts and NHS foundation trusts (England)',
+					n: 'Encoded',
+					r: 'r'
+				}),
+				raw
+			]),
+			[
+				{
+					category: 'Hospitals operated by NHS trusts and NHS foundation trusts (England)',
+					name: 'Encoded',
+					reason: 'r'
+				},
+				{ category: 'Parish, town and community councils', name: 'Plain Link', reason: 'from before' }
+			]
+		);
 		assert.deepStrictEqual(removedConsultees(encoded), [
 			{
 				id: 'm-1',
-				category: 'Parish Council',
+				category: 'Parish, town and community councils',
 				name: "O'Brien & Sons",
 				reason: "Asked to be consulted - 'select' sites only"
 			}

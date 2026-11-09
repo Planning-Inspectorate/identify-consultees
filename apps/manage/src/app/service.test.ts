@@ -29,7 +29,10 @@ describe('ManageService', () => {
 		const service = new ManageService({
 			...buildManageTestConfig(true),
 			nearbyConsulteeRadiusMetres: 20_000,
-			nearbyRadiusMetresByCategory: { Hospital: 35_000, 'Parish Council': 5_000 }
+			nearbyRadiusMetresByCategory: {
+				'Hospitals operated by NHS trusts and NHS foundation trusts (England)': 35_000,
+				'Parish, town and community councils': 5_000
+			}
 		});
 		try {
 			assert.equal(service.nearbySearchRadiusMetres, 35_000);

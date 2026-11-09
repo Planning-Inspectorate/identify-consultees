@@ -6,7 +6,7 @@ What the service does, as opposed to how: which consultees each ruleset identifi
 | ---- | ---- |
 | [`rulesets/*_ruleset.csv`](./rulesets/) | The rulesets, one per sheet of the rulesets workbook |
 | [`rulesets/rulesets.yaml`](./rulesets/rulesets.yaml) | The rest of the rulesets: the default, display names, what each Consultee Type(s) and Logic wording matches, and categories awaiting data |
-| [`reference-data.yaml`](./reference-data.yaml) | The category each reference dataset loads as (for example `AMB_EW` as Ambulance Trust), and the five groups the data is uploaded and loaded in |
+| [`reference-data.yaml`](./reference-data.yaml) | The category each reference dataset loads as (for example `AMB_EW` as Ambulance trusts), and the five groups the data is uploaded and loaded in |
 | [`screening.yaml`](./screening.yaml) | How detailed a site's outline can be before it's screened against its bounding box instead |
 | [`nearby-consultees.yaml`](./nearby-consultees.yaml) | How far around a site the maps show consultees the ruleset didn't identify, per category; and how far away another case counts as a Nearby NSIP |
 | [`report.yaml`](./report.yaml) | Each report tab's columns, the metadata each category adds, and how much each category's map shows |
@@ -34,7 +34,7 @@ Each file explains its settings at the top.
 
 A setting a file doesn't have, such as a misspelt `nsipRadiusKM`, is refused rather than ignored.
 
-Settings are keyed by consultee category (`Parish Council`, `Hospital`...), which must match `consultee_area.consulteeCategory` exactly. The categories are the ones `reference-data.yaml` loads its datasets as: see [`kt-docs/data/reference-data.md`](../kt-docs/data/reference-data.md).
+Settings are keyed by consultee category (`Parish, town and community councils`, `Hospitals operated by NHS trusts and NHS foundation trusts (England)`...), which must match `consultee_area.consulteeCategory` exactly. The categories are the ones `reference-data.yaml` loads its datasets as: see [`kt-docs/data/reference-data.md`](../kt-docs/data/reference-data.md).
 
 ## Common changes
 
@@ -42,7 +42,7 @@ Settings are keyed by consultee category (`Parish Council`, `Hospital`...), whic
 
 ### Add a reference dataset, or a new consultee category
 
-1. **`reference-data.yaml`**: under `datasets`, add the dataset code and the category it loads as (`HSP_EN: Hospital`). Then add the category to one of the `groups`, which decides its report tab.
+1. **`reference-data.yaml`**: under `datasets`, add the dataset code and the category it loads as (`HSP_EN: Hospitals operated by NHS trusts and NHS foundation trusts (England)`). Then add the category to one of the `groups`, which decides its report tab.
 2. **`report.yaml`**: under its tab's `categories`, give it a `summary` label for the Summary tab, and any `metadata` columns it exports.
 3. **`rulesets/rulesets.yaml`**: if a ruleset row names it, map the row's Consultee Type(s) wording to the category under `consulteeTypes`. If a ruleset already names the category under `categoriesAwaitingData`, take it out.
 4. **`nearby-consultees.yaml`**: only if it needs a distance other than `defaultRadiusKm`.

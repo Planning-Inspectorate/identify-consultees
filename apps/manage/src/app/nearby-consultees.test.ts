@@ -11,16 +11,21 @@ describe('nearby consultees', () => {
 	it('loads the shipped config/nearby-consultees.yaml', () => {
 		const nearby = loadNearbyConsultees();
 		assert.ok(nearby.defaultRadiusMetres > 0);
-		assert.ok(Object.keys(nearby.radiusMetresByCategory).includes('Parish Council'));
+		assert.ok(Object.keys(nearby.radiusMetresByCategory).includes('Parish, town and community councils'));
 		assert.ok(nearby.nsipRadiusMetres > 0);
 	});
 
 	it('reads the default and each category in km, as metres', () => {
 		assert.deepStrictEqual(
-			parseNearbyConsultees('version: 1\ndefaultRadiusKm: 20\ncategories:\n  Parish Council: 5\n  Hospital: 0'),
+			parseNearbyConsultees(
+				'version: 1\ndefaultRadiusKm: 20\ncategories:\n  Parish, town and community councils: 5\n  Hospitals operated by NHS trusts and NHS foundation trusts (England): 0'
+			),
 			{
 				defaultRadiusMetres: 20_000,
-				radiusMetresByCategory: { 'Parish Council': 5_000, Hospital: 0 },
+				radiusMetresByCategory: {
+					'Parish, town and community councils': 5_000,
+					'Hospitals operated by NHS trusts and NHS foundation trusts (England)': 0
+				},
 				nsipRadiusMetres: 10_000
 			}
 		);
@@ -43,9 +48,21 @@ describe('nearby consultees', () => {
 		['the wrong version', 'version: 2\ndefaultRadiusKm: 20', /version 1 document/],
 		['no default', 'version: 1', /defaultRadiusKm must be a number of km above 0/],
 		['a zero default', 'version: 1\ndefaultRadiusKm: 0', /defaultRadiusKm must be a number of km above 0/],
-		['categories as a list', 'version: 1\ndefaultRadiusKm: 20\ncategories: [Parish Council]', /categories must map/],
-		['a negative category', 'version: 1\ndefaultRadiusKm: 20\ncategories:\n  Hospital: -1', /categories\.Hospital/],
-		['a distance in words', 'version: 1\ndefaultRadiusKm: 20\ncategories:\n  Hospital: ten', /categories\.Hospital/],
+		[
+			'categories as a list',
+			"version: 1\ndefaultRadiusKm: 20\ncategories: ['Parish, town and community councils']",
+			/categories must map/
+		],
+		[
+			'a negative category',
+			'version: 1\ndefaultRadiusKm: 20\ncategories:\n  Hospitals operated by NHS trusts and NHS foundation trusts (England): -1',
+			/categories\.Hospital/
+		],
+		[
+			'a distance in words',
+			'version: 1\ndefaultRadiusKm: 20\ncategories:\n  Hospitals operated by NHS trusts and NHS foundation trusts (England): ten',
+			/categories\.Hospital/
+		],
 		['a distance over 500km', 'version: 1\ndefaultRadiusKm: 501', /to 500/],
 		['a negative Nearby NSIPs distance', 'version: 1\ndefaultRadiusKm: 20\nnsipRadiusKm: -1', /nsipRadiusKm/],
 		['a Nearby NSIPs distance in words', 'version: 1\ndefaultRadiusKm: 20\nnsipRadiusKm: ten', /nsipRadiusKm/],
@@ -56,7 +73,7 @@ describe('nearby consultees', () => {
 		],
 		[
 			'a category the reference data has no group for',
-			'version: 1\ndefaultRadiusKm: 20\ncategories:\n  Parish Councl: 5\n  Hospital: 1',
+			'version: 1\ndefaultRadiusKm: 20\ncategories:\n  Parish Councl: 5\n  Hospitals operated by NHS trusts and NHS foundation trusts (England): 1',
 			/categories\.Parish Councl isn't a consultee category - use a name config\/reference-data\.yaml's groups list/
 		]
 	];
@@ -69,7 +86,16 @@ describe('nearby consultees', () => {
 	it('searches out to the largest distance configured', () => {
 		const nearby = { defaultRadiusMetres: 20_000, radiusMetresByCategory: {}, nsipRadiusMetres: 10_000 };
 		assert.equal(searchRadiusMetres(nearby), 20_000);
-		assert.equal(searchRadiusMetres({ ...nearby, radiusMetresByCategory: { Hospital: 35_000, Parish: 0 } }), 35_000);
+		assert.equal(
+			searchRadiusMetres({
+				...nearby,
+				radiusMetresByCategory: {
+					'Hospitals operated by NHS trusts and NHS foundation trusts (England)': 35_000,
+					Parish: 0
+				}
+			}),
+			35_000
+		);
 		// far enough to draw every Nearby NSIP too
 		assert.equal(searchRadiusMetres({ ...nearby, nsipRadiusMetres: 40_000 }), 40_000);
 	});

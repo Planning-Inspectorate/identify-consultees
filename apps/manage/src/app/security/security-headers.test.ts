@@ -174,7 +174,7 @@ describe('HTML security response headers', () => {
 
 	test('a category page keeps map-aware CSP', async () => {
 		const response = await request(developmentApp).get(
-			`/consultees/${mapPageTestCaseId}/report/consultees?ruleset=england-wales-post-20240430&category=Parish%20Council`
+			`/consultees/${mapPageTestCaseId}/report/consultees?ruleset=england-wales-post-20240430&category=Parish%2C%20town%20and%20community%20councils`
 		);
 		assert.equal(response.status, 200);
 		const csp = response.headers['content-security-policy'];

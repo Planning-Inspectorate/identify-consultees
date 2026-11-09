@@ -11,7 +11,7 @@ function input(overrides: Partial<MapPdfInput> = {}): MapPdfInput {
 		rulesetName: 'Test ruleset',
 		boundaryFileName: 'site.geojson',
 		generatedAt: new Date('2026-10-13T14:00:00Z'),
-		category: 'Parish Council',
+		category: 'Parish, town and community councils',
 		image: ONE_PIXEL_PNG,
 		// the one pixel is drawn 400pt square - 10 m a point
 		metresPerPixel: 4_000,
@@ -34,7 +34,7 @@ describe('report map PDF', () => {
 		assert.equal(pdf.toString('latin1').match(/\/Type \/Page\b/g)?.length, 2);
 		const lines = pdfTextLines(pdf);
 		assert.deepStrictEqual(lines.slice(0, 3), [
-			'Parish Council',
+			'Parish, town and community councils',
 			'Test Solar Farm (EN010001)',
 			'Ruleset: Test ruleset   |   Boundary file: site.geojson   |   Generated 13 October 2026'
 		]);
@@ -47,7 +47,7 @@ describe('report map PDF', () => {
 			'In the report',
 			'The site',
 			'Ruleset buffers (2 km, 10 km)',
-			'Parish Council: 2 in the report',
+			'Parish, town and community councils: 2 in the report',
 			'Abbey Parish Council',
 			'"B" host Parish Councils: intersects the site',
 			'Asked to be consulted',

@@ -57,7 +57,7 @@ describe('admin import reference data', () => {
 	it("shows each group's newest file, its rows and its last load, and the tables' counts", async () => {
 		const res = newRes();
 		const db = databaseWith({
-			groupRows: { 'Ambulance Trust': 12_000, 'Parish Council': 11_548 },
+			groupRows: { 'Ambulance trusts': 12_000, 'Parish, town and community councils': 11_548 },
 			loads: [
 				{
 					dataGroup: 'public_bodies',
@@ -88,7 +88,7 @@ describe('admin import reference data', () => {
 			name: 'Public bodies',
 			slug: 'public_bodies',
 			categories:
-				'Ambulance Trust, Fire and Rescue Authority, Hospital, ICB, Internal Drainage Board, Internal Drainage District, Local Health Board, Local Resilience Forum, National Landscape, Police',
+				'Ambulance trusts, Fire and rescue authorities, Hospitals operated by NHS trusts and NHS foundation trusts (England), Integrated Care Boards (England), Internal drainage boards (England), Internal drainage boards (Wales), Local health boards (Wales), Local resilience forums (Wales), National Landscapes - areas of outstanding natural beauty (England), National Landscapes - areas of outstanding natural beauty (Wales), Police and crime commissioners',
 			// the newest by the date its data is from, whatever order they're listed in
 			file: { name: '20261020_public_bodies.geojson', dataDate: '20 October 2026', quarter: '2026Q4', size: '250MB' },
 			rows: 12_000,
@@ -155,8 +155,13 @@ describe('admin import reference data', () => {
 				{ name: 'consultee_area_2027Q1', rows: 1_929 },
 				{ name: 'consultee_area_2026Q4', rows: 15_605 }
 			],
-			groupRows: { 'Parish Council': 11_901, 'Ambulance Trust': 316, DNO: 1_929, Canal: 1_459 },
-			pendingGroupRows: { DNO: 1_929 }
+			groupRows: {
+				'Parish, town and community councils': 11_901,
+				'Ambulance trusts': 316,
+				'Electricity distributors with compulsory purchase order powers': 1_929,
+				'Canal or inland navigation authorities': 1_459
+			},
+			pendingGroupRows: { 'Electricity distributors with compulsory purchase order powers': 1_929 }
 		});
 		await buildImportReferenceDataPage({ db, logger: mockLogger() } as never, files())({}, res);
 

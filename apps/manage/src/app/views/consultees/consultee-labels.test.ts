@@ -14,24 +14,39 @@ const detail = (overrides: Partial<ConsulteeAreaDetail> = {}): ConsulteeAreaDeta
 describe('consultee labels', () => {
 	it("tells a consultee apart by its category's detail: council area, operator and technology, else region", () => {
 		assert.strictEqual(
-			distinguishingDetail('Parish Council', detail({ authority: 'Lancaster', region: 'North West' })),
+			distinguishingDetail(
+				'Parish, town and community councils',
+				detail({ authority: 'Lancaster', region: 'North West' })
+			),
 			'Lancaster'
 		);
 		assert.strictEqual(
 			distinguishingDetail(
-				'Electricity Generator',
+				'Electricity generators with compulsory purchase order powers',
 				detail({ metadata: JSON.stringify({ COMPANY_NAME: ' Intergen ', PRIMARY_TYPE: 'Wind' }), region: 'Scotland' })
 			),
 			'Intergen, Wind'
 		);
 		// a generator with neither, or metadata that isn't an object or isn't JSON - its region
 		for (const metadata of ['{}', '"text"', 'not json']) {
-			assert.strictEqual(distinguishingDetail('Electricity Generator', detail({ metadata, region: 'Wales' })), 'Wales');
+			assert.strictEqual(
+				distinguishingDetail(
+					'Electricity generators with compulsory purchase order powers',
+					detail({ metadata, region: 'Wales' })
+				),
+				'Wales'
+			);
 		}
-		assert.strictEqual(distinguishingDetail('DNO', detail({ region: 'London', subcategory: 'DNO' })), 'London');
-		assert.strictEqual(distinguishingDetail('Railway', detail({ region: ' ', subcategory: 'Active' })), 'Active');
-		assert.strictEqual(distinguishingDetail('Railway', detail()), undefined);
-		assert.strictEqual(distinguishingDetail('Railway', undefined), undefined);
+		assert.strictEqual(
+			distinguishingDetail(
+				'Electricity distributors with compulsory purchase order powers',
+				detail({ region: 'London', subcategory: 'Electricity distributors with compulsory purchase order powers' })
+			),
+			'London'
+		);
+		assert.strictEqual(distinguishingDetail('Railways', detail({ region: ' ', subcategory: 'Active' })), 'Active');
+		assert.strictEqual(distinguishingDetail('Railways', detail()), undefined);
+		assert.strictEqual(distinguishingDetail('Railways', undefined), undefined);
 	});
 
 	it('labels only names that repeat - in the list, or among those already listed - adding the distance where still needed', () => {
@@ -49,7 +64,7 @@ describe('consultee labels', () => {
 				{ id: 'd', name: 'Christleton', distanceMetres: 7_300 },
 				{ id: 'e', name: 'Barton', distanceMetres: 4_000 }
 			],
-			'Parish Council',
+			'Parish, town and community councils',
 			details,
 			['barton']
 		);
@@ -68,7 +83,7 @@ describe('consultee labels', () => {
 				{ id: 'x', name: 'Rail', distanceMetres: 1_000 },
 				{ id: 'y', name: 'Rail' }
 			],
-			'Railway',
+			'Railways',
 			new Map()
 		);
 		assert.deepStrictEqual(Object.fromEntries(bare), { x: 'Rail (1.0 km from the site)', y: 'Rail' });

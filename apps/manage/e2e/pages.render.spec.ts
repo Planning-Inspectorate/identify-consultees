@@ -8,7 +8,7 @@ import {
 	SAMPLE_RULESET_NAME
 } from './fixtures.ts';
 
-const CATEGORY_PAGE = `/consultees/${SAMPLE_CASE_ID}/report/consultees?ruleset=${SAMPLE_RULESET_ID}&category=Parish%20Council`;
+const CATEGORY_PAGE = `/consultees/${SAMPLE_CASE_ID}/report/consultees?ruleset=${SAMPLE_RULESET_ID}&category=Parish%2C%20town%20and%20community%20councils`;
 
 const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
@@ -64,19 +64,19 @@ const pages = [
 		]
 	},
 	{
-		path: `/consultees/${SAMPLE_CASE_ID}/report/consultees?ruleset=${SAMPLE_RULESET_ID}&category=Parish%20Council`,
+		path: `/consultees/${SAMPLE_CASE_ID}/report/consultees?ruleset=${SAMPLE_RULESET_ID}&category=Parish%2C%20town%20and%20community%20councils`,
 		name: 'report consultees',
-		heading: /Parish Council/i,
+		heading: /Parish, town and community councils/i,
 		mustSee: [/Included consultees/i, /Add a consultee/i, /Back to draft report/i]
 	},
 	{
-		path: `/consultees/${SAMPLE_CASE_ID}/report/consultees/add?ruleset=${SAMPLE_RULESET_ID}&category=Parish%20Council`,
+		path: `/consultees/${SAMPLE_CASE_ID}/report/consultees/add?ruleset=${SAMPLE_RULESET_ID}&category=Parish%2C%20town%20and%20community%20councils`,
 		name: 'report consultee add',
 		heading: /Add a consultee/i,
 		mustSee: [/Reason for adding/i, /Add consultee/i]
 	},
 	{
-		path: `/consultees/${SAMPLE_CASE_ID}/report/consultees/remove?ruleset=${SAMPLE_RULESET_ID}&category=Parish%20Council&add=${Buffer.from('{"c":"Parish Council","n":"A Consultee","r":"borders"}').toString('base64url')}&added=0`,
+		path: `/consultees/${SAMPLE_CASE_ID}/report/consultees/remove?ruleset=${SAMPLE_RULESET_ID}&category=Parish%2C%20town%20and%20community%20councils&add=${Buffer.from('{"c":"Parish, town and community councils","n":"A Consultee","r":"borders"}').toString('base64url')}&added=0`,
 		name: 'report consultee remove',
 		heading: /Remove consultee/i,
 		mustSee: [/A Consultee/i, /Reason for removing/i]
@@ -182,12 +182,12 @@ test.describe('cross-browser render completeness', () => {
 
 	test('a category page exposes a map region', async ({ page }) => {
 		await page.goto(CATEGORY_PAGE, { waitUntil: 'domcontentloaded' });
-		await expect(page.getByRole('heading', { level: 1, name: 'Parish Council' })).toBeVisible();
+		await expect(page.getByRole('heading', { level: 1, name: 'Parish, town and community councils' })).toBeVisible();
 
 		const mapRegion = page.locator('.app-consultee-map.app-case-map').first();
 		await expect(mapRegion).toBeAttached();
 		await expect(mapRegion).toHaveAttribute('role', 'region');
-		await expect(mapRegion).toHaveAttribute('aria-label', /Parish Council/);
+		await expect(mapRegion).toHaveAttribute('aria-label', /Parish, town and community councils/);
 
 		// the static-map fallback travels in the page config - data-* attributes on the map
 		// container are JSON.parsed by the InteractiveMap constructor and must stay off it

@@ -49,7 +49,7 @@ export function distinguishingDetail(category: string, detail: ConsulteeAreaDeta
 	if (detail.authority) {
 		return detail.authority;
 	}
-	if (category === 'Electricity Generator') {
+	if (category === 'Electricity generators with compulsory purchase order powers') {
 		const metadata = metadataOf(detail);
 		const generator = [text(metadata.COMPANY_NAME), text(metadata.PRIMARY_TYPE)].filter(Boolean).join(', ');
 		if (generator) {

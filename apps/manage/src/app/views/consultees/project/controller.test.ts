@@ -93,9 +93,9 @@ describe('consultee project boundary page', () => {
 	});
 
 	it("should check the check page's file, and go back to it, when changing its shapefile", async () => {
-		const exclude = Buffer.from('{"i":"m1","c":"Parish Council","n":"Abbey Parish","r":"Not affected"}').toString(
-			'base64url'
-		);
+		const exclude = Buffer.from(
+			'{"i":"m1","c":"Parish, town and community councils","n":"Abbey Parish","r":"Not affected"}'
+		).toString('base64url');
 		const render = async (query: Record<string, unknown>) => {
 			const mockRes = { status: mock.fn(() => mockRes), render: mock.fn() };
 			const db = dbReturning([
@@ -264,9 +264,9 @@ describe('project boundary submit', () => {
 	});
 
 	it('should go straight back to the check page when changing its project or shapefile', async () => {
-		const exclude = Buffer.from('{"i":"m1","c":"Parish Council","n":"Abbey Parish","r":"Not affected"}').toString(
-			'base64url'
-		);
+		const exclude = Buffer.from(
+			'{"i":"m1","c":"Parish, town and community councils","n":"Abbey Parish","r":"Not affected"}'
+		).toString('base64url');
 		const ruleset = 'england-wales-post-20240430';
 		const submit = async (query: Record<string, unknown>) => {
 			const mockRes = { status: mock.fn(() => mockRes), render: mock.fn(), redirect: mock.fn() };

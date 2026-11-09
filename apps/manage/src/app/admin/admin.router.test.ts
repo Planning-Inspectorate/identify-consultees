@@ -32,7 +32,7 @@ describe('admin section', () => {
 					type: 'Feature',
 					geometry: { type: 'Point', coordinates: [1.5, 55.5] },
 					properties: {
-						consulteeCategory: 'Parish Council',
+						consulteeCategory: 'Parish, town and community councils',
 						consultee: 'Admin Test Parish',
 						metadata: { FID: 612 }
 					}
@@ -82,12 +82,14 @@ describe('admin section', () => {
 		assert.match(response.text, /<code>case_boundary<\/code>/);
 		assert.match(
 			response.text,
-			/href="\/admin\/database\/consultee-areas\?category=Parish\+Council">Parish Council<\/a>/
+			/href="\/admin\/database\/consultee-areas\?category=Parish%2C\+town\+and\+community\+councils">Parish, town and community councils<\/a>/
 		);
 	});
 
 	test('the consultee areas list finds a row by name, and its page shows it whole', async () => {
-		const list = await request(app).get('/admin/database/consultee-areas?category=Parish+Council&q=Admin+Test');
+		const list = await request(app).get(
+			'/admin/database/consultee-areas?category=Parish%2C+town+and+community+councils&q=Admin+Test'
+		);
 		assert.equal(list.status, 200);
 		assert.match(list.text, /Showing 1 to 1 of 1 rows\./);
 		assert.match(

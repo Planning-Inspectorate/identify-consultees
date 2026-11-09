@@ -42,7 +42,7 @@ describe('toConsulteeArea', () => {
 
 		assert.deepEqual(feature.properties, {
 			sourceId: 'health_AMB_EW_00001',
-			consulteeCategory: 'Ambulance Trust',
+			consulteeCategory: 'Ambulance trusts',
 			consulteeGroup: 'Health',
 			consulteeSubcategory: null,
 			consulteeSubcategoryDescription: null,
@@ -63,7 +63,7 @@ describe('toConsulteeArea', () => {
 			properties: {
 				id: 'E23000001',
 				consultee: 'Example Trust',
-				consulteeCategory: 'Ambulance Trust',
+				consulteeCategory: 'Ambulance trusts',
 				caseId: 'EN010001',
 				currentVersion: 2,
 				metadata: { layer: 'ambulance' }
@@ -72,7 +72,7 @@ describe('toConsulteeArea', () => {
 
 		assert.deepEqual(feature.properties, {
 			sourceId: 'E23000001',
-			consulteeCategory: 'Ambulance Trust',
+			consulteeCategory: 'Ambulance trusts',
 			consulteeGroup: null,
 			consulteeSubcategory: null,
 			consulteeSubcategoryDescription: null,
@@ -92,10 +92,13 @@ describe('toConsulteeArea', () => {
 				properties: { id, consultee_category: 'Energy', consultee_subcategory: subcategory }
 			}).properties;
 		const cable = offshoreWind('energy_OWF_EW_00073', 'Offshore Wind Export Cables');
-		assert.equal(cable.consulteeCategory, 'Offshore Wind Export Cable');
+		assert.equal(cable.consulteeCategory, 'Offshore wind export cables and sites');
 		assert.equal(cable.consulteeSubcategory, 'Offshore Wind Export Cables');
 		assert.equal(cable.consulteeGroup, 'Energy');
-		assert.equal(offshoreWind('energy_OWF_EW_00001', 'Offshore Wind Sites').consulteeCategory, 'Offshore Wind Site');
+		assert.equal(
+			offshoreWind('energy_OWF_EW_00001', 'Offshore Wind Sites').consulteeCategory,
+			'Offshore wind export cables and sites'
+		);
 	});
 
 	test("takes the export's subcategory and its description, a blank one as none", () => {
@@ -122,7 +125,7 @@ describe('toConsulteeArea', () => {
 			properties: { id: 'health_AMB_EW_00002' }
 		});
 		assert.equal(ungrouped.properties.consulteeGroup, null);
-		assert.equal(ungrouped.properties.consulteeCategory, 'Ambulance Trust');
+		assert.equal(ungrouped.properties.consulteeCategory, 'Ambulance trusts');
 		assert.equal(blank.properties.consulteeSubcategoryDescription, 'Sample');
 	});
 
@@ -168,11 +171,11 @@ describe('toConsulteeArea', () => {
 	test('keeps metadata that is not a JSON object whole, as rawMetadata', () => {
 		const feature = toConsulteeArea({
 			geometry: { type: 'Point', coordinates: [1, 2] },
-			properties: { id: 42, consultee_category: 'Railway', metadata: "{'source': 'python-dict-repr'}" }
+			properties: { id: 42, consultee_category: 'Railways', metadata: "{'source': 'python-dict-repr'}" }
 		});
 
 		assert.equal(feature.properties.sourceId, '42');
-		assert.equal(feature.properties.consulteeCategory, 'Railway');
+		assert.equal(feature.properties.consulteeCategory, 'Railways');
 		assert.deepEqual(feature.properties.metadata, { rawMetadata: "{'source': 'python-dict-repr'}" });
 	});
 
@@ -347,7 +350,7 @@ describe('importConsulteeAreas', () => {
 
 	test('loads a chunk of the file at a time, reporting progress across them', async () => {
 		const { client, $executeRaw } = loadingClient();
-		const features = ['a', 'b', 'c'].map((id) => point({ id, consultee: id, consulteeCategory: 'Ambulance Trust' }));
+		const features = ['a', 'b', 'c'].map((id) => point({ id, consultee: id, consulteeCategory: 'Ambulance trusts' }));
 		const progress: [number, number][] = [];
 		await withFile(JSON.stringify({ type: 'FeatureCollection', features }), async (filePath) => {
 			const imported = await importConsulteeAreas(client, filePath, {
@@ -367,7 +370,7 @@ describe('importConsulteeAreas', () => {
 
 	test('loads a feature larger than a chunk on its own', async () => {
 		const { client, $executeRaw } = loadingClient();
-		const features = ['a', 'b'].map((id) => point({ id, consulteeCategory: 'Ambulance Trust' }));
+		const features = ['a', 'b'].map((id) => point({ id, consulteeCategory: 'Ambulance trusts' }));
 		await withFile(JSON.stringify({ type: 'FeatureCollection', features }), async (filePath) => {
 			assert.equal(await importConsulteeAreas(client, filePath, { chunkCharacters: 1 }), 2);
 		});

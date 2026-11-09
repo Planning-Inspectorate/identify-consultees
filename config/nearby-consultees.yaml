@@ -14,7 +14,7 @@
 #                      once, by its most recently received shapefile. 0 means none are looked for;
 #                      10 if not set.
 #
-# Railway is never searched as nearby, whatever is set here: its data is one national shape per
+# Railways is never searched as nearby, whatever is set here: its data is one national shape per
 # line type, which is near almost every site and slows the search (see kt-docs/data/screening-issues.md).
 #
 # Larger distances mean more consultees on the maps and a slower search: the search reaches out to
@@ -28,34 +28,35 @@ nsipRadiusKm: 35
 
 categories:
   # local government
-  Parish Council: 20
-  Lower Tier Authority: 20
-  Unitary Authority: 20
-  Upper Tier Authority: 20
+  'Parish, town and community councils': 20
+  District councils (lower-tier authorities): 20
+  Unitary authorities: 20
+  County councils (upper-tier authorities): 20
   Greater London Authority: 20
-  Corporate Joint Committee: 20
+  Corporate joint committees (Wales): 20
   # health
-  Hospital: 20
-  ICB: 20
-  Local Health Board: 20
-  Ambulance Trust: 20
+  Hospitals operated by NHS trusts and NHS foundation trusts (England): 20
+  Integrated Care Boards (England): 20
+  Local health boards (Wales): 20
+  Ambulance trusts: 20
   # emergency services and resilience
-  Police: 20
-  Fire and Rescue Authority: 20
-  Local Resilience Forum: 20
+  Police and crime commissioners: 20
+  Fire and rescue authorities: 20
+  Local resilience forums (Wales): 20
   # landscape and water
-  National Park: 20
-  National Landscape: 20
-  Internal Drainage Board: 20
-  Internal Drainage District: 20
+  National Parks UK (England): 20
+  National Parks UK (Wales): 20
+  National Landscapes - areas of outstanding natural beauty (England): 20
+  National Landscapes - areas of outstanding natural beauty (Wales): 20
+  Internal drainage boards (England): 20
+  Internal drainage boards (Wales): 20
   # transport
-  Dock or Harbour: 20
-  Integrated Transport Authority: 20
-  Passenger Transport Executive: 20
+  Dock and harbour authorities: 20
+  Integrated transport authorities: 20
+  Passenger transport executives: 20
   # energy
-  Electricity Generator: 20
-  ONR Site: 20
-  DNO: 20
-  Interconnector: 20
-  Offshore Wind Site: 20
-  Offshore Wind Export Cable: 20
+  Electricity generators with compulsory purchase order powers: 20
+  Office for Nuclear Regulation sites: 20
+  Electricity distributors with compulsory purchase order powers: 20
+  Electricity interconnectors with compulsory purchase order powers: 20
+  Offshore wind export cables and sites: 20

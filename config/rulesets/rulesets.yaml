@@ -43,89 +43,119 @@ names:
 consulteeTypes:
   # administrative boundaries - see the workbook's A-D_authorities sheet
   Parish / Town / Community Councils:
-    categories: [Parish Council]
+    categories: ['Parish, town and community councils']
   Community Councils bordering B Host Community Councils:
-    categories: [Parish Council]
-    hostCategory: Parish Council
+    categories: ['Parish, town and community councils']
+    hostCategory: 'Parish, town and community councils'
   District Councils (Lower Tier Authorities):
-    categories: [Lower Tier Authority]
+    categories: [District councils (lower-tier authorities)]
   Unitary Authorities:
-    categories: [Unitary Authority]
-  # Broads Authority areas are expected within the National Park data
+    categories: [Unitary authorities]
+  # Broads Authority areas are expected within the national parks data
   National Parks & Broads:
-    categories: [National Park]
+    categories: [National Parks UK (England), National Parks UK (Wales)]
   County Councils (Upper Tier Authorities):
-    categories: [Upper Tier Authority]
+    categories: [County councils (upper-tier authorities)]
   District Councils, Unitary Authorities, National Parks & Broads bordering B Host District Councils:
-    categories: [Lower Tier Authority, Unitary Authority, National Park]
-    hostCategory: Lower Tier Authority
+    categories:
+      [
+        District councils (lower-tier authorities),
+        Unitary authorities,
+        National Parks UK (England),
+        National Parks UK (Wales)
+      ]
+    hostCategory: District councils (lower-tier authorities)
   County Councils, District Councils, Unitary Authorities, National Parks & Broads bordering B Host Unitary Authorities:
-    categories: [Upper Tier Authority, Lower Tier Authority, Unitary Authority, National Park]
-    hostCategory: Unitary Authority
+    categories:
+      [
+        County councils (upper-tier authorities),
+        District councils (lower-tier authorities),
+        Unitary authorities,
+        National Parks UK (England),
+        National Parks UK (Wales)
+      ]
+    hostCategory: Unitary authorities
   County Councils, Unitary Authorities, National Parks & Broads and District Councils bordering B Host Unitary Authorities:
-    categories: [Upper Tier Authority, Lower Tier Authority, Unitary Authority, National Park]
-    hostCategory: Unitary Authority
+    categories:
+      [
+        County councils (upper-tier authorities),
+        District councils (lower-tier authorities),
+        Unitary authorities,
+        National Parks UK (England),
+        National Parks UK (Wales)
+      ]
+    hostCategory: Unitary authorities
   County Councils, Unitary Authorities, National Parks & Broads bordering C Host County Councils:
-    categories: [Upper Tier Authority, Unitary Authority, National Park]
-    hostCategory: Upper Tier Authority
+    categories:
+      [
+        County councils (upper-tier authorities),
+        Unitary authorities,
+        National Parks UK (England),
+        National Parks UK (Wales)
+      ]
+    hostCategory: County councils (upper-tier authorities)
   Greater London Authority:
     categories: [Greater London Authority]
   # public bodies
   National Landscapes (formerly AONBs):
-    categories: [National Landscape]
+    categories:
+      [
+        National Landscapes - areas of outstanding natural beauty (England),
+        National Landscapes - areas of outstanding natural beauty (Wales)
+      ]
   Internal Drainage Boards (England & Wales):
-    categories: [Internal Drainage Board, Internal Drainage District]
+    categories: [Internal drainage boards (England), Internal drainage boards (Wales)]
   Ambulance Trusts:
-    categories: [Ambulance Trust]
+    categories: [Ambulance trusts]
   Fire & Rescue Authorities:
-    categories: [Fire and Rescue Authority]
+    categories: [Fire and rescue authorities]
   # police force areas, which are also the PCCs' areas
   Police & Crime Commissioners:
-    categories: [Police]
+    categories: [Police and crime commissioners]
   Hospitals operated by NHS Trusts and NHS Foundation Trusts (England):
-    categories: [Hospital]
+    categories: [Hospitals operated by NHS trusts and NHS foundation trusts (England)]
   Integrated Care Boards (England):
-    categories: [ICB]
+    categories: [Integrated Care Boards (England)]
   Local Health Boards (Wales):
-    categories: [Local Health Board]
+    categories: [Local health boards (Wales)]
   Local Resilience Forums:
-    categories: [Local Resilience Forum]
+    categories: [Local resilience forums (Wales)]
   # energy
   Electricity Generators (Biomass, Coal, Energy from Waste, Hydroelectric, Hydrogen, Natural Gas, Nuclear, Offshore Wind, Onshore Wind, Solar, Tidal, Other, Unknown):
-    categories: [Electricity Generator]
+    categories: [Electricity generators with compulsory purchase order powers]
   Offshore Wind Sites:
-    categories: [Offshore Wind Site]
+    categories: [Offshore wind export cables and sites]
   Wind Export Cables:
-    categories: [Offshore Wind Export Cable]
+    categories: [Offshore wind export cables and sites]
   Electricity Distribution Networks:
-    categories: [DNO]
+    categories: [Electricity distributors with compulsory purchase order powers]
   Electricity Interconnectors (Built, Proposed, Scoping):
-    categories: [Interconnector]
+    categories: [Electricity interconnectors with compulsory purchase order powers]
   Office for Nuclear Regulation Sites:
-    categories: [ONR Site]
+    categories: [Office for Nuclear Regulation sites]
   # transport
   Canals England & Wales:
-    categories: [Canal]
+    categories: [Canal or inland navigation authorities]
   Railways:
-    categories: [Railway]
+    categories: [Railways]
   Passenger Transport Executives:
-    categories: [Passenger Transport Executive]
+    categories: [Passenger transport executives]
   Integrated Transport Authorities:
-    categories: [Integrated Transport Authority]
+    categories: [Integrated transport authorities]
   Docks / Harbours operated by Statutory Harbour Authorities:
-    categories: [Dock or Harbour]
+    categories: [Dock and harbour authorities]
   # Wales's Corporate Joint Committees hold its regional transport planning duties
   Joint Transport Authorities (Wales):
-    categories: [Corporate Joint Committee]
+    categories: [Corporate joint committees (Wales)]
   # other
   MoD Safeguarding Areas:
-    categories: [MOD Safeguarding Area]
+    categories: [Ministry of Defence safeguarding areas]
   MoD Low Flying Areas (Green, Amber, Red, Blue):
-    categories: [MOD Low Flying Area]
+    categories: [Ministry of Defence low flying areas]
   Coal Mining Reporting Areas:
-    categories: [Coal Mining Reporting Area]
+    categories: [Mining remediation authority]
   Cheshire Brine Area:
-    categories: [Cheshire Brine Area]
+    categories: [Cheshire brine subsidence district]
 
 logic:
   Intersects application site: intersection
