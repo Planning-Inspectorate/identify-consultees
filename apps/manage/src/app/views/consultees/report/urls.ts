@@ -319,19 +319,43 @@ export function addConsulteeSuggestionsUrl(
  */
 export type RemovalTarget = { matchId: string } | { addedIndex: number };
 
-/** The "Remove consultee" form on a category page - posts back to the same URL with the reason. */
+/**
+ * The "Remove consultee" form on a category page - posts back to the same URL with the reason.
+ * Several targets (a bulk removal) ride along as repeated `match`/`added` params.
+ */
 export function removeConsulteeUrl(
 	caseId: string,
 	rulesetId: string,
 	category: string,
-	target: RemovalTarget,
+	target: RemovalTarget | RemovalTarget[],
 	selection: ConsulteeSelection = NO_SELECTION
 ): string {
-	const targetParam =
-		'matchId' in target
-			? `&match=${encodeURIComponent(target.matchId)}`
-			: `&added=${encodeURIComponent(String(target.addedIndex))}`;
+	const targetParam = (Array.isArray(target) ? target : [target])
+		.map((t) =>
+			'matchId' in t ? `&match=${encodeURIComponent(t.matchId)}` : `&added=${encodeURIComponent(String(t.addedIndex))}`
+		)
+		.join('');
 	return reportPageUrl(caseId, 'report/consultees/remove', rulesetId, selection, categoryParam(category) + targetParam);
+}
+
+/**
+ * The bare "Remove consultee" path a category page's bulk form submits to: a GET form replaces
+ * its action's query string with its fields, so ruleset, category, the selection and the
+ * checked `match`/`added` targets all travel as inputs rather than in this URL.
+ */
+export function bulkRemoveConsulteeUrl(caseId: string): string {
+	return `/consultees/${encodeURIComponent(caseId)}/report/consultees/remove`;
+}
+
+/**
+ * The selection as repeated query-param name/value pairs - for the bulk form's hidden inputs,
+ * which re-encode each `exclude`/`add` entry the way appendSelection puts them in a URL.
+ */
+export function selectionParams(selection: ConsulteeSelection): { name: string; value: string }[] {
+	return [
+		...selection.removed.map((removal) => ({ name: 'exclude', value: encodeEntry(removal) })),
+		...selection.adds.map((add) => ({ name: 'add', value: encodeEntry(add) }))
+	];
 }
 
 /**

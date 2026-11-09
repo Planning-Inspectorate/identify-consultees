@@ -261,7 +261,7 @@ test.describe('manage journeys', () => {
 		await page.getByRole('link', { name: 'Back', exact: true }).click();
 		await expect(page).toHaveURL(/\/report\/consultees\?.*category=Parish/);
 		expect(new URL(page.url()).searchParams.getAll('add')).toEqual([]);
-		await expect(page.getByRole('rowheader', { name: 'First Test Consultee' })).toHaveCount(0);
+		await expect(page.getByRole('cell', { name: 'First Test Consultee', exact: true })).toHaveCount(0);
 		await expect(page.getByRole('link', { name: /Remove/ })).toHaveCount(parishCount - removed);
 		await page.getByRole('button', { name: 'Add a consultee' }).click();
 		await page.getByLabel('Reason for adding').fill('Entered first');
@@ -271,7 +271,7 @@ test.describe('manage journeys', () => {
 		await nameInput.fill('First Test Consultee');
 		await addButton.click();
 		await expect(page).toHaveURL(/\/report\/consultees\?.*category=Parish.*add=/);
-		await expect(page.getByRole('rowheader', { name: 'First Test Consultee' })).toBeVisible();
+		await expect(page.getByRole('cell', { name: 'First Test Consultee', exact: true })).toBeVisible();
 		await expect(page.getByText('Entered first')).toBeVisible();
 		// it's far from the site - beyond where the run looked - but the map draws it all the same, as
 		// identified, and the static map's link carries it
@@ -309,7 +309,7 @@ test.describe('manage journeys', () => {
 			const pickedName = await nameInput.inputValue();
 			await page.getByLabel('Reason for adding').fill('Picked from nearby');
 			await addButton.click();
-			await expect(page.getByRole('rowheader', { name: pickedName, exact: true })).toBeVisible();
+			await expect(page.getByRole('cell', { name: pickedName, exact: true })).toBeVisible();
 			await expect(page.getByText('Picked from nearby')).toBeVisible();
 			// added by its id - the selection travels base64url-encoded, so read the last add back
 			const lastAdd = new URL(page.url()).searchParams.getAll('add').at(-1) ?? '';
@@ -324,7 +324,7 @@ test.describe('manage journeys', () => {
 		await nameInput.fill('Second Test Consultee');
 		await page.getByLabel('Reason for adding').fill('Borders the site');
 		await addButton.click();
-		await expect(page.getByRole('rowheader', { name: 'Second Test Consultee' })).toBeVisible();
+		await expect(page.getByRole('cell', { name: 'Second Test Consultee', exact: true })).toBeVisible();
 		await expect(page.getByText('Borders the site')).toBeVisible();
 		await expect(page.getByRole('link', { name: /Remove/ })).toHaveCount(parishCount - removed + picked + 2);
 
@@ -336,8 +336,8 @@ test.describe('manage journeys', () => {
 		await page.getByLabel('Reason for removing').fill('Added in error');
 		await page.getByRole('button', { name: 'Remove consultee' }).click();
 		const consulteesTable = page.getByRole('table', { name: 'Included consultees', exact: true });
-		await expect(consulteesTable.getByRole('rowheader', { name: 'Second Test Consultee' })).toHaveCount(0);
-		await expect(consulteesTable.getByRole('rowheader', { name: 'First Test Consultee' })).toBeVisible();
+		await expect(consulteesTable.getByRole('cell', { name: 'Second Test Consultee', exact: true })).toHaveCount(0);
+		await expect(consulteesTable.getByRole('cell', { name: 'First Test Consultee', exact: true })).toBeVisible();
 		const removedTable = page.getByRole('table', { name: 'Removed consultees' });
 		await expect(removedTable.getByRole('rowheader', { name: 'Second Test Consultee' })).toBeVisible();
 		await expect(removedTable.getByRole('row', { name: /Added in error/ })).toBeVisible();
@@ -379,7 +379,7 @@ test.describe('manage journeys', () => {
 		await page.getByRole('link', { name: 'Remove First Test Consultee' }).click();
 		await page.getByLabel('Reason for removing').fill('Not confirmed');
 		await page.getByRole('button', { name: 'Remove consultee' }).click();
-		await expect(consulteesTable.getByRole('rowheader', { name: 'First Test Consultee' })).toHaveCount(0);
+		await expect(consulteesTable.getByRole('cell', { name: 'First Test Consultee', exact: true })).toHaveCount(0);
 		await page.getByRole('link', { name: 'Back to draft report' }).click();
 		await expect(page.getByRole('heading', { level: 1 })).toContainText('Check consultees before creating the report');
 		expect((await returnedValue.innerHTML()).includes('First Test Consultee')).toBe(false);
@@ -391,7 +391,7 @@ test.describe('manage journeys', () => {
 		await nameInput.fill('First Test Consultee');
 		await page.getByLabel('Reason for adding').fill('Borders the site after all');
 		await addButton.click();
-		await expect(consulteesTable.getByRole('rowheader', { name: 'First Test Consultee' })).toBeVisible();
+		await expect(consulteesTable.getByRole('cell', { name: 'First Test Consultee', exact: true })).toBeVisible();
 		await page.getByRole('link', { name: 'Back to draft report' }).click();
 		await expect(page.getByRole('heading', { level: 1 })).toContainText('Check consultees before creating the report');
 		expect((await returnedValue.innerHTML()).includes('First Test Consultee')).toBe(true);
@@ -506,7 +506,7 @@ test.describe('manage journeys', () => {
 
 			// both listed, each with what tells it apart - and named the same way on the map
 			await page.getByRole('link', { name: 'Back', exact: true }).click();
-			const twins = page.getByRole('rowheader', { name: /^E2E Twin Parish \(/ });
+			const twins = page.getByRole('cell', { name: /^E2E Twin Parish \(/ });
 			await expect(twins).toHaveCount(2);
 			const listed = await twins.allInnerTexts();
 			expect(listed.map((text) => text.trim()).sort()).toEqual([

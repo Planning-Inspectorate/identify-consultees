@@ -10,8 +10,15 @@ import { firstQueryValue, requestedRuleset, runRulesetSafely } from '../../../ru
 import { categoryDisplayName } from '../../categories.ts';
 import { addedConsulteeReason, consulteeName } from '../../report-consultees.ts';
 import type { ConsulteeSelection, RemovalTarget } from '../../urls.ts';
-import { consulteeSelection, consulteesUrl, excludedMatchIds, removeConsulteeUrl } from '../../urls.ts';
+import { consulteeSelection, consulteesUrl, excludedMatchIds, queryValues, removeConsulteeUrl } from '../../urls.ts';
 import type { RemoveConsulteeViewModel } from './view-model.ts';
+
+/** One consultee being removed: what to drop/exclude, and its name and why it was identified. */
+interface ResolvedRemovalTarget {
+	target: RemovalTarget;
+	name: string;
+	identified: string[];
+}
 
 interface RemoveConsulteeContext {
 	caseId: string;
@@ -19,21 +26,21 @@ interface RemoveConsulteeContext {
 	/** The category it's being removed from - the page caption, as the Add a consultee page's. */
 	category: string;
 	selection: ConsulteeSelection;
-	/** Which consultee the page is removing - a ruleset match or a hand-added one. */
-	target: RemovalTarget;
-	/** The consultee's name and why it was identified - the page's summary table, and what the recorded removal keeps. */
-	name: string;
-	identified: string[];
+	/** The consultees being removed - one row of the summary table each, in param order. */
+	targets: ResolvedRemovalTarget[];
 	/** A match target whose ruleset run failed can't be resolved - the page shows an error, not the form. */
 	rulesetFailed: boolean;
 }
 
 /**
- * The case/ruleset/category and consultee a "Remove consultee" request targets: `?match=` is a
- * ruleset match's feature id (resolved by running the ruleset - it must be in this category and
- * not already removed) and `?added=` is an index into the `add` params. Anything else - a case
- * or ruleset that isn't found, a missing or unresolvable target - 404s. `undefined` means a
- * response has already been sent.
+ * The case/ruleset/category and consultees a "Remove consultee" request targets: each `?match=`
+ * is a ruleset match's feature id (resolved by running the ruleset - every one must be in this
+ * category and not already removed) and each `?added=` an index into the `add` params. A bulk
+ * removal from the category page's checkboxes arrives the same way, just with the params
+ * repeated - or, when that page's Select all box submits it (which only happens without JS, as
+ * consultee-select.js strips its name), a `?select-all=` that means every listed consultee.
+ * Anything else - a case or ruleset that isn't found, no targets, or one that doesn't
+ * resolve - 404s. `undefined` means a response has already been sent.
  */
 async function removeConsulteeContext(
 	service: ManageService,
@@ -49,14 +56,24 @@ async function removeConsulteeContext(
 	}
 	const category = firstQueryValue(query.category);
 	const selection = consulteeSelection(query);
-	const matchId = firstQueryValue(query.match);
+	const matchIds = queryValues(query.match);
+	const addedValues = queryValues(query.added);
+	const selectAll = queryValues(query['select-all']).length > 0;
+	if (!selectAll && matchIds.length === 0 && addedValues.length === 0) {
+		res.status(404).render('views/errors/404.njk', { pageHeading: 'Page not found' });
+		return undefined;
+	}
 
-	if (matchId) {
+	const targets: ResolvedRemovalTarget[] = [];
+	let resolvedCaseId = caseId;
+
+	if (matchIds.length > 0 || selectAll) {
 		const project = await resolveCase(service.db, caseId);
 		if (!project) {
 			res.status(404).render('views/errors/404.njk', { pageHeading: 'Page not found' });
 			return undefined;
 		}
+		resolvedCaseId = project.id;
 		const { consultees, failed } = await runRulesetSafely(service, project, ruleset, store);
 		if (failed) {
 			return {
@@ -64,57 +81,86 @@ async function removeConsulteeContext(
 				ruleset,
 				category,
 				selection,
-				target: { matchId },
-				name: '',
-				identified: [],
+				targets: [],
 				rulesetFailed: true
 			};
 		}
-		const match = consultees.find((consultee) => consultee.feature.id === matchId);
-		// a stale or crafted link - the match has to be listed in this category: identified by a
-		// condition (nearby-only consultees aren't in the report) and not already removed
-		if (
-			!match ||
-			!isIdentified(match) ||
-			match.feature.properties.consulteeCategory !== category ||
-			excludedMatchIds(selection.removed).has(matchId)
-		) {
+		const excluded = excludedMatchIds(selection.removed);
+		// select-all wants every match the category page listed: identified by a condition
+		// (nearby-only consultees aren't in the report), in this category, not already removed
+		const wantedMatchIds = selectAll
+			? consultees
+					.filter(
+						(match) =>
+							isIdentified(match) &&
+							match.feature.properties.consulteeCategory === category &&
+							!excluded.has(match.feature.id)
+					)
+					.map((match) => match.feature.id)
+			: matchIds;
+		for (const matchId of wantedMatchIds) {
+			const match = consultees.find((consultee) => consultee.feature.id === matchId);
+			// a stale or crafted link - every match has to be listed in this category: identified
+			// by a condition (nearby-only consultees aren't in the report) and not already removed
+			if (
+				!match ||
+				!isIdentified(match) ||
+				match.feature.properties.consulteeCategory !== category ||
+				excluded.has(matchId)
+			) {
+				res.status(404).render('views/errors/404.njk', { pageHeading: 'Page not found' });
+				return undefined;
+			}
+			targets.push({
+				target: { matchId },
+				name: consulteeName(match),
+				identified: describeReasons(match, ruleset, { nearby: false })
+			});
+		}
+	}
+
+	if (addedValues.length > 0 || selectAll) {
+		// the match path's resolved project answers this too - the summary lookup only runs when
+		// the removal is hand-added consultees alone (which also skips the ruleset run)
+		const project =
+			matchIds.length > 0 || selectAll ? { id: resolvedCaseId } : await resolveCaseSummary(service.db, caseId);
+		if (!project) {
 			res.status(404).render('views/errors/404.njk', { pageHeading: 'Page not found' });
 			return undefined;
 		}
-		return {
-			caseId: project.id,
-			ruleset,
-			category,
-			selection,
-			target: { matchId },
-			name: consulteeName(match),
-			identified: describeReasons(match, ruleset, { nearby: false }),
-			rulesetFailed: false
-		};
+		resolvedCaseId = project.id;
+		// select-all wants every add the category page listed - the ones in this category only
+		const wantedAddedValues = selectAll
+			? selection.adds.flatMap((add, index) => (add.category === category ? [String(index)] : []))
+			: addedValues;
+		for (const value of wantedAddedValues) {
+			// Number('') is 0 - a missing param must not read as index 0 (queryValues drops blanks)
+			const addedIndex = Number(value);
+			const add = Number.isInteger(addedIndex) ? selection.adds[addedIndex] : undefined;
+			if (!add || add.category !== category) {
+				res.status(404).render('views/errors/404.njk', { pageHeading: 'Page not found' });
+				return undefined;
+			}
+			targets.push({
+				target: { addedIndex },
+				name: add.name,
+				identified: [addedConsulteeReason(add)]
+			});
+		}
 	}
 
-	const addedParam = firstQueryValue(query.added);
-	// Number('') is 0 - a missing param must not read as index 0
-	const addedIndex = addedParam === '' ? Number.NaN : Number(addedParam);
-	const add = Number.isInteger(addedIndex) ? selection.adds[addedIndex] : undefined;
-	if (!add || add.category !== category) {
-		res.status(404).render('views/errors/404.njk', { pageHeading: 'Page not found' });
-		return undefined;
-	}
-	const project = await resolveCaseSummary(service.db, caseId);
-	if (!project) {
+	// select-all's enumeration filters rather than 404ing, so an empty category arrives here -
+	// a page that never rendered the form has nothing to remove
+	if (targets.length === 0) {
 		res.status(404).render('views/errors/404.njk', { pageHeading: 'Page not found' });
 		return undefined;
 	}
 	return {
-		caseId: project.id,
+		caseId: resolvedCaseId,
 		ruleset,
 		category,
 		selection,
-		target: { addedIndex },
-		name: add.name,
-		identified: [addedConsulteeReason(add)],
+		targets,
 		rulesetFailed: false
 	};
 }
@@ -124,7 +170,7 @@ function viewModel(context: RemoveConsulteeContext, reasonValue = '', reasonErro
 		context.caseId,
 		context.ruleset.id,
 		context.category,
-		context.target,
+		context.targets.map(({ target }) => target),
 		context.selection
 	);
 	return {
@@ -132,8 +178,7 @@ function viewModel(context: RemoveConsulteeContext, reasonValue = '', reasonErro
 		pageCaption: categoryDisplayName(context.category),
 		backLinkUrl: consulteesUrl(context.caseId, context.ruleset.id, context.category, context.selection),
 		formAction: selfUrl,
-		name: context.name,
-		identified: context.identified,
+		consultees: context.targets.map(({ name, identified }) => ({ name, identified })),
 		reasonValue,
 		...(reasonError
 			? {
@@ -180,7 +225,7 @@ export function buildReportConsulteeRemoveSubmit(
 		if (context.rulesetFailed) {
 			return res.render('views/consultees/report/consultees/remove/view.njk', viewModel(context));
 		}
-		const { caseId, ruleset, category, selection, target } = context;
+		const { caseId, ruleset, category, selection } = context;
 
 		const reason = typeof req.body?.reason === 'string' ? req.body.reason.trim() : '';
 		if (!reason) {
@@ -189,17 +234,28 @@ export function buildReportConsulteeRemoveSubmit(
 				viewModel(
 					context,
 					typeof req.body?.reason === 'string' ? req.body.reason : '',
-					'Enter a reason for removing this consultee'
+					context.targets.length > 1
+						? 'Enter a reason for removing these consultees'
+						: 'Enter a reason for removing this consultee'
 				)
 			);
 		}
 
+		// one reason serves the whole submission - every target joins the selection as a recorded
+		// removal, and each hand-added consultee's `add` param is dropped alongside it
 		const removed = [
 			...selection.removed,
-			{ ...('matchId' in target ? { id: target.matchId } : {}), category, name: context.name, reason }
+			...context.targets.map(({ target, name }) => ({
+				...('matchId' in target ? { id: target.matchId } : {}),
+				category,
+				name,
+				reason
+			}))
 		];
-		const adds =
-			'addedIndex' in target ? selection.adds.filter((_, index) => index !== target.addedIndex) : selection.adds;
+		const droppedAdds = new Set(
+			context.targets.flatMap(({ target }) => ('addedIndex' in target ? [target.addedIndex] : []))
+		);
+		const adds = selection.adds.filter((_, index) => !droppedAdds.has(index));
 		return res.redirect(`${consulteesUrl(caseId, ruleset.id, category, { ...selection, removed, adds })}&removed=open`);
 	};
 }

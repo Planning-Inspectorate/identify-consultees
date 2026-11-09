@@ -161,6 +161,25 @@ $font-family: arial, helvetica, sans-serif;
 	border-color: index.govuk-functional-colour(error);
 }
 
+// The bulk-remove table's MoJ multi-select pattern (consultees/view.njk +
+// javascripts/consultee-select.js): the checkbox column's items carry no visible
+// label, so they drop the item padding and sit inline; the header's "Select all"
+// toggle label sheds its margin and padding entirely. Rules copied from
+// moj-frontend's multi-select component, so class names match its own
+/* stylelint-disable-next-line selector-class-pattern */
+.moj-multi-select__checkbox {
+	display: inline-block;
+	padding-left: 0;
+}
+
+/* stylelint-disable-next-line selector-class-pattern */
+.moj-multi-select__toggle-label {
+	/* stylelint-disable-next-line declaration-no-important */
+	padding: 0 !important;
+	/* stylelint-disable-next-line declaration-no-important */
+	margin: 0 !important;
+}
+
 // The admin section's menu (admin/layout.njk): the current page in bold, marked by a left border
 .pins-admin-nav__item {
 	padding-left: index.govuk-spacing(2);

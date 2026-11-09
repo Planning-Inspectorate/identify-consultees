@@ -96,8 +96,11 @@ describe('report consultee remove page', () => {
 		assert.strictEqual(viewModel.pageHeading, 'Remove consultee');
 		// captioned with its category, as the Add a consultee page is
 		assert.strictEqual(viewModel.pageCaption, 'Parish, town and community councils');
-		assert.strictEqual(viewModel.name, 'Little Snoring Parish Council');
-		assert.deepStrictEqual(viewModel.identified, ['"B" host Parish / Town / Community Councils: intersects the site']);
+		assert.strictEqual(viewModel.consultees.length, 1);
+		assert.strictEqual(viewModel.consultees[0].name, 'Little Snoring Parish Council');
+		assert.deepStrictEqual(viewModel.consultees[0].identified, [
+			'"B" host Parish / Town / Community Councils: intersects the site'
+		]);
 		assert.strictEqual(
 			viewModel.backLinkUrl,
 			`/consultees/${realProjectId}/report/consultees?ruleset=england-wales-post-20240430&category=Parish%2C%20town%20and%20community%20councils`
@@ -145,8 +148,8 @@ describe('report consultee remove page', () => {
 		);
 
 		const viewModel = mockRes.render.mock.calls[0].arguments[1];
-		assert.strictEqual(viewModel.name, 'Manual Consultee');
-		assert.deepStrictEqual(viewModel.identified, ['Adjacent landowner']);
+		assert.strictEqual(viewModel.consultees[0].name, 'Manual Consultee');
+		assert.deepStrictEqual(viewModel.consultees[0].identified, ['Adjacent landowner']);
 		assert.match(viewModel.formAction, /added=0/);
 		assert.strictEqual(rulesetRunner.mock.callCount(), 0);
 	});
@@ -168,6 +171,138 @@ describe('report consultee remove page', () => {
 		);
 
 		assert.strictEqual(mockRes.render.mock.calls[0].arguments[1].pageCaption, 'National infrastructure projects');
+	});
+
+	it('should render every selected consultee for a bulk removal', async () => {
+		const secondMatchId = '66666666-6666-6666-6666-666666666666';
+		const nunjucks = configureNunjucks();
+		const mockRes = {
+			status: mock.fn(() => mockRes),
+			render: mock.fn((view, data) => nunjucks.render(view, data))
+		};
+		const db = dbReturning(
+			[[realProjectRow()]],
+			[parishMatchRow(), parishMatchRow(secondMatchId, 'Great Snoring Parish Council')]
+		);
+		await removePage(db)(
+			{
+				params: { caseId: realProjectId },
+				query: {
+					...parishQuery,
+					match: [matchId, secondMatchId],
+					added: '0',
+					add: addJson('Manual Consultee', 'Adjacent landowner')
+				}
+			},
+			mockRes
+		);
+
+		const viewModel = mockRes.render.mock.calls[0].arguments[1];
+		// the page reads the same as a single removal - the table lists everyone it removes
+		assert.strictEqual(viewModel.pageHeading, 'Remove consultee');
+		assert.deepEqual(
+			viewModel.consultees.map((consultee: { name: string }) => consultee.name),
+			['Little Snoring Parish Council', 'Great Snoring Parish Council', 'Manual Consultee']
+		);
+		// the post target keeps every target param so the submit removes them all
+		assert.match(
+			viewModel.formAction,
+			/match=55555555-5555-5555-5555-555555555555&match=66666666-6666-6666-6666-666666666666&added=0/
+		);
+
+		const html = mockRes.render.mock.calls[0].result;
+		assert.doesNotMatch(html, /Remove consultees/);
+		assert.match(html, /Little Snoring Parish Council/);
+		assert.match(html, /Great Snoring Parish Council/);
+		assert.match(html, /Manual Consultee/);
+	});
+
+	it('should 404 a bulk removal when any one target does not resolve', async () => {
+		const secondMatchId = '66666666-6666-6666-6666-666666666666';
+		const mockRes = { status: mock.fn(() => mockRes), render: mock.fn() };
+		await removePage(dbReturning([[realProjectRow()]], [parishMatchRow()]))(
+			{ params: { caseId: realProjectId }, query: { ...parishQuery, match: [matchId, secondMatchId] } },
+			mockRes
+		);
+		assert.strictEqual(mockRes.status.mock.calls[0].arguments[0], 404);
+	});
+
+	it('should target every listed consultee for a no-JS select all', async () => {
+		const secondMatchId = '66666666-6666-6666-6666-666666666666';
+		const mockRes = { status: mock.fn(() => mockRes), render: mock.fn() };
+		const db = dbReturning(
+			[[realProjectRow()]],
+			[
+				parishMatchRow(),
+				parishMatchRow(secondMatchId, 'Great Snoring Parish Council'),
+				// not listed on the category page, so not targeted: a nearby-only find
+				// (never in the report) and a match in another category
+				{
+					...parishMatchRow('77777777-7777-7777-7777-777777777777'),
+					reasons: [{ type: 'nearby', radiusMetres: 20_000 }]
+				},
+				{ ...parishMatchRow('88888888-8888-8888-8888-888888888888'), consulteeCategory: 'Hospital' }
+			]
+		);
+		await removePage(db)(
+			{
+				params: { caseId: realProjectId },
+				query: {
+					...parishQuery,
+					'select-all': 'true',
+					add: [addJson('Manual Consultee'), addJson('Other Consultee', '', 'Hospital')]
+				}
+			},
+			mockRes
+		);
+
+		const viewModel = mockRes.render.mock.calls[0].arguments[1];
+		assert.strictEqual(viewModel.pageHeading, 'Remove consultee');
+		assert.deepEqual(
+			viewModel.consultees.map((consultee: { name: string }) => consultee.name),
+			['Little Snoring Parish Council', 'Great Snoring Parish Council', 'Manual Consultee']
+		);
+		// the param is consumed at the boundary - the post target re-lists the targets explicitly
+		assert.match(
+			viewModel.formAction,
+			/match=55555555-5555-5555-5555-555555555555&match=66666666-6666-6666-6666-666666666666&added=0/
+		);
+		assert.doesNotMatch(viewModel.formAction, /select-all|added=1/);
+	});
+
+	it('should target only the consultees still listed for a select all', async () => {
+		const secondMatchId = '66666666-6666-6666-6666-666666666666';
+		const mockRes = { status: mock.fn(() => mockRes), render: mock.fn() };
+		const db = dbReturning(
+			[[realProjectRow()]],
+			[parishMatchRow(), parishMatchRow(secondMatchId, 'Great Snoring Parish Council')]
+		);
+		await removePage(db)(
+			{
+				params: { caseId: realProjectId },
+				query: { ...parishQuery, 'select-all': 'true', exclude: matchId }
+			},
+			mockRes
+		);
+		// the earlier removal is skipped, not an error - the page lists what remains
+		assert.deepEqual(
+			mockRes.render.mock.calls[0].arguments[1].consultees.map((consultee: { name: string }) => consultee.name),
+			['Great Snoring Parish Council']
+		);
+	});
+
+	it('should 404 a select all when nothing is still listed to remove', async () => {
+		const mockRes = { status: mock.fn(() => mockRes), render: mock.fn() };
+		const db = dbReturning([[realProjectRow()]], [parishMatchRow()]);
+		await removePage(db)(
+			{
+				params: { caseId: realProjectId },
+				query: { ...parishQuery, 'select-all': 'true', exclude: matchId }
+			},
+			mockRes
+		);
+		// the one listed consultee is already removed, so nothing is listed to remove
+		assert.strictEqual(mockRes.status.mock.calls[0].arguments[0], 404);
 	});
 
 	for (const [title, query] of [
@@ -334,6 +469,95 @@ describe('report consultee remove submit', () => {
 			)
 		);
 		assert.ok(location.includes(`add=${urlParam(existingAdd)}`));
+	});
+
+	it('should remove every selected consultee in one submit, dropping their adds', async () => {
+		const secondMatchId = '66666666-6666-6666-6666-666666666666';
+		const mockRes = { redirect: mock.fn(), render: mock.fn(), status: mock.fn(() => mockRes) };
+		const db = {
+			matchRows: [parishMatchRow(), parishMatchRow(secondMatchId, 'Great Snoring Parish Council')],
+			$queryRaw: mock.fn(async () => [realProjectRow()])
+		};
+		const kept = addJson('Kept Consultee', 'Still borders');
+		await buildReportConsulteeRemoveSubmit(service(db))(
+			request({
+				query: {
+					...parishQuery,
+					match: [matchId, secondMatchId],
+					added: '1',
+					add: [kept, addJson('Manual Consultee', 'Adjacent landowner')]
+				}
+			}),
+			mockRes
+		);
+
+		const location = mockRes.redirect.mock.calls[0].arguments[0];
+		for (const [name, id] of [
+			['Little Snoring Parish Council', matchId],
+			['Great Snoring Parish Council', secondMatchId]
+		] as const) {
+			assert.ok(location.includes(`exclude=${urlParam(removalJson(name, 'Outside the search area', id))}`));
+		}
+		// the added consultee's removal is recorded and its add param dropped; the kept one stays
+		assert.ok(location.includes(`exclude=${urlParam(removalJson('Manual Consultee', 'Outside the search area'))}`));
+		assert.ok(location.includes(`add=${urlParam(kept)}`));
+		assert.strictEqual(location.includes(urlParam(addJson('Manual Consultee', 'Adjacent landowner'))), false);
+		assert.ok(location.endsWith('&removed=open'));
+	});
+
+	it('should remove every listed consultee for a no-JS select all', async () => {
+		const secondMatchId = '66666666-6666-6666-6666-666666666666';
+		const mockRes = { redirect: mock.fn(), render: mock.fn(), status: mock.fn(() => mockRes) };
+		const db = {
+			matchRows: [parishMatchRow(), parishMatchRow(secondMatchId, 'Great Snoring Parish Council')],
+			$queryRaw: mock.fn(async () => [realProjectRow()])
+		};
+		const kept = addJson('Kept Consultee', 'Still borders', 'Hospital');
+		await buildReportConsulteeRemoveSubmit(service(db))(
+			request({
+				query: {
+					...parishQuery,
+					'select-all': 'true',
+					add: [addJson('Manual Consultee', 'Adjacent landowner'), kept]
+				}
+			}),
+			mockRes
+		);
+
+		const location = mockRes.redirect.mock.calls[0].arguments[0];
+		for (const [name, id] of [
+			['Little Snoring Parish Council', matchId],
+			['Great Snoring Parish Council', secondMatchId]
+		] as const) {
+			assert.ok(location.includes(`exclude=${urlParam(removalJson(name, 'Outside the search area', id))}`));
+		}
+		// the added consultee's removal is recorded and its add param dropped; the
+		// other category's add isn't a target, so it survives
+		assert.ok(location.includes(`exclude=${urlParam(removalJson('Manual Consultee', 'Outside the search area'))}`));
+		assert.ok(location.includes(`add=${urlParam(kept)}`));
+		assert.strictEqual(location.includes(urlParam(addJson('Manual Consultee', 'Adjacent landowner'))), false);
+		assert.ok(location.endsWith('&removed=open'));
+	});
+
+	it('should ask for one reason for the whole bulk removal', async () => {
+		const secondMatchId = '66666666-6666-6666-6666-666666666666';
+		const mockRes = { render: mock.fn(), redirect: mock.fn(), status: mock.fn(() => mockRes) };
+		const db = dbReturning(
+			[[realProjectRow()]],
+			[parishMatchRow(), parishMatchRow(secondMatchId, 'Great Snoring Parish Council')]
+		);
+		await removeSubmit(db)(
+			request({
+				query: { ...parishQuery, match: [matchId, secondMatchId] },
+				body: { reason: ' ' }
+			}),
+			mockRes
+		);
+		assert.strictEqual(mockRes.redirect.mock.callCount(), 0);
+		assert.strictEqual(
+			mockRes.render.mock.calls[0].arguments[1].reasonError.text,
+			'Enter a reason for removing these consultees'
+		);
 	});
 
 	it('should re-render the form with an error when the reason is blank', async () => {

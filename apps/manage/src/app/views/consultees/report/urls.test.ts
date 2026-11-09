@@ -4,6 +4,7 @@ import {
 	addConsulteeUrl,
 	addedConsultees,
 	addedMatchIds,
+	bulkRemoveConsulteeUrl,
 	categoryStaticMapUrl,
 	consulteeSelection,
 	consulteesUrl,
@@ -15,7 +16,8 @@ import {
 	removedConsultees,
 	reportCreatedUrl,
 	reportUrl,
-	rulesetUrl
+	rulesetUrl,
+	selectionParams
 } from './urls.ts';
 
 // a selection entry as the app's URLs carry it - base64url-encoded JSON (see ENCODED_JSON)
@@ -43,8 +45,39 @@ describe('report url helpers', () => {
 			'/consultees/case-1/report/consultees/remove?ruleset=rs-1&category=Parish%2C%20town%20and%20community%20councils&added=2'
 		);
 		assert.strictEqual(
+			removeConsulteeUrl('case-1', 'rs-1', 'Parish, town and community councils', [
+				{ matchId: 'm-1' },
+				{ matchId: 'm-2' },
+				{ addedIndex: 0 }
+			]),
+			'/consultees/case-1/report/consultees/remove?ruleset=rs-1&category=Parish%2C%20town%20and%20community%20councils&match=m-1&match=m-2&added=0'
+		);
+		assert.strictEqual(
 			categoryStaticMapUrl('case-1', 'rs-1', 'Parish, town and community councils'),
 			'/consultees/case-1/results/static-map?ruleset=rs-1&category=Parish%2C%20town%20and%20community%20councils'
+		);
+	});
+
+	it('should build the bare bulk-remove path and the selection as hidden-input pairs', () => {
+		assert.strictEqual(bulkRemoveConsulteeUrl('case-1'), '/consultees/case-1/report/consultees/remove');
+		const selection = {
+			removed: [
+				{ id: 'm-1', category: 'Parish, town and community councils', name: 'A Consultee', reason: 'not needed' }
+			],
+			adds: [{ category: 'Parish, town and community councils', name: 'Added Consultee', reason: 'Adjacent landowner' }]
+		};
+		const params = selectionParams(selection);
+		assert.strictEqual(params.length, 2);
+		assert.strictEqual(params[0].name, 'exclude');
+		assert.strictEqual(params[1].name, 'add');
+		// each hidden input round-trips through the same decoder the query params use
+		assert.deepEqual(
+			removedConsultees(params[0].value).map(({ id, name }) => ({ id, name })),
+			[{ id: 'm-1', name: 'A Consultee' }]
+		);
+		assert.deepEqual(
+			addedConsultees(params[1].value).map(({ name }) => name),
+			['Added Consultee']
 		);
 	});
 
