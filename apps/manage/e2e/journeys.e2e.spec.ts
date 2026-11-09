@@ -42,7 +42,7 @@ const E2E_ADDED_CONSULTEES = ['First Test Consultee', 'Second Test Consultee'].m
 	id: `e2e00000-0000-0000-0001-${String(i + 1).padStart(12, '0')}`,
 	type: 'Feature' as const,
 	geometry: { type: 'Point' as const, coordinates: [-1.3, 60.3 + i * 0.01] },
-	properties: { consulteeCategory: 'Parish Council', consultee }
+	properties: { consulteeCategory: 'Parish, town and community councils', consultee }
 }));
 
 // two parish councils of the same name, far from the sample case like the ones above, for the add
@@ -55,7 +55,7 @@ const E2E_TWIN_CONSULTEES = [
 	id: `e2e00000-0000-0000-0002-${String(i + 1).padStart(12, '0')}`,
 	type: 'Feature' as const,
 	geometry: { type: 'Point' as const, coordinates },
-	properties: { consulteeCategory: 'Parish Council', consultee: E2E_TWIN_PARISH, region }
+	properties: { consulteeCategory: 'Parish, town and community councils', consultee: E2E_TWIN_PARISH, region }
 }));
 
 async function deleteE2eTwinConsultees(db: ReturnType<typeof newDatabaseClient>) {
@@ -196,7 +196,7 @@ test.describe('manage journeys', () => {
 		await expect(page.locator('.govuk-summary-card__title').first()).toHaveText('National infrastructure projects');
 		await expect(page.getByRole('link', { name: 'Change National infrastructure projects' })).toBeVisible();
 
-		const parishChange = page.getByRole('link', { name: 'Change Parish Council' });
+		const parishChange = page.getByRole('link', { name: 'Change Parish, town and community councils' });
 		const parishValue = page
 			.locator('.govuk-summary-list__row', { has: parishChange })
 			.locator('.govuk-summary-list__value');
@@ -207,7 +207,7 @@ test.describe('manage journeys', () => {
 		await parishChange.click();
 
 		await expect(page).toHaveURL(/\/report\/consultees\?.*category=Parish/);
-		await expect(page.getByRole('heading', { level: 1 })).toContainText('Parish Council');
+		await expect(page.getByRole('heading', { level: 1 })).toContainText('Parish, town and community councils');
 		await expect(page.getByRole('heading', { level: 2, name: 'Included consultees' })).toBeVisible();
 		const removeLinks = page.getByRole('link', { name: /Remove/ });
 		await expect(removeLinks).toHaveCount(parishCount);
@@ -345,7 +345,7 @@ test.describe('manage journeys', () => {
 		await expect(page).toHaveURL(new RegExp(`/consultees/${SAMPLE_CASE_ID}/report\\?ruleset=${SAMPLE_RULESET_ID}`));
 		await expect(page.getByRole('heading', { level: 1 })).toContainText('Check consultees before creating the report');
 		const returnedValue = page
-			.locator('.govuk-summary-list__row', { hasText: 'Parish Council' })
+			.locator('.govuk-summary-list__row', { hasText: 'Parish, town and community councils' })
 			.locator('.govuk-summary-list__value')
 			.first();
 		const expectedTotal = parishCount - removed + picked + 1;
@@ -371,7 +371,7 @@ test.describe('manage journeys', () => {
 
 		// there's no save step - a change is kept straight away: removing a consultee, then going
 		// back, leaves the check page without it
-		await page.getByRole('link', { name: 'Change Parish Council' }).click();
+		await page.getByRole('link', { name: 'Change Parish, town and community councils' }).click();
 		await page.getByRole('link', { name: 'Remove First Test Consultee' }).click();
 		await page.getByLabel('Reason for removing').fill('Not confirmed');
 		await page.getByRole('button', { name: 'Remove consultee' }).click();
@@ -380,9 +380,9 @@ test.describe('manage journeys', () => {
 		await expect(page.getByRole('heading', { level: 1 })).toContainText('Check consultees before creating the report');
 		expect((await returnedValue.innerHTML()).includes('First Test Consultee')).toBe(false);
 
-		// and adding it back lands on the check page the same way - keeping a Parish Council
+		// and adding it back lands on the check page the same way - keeping a Parish, town and community councils
 		// consultee in the report, whatever the seeded ruleset found
-		await page.getByRole('link', { name: 'Change Parish Council' }).click();
+		await page.getByRole('link', { name: 'Change Parish, town and community councils' }).click();
 		await page.getByRole('button', { name: 'Add a consultee' }).click();
 		await nameInput.fill('First Test Consultee');
 		await page.getByLabel('Reason for adding').fill('Borders the site after all');
@@ -408,7 +408,7 @@ test.describe('manage journeys', () => {
 		expect(download.suggestedFilename()).toMatch(/consultee report \d{4}-\d{2}-\d{2}\.zip$/);
 		const files = Object.keys(unzipSync(new Uint8Array(await readFile(await download.path()))));
 		expect(files.filter((file) => file.endsWith('.xlsx'))).toHaveLength(1);
-		expect(files.filter((file) => /^maps\/\d{2} Parish Council\.pdf$/.test(file))).toHaveLength(1);
+		expect(files.filter((file) => /^maps\/\d{2} Parish, town and community councils\.pdf$/.test(file))).toHaveLength(1);
 	});
 
 	test('the boundary page offers the project’s shapefiles and continues with one', async ({ page }) => {
@@ -475,7 +475,7 @@ test.describe('manage journeys', () => {
 			await loadConsulteeAreas(db, { type: 'FeatureCollection', features: E2E_TWIN_CONSULTEES });
 
 			await page.goto(
-				`/consultees/${SAMPLE_CASE_ID}/report/consultees/add?ruleset=${SAMPLE_RULESET_ID}&category=Parish+Council`
+				`/consultees/${SAMPLE_CASE_ID}/report/consultees/add?ruleset=${SAMPLE_RULESET_ID}&category=Parish%2C+town+and+community+councils`
 			);
 			const nameInput = page.getByLabel('Name', { exact: true });
 			const options = page.locator('.autocomplete__option');

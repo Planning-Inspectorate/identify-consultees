@@ -103,8 +103,8 @@ VALID_BODY = {
     "siteWkt": "POINT(0 0)",
     "nearbyRadiusMetres": 20_000,
     "rules": [
-        {"id": "hospital", "logicType": "intersection", "categories": ["Hospital"], "bufferMetres": 10_000},
-        {"id": "parish", "logicType": "bordering", "categories": ["Parish Council"], "hostCategory": "Parish Council"},
+        {"id": "hospital", "logicType": "intersection", "categories": ["Hospitals operated by NHS trusts and NHS foundation trusts (England)"], "bufferMetres": 10_000},
+        {"id": "parish", "logicType": "bordering", "categories": ["Parish, town and community councils"], "hostCategory": "Parish, town and community councils"},
     ],
 }
 
@@ -117,8 +117,8 @@ def test_run_ruleset_shares_the_consultee_areas_api_key_check():
 
 
 def test_run_ruleset_runs_the_posted_conditions_and_returns_each_consultee_with_its_reasons():
-    area = {"id": "a", "properties": {"consulteeCategory": "Hospital", "consultee": "Example"}}
-    nearby_only = {"id": "b", "properties": {"consulteeCategory": "Interconnector", "consultee": "Other"}}
+    area = {"id": "a", "properties": {"consulteeCategory": "Hospitals operated by NHS trusts and NHS foundation trusts (England)", "consultee": "Example"}}
+    nearby_only = {"id": "b", "properties": {"consulteeCategory": "Electricity interconnectors with compulsory purchase order powers", "consultee": "Other"}}
     reasons = [{"type": "condition", "conditionId": "hospital"}, {"type": "nearby", "radiusMetres": 20_000}]
     result = [
         Consultee(
@@ -152,9 +152,9 @@ def test_run_ruleset_runs_the_posted_conditions_and_returns_each_consultee_with_
         params,
         "POINT(0 0)",
         [
-            RuleCondition(id="hospital", logic_type="intersection", categories=("Hospital",), buffer_metres=10_000),
+            RuleCondition(id="hospital", logic_type="intersection", categories=("Hospitals operated by NHS trusts and NHS foundation trusts (England)",), buffer_metres=10_000),
             RuleCondition(
-                id="parish", logic_type="bordering", categories=("Parish Council",), host_category="Parish Council"
+                id="parish", logic_type="bordering", categories=("Parish, town and community councils",), host_category="Parish, town and community councils"
             ),
         ],
         20_000,
@@ -218,11 +218,11 @@ def test_run_ruleset_passes_each_categorys_nearby_radius_on():
         patch("function_app.connection_params_from_env", return_value=object()),
         patch("function_app.run_ruleset", return_value=Screening([], "outline")) as run,
     ):
-        body = {**VALID_BODY, "nearbyRadiusMetresByCategory": {"Parish Council": 5_000, "Hospital": 0}}
+        body = {**VALID_BODY, "nearbyRadiusMetresByCategory": {"Parish, town and community councils": 5_000, "Hospitals operated by NHS trusts and NHS foundation trusts (England)": 0}}
         response = run_ruleset_route(_ruleset_request(body))
 
     assert response.status_code == 200
-    assert run.call_args.args[4] == {"Parish Council": 5_000.0, "Hospital": 0.0}
+    assert run.call_args.args[4] == {"Parish, town and community councils": 5_000.0, "Hospitals operated by NHS trusts and NHS foundation trusts (England)": 0.0}
 
 
 @pytest.mark.parametrize(
@@ -237,12 +237,12 @@ def test_run_ruleset_passes_each_categorys_nearby_radius_on():
         {**VALID_BODY, "nearbyRadiusMetres": 10_000_000},
         {**VALID_BODY, "rules": "all of them"},
         {**VALID_BODY, "rules": [{"id": "x", "logicType": "nearest", "categories": []}]},
-        {**VALID_BODY, "rules": [{"id": "x", "logicType": "intersection", "categories": "Hospital"}]},
+        {**VALID_BODY, "rules": [{"id": "x", "logicType": "intersection", "categories": "Hospitals operated by NHS trusts and NHS foundation trusts (England)"}]},
         {**VALID_BODY, "rules": [{"id": "x", "logicType": "intersection", "categories": [7]}]},
         {**VALID_BODY, "rules": [{"logicType": "intersection", "categories": []}]},
         {**VALID_BODY, "rules": [{"id": "x", "logicType": "intersection", "categories": [], "bufferMetres": "5"}]},
-        {**VALID_BODY, "nearbyRadiusMetresByCategory": ["Parish Council"]},
-        {**VALID_BODY, "nearbyRadiusMetresByCategory": {"Parish Council": -1}},
+        {**VALID_BODY, "nearbyRadiusMetresByCategory": ["Parish, town and community councils"]},
+        {**VALID_BODY, "nearbyRadiusMetresByCategory": {"Parish, town and community councils": -1}},
         {**VALID_BODY, "nearbyRadiusMetresByCategory": {"": 5_000}},
         {**VALID_BODY, "nearbyRadiusMetresByCategory": {f"Category {i}": 1 for i in range(201)}},
         {**VALID_BODY, "boundingBoxAbovePoints": 0},

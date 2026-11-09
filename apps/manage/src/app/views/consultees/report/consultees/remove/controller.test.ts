@@ -41,7 +41,7 @@ function parishMatchRow(id = matchId, consultee = 'Little Snoring Parish Council
 		reasons: [{ type: 'condition' as const, conditionId: 'b_host_parish_town_community_councils' }],
 		id,
 		geometryType: 'MultiLineString',
-		consulteeCategory: 'Parish Council',
+		consulteeCategory: 'Parish, town and community councils',
 		consultee,
 		region: 'East of England',
 		metadata: '{}',
@@ -52,12 +52,12 @@ function parishMatchRow(id = matchId, consultee = 'Little Snoring Parish Council
 
 // `query.add`/`query.exclude` hold the raw param values (Express has already decoded them);
 // expected URLs hold the encoded forms
-const addJson = (name: string, reason = '', category = 'Parish Council') =>
+const addJson = (name: string, reason = '', category = 'Parish, town and community councils') =>
 	JSON.stringify({ c: category, n: name, r: reason });
-const removalJson = (name: string, reason: string, id?: string, category = 'Parish Council') =>
+const removalJson = (name: string, reason: string, id?: string, category = 'Parish, town and community councils') =>
 	JSON.stringify({ ...(id ? { i: id } : {}), c: category, n: name, r: reason });
 
-const parishQuery = { ruleset: 'england-wales-post-20240430', category: 'Parish Council' };
+const parishQuery = { ruleset: 'england-wales-post-20240430', category: 'Parish, town and community councils' };
 
 // rows[0] answers the project lookup; matchRows, if given, is what the ruleset matched - the
 // added-consultee path only reads the summary, so dbFor covers it
@@ -95,16 +95,16 @@ describe('report consultee remove page', () => {
 		const viewModel = mockRes.render.mock.calls[0].arguments[1];
 		assert.strictEqual(viewModel.pageHeading, 'Remove consultee');
 		// captioned with its category, as the Add a consultee page is
-		assert.strictEqual(viewModel.pageCaption, 'Parish Council');
+		assert.strictEqual(viewModel.pageCaption, 'Parish, town and community councils');
 		assert.strictEqual(viewModel.name, 'Little Snoring Parish Council');
 		assert.deepStrictEqual(viewModel.identified, ['"B" host Parish / Town / Community Councils: intersects the site']);
 		assert.strictEqual(
 			viewModel.backLinkUrl,
-			`/consultees/${realProjectId}/report/consultees?ruleset=england-wales-post-20240430&category=Parish%20Council`
+			`/consultees/${realProjectId}/report/consultees?ruleset=england-wales-post-20240430&category=Parish%2C%20town%20and%20community%20councils`
 		);
 		assert.strictEqual(
 			viewModel.formAction,
-			`/consultees/${realProjectId}/report/consultees/remove?ruleset=england-wales-post-20240430&category=Parish%20Council&match=${matchId}`
+			`/consultees/${realProjectId}/report/consultees/remove?ruleset=england-wales-post-20240430&category=Parish%2C%20town%20and%20community%20councils&match=${matchId}`
 		);
 		assert.strictEqual(viewModel.reasonValue, '');
 		assert.strictEqual(viewModel.errorSummary, undefined);
@@ -124,7 +124,7 @@ describe('report consultee remove page', () => {
 	it('should fall back to the default ruleset when none is given', async () => {
 		const mockRes = { status: mock.fn(() => mockRes), render: mock.fn() };
 		await removePage(dbReturning([[realProjectRow()]], [parishMatchRow()]))(
-			{ params: { caseId: realProjectId }, query: { category: 'Parish Council', match: matchId } },
+			{ params: { caseId: realProjectId }, query: { category: 'Parish, town and community councils', match: matchId } },
 			mockRes
 		);
 		assert.strictEqual(mockRes.status.mock.callCount(), 0);
@@ -155,11 +155,25 @@ describe('report consultee remove page', () => {
 		['neither a match nor an added target', parishQuery],
 		['an unknown match id', { ...parishQuery, match: '99999999-9999-9999-9999-999999999999' }],
 		['a match already removed', { ...parishQuery, match: matchId, exclude: matchId }],
-		['a match in another category', { ...parishQuery, category: 'Hospital', match: matchId }],
+		[
+			'a match in another category',
+			{
+				...parishQuery,
+				category: 'Hospitals operated by NHS trusts and NHS foundation trusts (England)',
+				match: matchId
+			}
+		],
 		['a missing added index', { ...parishQuery, added: '0' }],
 		['a non-numeric added index', { ...parishQuery, add: addJson('Manual Consultee'), added: 'abc' }],
 		['an out-of-range added index', { ...parishQuery, add: addJson('Manual Consultee'), added: '5' }],
-		['an added consultee in another category', { ...parishQuery, add: addJson('Other', 'r', 'Hospital'), added: '0' }],
+		[
+			'an added consultee in another category',
+			{
+				...parishQuery,
+				add: addJson('Other', 'r', 'Hospitals operated by NHS trusts and NHS foundation trusts (England)'),
+				added: '0'
+			}
+		],
 		['an unknown ruleset', { ...parishQuery, ruleset: 'not-a-real-ruleset', match: matchId }]
 	] as const) {
 		it(`should 404 for ${title}`, async () => {
@@ -246,7 +260,7 @@ describe('report consultee remove submit', () => {
 		const location = mockRes.redirect.mock.calls[0].arguments[0];
 		assert.strictEqual(
 			location,
-			`/consultees/${realProjectId}/report/consultees?ruleset=england-wales-post-20240430&category=Parish%20Council&exclude=${urlParam(
+			`/consultees/${realProjectId}/report/consultees?ruleset=england-wales-post-20240430&category=Parish%2C%20town%20and%20community%20councils&exclude=${urlParam(
 				removalJson('Little Snoring Parish Council', 'Outside the search area', matchId)
 			)}&removed=open`
 		);

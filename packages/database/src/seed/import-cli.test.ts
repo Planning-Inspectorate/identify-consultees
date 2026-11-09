@@ -124,7 +124,7 @@ describe('running as a script (requires a local SQL Server - see docker-compose.
 				features: [
 					{
 						geometry: { type: 'Point', coordinates: [0, 0] },
-						properties: { id: 'import-cli-test-1', consultee: 'CLI Trust', consulteeCategory: 'Ambulance Trust' }
+						properties: { id: 'import-cli-test-1', consultee: 'CLI Trust', consulteeCategory: 'Ambulance trusts' }
 					}
 				]
 			};

@@ -166,7 +166,7 @@ describe('layers-key-plugin helpers', () => {
 				style: { stroke: '#000' },
 				sublayers: [
 					{ id: 's1', label: 'Hospitals', style: { symbolBackgroundColor: '#f47738' } },
-					{ id: 's2', label: 'Police', showInMenu: false }
+					{ id: 's2', label: 'Police and crime commissioners', showInMenu: false }
 				]
 			}
 		]);

@@ -12,7 +12,14 @@ describe('admin page accessibility smoke', () => {
 	const navFor = (path: string) => ({ adminNav: adminNavigation(path) });
 
 	test('admin files page, copying from the previous environment, has no serious a11y violations', async () => {
-		const groups = [{ name: 'Energy', slug: 'energy', categories: 'DNO, Interconnector' }];
+		const groups = [
+			{
+				name: 'Energy',
+				slug: 'energy',
+				categories:
+					'Electricity distributors with compulsory purchase order powers, Electricity interconnectors with compulsory purchase order powers'
+			}
+		];
 		const html = nunjucks.render('admin/upload-to-blob/view.njk', {
 			...adminLocals,
 			...navFor('/admin/upload-to-blob'),
@@ -48,7 +55,9 @@ describe('admin page accessibility smoke', () => {
 			...navFor('/admin/upload-to-blob'),
 			pageHeading: 'Reference data files',
 			_csrf: 'test-csrf',
-			groups: [{ name: 'Energy', slug: 'energy', categories: 'DNO' }]
+			groups: [
+				{ name: 'Energy', slug: 'energy', categories: 'Electricity distributors with compulsory purchase order powers' }
+			]
 		};
 		const running = nunjucks.render('admin/upload-to-blob/view.njk', {
 			...base,
@@ -145,7 +154,7 @@ describe('admin page accessibility smoke', () => {
 			backLinkUrl: '/admin/database',
 			categoryItems: [
 				{ value: '', text: 'Every category', selected: false },
-				{ value: 'Parish Council', text: 'Parish Council', selected: true }
+				{ value: 'Parish, town and community councils', text: 'Parish, town and community councils', selected: true }
 			],
 			search: 'bart',
 			showing: 'Showing 1 to 50 of 51 rows.',
@@ -153,7 +162,7 @@ describe('admin page accessibility smoke', () => {
 				{
 					href: '/admin/database/consultee-areas/11111111-1111-1111-1111-111111111111',
 					consultee: 'Barton & <Co>',
-					category: 'Parish Council',
+					category: 'Parish, town and community councils',
 					region: '',
 					geometryType: 'Polygon',
 					lastUpdated: '13 Oct 2026, 14:38'

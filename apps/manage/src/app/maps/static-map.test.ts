@@ -816,7 +816,7 @@ describe('static-map labels', () => {
 			overlay(
 				collection(
 					{
-						properties: { name: 'Railway' },
+						properties: { name: 'Railways' },
 						geometry: {
 							type: 'LineString',
 							coordinates: [
@@ -831,7 +831,7 @@ describe('static-map labels', () => {
 			)
 		);
 		const at = (text: string) => drawn.find((label) => label.text === text)!;
-		assert.ok(Math.abs(at('Railway').y - pixel(-1.75, 50.62)[1]) < 1);
+		assert.ok(Math.abs(at('Railways').y - pixel(-1.75, 50.62)[1]) < 1);
 		const [portX, portY] = pixel(-1.75, 50.68);
 		assert.ok(Math.abs(at('Port').x - portX) < 1 && Math.abs(at('Port').y - portY) < 1);
 		const [tinyX, tinyY] = pixel(-1.7, 50.6555);

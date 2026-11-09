@@ -43,7 +43,7 @@ const RULESET: Ruleset = {
 			name: 'Ambulance near',
 			group: 'Public bodies',
 			logicType: 'intersection',
-			categories: ['Ambulance Trust'],
+			categories: ['Ambulance trusts'],
 			bufferMetres: 1_000
 		},
 		{
@@ -51,7 +51,7 @@ const RULESET: Ruleset = {
 			name: 'Ambulance and hospital',
 			group: 'Public bodies',
 			logicType: 'intersection',
-			categories: ['Ambulance Trust', 'Hospital'],
+			categories: ['Ambulance trusts', 'Hospitals operated by NHS trusts and NHS foundation trusts (England)'],
 			bufferMetres: 10_000
 		},
 		{
@@ -59,7 +59,7 @@ const RULESET: Ruleset = {
 			name: 'Hospital touching',
 			group: 'Public bodies',
 			logicType: 'intersection',
-			categories: ['Hospital'],
+			categories: ['Hospitals operated by NHS trusts and NHS foundation trusts (England)'],
 			bufferMetres: 0
 		},
 		{
@@ -67,15 +67,15 @@ const RULESET: Ruleset = {
 			name: 'Parish host',
 			group: 'Administrative boundaries',
 			logicType: 'intersection',
-			categories: ['Parish Council']
+			categories: ['Parish, town and community councils']
 		},
 		{
 			id: 'parish-bordering',
 			name: 'Parish bordering',
 			group: 'Administrative boundaries',
 			logicType: 'bordering',
-			categories: ['Parish Council'],
-			hostCategory: 'Parish Council'
+			categories: ['Parish, town and community councils'],
+			hostCategory: 'Parish, town and community councils'
 		}
 	]
 };
@@ -150,21 +150,25 @@ describe("the report's maps", () => {
 			project: PROJECT,
 			ruleset: RULESET,
 			consultees: [
-				match('a1', 'Ambulance Trust', 'ambulance-near'),
+				match('a1', 'Ambulance trusts', 'ambulance-near'),
 				// only the nearby search found it - not in the report, so not drawn
-				match('a2', 'Ambulance Trust'),
-				match('h1', 'Hospital', 'ambulance-and-hospital')
+				match('a2', 'Ambulance trusts'),
+				match('h1', 'Hospitals operated by NHS trusts and NHS foundation trusts (England)', 'ambulance-and-hospital')
 			],
 			selection: { removed: [], adds: [] },
 			siteScreenedAs: 'boundingBox'
 		});
 
 		const files = unzipSync(new Uint8Array(report.contents));
-		const ambulance = pdfTextLines(Buffer.from(files['maps/01 Ambulance Trust.pdf']));
+		const ambulance = pdfTextLines(Buffer.from(files['maps/01 Ambulance trusts.pdf']));
 		// its 1km buffer couldn't be drawn, so only its 10km one is keyed
 		assert.ok(ambulance.includes('Ruleset buffer (10 km)'), ambulance.join('|'));
 		assert.ok(!ambulance.some((line) => line.startsWith('Nearby')));
-		assert.ok(pdfTextLines(Buffer.from(files['maps/02 Hospital.pdf'])).includes('Ruleset buffer (10 km)'));
+		assert.ok(
+			pdfTextLines(
+				Buffer.from(files['maps/02 Hospitals operated by NHS trusts and NHS foundation trusts (England).pdf'])
+			).includes('Ruleset buffer (10 km)')
+		);
 		assert.strictEqual(logger.warn.mock.callCount(), 1);
 
 		// each buffer grown once for the report, from the rectangle the run screened

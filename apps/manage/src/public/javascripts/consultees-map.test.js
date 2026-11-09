@@ -128,9 +128,14 @@ describe('consultees-map client helpers', () => {
 		});
 		const datasets = buildDatasets({
 			// a stale config's nearby layer is ignored - the map shows only the project and its matches
-			nearbyGeojson: { features: [area('Police', '#912b88')] },
+			nearbyGeojson: { features: [area('Police and crime commissioners', '#912b88')] },
 			projectGeojson: { features: [{}] },
-			consulteeGeojson: { features: [area('Parish Council', '#1d70b8'), point('Hospital', '#f47738')] }
+			consulteeGeojson: {
+				features: [
+					area('Parish, town and community councils', '#1d70b8'),
+					point('Hospitals operated by NHS trusts and NHS foundation trusts (England)', '#f47738')
+				]
+			}
 		});
 
 		assert.deepEqual(
@@ -142,11 +147,14 @@ describe('consultees-map client helpers', () => {
 		assert.equal(matches.visible, undefined);
 		assert.deepEqual(
 			matches.sublayers.map((sublayer) => sublayer.label),
-			['Hospital (1)', 'Parish Council (1)']
+			[
+				'Hospitals operated by NHS trusts and NHS foundation trusts (England) (1)',
+				'Parish, town and community councils (1)'
+			]
 		);
 		assert.deepEqual(matches.sublayers[0].filter, [
 			'all',
-			['==', ['get', 'consulteeCategory'], 'Hospital'],
+			['==', ['get', 'consulteeCategory'], 'Hospitals operated by NHS trusts and NHS foundation trusts (England)'],
 			['!=', ['get', 'identified'], 'false']
 		]);
 		// points as small circles
@@ -164,16 +172,16 @@ describe('consultees-map client helpers', () => {
 	test("buildCategorySublayers fills at each category's opacity, lightest first", () => {
 		const sublayers = buildCategorySublayers(
 			[
-				{ properties: { consulteeCategory: 'Ambulance Trust', colour: '#1d70b8', fillOpacity: '0.35' } },
-				{ properties: { consulteeCategory: 'Police', colour: '#912b88', fillOpacity: '0.06' } }
+				{ properties: { consulteeCategory: 'Ambulance trusts', colour: '#1d70b8', fillOpacity: '0.35' } },
+				{ properties: { consulteeCategory: 'Police and crime commissioners', colour: '#912b88', fillOpacity: '0.06' } }
 			],
 			'identified'
 		);
 		assert.deepEqual(
 			sublayers.map((sublayer) => [sublayer.label, sublayer.style.fill]),
 			[
-				['Police (1)', 'rgba(145, 43, 136, 0.06)'],
-				['Ambulance Trust (1)', 'rgba(29, 112, 184, 0.35)']
+				['Police and crime commissioners (1)', 'rgba(145, 43, 136, 0.06)'],
+				['Ambulance trusts (1)', 'rgba(29, 112, 184, 0.35)']
 			]
 		);
 	});
@@ -183,7 +191,7 @@ describe('consultees-map client helpers', () => {
 			[
 				{
 					properties: {
-						consulteeCategory: 'Parish Council',
+						consulteeCategory: 'Parish, town and community councils',
 						colour: '#28a197',
 						fillOpacity: '0.35',
 						identified: 'true'
@@ -191,7 +199,7 @@ describe('consultees-map client helpers', () => {
 				},
 				{
 					properties: {
-						consulteeCategory: 'Parish Council',
+						consulteeCategory: 'Parish, town and community councils',
 						colour: '#28a197',
 						fillOpacity: '0.1',
 						identified: 'false'
@@ -199,7 +207,7 @@ describe('consultees-map client helpers', () => {
 				},
 				{
 					properties: {
-						consulteeCategory: 'Parish Council',
+						consulteeCategory: 'Parish, town and community councils',
 						colour: '#28a197',
 						fillOpacity: '0.1',
 						identified: 'false'
@@ -207,7 +215,12 @@ describe('consultees-map client helpers', () => {
 				},
 				{
 					geometry: { type: 'Point' },
-					properties: { consulteeCategory: 'Hospital', colour: '#d53880', fillOpacity: '0.1', identified: 'false' }
+					properties: {
+						consulteeCategory: 'Hospitals operated by NHS trusts and NHS foundation trusts (England)',
+						colour: '#d53880',
+						fillOpacity: '0.1',
+						identified: 'false'
+					}
 				}
 			],
 			'consultees'
@@ -216,9 +229,12 @@ describe('consultees-map client helpers', () => {
 		assert.deepEqual(
 			sublayers.map((sublayer) => [sublayer.label, sublayer.filter[2]]),
 			[
-				['Hospital: nearby, not identified (1)', ['==', ['get', 'identified'], 'false']],
-				['Parish Council: nearby, not identified (2)', ['==', ['get', 'identified'], 'false']],
-				['Parish Council (1)', ['!=', ['get', 'identified'], 'false']]
+				[
+					'Hospitals operated by NHS trusts and NHS foundation trusts (England): nearby, not identified (1)',
+					['==', ['get', 'identified'], 'false']
+				],
+				['Parish, town and community councils: nearby, not identified (2)', ['==', ['get', 'identified'], 'false']],
+				['Parish, town and community councils (1)', ['!=', ['get', 'identified'], 'false']]
 			]
 		);
 		// every sublayer, nearby context included, starts shown
@@ -236,7 +252,7 @@ describe('consultees-map client helpers', () => {
 
 	test('buildCategorySublayers groups uncategorised features and defaults missing colours', () => {
 		const sublayers = buildCategorySublayers(
-			[{ properties: { consulteeCategory: 'Police' } }, { geometry: { type: 'Polygon' } }],
+			[{ properties: { consulteeCategory: 'Police and crime commissioners' } }, { geometry: { type: 'Polygon' } }],
 			'identified'
 		);
 
@@ -244,7 +260,7 @@ describe('consultees-map client helpers', () => {
 			sublayers.map((sublayer) => [sublayer.id, sublayer.label]),
 			[
 				['identified-0', 'Other (1)'],
-				['identified-1', 'Police (1)']
+				['identified-1', 'Police and crime commissioners (1)']
 			]
 		);
 		assert.equal(sublayers[1].style.stroke, '#55A868');
@@ -394,7 +410,10 @@ describe('consultees-map client helpers', () => {
 	});
 
 	test('buildSelectableLayers lists the MapLibre layers of each consultee sublayer and the project site', () => {
-		const area = { properties: { consulteeCategory: 'Police', colour: '#1d70b8' }, geometry: { type: 'Polygon' } };
+		const area = {
+			properties: { consulteeCategory: 'Police and crime commissioners', colour: '#1d70b8' },
+			geometry: { type: 'Polygon' }
+		};
 		const layers = buildSelectableLayers(
 			buildDatasets({
 				consulteeGeojson: { features: [area] },
@@ -416,14 +435,24 @@ describe('consultees-map client helpers', () => {
 
 	test('featureDetailsHtml describes a consultee or the project site, escaping their text', () => {
 		assert.equal(
-			featureDetailsHtml({ consulteeId: 'x', name: 'A & <B>', consulteeCategory: 'Police', region: 'East' }),
+			featureDetailsHtml({
+				consulteeId: 'x',
+				name: 'A & <B>',
+				consulteeCategory: 'Police and crime commissioners',
+				region: 'East'
+			}),
 			'<p class="govuk-body govuk-!-font-weight-bold govuk-!-margin-bottom-2">A &amp; &lt;B&gt;</p>' +
-				'<p class="govuk-body-s govuk-!-margin-bottom-1">Category: Police</p>' +
+				'<p class="govuk-body-s govuk-!-margin-bottom-1">Category: Police and crime commissioners</p>' +
 				'<p class="govuk-body-s govuk-!-margin-bottom-1">Region: East</p>'
 		);
 		assert.match(
-			featureDetailsHtml({ consulteeId: 'x', name: '', consulteeCategory: 'Hospital', region: '' }),
-			/Unnamed.*Category: Hospital<\/p>$/
+			featureDetailsHtml({
+				consulteeId: 'x',
+				name: '',
+				consulteeCategory: 'Hospitals operated by NHS trusts and NHS foundation trusts (England)',
+				region: ''
+			}),
+			/Unnamed.*Category: Hospitals operated by NHS trusts and NHS foundation trusts \(England\)<\/p>$/
 		);
 		assert.match(featureDetailsHtml({ name: 'Luton', reference: 'TR020001' }), /Luton.*Reference: TR020001/);
 		assert.match(
@@ -477,7 +506,9 @@ describe('consultees-map client helpers', () => {
 		assert.equal(map.hidePanel.mock.callCount(), 1);
 
 		fire('interact:selectionchange', {
-			selectedFeatures: [{ properties: { consulteeId: 'x', name: 'Offley', consulteeCategory: 'Parish Council' } }]
+			selectedFeatures: [
+				{ properties: { consulteeId: 'x', name: 'Offley', consulteeCategory: 'Parish, town and community councils' } }
+			]
 		});
 		assert.equal(map.showPanel.mock.callCount(), 1);
 		assert.match(document.getElementById('consultee-details-content').innerHTML, /Offley/);

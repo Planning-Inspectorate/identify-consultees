@@ -26,9 +26,9 @@ BORDERING_TOLERANCE_METRES = 50
 boundaries drawn from different sources (e.g. 32m between Sundon parish and Luton, which really do
 border)."""
 
-CATEGORIES_EXCLUDED_FROM_NEARBY = ("Railway",)
-"""Left out of the "any category" nearby search, whatever the distance. Railway's rows are merged
+CATEGORIES_EXCLUDED_FROM_NEARBY = ("Railways",)
+"""Left out of the "any category" nearby search, whatever the distance. Railways's rows are merged
 nationwide (one feature is a single MultiLineString covering the whole GB network), so its bounding
 box defeats the spatial index everywhere - roughly doubling that query's cost - and "near the
-national rail network" is true for almost every project anyway. Conditions that name Railway run
+national rail network" is true for almost every project anyway. Conditions that name Railways run
 their own category-scoped query instead."""

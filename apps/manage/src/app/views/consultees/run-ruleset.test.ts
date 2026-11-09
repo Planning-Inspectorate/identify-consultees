@@ -24,7 +24,7 @@ function project(id = '44444444-4444-4444-4444-444444444444'): CaseBoundaryFeatu
 
 const MATCH = {
 	id: 'aaaaaaaa-0000-0000-0000-000000000001',
-	consulteeCategory: 'Parish Council',
+	consulteeCategory: 'Parish, town and community councils',
 	consultee: 'Abbey Parish Council',
 	region: 'East',
 	distanceMetres: 120
@@ -70,7 +70,7 @@ describe('runRulesetSafely', () => {
 				id: MATCH.id,
 				properties: {
 					sourceId: null,
-					consulteeCategory: 'Parish Council',
+					consulteeCategory: 'Parish, town and community councils',
 					consulteeGroup: null,
 					consulteeSubcategory: null,
 					consulteeSubcategoryDescription: null,
@@ -167,7 +167,7 @@ describe('runRulesetSafely', () => {
 		assert.equal(failed, false);
 		assert.deepStrictEqual(
 			consultees.map((match) => match.feature.properties.consulteeCategory),
-			['Parish Council', NEARBY_NSIPS]
+			['Parish, town and community councils', NEARBY_NSIPS]
 		);
 		assert.deepStrictEqual(consultees[1], {
 			feature: {
@@ -229,7 +229,7 @@ describe('buildSearchAreaSafely', () => {
 		reasons: [{ type: 'nearbyNsip' as const, radiusMetres: 10_000 }]
 	};
 	const parish = {
-		feature: { id: MATCH.id, properties: { consulteeCategory: 'Parish Council' } },
+		feature: { id: MATCH.id, properties: { consulteeCategory: 'Parish, town and community councils' } },
 		distanceMetres: 0,
 		reasons: [{ type: 'condition' as const, conditionId: 'test-condition' }]
 	};

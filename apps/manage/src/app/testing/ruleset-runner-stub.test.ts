@@ -12,11 +12,13 @@ function row(id: string, consulteeCategory: string | null, distanceMetres: numbe
 
 describe('rulesetRunnerReturning', () => {
 	it('fills in the optional columns and reasons a fixture row leaves out', async () => {
-		const { consultees } = await rulesetRunnerReturning([row('a', 'Hospital', 5)])(site, emptyRuleset, 1);
+		const { consultees } = await rulesetRunnerReturning([
+			row('a', 'Hospitals operated by NHS trusts and NHS foundation trusts (England)', 5)
+		])(site, emptyRuleset, 1);
 
 		assert.deepEqual(consultees[0].feature.properties, {
 			sourceId: null,
-			consulteeCategory: 'Hospital',
+			consulteeCategory: 'Hospitals operated by NHS trusts and NHS foundation trusts (England)',
 			consulteeGroup: null,
 			consulteeSubcategory: null,
 			consulteeSubcategoryDescription: null,
@@ -27,7 +29,9 @@ describe('rulesetRunnerReturning', () => {
 	});
 
 	it('gives no consultee geometry or metadata, as the function gives none', async () => {
-		const { consultees } = await rulesetRunnerReturning([row('b', 'Interconnector', 5)])(site, emptyRuleset, 1);
+		const { consultees } = await rulesetRunnerReturning([
+			row('b', 'Electricity interconnectors with compulsory purchase order powers', 5)
+		])(site, emptyRuleset, 1);
 		assert.equal('geometry' in consultees[0].feature, false);
 		assert.equal('metadata' in consultees[0].feature.properties, false);
 	});
@@ -42,9 +46,9 @@ describe('failingRulesetRunner', () => {
 describe('buildDatabaseRulesetRunner', () => {
 	it('gives each consultee its condition and nearby reasons, and leaves out anything with neither', async () => {
 		const rows = [
-			row('police', 'Police', 0),
-			row('hospital', 'Hospital', 900),
-			row('far-hospital', 'Hospital', 1_500),
+			row('police', 'Police and crime commissioners', 0),
+			row('hospital', 'Hospitals operated by NHS trusts and NHS foundation trusts (England)', 900),
+			row('far-hospital', 'Hospitals operated by NHS trusts and NHS foundation trusts (England)', 1_500),
 			row('none', null, 0)
 		];
 		const db = { $queryRaw: mock.fn(async () => rows) };
@@ -52,15 +56,21 @@ describe('buildDatabaseRulesetRunner', () => {
 			id: 'r',
 			name: 'R',
 			rules: [
-				{ id: 'h', name: 'Hospitals', logicType: 'intersection', categories: ['Hospital'], bufferMetres: 1_000 },
+				{
+					id: 'h',
+					name: 'Hospitals',
+					logicType: 'intersection',
+					categories: ['Hospitals operated by NHS trusts and NHS foundation trusts (England)'],
+					bufferMetres: 1_000
+				},
 				// no buffer means it must touch the site
-				{ id: 'touching', name: 'Touching', logicType: 'intersection', categories: ['Police'] },
+				{ id: 'touching', name: 'Touching', logicType: 'intersection', categories: ['Police and crime commissioners'] },
 				{
 					id: 'b',
 					name: 'Bordering',
 					logicType: 'bordering',
-					categories: ['Parish Council'],
-					hostCategory: 'Parish Council'
+					categories: ['Parish, town and community councils'],
+					hostCategory: 'Parish, town and community councils'
 				}
 			]
 		};

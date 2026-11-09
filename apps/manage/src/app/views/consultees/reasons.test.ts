@@ -7,17 +7,23 @@ const ruleset: Ruleset = {
 	id: 'r',
 	name: 'R',
 	rules: [
-		{ id: 'hospital', name: 'Hospitals', logicType: 'intersection', categories: ['Hospital'], bufferMetres: 10_000 },
+		{
+			id: 'hospital',
+			name: 'Hospitals',
+			logicType: 'intersection',
+			categories: ['Hospitals operated by NHS trusts and NHS foundation trusts (England)'],
+			bufferMetres: 10_000
+		},
 		{ id: 'fire', name: 'Fire and Rescue', logicType: 'intersection', categories: ['Fire'], bufferMetres: 500 },
 		{ id: 'host', name: 'Host councils', logicType: 'intersection', categories: ['Council'], bufferMetres: 0 },
 		// no buffer at all means the same as 0: it must touch the site
-		{ id: 'onr', name: 'ONR sites', logicType: 'intersection', categories: ['ONR Site'] },
+		{ id: 'onr', name: 'ONR sites', logicType: 'intersection', categories: ['Office for Nuclear Regulation sites'] },
 		{
 			id: 'bordering',
 			name: '"A" parishes bordering "B" host parishes',
 			logicType: 'bordering',
-			categories: ['Parish Council'],
-			hostCategory: 'Parish Council'
+			categories: ['Parish, town and community councils'],
+			hostCategory: 'Parish, town and community councils'
 		}
 	]
 };

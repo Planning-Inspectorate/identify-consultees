@@ -36,7 +36,7 @@ function match(id: string): ConsulteeMatch {
 			id,
 			type: 'Feature',
 			geometry: { type: 'Point', coordinates: [-1.5, 52.5] },
-			properties: { consultee: 'Network Rail', consulteeCategory: 'Railway', region: 'Midlands' }
+			properties: { consultee: 'Network Rail', consulteeCategory: 'Railways', region: 'Midlands' }
 		},
 		distanceMetres: 0,
 		reasons: [{ type: 'condition', conditionId: 'railways_10km' }]
@@ -140,7 +140,7 @@ describe('buildCaseMapConfig with a search area', () => {
 			computeFittedMapView(buildProjectGeojson(project()), MAP_VIEWPORT, REPORT_CONFIG.defaults.mapMarginMetres).zoom
 		);
 		// a category's own distance, when its map is given one
-		const closer = buildCaseMapConfig(project(), [], 'Parish Council', undefined, undefined, 500);
+		const closer = buildCaseMapConfig(project(), [], 'Parish, town and community councils', undefined, undefined, 500);
 		assert.strictEqual(closer.zoom, computeFittedMapView(buildProjectGeojson(project()), MAP_VIEWPORT, 500).zoom);
 		assert.ok(closer.zoom > config.zoom);
 		// only the match touching the area is drawn, in its display geometry
@@ -169,7 +169,7 @@ describe('buildCaseMapConfig with a search area', () => {
 				id: 'county',
 				type: 'Feature',
 				geometry: area,
-				properties: { consultee: 'Suffolk', consulteeCategory: 'Upper Tier Authority' }
+				properties: { consultee: 'Suffolk', consulteeCategory: 'County councils (upper-tier authorities)' }
 			},
 			distanceMetres: 0,
 			reasons: [{ type: 'condition', conditionId: 'c_host_county_councils_upper_tier_authorities' }]
@@ -207,7 +207,11 @@ describe('buildCaseMapConfig with a search area', () => {
 		});
 		const regionalMatch = {
 			...match('county'),
-			feature: { ...match('county').feature, geometry: area, properties: { consulteeCategory: 'Upper Tier Authority' } }
+			feature: {
+				...match('county').feature,
+				geometry: area,
+				properties: { consulteeCategory: 'County councils (upper-tier authorities)' }
+			}
 		} as ConsulteeMatch;
 		const config = buildCaseMapConfig(
 			project(),
@@ -247,7 +251,7 @@ describe('buildCaseMapConfig with a search area', () => {
 		const matches = [nearby('picked'), nearby('not-picked')];
 		// nothing picked - the matches as they are
 		assert.strictEqual(markAddedByHand(matches, new Set()), matches);
-		const config = buildCaseMapConfig(project(), markAddedByHand(matches, new Set(['picked'])), 'Railway', {
+		const config = buildCaseMapConfig(project(), markAddedByHand(matches, new Set(['picked'])), 'Railways', {
 			area,
 			geometries: new Map<string, Geometry>([
 				['picked', display],
@@ -274,18 +278,22 @@ describe('buildCaseMapConfig with a search area', () => {
 			run,
 			[
 				// found by the run - drawn as the run's match, not again
-				{ id: 'FOUND', category: 'Railway', name: 'Network Rail' },
-				{ id: 'far', category: 'Railway', name: 'Far Railway' },
-				{ id: 'far', category: 'Railway', name: 'Far Railway' },
+				{ id: 'FOUND', category: 'Railways', name: 'Network Rail' },
+				{ id: 'far', category: 'Railways', name: 'Far Railway' },
+				{ id: 'far', category: 'Railways', name: 'Far Railway' },
 				// another category's, and one with no id (a link from before ids were kept)
-				{ id: 'other', category: 'Hospital', name: 'A Hospital' },
-				{ category: 'Railway', name: 'Named Only' }
+				{
+					id: 'other',
+					category: 'Hospitals operated by NHS trusts and NHS foundation trusts (England)',
+					name: 'A Hospital'
+				},
+				{ category: 'Railways', name: 'Named Only' }
 			],
-			'Railway'
+			'Railways'
 		);
 		assert.deepStrictEqual(beyond, [
 			{
-				feature: { id: 'far', properties: { consulteeCategory: 'Railway', consultee: 'Far Railway' } },
+				feature: { id: 'far', properties: { consulteeCategory: 'Railways', consultee: 'Far Railway' } },
 				distanceMetres: 0,
 				reasons: [],
 				addedByHand: true,
@@ -295,8 +303,8 @@ describe('buildCaseMapConfig with a search area', () => {
 
 		const farAway = { type: 'Point' as const, coordinates: [-3.5, 55.5] as [number, number] };
 		const searchArea = { area, geometries: new Map<string, Geometry>([['far', farAway]]) };
-		const siteOnly = buildCaseMapConfig(project(), run, 'Railway', searchArea);
-		const config = buildCaseMapConfig(project(), [...run, ...beyond], 'Railway', searchArea);
+		const siteOnly = buildCaseMapConfig(project(), run, 'Railways', searchArea);
+		const config = buildCaseMapConfig(project(), [...run, ...beyond], 'Railways', searchArea);
 		const far = config.consulteeGeojson.features.find((feature) => feature.id === 'far');
 		assert.deepStrictEqual(far?.geometry, farAway);
 		assert.strictEqual(far?.properties.identified, 'true');
@@ -306,7 +314,7 @@ describe('buildCaseMapConfig with a search area', () => {
 		// with nothing beyond the run, the map opens on the site as before
 		assert.deepStrictEqual(
 			[siteOnly.center, siteOnly.zoom],
-			[buildCaseMapConfig(project(), run, 'Railway').center, buildCaseMapConfig(project(), run, 'Railway').zoom]
+			[buildCaseMapConfig(project(), run, 'Railways').center, buildCaseMapConfig(project(), run, 'Railways').zoom]
 		);
 	});
 

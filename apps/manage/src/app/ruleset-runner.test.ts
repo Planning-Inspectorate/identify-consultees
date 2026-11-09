@@ -7,18 +7,29 @@ const ruleset: Ruleset = {
 	id: 'example',
 	name: 'Example',
 	rules: [
-		{ id: 'hospital', name: 'Hospitals', logicType: 'intersection', categories: ['Hospital'], bufferMetres: 10_000 },
+		{
+			id: 'hospital',
+			name: 'Hospitals',
+			logicType: 'intersection',
+			categories: ['Hospitals operated by NHS trusts and NHS foundation trusts (England)'],
+			bufferMetres: 10_000
+		},
 		{
 			id: 'parish',
 			name: 'Bordering parishes',
 			logicType: 'bordering',
-			categories: ['Parish Council'],
-			hostCategory: 'Parish Council'
+			categories: ['Parish, town and community councils'],
+			hostCategory: 'Parish, town and community councils'
 		}
 	]
 };
 const site = { type: 'Point' as const, coordinates: [-1.5, 52.5] as [number, number] };
-const properties = { consulteeCategory: 'Hospital', consultee: 'Example Hospital', region: null, metadata: {} };
+const properties = {
+	consulteeCategory: 'Hospitals operated by NHS trusts and NHS foundation trusts (England)',
+	consultee: 'Example Hospital',
+	region: null,
+	metadata: {}
+};
 
 const originalFetch = globalThis.fetch;
 
@@ -50,7 +61,7 @@ describe('buildPythonRulesetRunner', () => {
 		const run = buildPythonRulesetRunner({
 			pythonFunctionUrl: 'http://localhost:7071/api/consultee-areas',
 			apiKey: 'shared-key',
-			nearbyRadiusMetresByCategory: { 'Parish Council': 5_000 }
+			nearbyRadiusMetresByCategory: { 'Parish, town and community councils': 5_000 }
 		});
 
 		await run(site, ruleset, 20_000);
@@ -63,14 +74,24 @@ describe('buildPythonRulesetRunner', () => {
 		assert.deepEqual(JSON.parse(String(init?.body)), {
 			siteWkt: 'POINT(-1.5 52.5)',
 			nearbyRadiusMetres: 20_000,
-			nearbyRadiusMetresByCategory: { 'Parish Council': 5_000 },
+			nearbyRadiusMetresByCategory: { 'Parish, town and community councils': 5_000 },
 			includeGeometry: false,
 			// the function stops its run before this request gives up on it
 			timeoutSeconds: 50,
 			// the display name stays here - the function only needs what to run
 			rules: [
-				{ id: 'hospital', logicType: 'intersection', categories: ['Hospital'], bufferMetres: 10_000 },
-				{ id: 'parish', logicType: 'bordering', categories: ['Parish Council'], hostCategory: 'Parish Council' }
+				{
+					id: 'hospital',
+					logicType: 'intersection',
+					categories: ['Hospitals operated by NHS trusts and NHS foundation trusts (England)'],
+					bufferMetres: 10_000
+				},
+				{
+					id: 'parish',
+					logicType: 'bordering',
+					categories: ['Parish, town and community councils'],
+					hostCategory: 'Parish, town and community councils'
+				}
 			]
 		});
 	});

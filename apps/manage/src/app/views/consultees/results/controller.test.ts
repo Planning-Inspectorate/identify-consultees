@@ -28,7 +28,7 @@ function railwayMatchRow(
 	return {
 		id: '55555555-5555-5555-5555-555555555555',
 		geometryType: 'MultiLineString',
-		consulteeCategory: overrides.consulteeCategory === undefined ? 'Railway' : overrides.consulteeCategory,
+		consulteeCategory: overrides.consulteeCategory === undefined ? 'Railways' : overrides.consulteeCategory,
 		consultee: overrides.consultee === undefined ? 'Network Rail' : overrides.consultee,
 		region: overrides.region === undefined ? 'Midlands' : overrides.region,
 		metadata: '{}',
@@ -169,7 +169,7 @@ describe('consultees results static map', () => {
 		const parishRow = (id: string, consultee: string) => ({
 			...railwayMatchRow(),
 			id,
-			consulteeCategory: 'Parish Council',
+			consulteeCategory: 'Parish, town and community councils',
 			consultee
 		});
 		const db = dbReturning([
@@ -202,7 +202,7 @@ describe('consultees results static map', () => {
 		// out-of-category railway are not
 		const withCategory = await displayGeometryIds({
 			ruleset: 'england-wales-post-20240430',
-			category: 'Parish Council',
+			category: 'Parish, town and community councils',
 			exclude: excludedParishId
 		});
 		assert.ok(withCategory.includes(keptParishId));
@@ -253,7 +253,7 @@ describe('consultees results static map', () => {
 			await handler({ params: { caseId: realProjectId }, query, headers: {} }, mockRes);
 			return String(mockRes.send.mock.calls[0].arguments[0]);
 		};
-		const query = { ruleset: 'england-wales-post-20240430', category: 'Railway' };
+		const query = { ruleset: 'england-wales-post-20240430', category: 'Railways' };
 
 		assert.match(await svg(query), new RegExp(`fill-opacity="${NEARBY_REGIONAL_FILL_OPACITY}"`));
 		assert.match(await svg({ ...query, include: nearbyRow.id }), new RegExp(`fill-opacity="${REGIONAL_FILL_OPACITY}"`));
@@ -294,9 +294,9 @@ describe('consultees results static map', () => {
 			return String(mockRes.send.mock.calls[0].arguments[0]);
 		};
 		// railways are found within 10km of the site
-		assert.match(await svg('Railway'), /stroke-dasharray="8 5"/);
+		assert.match(await svg('Railways'), /stroke-dasharray="8 5"/);
 		// parishes must intersect it - no buffer
-		assert.doesNotMatch(await svg('Parish Council'), /stroke-dasharray="8 5"/);
+		assert.doesNotMatch(await svg('Parish, town and community councils'), /stroke-dasharray="8 5"/);
 	});
 
 	it('should 503 rather than serve a cacheable empty map if the ruleset query fails', async () => {

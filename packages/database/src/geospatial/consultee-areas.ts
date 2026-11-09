@@ -484,7 +484,7 @@ export interface ConsulteeAreaDetail {
 }
 
 // the categories whose areas lie within a council area - named for it when they share a name
-const WITHIN_A_COUNCIL_AREA = ['Parish Council'];
+const WITHIN_A_COUNCIL_AREA = ['Parish, town and community councils'];
 
 // a consultee_area id - anything else in a list of ids would fail the whole query's conversion
 const AREA_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -520,11 +520,11 @@ export async function consulteeAreaDetails(
 					SELECT TOP 1 c.consultee
 					FROM consultee_area c WITH (INDEX(consultee_area_geometry_simplified_sidx))
 					WHERE a.consulteeCategory IN (${Prisma.join(WITHIN_A_COUNCIL_AREA)})
-						AND c.consulteeCategory IN ('Lower Tier Authority', 'Unitary Authority')
+						AND c.consulteeCategory IN ('District councils (lower-tier authorities)', 'Unitary authorities')
 						AND c.geometrySimplified.STIntersects(a.geometrySimplified) = 1
 					ORDER BY
 						CASE WHEN c.geometrySimplified.STIntersects(a.geometrySimplified.EnvelopeCenter()) = 1 THEN 0 ELSE 1 END,
-						CASE c.consulteeCategory WHEN 'Lower Tier Authority' THEN 0 ELSE 1 END
+						CASE c.consulteeCategory WHEN 'District councils (lower-tier authorities)' THEN 0 ELSE 1 END
 				) AS council
 				WHERE a.id IN (${Prisma.join(batch)})
 			`

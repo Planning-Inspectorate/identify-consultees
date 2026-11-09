@@ -34,7 +34,7 @@ function parishMatchRow() {
 	return {
 		id: '55555555-5555-5555-5555-555555555555',
 		geometryType: 'MultiLineString',
-		consulteeCategory: 'Parish Council',
+		consulteeCategory: 'Parish, town and community councils',
 		consultee: 'Little Snoring Parish Council',
 		region: 'East of England',
 		metadata: '{}',
@@ -68,7 +68,7 @@ function dbReturning(rows: unknown[][]) {
 					id,
 					geometryType: 'Point',
 					sourceId: null,
-					consulteeCategory: 'Parish Council',
+					consulteeCategory: 'Parish, town and community councils',
 					consulteeGroup: null,
 					consultee: `Parish ${id}`,
 					region: 'East',
@@ -106,19 +106,21 @@ describe('consultee report check page', () => {
 			...parishMatchRow('88888888-8888-8888-8888-888888888888', 'Nearby Parish Council'),
 			reasons: [{ type: 'nearby' as const, radiusMetres: 20_000 }]
 		};
-		// the default ruleset (England and Wales (Post 30 April 2024)) has no Local Resilience Forum condition
+		// the default ruleset (England and Wales (Post 30 April 2024)) has no Local resilience forums (Wales) condition
 		const nearbyForum = {
 			...parishMatchRow('99999999-9999-9999-9999-999999999999', 'Example Local Resilience Forum'),
-			consulteeCategory: 'Local Resilience Forum',
+			consulteeCategory: 'Local resilience forums (Wales)',
 			reasons: [{ type: 'nearby' as const, radiusMetres: 20_000 }]
 		};
 		const db = dbReturning([[realProjectRow()], [parishMatchRow(), nearbyParish, nearbyForum]]);
 		await handlerFor(db)({ params: { caseId: realProjectId }, query: {} }, mockRes);
 
 		const viewModel = mockRes.render.mock.calls[0].arguments[1];
-		assert.deepStrictEqual(rowNamed(viewModel, 'Parish Council')?.names, ['Little Snoring Parish Council']);
+		assert.deepStrictEqual(rowNamed(viewModel, 'Parish, town and community councils')?.names, [
+			'Little Snoring Parish Council'
+		]);
 		// a category only the nearby search found isn't listed at all
-		assert.ok(!allRows(viewModel).some((category) => category.name === 'Local Resilience Forum'));
+		assert.ok(!allRows(viewModel).some((category) => category.name === 'Local resilience forums (Wales)'));
 	});
 
 	it('should render the report details and per-category consultee counts', async () => {
@@ -162,7 +164,7 @@ describe('consultee report check page', () => {
 		);
 
 		// one row per ruleset category, grouped under the export's tabs, in ruleset order
-		const parishRow = rowNamed(viewModel, 'Parish Council');
+		const parishRow = rowNamed(viewModel, 'Parish, town and community councils');
 		assert.deepStrictEqual(parishRow.names, ['Little Snoring Parish Council']);
 		assert.ok(allRows(viewModel).every((row: { names: string[] }) => Array.isArray(row.names)));
 		assert.ok(allRows(viewModel).length > 1);
@@ -174,15 +176,21 @@ describe('consultee report check page', () => {
 				)
 			)
 		);
-		assert.match(parishRow.changeUrl, /category=Parish%20Council/);
+		assert.match(parishRow.changeUrl, /category=Parish%2C%20town%20and%20community%20councils/);
 
 		// a group's rows are the categories the export's tab of the same name lists
 		const administrative = viewModel.groups.find(
 			(group: { name: string }) => group.name === 'Administrative boundaries'
 		);
-		assert.ok(administrative.consultees.some((row: { name: string }) => row.name === 'Parish Council'));
+		assert.ok(
+			administrative.consultees.some((row: { name: string }) => row.name === 'Parish, town and community councils')
+		);
 		const publicBodies = viewModel.groups.find((group: { name: string }) => group.name === 'Public bodies');
-		assert.ok(publicBodies.consultees.some((row: { name: string }) => row.name === 'Hospital'));
+		assert.ok(
+			publicBodies.consultees.some(
+				(row: { name: string }) => row.name === 'Hospitals operated by NHS trusts and NHS foundation trusts (England)'
+			)
+		);
 
 		const html = mockRes.render.mock.calls[0].result;
 		assert.match(html, /Report details/);
@@ -203,7 +211,7 @@ describe('consultee report check page', () => {
 
 		const viewModel = mockRes.render.mock.calls[0].arguments[1];
 		// the only match was excluded - the category row lists no names
-		const parishRow = rowNamed(viewModel, 'Parish Council');
+		const parishRow = rowNamed(viewModel, 'Parish, town and community councils');
 		assert.deepStrictEqual(parishRow.names, []);
 		assert.ok(parishRow.changeUrl.includes(`&exclude=${excludedId}`));
 		assert.ok(viewModel.generateReportUrl.includes(`&exclude=${excludedId}`));
@@ -211,8 +219,12 @@ describe('consultee report check page', () => {
 
 	it('should add hand-added consultees to their category count and carry them through the links', async () => {
 		const mockRes = { status: mock.fn(() => mockRes), render: mock.fn() };
-		const parishAdd = JSON.stringify({ c: 'Parish Council', n: 'Test Consultee', r: 'Adjacent' });
-		const hospitalAdd = JSON.stringify({ c: 'Hospital', n: 'Other Test Consultee', r: '' });
+		const parishAdd = JSON.stringify({ c: 'Parish, town and community councils', n: 'Test Consultee', r: 'Adjacent' });
+		const hospitalAdd = JSON.stringify({
+			c: 'Hospitals operated by NHS trusts and NHS foundation trusts (England)',
+			n: 'Other Test Consultee',
+			r: ''
+		});
 		const db = dbReturning([[realProjectRow()], [parishMatchRow()]]);
 		await handlerFor(db)(
 			{
@@ -223,8 +235,8 @@ describe('consultee report check page', () => {
 		);
 
 		const viewModel = mockRes.render.mock.calls[0].arguments[1];
-		const parishRow = rowNamed(viewModel, 'Parish Council');
-		const hospitalRow = rowNamed(viewModel, 'Hospital');
+		const parishRow = rowNamed(viewModel, 'Parish, town and community councils');
+		const hospitalRow = rowNamed(viewModel, 'Hospitals operated by NHS trusts and NHS foundation trusts (England)');
 		// one ruleset match + one hand-added row
 		assert.deepStrictEqual(parishRow.names, ['Little Snoring Parish Council', 'Test Consultee']);
 		assert.deepStrictEqual(hospitalRow.names, ['Other Test Consultee']);
@@ -252,7 +264,7 @@ describe('consultee report check page', () => {
 		);
 
 		const viewModel = mockRes.render.mock.calls[0].arguments[1];
-		const parishRow = rowNamed(viewModel, 'Parish Council');
+		const parishRow = rowNamed(viewModel, 'Parish, town and community councils');
 		assert.strictEqual(parishRow.names.length, 12);
 
 		// all twelve names are in the row - the first five listed, the rest inside the details
@@ -276,8 +288,13 @@ describe('consultee report check page', () => {
 			id: 'test-ruleset',
 			name: 'Test',
 			rules: [
-				{ id: 'a', name: 'a', group: 'Administative boundaries', categories: ['Parish Council'] },
-				{ id: 'b', name: 'b', group: 'Public bodies', categories: ['Hospital'] }
+				{ id: 'a', name: 'a', group: 'Administative boundaries', categories: ['Parish, town and community councils'] },
+				{
+					id: 'b',
+					name: 'b',
+					group: 'Public bodies',
+					categories: ['Hospitals operated by NHS trusts and NHS foundation trusts (England)']
+				}
 			]
 		} as unknown as Ruleset;
 		const groups = groupedConsultees(ruleset, realProjectId, [], { removed: [], adds: [] });
@@ -291,7 +308,9 @@ describe('consultee report check page', () => {
 		const ruleset = {
 			id: 'test-ruleset',
 			name: 'Test',
-			rules: [{ id: 'a', name: 'a', group: 'Administative boundaries', categories: ['Parish Council'] }]
+			rules: [
+				{ id: 'a', name: 'a', group: 'Administative boundaries', categories: ['Parish, town and community councils'] }
+			]
 		} as unknown as Ruleset;
 		const none = { removed: [], adds: [] };
 		assert.deepStrictEqual(
@@ -301,7 +320,7 @@ describe('consultee report check page', () => {
 			]),
 			[
 				['National infrastructure projects', [['National infrastructure projects', []]]],
-				['Administrative boundaries', [['Parish Council', []]]]
+				['Administrative boundaries', [['Parish, town and community councils', []]]]
 			]
 		);
 		const nearbyNsip = {
@@ -410,7 +429,7 @@ describe('report created page', () => {
 	const hospitalRow = () => ({
 		...parishMatchRow(),
 		id: '66666666-6666-6666-6666-666666666666',
-		consulteeCategory: 'Hospital',
+		consulteeCategory: 'Hospitals operated by NHS trusts and NHS foundation trusts (England)',
 		consultee: 'Norfolk Hospital',
 		reasons: [
 			{
@@ -486,8 +505,8 @@ describe('report created page', () => {
 		assert.ok(kept);
 		const files = unzipSync(new Uint8Array(kept.contents));
 		assert.ok(Object.keys(files).some((name) => name.endsWith('.xlsx')));
-		assert.ok(files['maps/01 Parish Council.pdf']);
-		assert.ok(files['maps/02 Hospital.pdf']);
+		assert.ok(files['maps/01 Parish, town and community councils.pdf']);
+		assert.ok(files['maps/02 Hospitals operated by NHS trusts and NHS foundation trusts (England).pdf']);
 	});
 
 	it('should carry the consultee selection into the download link and the report it serves', async () => {
@@ -508,9 +527,9 @@ describe('report created page', () => {
 		const kept = rememberedReportZip(downloadUrl);
 		assert.ok(kept);
 		const files = unzipSync(new Uint8Array(kept.contents));
-		assert.ok(files['maps/01 Hospital.pdf']);
+		assert.ok(files['maps/01 Hospitals operated by NHS trusts and NHS foundation trusts (England).pdf']);
 		assert.ok(files['maps/02 Landowner.pdf']);
-		assert.ok(!files['maps/01 Parish Council.pdf']);
+		assert.ok(!files['maps/01 Parish, town and community councils.pdf']);
 	});
 
 	it('should build the report once for a URL and serve the kept copy on a refresh', async () => {
@@ -519,7 +538,12 @@ describe('report created page', () => {
 			params: { caseId: realProjectId },
 			query: {
 				add: urlParam(
-					JSON.stringify({ i: '99999999-9999-9999-9999-999999999999', c: 'Parish Council', n: 'Kept', r: '' })
+					JSON.stringify({
+						i: '99999999-9999-9999-9999-999999999999',
+						c: 'Parish, town and community councils',
+						n: 'Kept',
+						r: ''
+					})
 				)
 			}
 		};

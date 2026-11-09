@@ -78,7 +78,7 @@ export function buildDatabaseRulesetRunner(getDb: () => PrismaClient): RulesetRu
 				geometrySimplified.STDistance(geography::STGeomFromText(${wkt}, 4326)) AS distanceMetres
 			FROM consultee_area
 			WHERE geometrySimplified.STDistance(geography::STGeomFromText(${wkt}, 4326)) <= ${searchMetres}
-				AND (consulteeCategory IS NULL OR consulteeCategory <> 'Railway')
+				AND (consulteeCategory IS NULL OR consulteeCategory <> 'Railways')
 			ORDER BY distanceMetres, id
 		`;
 		const consultees = rows.flatMap((row) => {
