@@ -260,9 +260,22 @@ describe('manage page accessibility smoke', () => {
 					name: 'Little Snoring Parish Council',
 					identified: ['"B" host Parishes or Community Councils: intersects the site', 'Within 20km of the site'],
 					removeUrl:
-						'/consultees/11111111-1111-1111-1111-111111111111/report/consultees?ruleset=england-wales-post-20240430&category=Parish%2C%20town%20and%20community%20councils&exclude=55555555-5555-5555-5555-555555555555'
+						'/consultees/11111111-1111-1111-1111-111111111111/report/consultees?ruleset=england-wales-post-20240430&category=Parish%2C%20town%20and%20community%20councils&exclude=55555555-5555-5555-5555-555555555555',
+					select: {
+						param: 'match',
+						value: '55555555-5555-5555-5555-555555555555',
+						domId: 'select-match-55555555-5555-5555-5555-555555555555'
+					}
 				}
 			],
+			bulkRemove: {
+				formAction: '/consultees/11111111-1111-1111-1111-111111111111/report/consultees/remove',
+				hiddenParams: [
+					{ name: 'ruleset', value: 'england-wales-post-20240430' },
+					{ name: 'category', value: 'Parish, town and community councils' },
+					{ name: 'exclude', value: 'eyJpIjoiMTExMSJ9' }
+				]
+			},
 			addConsulteeUrl:
 				'/consultees/11111111-1111-1111-1111-111111111111/report/consultees/add?ruleset=england-wales-post-20240430&category=Parish%2C%20town%20and%20community%20councils',
 			mapId: 'case-map',
@@ -281,6 +294,8 @@ describe('manage page accessibility smoke', () => {
 		});
 		assert.match(html, /Removed consultees/);
 		assert.match(html, /Outside the search area/);
+		// the header's Select all box is server-rendered - its name is what a no-JS submit sends
+		assert.match(html, /name="select-all"/);
 		await assertNoSeriousA11yViolations(html);
 	});
 

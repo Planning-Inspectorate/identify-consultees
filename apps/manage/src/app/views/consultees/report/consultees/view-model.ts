@@ -9,6 +9,8 @@ export interface ConsulteeRow {
 	identified: string[];
 	/** The "Remove consultee" page for this row - it records the removal reason, then returns here. */
 	removeUrl: string;
+	/** The bulk-remove checkbox for this row: the query param it submits and the input's DOM id. */
+	select: { param: string; value: string; domId: string };
 }
 
 /** One row of the expandable Removed consultees section - a removal and the reason given. */
@@ -26,6 +28,12 @@ export interface ReportConsulteesViewModel {
 	/** "Back to draft report" - the layout renders the back link itself from these two. */
 	backLinkText: string;
 	rows: ConsulteeRow[];
+	/**
+	 * The bulk-remove form around the table: a bare GET action (the form's fields carry the state -
+	 * see bulkRemoveConsulteeUrl) and the hidden inputs re-sending the ruleset, category and
+	 * selection alongside the checked rows.
+	 */
+	bulkRemove: { formAction: string; hiddenParams: { name: string; value: string }[] };
 	/** The "Add a consultee" page the Add consultee link opens, keeping the current selection. */
 	addConsulteeUrl: string;
 	mapId: string;
