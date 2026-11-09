@@ -83,7 +83,7 @@ Internal tools for loading and checking an environment's data, all in `apps/mana
 
 `AUTH_DISABLED=true` locally. Otherwise `/auth` is rate limited and everything after it needs an Entra login and group membership (`authGuards`), and `/admin` its own group too (see "Admin section"). Footer pages and monitoring stay public.
 
-**msal-node 7 nonce regression:** `@azure/msal-node` ≥ 7.0.2 rewrites the second-argument auth code payload inside `ConfidentialClientApplication.acquireTokenByCode`, reading `nonce` off the request object and silently dropping `authCodePayload.nonce` - the only place `@planning-inspectorate/core` 1.15.x puts it. msal-common's strict nonce check then throws `nonceMismatch` (the ID token carries the nonce, no expected nonce is seen) and every sign-in fails at `/auth/redirect`. `scripts/patch-core-msal-nonce.ts` rewrites the installed `dist/auth/auth-service.js` at postinstall to pass `nonce` on the request; it throws when the pattern disappears so a fixed core release fails loudly and the patch can be removed.
+**Known issue - msal-node 7:** `@planning-inspectorate/core` 1.15.1 moved its sign-in onto `@azure/msal-node` 7.x, whose payload sanitizer silently drops the nonce core passes to `acquireTokenByCode`, so every Entra sign-in fails at `/auth/redirect` (`nonceMismatch`). The service stays on core 1.15.0 until core passes `nonce` on the token request itself - the full analysis and required fix are in [`docs/msal-node-7-nonce.md`](../docs/msal-node-7-nonce.md).
 
 ## Changing the case or ruleset shape
 
