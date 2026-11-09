@@ -24,6 +24,8 @@ export interface DatasetStatus {
 
 export interface ImportReferenceDataViewModel {
 	pageHeading: string;
+	/** Whether the page can load and clear, or only reports - Training and Prod's (see config.ts). */
+	canChange?: boolean;
 	error?: string;
 	/** What loading a group did, said on the page. */
 	groupLoaded?: string;

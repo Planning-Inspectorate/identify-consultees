@@ -98,3 +98,7 @@ waf_rate_limits = {
 web_domains = {
   web = "consultees-test.planninginspectorate.gov.uk"
 }
+
+# the admin pages can upload, load and clear the reference data here; Training and Prod's only report
+# it, loaded by the Load and Promote reference data pipelines
+reference_data_changes_enabled = true

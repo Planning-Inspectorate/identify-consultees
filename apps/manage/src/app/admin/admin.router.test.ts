@@ -128,12 +128,27 @@ describe('admin section', () => {
 		assert.equal(response.status, 200);
 		assert.match(response.text, /<h1 class="govuk-heading-l">Reference data files<\/h1>/);
 		assert.match(response.text, /aria-current="page">Reference data files<\/a>/);
-		// no copying set up here, so no Copy section, and no route to start one
-		assert.doesNotMatch(response.text, /Copy from/);
-		const agent = request.agent(app);
-		const token = /data-csrf-token="([^"]+)"/.exec((await agent.get('/admin/upload-to-blob')).text)?.[1];
-		assert.ok(token);
-		assert.equal((await agent.post('/admin/upload-to-blob/copy').type('form').send({ _csrf: token })).status, 404);
+		// copying is the Promote reference data pipeline's, not a button here
+		assert.doesNotMatch(response.text, /Copy the files/);
+	});
+
+	test('where the reference data cannot be changed, the pages only report it', async () => {
+		const reportOnly = createManageTestApp(createManageTestService(true, { referenceDataChanges: false }));
+		const agent = request.agent(reportOnly);
+		const page = await agent.get('/admin/import-reference-data');
+		assert.equal(page.status, 200);
+		assert.match(page.text, /<h1 class="govuk-heading-l">Reference data<\/h1>/);
+		assert.doesNotMatch(page.text, /Reference data files/);
+		assert.equal((await agent.get('/admin/upload-to-blob')).status, 404);
+		// no route to load or clear, even with a CSRF token
+		const token = /name="_csrf" value="([^"]+)"/.exec((await agent.get('/')).text)?.[1];
+		for (const path of [
+			'/import-reference-data/run-consultee-area-group',
+			'/import-reference-data/clear-consultee-areas'
+		]) {
+			const response = await agent.post(`/admin${path}`).type('form').send({ _csrf: token, group: 'energy' });
+			assert.equal(response.status, 404, path);
+		}
 	});
 
 	test("POST /admin/upload-to-blob/blocks and /commit take a file's parts with the page's CSRF token", async () => {

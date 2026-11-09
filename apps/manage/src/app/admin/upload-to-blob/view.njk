@@ -6,9 +6,6 @@
 {% from "govuk/components/error-message/macro.njk" import govukErrorMessage %}
 {% from "govuk/components/file-upload/macro.njk" import govukFileUpload %}
 {% from "govuk/components/notification-banner/macro.njk" import govukNotificationBanner %}
-{% from "govuk/components/summary-list/macro.njk" import govukSummaryList %}
-{% from "govuk/components/tag/macro.njk" import govukTag %}
-{% from "govuk/components/warning-text/macro.njk" import govukWarningText %}
 
 {% block pageTitle %}
     {{ pageHeading }} - {{ config.headerTitle }}
@@ -56,53 +53,16 @@
         The files in this environment's blob storage, one per group. Load them on
         <a class="govuk-link" href="/admin/import-reference-data">Load into database</a>.
     </p>
+    <p class="govuk-body">
+        Test's newest file for each group is copied on to Training, then Prod, and loaded there by the
+        Promote reference data pipeline in Azure DevOps.
+    </p>
 
     {% if uploadedBlobName %}
         {{ govukNotificationBanner({ type: "success", titleText: "Success", text: "Uploaded " ~ uploadedBlobName ~ "." }) }}
     {% endif %}
-    {% if copy.notice == "started" %}
-        {{ govukNotificationBanner({
-            type: "success",
-            titleText: "Success",
-            text: "Started copying the files from " ~ copy.from ~ "." ~ (" It needs approving in Azure DevOps first." if copy.needsApproval else "")
-        }) }}
-    {% elif copy.notice == "running" %}
-        {{ govukNotificationBanner({ titleText: "Important", text: "A copy from " ~ copy.from ~ " is already running." }) }}
-    {% endif %}
-
     {% if error %}
         {{ govukErrorMessage({ text: error }) }}
-    {% endif %}
-
-    {% if copy %}
-        <h2 class="govuk-heading-m">Copy from {{ copy.from }}</h2>
-        <p class="govuk-body">
-            Copies the files {{ copy.from }} loaded for the quarter it's using into this environment's blob
-            storage, through the Promote reference data pipeline. Nothing is loaded until you load it.
-        </p>
-
-        {% if copy.error %}
-            {{ govukWarningText({ text: copy.error, iconFallbackText: "Warning" }) }}
-        {% endif %}
-
-        {% if copy.latest %}
-            {{ govukSummaryList({
-                classes: "govuk-summary-list--no-border",
-                rows: [
-                    { key: { text: "Last copy" }, value: { html: govukTag({ text: copy.latest.status.text, classes: "govuk-tag--" ~ copy.latest.status.colour }) } },
-                    { key: { text: "Started" }, value: { text: copy.latest.queuedAt } },
-                    { key: { text: "Finished" }, value: { text: copy.latest.finishedAt or "Not yet" } },
-                    { key: { text: "Run" }, value: { html: '<a class="govuk-link" href="' ~ (copy.latest.url | escape) ~ '">View in Azure DevOps</a>' } }
-                ]
-            }) }}
-        {% endif %}
-
-        {% if not copy.running %}
-            <form method="post" action="/admin/upload-to-blob/copy" novalidate>
-                <input type="hidden" name="_csrf" value="{{ _csrf }}">
-                {{ govukButton({ text: "Copy the files from " ~ copy.from, classes: "govuk-button--secondary", preventDoubleClick: true }) }}
-            </form>
-        {% endif %}
     {% endif %}
 
     <h2 class="govuk-heading-m">Upload a file</h2>

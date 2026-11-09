@@ -21,7 +21,7 @@ Alerts email the `consultees-tech` and `consultees-service-manager` action group
 ## When a journey fails but pages load
 
 - **`run-ruleset` returns 504**: the screening queries timed out. The function logs `run-ruleset: stopped after {timeout}s`; check the site boundary's size and the database tier (`kt-docs/data/screening-issues.md`).
-- **Empty consultee lists or maps**: the environment's reference data may not be loaded. `/admin/database` shows row counts; data loads don't need a deploy (`db-seed.yml`, `/admin/import-reference-data`, Refresh cases on the search page).
+- **Empty consultee lists or maps**: the environment's reference data may not be loaded. `/admin/database` shows row counts; data loads don't need a deploy (the Load and Promote reference data pipelines, Dev's and Test's `/admin/import-reference-data`, Refresh cases on the search page).
 - **Map images missing**: the static-map fallback fetches upstream tiles at request time; upstream rate-limits or outages show as failed `<img>` while interactive maps still work.
 
 ## Rotating secrets

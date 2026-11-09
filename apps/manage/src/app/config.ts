@@ -38,11 +38,11 @@ export interface Config extends BaseConfig {
 	// CBOS_SUBSCRIBER_ENABLED=true and the namespace and subscription are set: the staging slot has
 	// it off (infrastructure/app-web.tf), so only the live app takes the messages
 	cbosSubscriber?: CbosSubscriberSettings;
-	// the environment this one's reference data files are copied from, on the admin files page -
-	// Training's from Test, Prod's from Training - by starting the Promote reference data pipeline
-	// (admin/upload-to-blob/copy-pipeline.ts). Undefined - no Copy section - unless
-	// REFERENCE_DATA_COPY_FROM and AZURE_DEVOPS_PROJECT_URL are set
-	referenceDataCopy?: ReferenceDataCopySettings;
+	// whether the admin pages can change the reference data - upload files, load them, clear a
+	// quarter - or only report what's there. On for Dev and Test (REFERENCE_DATA_CHANGES_ENABLED,
+	// reference_data_changes_enabled in their tfvars) and locally; Training and Prod are loaded by
+	// the Load and Promote reference data pipelines instead (see kt-docs/data/data-model.md)
+	referenceDataChanges: boolean;
 	// the hours of the day, UK time, the app imports every CBOS boundary on its own - as the admin
 	// page's button does (admin/import-from-cbos/scheduled-import.ts). From CBOS_IMPORT_HOURS
 	// ("7,10,13,16,19"); empty - off - unless set, and the staging slot has it off
@@ -96,28 +96,6 @@ export function cbosSubscriberSettings(env: NodeJS.ProcessEnv): CbosSubscriberSe
 	return { namespace, topic: env.CBOS_SERVICE_BUS_TOPIC?.trim() || 'nsip-document', subscription };
 }
 
-/** Where the Promote reference data pipeline copies this environment's files from, and the project it's in. */
-export interface ReferenceDataCopySettings {
-	/** The Azure DevOps project, as https://dev.azure.com/planninginspectorate/identify-consultees. */
-	projectUrl: string;
-	/** The pipeline's routes: Test to Training, Training to Prod. */
-	from: 'Test' | 'Training';
-	to: 'Training' | 'Prod';
-}
-
-/** Where this environment's reference data files are copied from, when set; a route the pipeline doesn't have throws. */
-export function referenceDataCopySettings(env: NodeJS.ProcessEnv): ReferenceDataCopySettings | undefined {
-	const from = env.REFERENCE_DATA_COPY_FROM?.trim();
-	const projectUrl = env.AZURE_DEVOPS_PROJECT_URL?.trim().replace(/\/+$/, '');
-	if (!from || !projectUrl) {
-		return undefined;
-	}
-	if (from !== 'Test' && from !== 'Training') {
-		throw new Error(`REFERENCE_DATA_COPY_FROM must be Test or Training, not "${from}"`);
-	}
-	return { projectUrl, from, to: from === 'Test' ? 'Training' : 'Prod' };
-}
-
 // cache the config
 let config: Config | undefined;
 
@@ -150,6 +128,7 @@ export function loadConfig(): Config {
 		AUTH_TENANT_ID,
 		BLOB_STORE_HOST,
 		CBOS_IMPORT_HOURS,
+		REFERENCE_DATA_CHANGES_ENABLED,
 		BLOB_STORE_CONTAINER,
 		CACHE_CONTROL_MAX_AGE,
 		GIT_SHA,
@@ -213,7 +192,7 @@ export function loadConfig(): Config {
 		boundingBoxAbovePoints: screening.boundingBoxAbovePoints,
 		cbosImportHours: parseImportHours(CBOS_IMPORT_HOURS),
 		cbosSubscriber: cbosSubscriberSettings(process.env),
-		referenceDataCopy: referenceDataCopySettings(process.env),
+		referenceDataChanges: !isProduction || REFERENCE_DATA_CHANGES_ENABLED === 'true',
 		auth: {
 			authority: `https://login.microsoftonline.com/${AUTH_TENANT_ID}`,
 			clientId: AUTH_CLIENT_ID || '',
