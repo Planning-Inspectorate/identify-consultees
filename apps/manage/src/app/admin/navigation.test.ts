@@ -1,19 +1,29 @@
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
-import { ADMIN_PAGES, adminNavigation } from './navigation.ts';
+import { adminNavigation, adminPages } from './navigation.ts';
 
 const currentOf = (path: string) =>
-	adminNavigation(path)
+	adminNavigation(path, adminPages(true))
 		.filter((item) => item.current)
 		.map((item) => item.text);
 
 describe('admin navigation', () => {
 	test('lists every admin page, Overview first', () => {
 		assert.deepEqual(
-			adminNavigation('/admin').map((item) => item.href),
-			ADMIN_PAGES.map((page) => page.href)
+			adminNavigation('/admin', adminPages(true)).map((item) => item.text),
+			['Overview', 'Database', 'Reference data files', 'Load into database']
 		);
-		assert.equal(ADMIN_PAGES[0].text, 'Overview');
+	});
+
+	test('has no files page, and only Reference data, where the reference data cannot be changed', () => {
+		assert.deepEqual(
+			adminNavigation('/admin/import-reference-data', adminPages(false)).map((item) => [item.text, item.current]),
+			[
+				['Overview', false],
+				['Database', false],
+				['Reference data', true]
+			]
+		);
 	});
 
 	test('marks the page a path is for, or one beneath it', () => {

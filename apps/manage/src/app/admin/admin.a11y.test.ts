@@ -2,24 +2,18 @@ import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
 import { configureNunjucks } from '../nunjucks.ts';
 import { assertNoSeriousA11yViolations, pageLocals } from '../testing/a11y.ts';
-import { adminNavigation } from './navigation.ts';
+import { adminNavigation, adminPages } from './navigation.ts';
 
 // what admin/index.ts puts on every admin page: the header link and the menu
 const adminLocals = { ...pageLocals, adminLink: { href: '/admin', active: true } };
 
 describe('admin page accessibility smoke', () => {
 	const nunjucks = configureNunjucks();
-	const navFor = (path: string) => ({ adminNav: adminNavigation(path) });
+	const navFor = (path: string, referenceDataChanges = true) => ({
+		adminNav: adminNavigation(path, adminPages(referenceDataChanges))
+	});
 
-	test('admin files page, copying from the previous environment, has no serious a11y violations', async () => {
-		const groups = [
-			{
-				name: 'Energy',
-				slug: 'energy',
-				categories:
-					'Electricity distributors with compulsory purchase order powers, Electricity interconnectors with compulsory purchase order powers'
-			}
-		];
+	test('admin files page, with a file just uploaded, has no serious a11y violations', async () => {
 		const html = nunjucks.render('admin/upload-to-blob/view.njk', {
 			...adminLocals,
 			...navFor('/admin/upload-to-blob'),
@@ -27,59 +21,19 @@ describe('admin page accessibility smoke', () => {
 			_csrf: 'test-csrf',
 			chunkBytes: 8,
 			maxUploadBytes: 64,
-			groups,
-			copy: {
-				from: 'Training',
-				to: 'Prod',
-				needsApproval: true,
-				running: false,
-				notice: 'started',
-				latest: {
-					status: { text: 'Copied', colour: 'green' },
-					queuedAt: '09:00, 6 Nov 2026',
-					finishedAt: '09:04, 6 Nov 2026',
-					url: 'https://dev.azure.com/org/project/_build/results?buildId=1'
-				},
-				error: "Couldn't reach Azure DevOps to see the last copy: status 401"
-			}
-		});
-		assert.match(html, /<h2 class="govuk-heading-m">Copy from Training<\/h2>/);
-		assert.match(html, /It needs approving in Azure DevOps first/);
-		assert.match(html, /Copy the files from Training/);
-		await assertNoSeriousA11yViolations(html);
-	});
-
-	test('admin files page with a copy running, or no copying, has no serious a11y violations', async () => {
-		const base = {
-			...adminLocals,
-			...navFor('/admin/upload-to-blob'),
-			pageHeading: 'Reference data files',
-			_csrf: 'test-csrf',
 			groups: [
-				{ name: 'Energy', slug: 'energy', categories: 'Electricity distributors with compulsory purchase order powers' }
-			]
-		};
-		const running = nunjucks.render('admin/upload-to-blob/view.njk', {
-			...base,
-			copy: {
-				from: 'Test',
-				to: 'Training',
-				needsApproval: false,
-				running: true,
-				notice: 'running',
-				latest: { status: { text: 'Running', colour: 'blue' }, queuedAt: '09:00, 6 Nov 2026', url: 'https://x.test/1' }
-			}
-		});
-		// no button while one runs
-		assert.doesNotMatch(running, /Copy the files from/);
-		assert.match(running, /A copy from Test is already running/);
-		await assertNoSeriousA11yViolations(running);
-		const none = nunjucks.render('admin/upload-to-blob/view.njk', {
-			...base,
+				{
+					name: 'Energy',
+					slug: 'energy',
+					categories:
+						'Electricity distributors with compulsory purchase order powers, Electricity interconnectors with compulsory purchase order powers'
+				}
+			],
 			uploadedBlobName: '20261020_energy.geojson'
 		});
-		assert.doesNotMatch(none, /Copy from/);
-		await assertNoSeriousA11yViolations(none);
+		assert.match(html, /Uploaded 20261020_energy.geojson/);
+		assert.match(html, /copied on to Training, then Prod, and loaded there by the\s+Promote reference data pipeline/);
+		await assertNoSeriousA11yViolations(html);
 	});
 
 	test('admin home lists every admin page beside the menu, with no serious a11y violations', async () => {
@@ -236,5 +190,31 @@ describe('admin page accessibility smoke', () => {
 			assert.equal(html.match(/<h1/g)?.length, 1);
 			await assertNoSeriousA11yViolations(html);
 		}
+	});
+
+	test('the reference data page, where it only reports, has no serious a11y violations', async () => {
+		const html = nunjucks.render('admin/import-reference-data/view.njk', {
+			...adminLocals,
+			...navFor('/admin/import-reference-data', false),
+			_csrf: 'test-csrf',
+			pageHeading: 'Reference data',
+			canChange: false,
+			datasetInUse: '2026Q4',
+			datasets: [{ quarter: '2026Q4', rows: 10, status: 'In use' }],
+			blobStorageRead: true,
+			groups: [
+				{
+					name: 'Energy',
+					slug: 'energy',
+					categories: 'Electricity distributors with compulsory purchase order powers',
+					file: { name: '20261020_energy.geojson', dataDate: '20 October 2026', quarter: '2026Q4', size: '1 KB' },
+					rows: 10
+				}
+			]
+		});
+		assert.match(html, /Load\s+reference data pipeline/);
+		assert.doesNotMatch(html, /<form/);
+		assert.doesNotMatch(html, /Clear consultee areas/);
+		await assertNoSeriousA11yViolations(html);
 	});
 });

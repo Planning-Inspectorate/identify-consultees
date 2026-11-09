@@ -17,6 +17,7 @@ import {
 	groupsStillToLoad,
 	importConsulteeAreaGroup,
 	isoDate,
+	latestGroupFiles,
 	latestGroupLoads,
 	parseGroupBlobName,
 	quarterOf
@@ -46,6 +47,23 @@ describe('group files', () => {
 		]) {
 			assert.equal(parseGroupBlobName(name), undefined, name);
 		}
+	});
+
+	test("give each group's newest, leaving out files that aren't a group's", () => {
+		const latest = latestGroupFiles([
+			{ name: '20260715_public_bodies.geojson', size: 1 },
+			{ name: '20261020_public_bodies.geojson', size: 2 },
+			{ name: '20260101_public_bodies.geojson', size: 3 },
+			{ name: '20261020_energy.geojson', size: 4 },
+			{ name: 'combined_reference_data_v1.geojson', size: 5 }
+		]);
+		assert.deepEqual(
+			[...latest],
+			[
+				['public_bodies', { name: '20261020_public_bodies.geojson', size: 2, dataDate: '2026-10-20' }],
+				['energy', { name: '20261020_energy.geojson', size: 4, dataDate: '2026-10-20' }]
+			]
+		);
 	});
 
 	test('take their date from a form, or from the start of the file name', () => {

@@ -13,7 +13,8 @@
     "seed-prod": "npm run generate && node src/seed/seed-prod.ts",
     "import": "npm run generate && node src/seed/import-cli.ts",
     "import-from-blob": "npm run generate && node src/seed/import-from-blob.ts",
-    "promote-reference-data": "npm run generate && node src/seed/promote-reference-data.ts"
+    "promote-reference-data": "npm run generate && node src/seed/promote-reference-data.ts",
+    "load-reference-data": "npm run generate && node src/seed/load-reference-data.ts"
   },
   "license": "MIT",
   "dependencies": {
