@@ -47,7 +47,10 @@ COPY --chown=node:node config ./config
 # and the viewport aria-controls patch (see scripts/patch-im-aria-controls.ts)
 # are never applied. The app serves Defra's vendored bundles straight from
 # node_modules (see src/app/maps/vendor.ts), so both patches must be applied
-# here or the deployed image ships the vulnerable/broken bundles.
+# here or the deployed image ships the vulnerable/broken bundles. The same goes
+# for any future deps:patch-* script: wiring it only into the root postinstall
+# fixes local installs and CI but never reaches this image - it must be added
+# to the RUN below by name.
 RUN npm ci --loglevel notice --workspace=identify-consultees-manage --ignore-scripts
 RUN npm run deps:patch-maplibre && npm run deps:patch-im-aria-controls
 
