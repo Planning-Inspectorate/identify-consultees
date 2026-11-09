@@ -115,6 +115,15 @@ describe('manage router wiring', () => {
 		const footer = response.text.slice(response.text.indexOf('<footer'));
 		assert.doesNotMatch(footer, /href="\/help"/);
 		assert.doesNotMatch(footer, /href="\/contact"/);
+		// the accessibility statement stays routed but its link is hidden (CSS)
+		// until its content has had a proper audit
+		assert.match(
+			footer,
+			new RegExp(
+				`govuk-footer__inline-list-item pins-footer__item--hidden">\\s*<a[^>]*href="${escapeRegExp('/accessibility-statement')}"`
+			)
+		);
+		assert.equal(footer.match(/pins-footer__item--hidden/g)?.length, 1);
 		for (const [text, href] of [
 			['Terms and conditions', '/terms-and-conditions'],
 			['Accessibility statement', '/accessibility-statement'],
