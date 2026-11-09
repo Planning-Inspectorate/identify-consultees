@@ -2,8 +2,9 @@
 # installs whatever this file resolves to (see .azure/pipelines/build.yml), so
 # unpinned deps would pull whatever happened to be latest at deploy time.
 # azure-functions 2.x requires Python >=3.13; the Function App runtime is 3.12 and CI
-# lint/test uses the agent's system Python 3.10, so we stay on the latest 1.x release.
-azure-functions==1.25.0
+# lint/test uses the agent's system Python 3.10, so this cannot install until the
+# runtime and CI move to 3.13+ - blocked pending the Python upgrade.
+azure-functions==2.3.0
 pymssql==2.4.2
 # CBOS (the IDAS back office) is reached as the app's managed identity - see cbos/. mssql-python
 # bundles its own ODBC driver and accepts an azure-identity credential, which pymssql can't.
