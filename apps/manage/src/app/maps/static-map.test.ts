@@ -384,11 +384,13 @@ describe('static-map helpers', () => {
 	describe('fetchBasemapTiles', () => {
 		// a small London map, at a zoom OS has
 		const LONDON_MAP = { center: [-0.1276, 51.5072] as const, zoom: 14, width: 128, height: 128 };
-		const fetchingFrom = (respond: (url: string) => Response) => {
+		// each request's host, compared whole - never a substring of the URL
+		const fetchingFrom = (respond: (host: string) => Response) => {
 			const hosts: string[] = [];
 			globalThis.fetch = async (url) => {
-				hosts.push(new URL(String(url)).hostname);
-				return respond(String(url));
+				const { hostname } = new URL(String(url));
+				hosts.push(hostname);
+				return respond(hostname);
 			};
 			return hosts;
 		};
@@ -411,13 +413,13 @@ describe('static-map helpers', () => {
 		test("draws on OpenStreetMap's when OS misses a tile - never half on each", async () => {
 			clearOsmTileCacheForTests();
 			let osTiles = 0;
-			const hosts = fetchingFrom((url) =>
-				url.includes('api.os.uk') && ++osTiles > 1 ? new Response('no', { status: 503 }) : png()
+			const hosts = fetchingFrom((host) =>
+				host === 'api.os.uk' && ++osTiles > 1 ? new Response('no', { status: 503 }) : png()
 			);
 			const basemap = await fetchBasemapTiles(LONDON_MAP, 'os-key');
 			assert.equal(basemap.provider, 'osm');
 			assert.ok(basemap.tiles.length >= 2);
-			assert.ok(hosts.includes('tile.openstreetmap.org'));
+			assert.ok(hosts.some((host) => host === 'tile.openstreetmap.org'));
 		});
 
 		test("draws on OpenStreetMap's without a key, or where OS doesn't cover the map", async () => {
