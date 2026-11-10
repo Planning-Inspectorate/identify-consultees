@@ -11,9 +11,7 @@ locals {
   short_resource_suffix = var.environment == "training" ? "consultees-${local.environment}" : local.resource_suffix
 
   secrets = [
-    "consultees-client-secret",
-    # the OS Data Hub project's key, with the OS Maps API - the maps' basemap (see os-maps.ts)
-    "consultees-os-maps-api-key"
+    "consultees-client-secret"
   ]
 
   # expiry stamped on terraform-generated Key Vault secrets so they carry a rotation date.

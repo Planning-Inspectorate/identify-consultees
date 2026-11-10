@@ -65,9 +65,9 @@ module "app_web" {
     MANAGED_REDIS_URL = local.managed_redis_url
     SESSION_SECRET    = local.key_vault_refs["session-secret-web"]
 
-    # maps: OS's basemap - a placeholder until the secret is filled in, when the maps stay on
-    # OpenStreetMap (see apps/manage/src/app/maps/os-maps.ts)
-    OS_MAPS_API_KEY   = local.key_vault_refs["consultees-os-maps-api-key"]
+    # maps: OS's basemap, from the Key Vault secret below - none while there's no key, when the
+    # maps stay on OpenStreetMap (see apps/manage/src/app/maps/os-maps.ts)
+    OS_MAPS_API_KEY   = local.os_maps_api_key_set ? "@Microsoft.KeyVault(SecretUri=${azurerm_key_vault_secret.os_maps_api_key[0].versionless_id})" : ""
     OS_LICENCE_NUMBER = var.os_licence_number
 
     #storage
@@ -151,4 +151,24 @@ resource "azurerm_managed_redis_access_policy_assignment" "manage" {
 resource "azurerm_managed_redis_access_policy_assignment" "manage_staging" {
   managed_redis_id = azurerm_managed_redis.cache.id
   object_id        = module.app_web.staging_principal_id
+}
+
+# The OS Maps API key - one OS Data Hub key for every environment, held once in Azure DevOps (the
+# consultees-os-maps variable group's OS_MAPS_API_KEY) and passed in by Infrastructure CD as
+# TF_VAR_os_maps_api_key (see infrastructure/pipelines/terraform-cd.yaml). No secret while it's
+# unset - or left as the pipeline's literal $(OS_MAPS_API_KEY), when the group doesn't have it
+locals {
+  os_maps_api_key_set = nonsensitive(var.os_maps_api_key != "" && !startswith(var.os_maps_api_key, "$("))
+}
+
+resource "azurerm_key_vault_secret" "os_maps_api_key" {
+  count = local.os_maps_api_key_set ? 1 : 0
+
+  key_vault_id    = azurerm_key_vault.main.id
+  name            = "${local.service_name}-os-maps-api-key"
+  value           = var.os_maps_api_key
+  content_type    = "api-key"
+  expiration_date = local.secret_expiration_date
+
+  tags = local.tags
 }

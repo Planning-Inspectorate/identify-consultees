@@ -1,8 +1,9 @@
 /**
  * The maps' basemap from Ordnance Survey's OS Maps API: its Light style, in Web Mercator (Light_3857),
  * so it fits the interactive maps (MapLibre) and the static ones (see static-map.ts) as OpenStreetMap
- * does. Needs OS_MAPS_API_KEY - the environment's Key Vault secret consultees-os-maps-api-key, from
- * an OS Data Hub project with the OS Maps API. Without it every map stays on OpenStreetMap.
+ * does. Needs OS_MAPS_API_KEY - the environment's Key Vault secret consultees-os-maps-api-key, an
+ * OS Data Hub key with the OS Maps API, set once for every environment (see kt-docs/runbook.md).
+ * Without it every map stays on OpenStreetMap.
  *
  * The key never reaches the browser: the interactive maps fetch their tiles from this app
  * (/maps/os/tiles/{z}/{x}/{y}.png, behind sign-in), which fetches them from OS with the key in a
