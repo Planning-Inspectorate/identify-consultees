@@ -1,7 +1,7 @@
 import type { ConsulteeMatch, Ruleset } from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
 import assert from 'node:assert';
 import { describe, it } from 'node:test';
-import { reportCategories, rulesetCategories } from './categories.ts';
+import { categoryDisplayName, reportCategories, rulesetCategories } from './categories.ts';
 
 const ruleset: Ruleset = {
 	id: 'test',
@@ -34,6 +34,14 @@ function match(consulteeCategory: string | null): ConsulteeMatch {
 }
 
 describe('report categories', () => {
+	it('spells out NSIPs wherever a page names the category - every other is its own name', () => {
+		assert.strictEqual(categoryDisplayName('NSIPs'), 'National infrastructure projects');
+		assert.strictEqual(
+			categoryDisplayName('Parish, town and community councils'),
+			'Parish, town and community councils'
+		);
+	});
+
 	it("lists the ruleset's categories once each, in rule order", () => {
 		assert.deepStrictEqual(rulesetCategories(ruleset), ['Parish, town and community councils', 'Railways']);
 	});

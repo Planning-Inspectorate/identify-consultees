@@ -7,6 +7,7 @@ import { describeReasons } from '../../../reasons.ts';
 import { resolveCase, resolveCaseSummary } from '../../../resolve-case.ts';
 import type { RulesetRunStore } from '../../../run-ruleset.ts';
 import { firstQueryValue, requestedRuleset, runRulesetSafely } from '../../../run-ruleset.ts';
+import { categoryDisplayName } from '../../categories.ts';
 import { addedConsulteeReason, consulteeName } from '../../report-consultees.ts';
 import type { ConsulteeSelection, RemovalTarget } from '../../urls.ts';
 import { consulteeSelection, consulteesUrl, excludedMatchIds, removeConsulteeUrl } from '../../urls.ts';
@@ -128,7 +129,7 @@ function viewModel(context: RemoveConsulteeContext, reasonValue = '', reasonErro
 	);
 	return {
 		pageHeading: 'Remove consultee',
-		pageCaption: context.category,
+		pageCaption: categoryDisplayName(context.category),
 		backLinkUrl: consulteesUrl(context.caseId, context.ruleset.id, context.category, context.selection),
 		formAction: selfUrl,
 		name: context.name,

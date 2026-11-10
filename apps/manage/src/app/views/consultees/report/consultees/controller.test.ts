@@ -643,7 +643,8 @@ describe('report consultees change page', () => {
 		assert.strictEqual(lookedFor.status.mock.callCount(), 0);
 		const [view, viewModel] = lookedFor.render.mock.calls[0].arguments as unknown as [string, { pageHeading: string }];
 		assert.strictEqual(view, 'views/consultees/report/consultees/view.njk');
-		assert.strictEqual(viewModel.pageHeading, 'NSIPs');
+		// the heading spells NSIPs out, as the check page does
+		assert.strictEqual(viewModel.pageHeading, 'National infrastructure projects');
 
 		const notLookedFor = { status: mock.fn(() => notLookedFor), render: mock.fn() };
 		await handlerFor(dbReturning([[realProjectRow()]]))(nearbyNsips, notLookedFor);

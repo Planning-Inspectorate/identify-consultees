@@ -5,7 +5,7 @@ import type { AsyncRequestHandler } from '@planning-inspectorate/core/util';
 import { NEARBY_NSIPS } from '../nearby-nsips.ts';
 import { resolveCase } from '../resolve-case.ts';
 import { firstQueryValue, requestedRuleset, runRulesetSafely } from '../run-ruleset.ts';
-import { reportCategories } from './categories.ts';
+import { categoryDisplayName, reportCategories } from './categories.ts';
 import { buildReportZip, formatFileSize, rememberedReportZip, rememberReportZip } from './export/report-zip.ts';
 import { GROUP_TABS, tabForCategory } from './export/workbook.ts';
 import { consulteeName } from './report-consultees.ts';
@@ -40,11 +40,9 @@ import type {
  * content - including covered categories that matched nothing, so the list reads as the
  * ruleset's full coverage. Excluded consultees (removed on a category's Change page) don't
  * appear and hand-added ones do. Groups with no categories at all are left out.
+ * "NSIPs" is spelled out (see categories.ts's categoryDisplayName) - the group heading, and
+ * its row label inside that card.
  */
-/** "NSIPs" spelled out - the check page's group heading, and its row label inside that card. */
-const GROUP_HEADINGS: Record<string, string> = {
-	[NEARBY_NSIPS]: 'National infrastructure projects'
-};
 
 export function groupedConsultees(
 	ruleset: Ruleset,
@@ -66,7 +64,7 @@ export function groupedConsultees(
 		names.set(add.category, [...(names.get(add.category) ?? []), add.name]);
 	}
 	const row = (category: string): IdentifiedConsultee => ({
-		name: GROUP_HEADINGS[category] ?? category,
+		name: categoryDisplayName(category),
 		names: names.get(category) ?? [],
 		changeUrl: consulteesUrl(caseId, ruleset.id, category, selection)
 	});
@@ -80,7 +78,7 @@ export function groupedConsultees(
 		byGroup.set(group, [...(byGroup.get(group) ?? []), row(category)]);
 	}
 	return [NEARBY_NSIPS, ...GROUP_TABS.filter((tab) => tab !== NEARBY_NSIPS)]
-		.map((tab) => ({ name: GROUP_HEADINGS[tab] ?? tab, consultees: byGroup.get(tab) ?? [] }))
+		.map((tab) => ({ name: categoryDisplayName(tab), consultees: byGroup.get(tab) ?? [] }))
 		.filter((group) => group.consultees.length > 0);
 }
 
