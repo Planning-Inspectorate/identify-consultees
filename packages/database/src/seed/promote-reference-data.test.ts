@@ -1,9 +1,11 @@
 import { BlobServiceClient } from '@azure/storage-blob';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+import { Readable } from 'node:stream';
 import { afterEach, beforeEach, describe, mock, test } from 'node:test';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import type { StoredBlob } from './import-from-blob.ts';
@@ -177,9 +179,14 @@ describe('run', () => {
 });
 
 describe('blobFileStore', () => {
-	// a stand-in container client lets the download/upload paths run without real blob storage
-	function stubContainer(blob: { exists: boolean; contentLength?: number }) {
-		const uploaded: string[] = [];
+	const md5 = (text: string) => createHash('md5').update(text).digest();
+
+	// a stand-in container client lets the download/upload paths run without real blob storage. The
+	// blob there holds `content`, uploaded with its MD5 recorded or not
+	function stubContainer(blob: { exists: boolean; content?: string; md5Recorded?: boolean }) {
+		const uploads: { filePath: string; contentMD5: Uint8Array | undefined }[] = [];
+		const downloads = { count: 0 };
+		const content = blob.content ?? '';
 		const getContainerClient = mock.method(BlobServiceClient.prototype, 'getContainerClient', () => ({
 			containerName: 'test-container',
 			getBlobClient: () => ({
@@ -190,15 +197,38 @@ describe('blobFileStore', () => {
 			},
 			getBlockBlobClient: () => ({
 				exists: async () => blob.exists,
-				getProperties: async () => ({ contentLength: blob.contentLength ?? 0 }),
-				uploadFile: async () => uploaded.push('file')
+				getProperties: async () => ({
+					contentLength: Buffer.byteLength(content),
+					contentMD5: blob.md5Recorded ? new Uint8Array(md5(content)) : undefined
+				}),
+				download: async () => {
+					downloads.count++;
+					return { readableStreamBody: Readable.from([Buffer.from(content)]) };
+				},
+				uploadFile: async (filePath: string, options: { blobHTTPHeaders?: { blobContentMD5?: Uint8Array } } = {}) =>
+					uploads.push({ filePath, contentMD5: options.blobHTTPHeaders?.blobContentMD5 })
 			})
 		}));
-		return { getContainerClient, uploaded };
+		return { getContainerClient, uploads, downloads };
 	}
 
-	test('downloads a blob and uploads a file that is not there yet', async () => {
-		const { getContainerClient, uploaded } = stubContainer({ exists: false });
+	async function uploadTo(blob: Parameters<typeof stubContainer>[0], fileContent = 'data') {
+		const filePath = path.join(dir, 'b.geojson');
+		writeFileSync(filePath, fileContent);
+		const stub = stubContainer(blob);
+		try {
+			let outcome: string | undefined;
+			await withBlobEnv(BLOB_ENV.BLOB_STORE_HOST, BLOB_ENV.BLOB_STORE_CONTAINER, async () => {
+				outcome = await blobFileStore().upload(filePath, 'b.geojson');
+			});
+			return { outcome, uploads: stub.uploads, downloads: stub.downloads.count };
+		} finally {
+			stub.getContainerClient.mock.restore();
+		}
+	}
+
+	test('downloads a blob and uploads a file that is not there yet, recording its MD5', async () => {
+		const { getContainerClient, uploads } = stubContainer({ exists: false });
 		try {
 			await withBlobEnv(BLOB_ENV.BLOB_STORE_HOST, BLOB_ENV.BLOB_STORE_CONTAINER, async () => {
 				const store = blobFileStore();
@@ -209,34 +239,41 @@ describe('blobFileStore', () => {
 
 				writeFileSync(target, 'data');
 				assert.equal(await store.upload(target, 'a.geojson'), 'uploaded');
-				assert.equal(uploaded.length, 1);
+				assert.deepEqual(uploads, [{ filePath: target, contentMD5: md5('data') }]);
 			});
 		} finally {
 			getContainerClient.mock.restore();
 		}
 	});
 
-	test('leaves the same file already in the container alone, and replaces a different one', async () => {
-		const filePath = path.join(dir, 'b.geojson');
-		writeFileSync(filePath, 'data');
+	test('leaves a blob with the same contents alone, by its recorded MD5 or else its bytes', async () => {
+		assert.deepEqual(await uploadTo({ exists: true, content: 'data', md5Recorded: true }), {
+			outcome: 'unchanged',
+			uploads: [],
+			downloads: 0
+		});
+		// uploaded by the admin page, without an MD5
+		assert.deepEqual(await uploadTo({ exists: true, content: 'data' }), {
+			outcome: 'unchanged',
+			uploads: [],
+			downloads: 1
+		});
+	});
 
-		const same = stubContainer({ exists: true, contentLength: 4 });
-		try {
-			await withBlobEnv(BLOB_ENV.BLOB_STORE_HOST, BLOB_ENV.BLOB_STORE_CONTAINER, async () => {
-				assert.equal(await blobFileStore().upload(filePath, 'b.geojson'), 'unchanged');
-			});
-		} finally {
-			same.getContainerClient.mock.restore();
-		}
-
-		const different = stubContainer({ exists: true, contentLength: 999 });
-		try {
-			await withBlobEnv(BLOB_ENV.BLOB_STORE_HOST, BLOB_ENV.BLOB_STORE_CONTAINER, async () => {
-				assert.equal(await blobFileStore().upload(filePath, 'b.geojson'), 'replaced');
-			});
-			assert.equal(different.uploaded.length, 1);
-		} finally {
-			different.getContainerClient.mock.restore();
+	test('replaces a blob with different contents, even one of the same size', async () => {
+		for (const blob of [
+			{ exists: true, content: 'atad', md5Recorded: true },
+			{ exists: true, content: 'atad' },
+			{ exists: true, content: 'longer data' }
+		]) {
+			const { outcome, uploads, downloads } = await uploadTo(blob);
+			assert.equal(outcome, 'replaced');
+			assert.deepEqual(
+				uploads.map((upload) => upload.contentMD5),
+				[md5('data')]
+			);
+			// a different size needs no download to tell
+			assert.equal(downloads, blob.md5Recorded || blob.content.length !== 4 ? 0 : 1);
 		}
 	});
 });
