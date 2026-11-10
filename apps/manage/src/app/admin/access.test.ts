@@ -1,7 +1,7 @@
 import { mockLogger } from '@planning-inspectorate/core/testing';
 import assert from 'node:assert';
 import { describe, it, mock } from 'node:test';
-import { buildAdminHeaderLink, buildAssertAdminAccess, canUseAdmin } from './access.ts';
+import { buildAssertAdminAccess, canUseAdmin } from './access.ts';
 
 const ADMIN_GROUP = 'admin-group-id';
 
@@ -45,17 +45,5 @@ describe('admin access', () => {
 
 		guard({ session: sessionIn(ADMIN_GROUP), originalUrl: '/admin' } as never, res as never, next);
 		assert.strictEqual(next.mock.callCount(), 1);
-	});
-
-	it("shows the header's Admin link only to those who may use it, marked on its pages", () => {
-		const link = (session: never, path: string) => {
-			const res = { locals: {} as Record<string, unknown> };
-			buildAdminHeaderLink(service())({ session, path } as never, res as never, () => {});
-			return res.locals.adminLink;
-		};
-		assert.deepStrictEqual(link(sessionIn(ADMIN_GROUP), '/admin/database'), { href: '/admin', active: true });
-		assert.deepStrictEqual(link(sessionIn(ADMIN_GROUP), '/admin'), { href: '/admin', active: true });
-		assert.deepStrictEqual(link(sessionIn(ADMIN_GROUP), '/'), { href: '/admin', active: false });
-		assert.strictEqual(link(sessionIn('app-group-id'), '/'), undefined);
 	});
 });

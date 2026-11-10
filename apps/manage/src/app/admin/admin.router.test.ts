@@ -58,20 +58,26 @@ describe('admin section', () => {
 		await service.db.$disconnect().catch(() => undefined);
 	});
 
-	test('GET /admin lists the admin pages, with the menu and the header link marked', async () => {
+	test('GET /admin lists the admin pages, with the menu marked', async () => {
 		const response = await request(app).get('/admin');
 		assert.equal(response.status, 200);
 		assert.match(response.text, /<h1 class="govuk-heading-l">Admin<\/h1>/);
 		assert.match(response.text, /href="\/admin" aria-current="page">Overview<\/a>/);
-		assert.match(response.text, /<a class="govuk-service-navigation__link" href="\/admin" aria-current="true">/);
 		for (const page of ['/admin/database', '/admin/upload-to-blob', '/admin/import-reference-data']) {
 			assert.match(response.text, new RegExp(`<h2[^>]*><a class="govuk-link" href="${page}">`));
 		}
 	});
 
-	test('the header links to the admin section from any page, without marking it there', async () => {
-		const response = await request(app).get('/');
-		assert.match(response.text, /<a class="govuk-service-navigation__link" href="\/admin">\s*Admin/);
+	test("the header has only Home and Sign out - the admin section isn't linked from it", async () => {
+		for (const page of ['/', '/admin']) {
+			const response = await request(app).get(page);
+			const links = [...response.text.matchAll(/class="govuk-service-navigation__link" href="([^"]+)"/g)];
+			assert.deepEqual(
+				links.map((link) => link[1]),
+				['/', '/auth/signout'],
+				page
+			);
+		}
 	});
 
 	test('GET /admin/database counts the tables and the consultee areas by category', async () => {
