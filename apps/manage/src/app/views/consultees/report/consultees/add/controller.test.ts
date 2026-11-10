@@ -4,7 +4,11 @@ import { describe, it, mock } from 'node:test';
 import { configureNunjucks } from '../../../../../nunjucks.ts';
 import { failingRulesetRunner, rulesetRunnerReturning } from '../../../../../testing/ruleset-runner-stub.ts';
 import { consulteesUrl } from '../../urls.ts';
-import { buildReportConsulteeAddPage, buildReportConsulteeAddSubmit } from './controller.ts';
+import {
+	buildReportConsulteeAddPage,
+	buildReportConsulteeAddSubmit,
+	buildReportConsulteeAddSuggestions
+} from './controller.ts';
 
 // a selection entry as the app's URLs carry it - base64url-encoded JSON (see urls.ts's ENCODED_JSON)
 const urlParam = (json: string) => Buffer.from(json).toString('base64url');
@@ -164,6 +168,33 @@ function dbReturning(rows: unknown[][], otherCases: unknown[] = OTHER_CASES) {
 					authority: 'authority' in row ? row.authority : null
 				}));
 			}
+			// which names the reference data has more than once
+			if (text.includes('HAVING COUNT')) {
+				const [category, ...names] = (values as unknown[]).flatMap((value) =>
+					value && typeof value === 'object' && 'values' in value ? (value as { values: unknown[] }).values : [value]
+				) as string[];
+				return names
+					.filter(
+						(name) =>
+							STORED.filter((row) => row.consulteeCategory === category && row.consultee.toLowerCase() === name)
+								.length > 1
+					)
+					.map((name) => ({ name }));
+			}
+			// the names starting with what's typed - those called exactly that first
+			if (text.includes(' LIKE ')) {
+				// the limit and the site come first
+				const [category, , typed] = (values as string[]).slice(-3);
+				return STORED.filter(
+					(row) => row.consulteeCategory === category && row.consultee.toLowerCase().startsWith(typed.toLowerCase())
+				)
+					.sort(
+						(a, b) =>
+							Number(b.consultee.toLowerCase() === typed.toLowerCase()) -
+							Number(a.consultee.toLowerCase() === typed.toLowerCase())
+					)
+					.map(({ id, consultee, distanceMetres, region }) => ({ id, consultee, distanceMetres, region }));
+			}
 			if (text.includes('LOWER(consultee)')) {
 				const [category, name] = (values as string[]).slice(-2);
 				return STORED.filter(
@@ -296,7 +327,7 @@ describe('add a consultee page', () => {
 			{ name: 'Barton (Bedford)', hint: '4.0 km from the site, East of England' },
 			{ name: 'Christleton', hint: '7.3 km from the site' }
 		]);
-		assert.match(viewModelOf(res).nameHint.text, /find consultees local to the site/);
+		assert.match(viewModelOf(res).nameHint.text, /those near the site come first/);
 	});
 
 	it('adds a removed consultee back by undoing its removal - as the ruleset found it, not added by hand', async () => {
@@ -544,7 +575,7 @@ describe('add a consultee page', () => {
 		assert.strictEqual(res.status.mock.calls[0].arguments[0], 404);
 	});
 
-	it('renders no datalist or hint for a consultee category with nothing nearby to suggest', async () => {
+	it('still offers suggestions as a name is typed for a consultee category with nothing nearby', async () => {
 		const res = rendering();
 		await buildReportConsulteeAddPage(service(rulesetRunnerReturning([parishMatchRow()])) as never)(
 			{ params: { caseId: realProjectId }, query: parishQuery } as never,
@@ -552,10 +583,13 @@ describe('add a consultee page', () => {
 		);
 
 		assert.deepStrictEqual(viewModelOf(res).nearbySuggestions, []);
-		assert.strictEqual(viewModelOf(res).nameHint, undefined);
+		assert.match(viewModelOf(res).nameHint.text, /Start typing/);
 		const html = res.render.mock.calls[0].result as string;
-		assert.match(html, /<input[^>]*name="name"/);
-		assert.doesNotMatch(html, /datalist|data-consultee-autocomplete|Start typing/);
+		assert.match(html, /<input[^>]*name="name"[^>]*data-consultee-autocomplete/);
+		assert.match(
+			html,
+			new RegExp(`data-suggestions-url="/consultees/${realProjectId}/report/consultees/add/suggestions\\?ruleset=`)
+		);
 	});
 
 	it('suggests the other cases on the Nearby NSIPs page, nearest first, less any already listed', async () => {
@@ -667,5 +701,52 @@ describe('add a consultee page', () => {
 
 		assert.strictEqual(res.redirect.mock.callCount(), 0);
 		assert.strictEqual(viewModelOf(res).addForm.nameError.text, 'Consultee not found');
+	});
+});
+
+describe('add a consultee suggestions, as a name is typed', () => {
+	const suggest = async (query: Record<string, unknown>, svc: unknown = service()) => {
+		const res = { json: mock.fn(), status: mock.fn(() => res), render: mock.fn() };
+		await buildReportConsulteeAddSuggestions(svc as never)(
+			{ params: { caseId: realProjectId }, query } as never,
+			res as never
+		);
+		return res;
+	};
+	const suggested = (res: Awaited<ReturnType<typeof suggest>>) => res.json.mock.calls[0].arguments[0];
+
+	it('suggests every consultee of the category whose name starts with what is typed, telling apart those that share it', async () => {
+		// none near the site - before, these were only offered after submitting "Middleton"
+		assert.deepStrictEqual(suggested(await suggest({ ...parishQuery, q: ' middle ' })), [
+			{ name: 'Middleton (Lancaster)', hint: '40.0 km from the site, North West' },
+			{ name: 'Middleton (North Yorkshire, 40.0 km from the site)', hint: 'Yorkshire and The Humber' },
+			{ name: 'Middleton (North Yorkshire, 95.0 km from the site)', hint: 'Yorkshire and The Humber' }
+		]);
+	});
+
+	it('leaves out one already listed, and says which were removed', async () => {
+		const added = JSON.stringify({ i: nearbyId, c: 'Parish, town and community councils', n: 'Barton', r: 'r' });
+		const removal = JSON.stringify({
+			i: fartherNearbyId,
+			c: 'Parish, town and community councils',
+			n: 'Barton',
+			r: 'r'
+		});
+		// the one left is still told apart from the listed Barton
+		assert.deepStrictEqual(suggested(await suggest({ ...parishQuery, q: 'Barton', add: added, exclude: removal })), [
+			{ name: 'Barton (Bedford)', hint: '4.0 km from the site, East of England, removed' }
+		]);
+	});
+
+	it('suggests nothing for fewer than three letters, or on the Nearby NSIPs page', async () => {
+		assert.deepStrictEqual(suggested(await suggest({ ...parishQuery, q: 'mi' })), []);
+		assert.deepStrictEqual(suggested(await suggest({ ...parishQuery })), []);
+		assert.deepStrictEqual(suggested(await suggest({ ...nsipQuery, q: 'Undated' }, nsipService())), []);
+	});
+
+	it("is a 404 page for a category the ruleset doesn't cover, as the add page is", async () => {
+		const res = await suggest({ ...parishQuery, category: 'Not A Category', q: 'Middle' });
+		assert.strictEqual(res.json.mock.callCount(), 0);
+		assert.deepStrictEqual(res.status.mock.calls[0]?.arguments, [404]);
 	});
 });

@@ -1,11 +1,18 @@
+import type { PrismaClient } from '@pins/identify-consultees-database/src/client/client.ts';
 import type { ConsulteeAreaDetail } from '@pins/identify-consultees-database/src/geospatial/consultee-areas.ts';
+import {
+	consulteeAreaDetails,
+	sharedConsulteeNames
+} from '@pins/identify-consultees-database/src/geospatial/consultee-areas.ts';
 
 /**
  * Names for consultees that share one. Many do - 575 parish names are shared, 12 parishes are
  * called Middleton - so where a list or a suggestion would show the same name twice, each reads with
  * what tells it apart: a parish its council area, "Middleton (Lancaster)"; a generator its operator
  * and technology; anything else its region, or its subcategory. One that still reads like another -
- * two Middletons in North Yorkshire - adds its distance from the site.
+ * two Middletons in North Yorkshire - adds its distance from the site. A name the reference data
+ * has more than once reads that way even when the list has it only once, so one Newton added on
+ * its own still says which Newton it is.
  */
 
 /** A consultee as a list names it. */
@@ -109,4 +116,43 @@ export function labelVariants(item: Labelled, detail: string | undefined): strin
 /** A label's name, without its last bracket - "Middleton (Lancaster)" → "Middleton" - or none. */
 export function nameBeforeLabel(typed: string): string | undefined {
 	return /^(.*\S) \([^()]*\)$/.exec(typed)?.[1];
+}
+
+/**
+ * Each item's label (distinguishedLabels), and which items share their name: with another item, one
+ * of `alsoNamed`, or another consultee of the category in the reference data. What tells them apart
+ * is looked up only for those. Nearby NSIPs (`isConsulteeCategory` false) are other cases, named
+ * with their case reference already.
+ */
+export async function labelsWithReferenceData(
+	dbClient: PrismaClient,
+	category: string,
+	isConsulteeCategory: boolean,
+	items: Labelled[],
+	alsoNamed: readonly string[] = []
+): Promise<{ labels: Map<string, string>; sharing: Set<string> }> {
+	const elsewhere = isConsulteeCategory
+		? [
+				...(await sharedConsulteeNames(
+					dbClient,
+					category,
+					items.map((item) => item.name)
+				))
+			]
+		: [];
+	const names = [...items, ...alsoNamed.map((name) => ({ name })), ...elsewhere.map((name) => ({ name }))].map(
+		({ name }) => comparableName(name)
+	);
+	const sharing = items.filter((item) => names.filter((name) => name === comparableName(item.name)).length > 1);
+	const details =
+		sharing.length > 0 && isConsulteeCategory
+			? await consulteeAreaDetails(
+					dbClient,
+					sharing.map(({ id }) => id)
+				)
+			: new Map<string, ConsulteeAreaDetail>();
+	return {
+		labels: distinguishedLabels(items, category, details, [...alsoNamed, ...elsewhere]),
+		sharing: new Set(sharing.map(({ id }) => id))
+	};
 }
