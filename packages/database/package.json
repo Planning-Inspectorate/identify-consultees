@@ -10,7 +10,6 @@
     "migrate-prod": "npx prisma migrate deploy",
     "generate": "npx prisma generate",
     "seed": "npm run generate && npx prisma db seed",
-    "seed-prod": "npm run generate && node src/seed/seed-prod.ts",
     "import": "npm run generate && node src/seed/import-cli.ts",
     "import-from-blob": "npm run generate && node src/seed/import-from-blob.ts",
     "promote-reference-data": "npm run generate && node src/seed/promote-reference-data.ts",

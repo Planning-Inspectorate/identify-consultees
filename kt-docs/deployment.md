@@ -26,7 +26,6 @@ Azure DevOps project [identify-consultees](https://dev.azure.com/planninginspect
 | Deploy                   | `deploy.yml`                                                       | After Build: migrate, deploy to the staging slot, swap. Dev, then Test, Training and Prod in turn                                 |
 | Rollback                 | `rollback.yml`                                                     | By hand                                                                                                                           |
 | Infrastructure CI and CD | `infrastructure/pipelines/terraform-ci*.yaml`, `terraform-cd.yaml` | Plan on PR; plan and apply per environment on merge                                                                               |
-| DB Seed                  | `db-seed.yml`                                                      | By hand: sample data, or the full reference data                                                                                  |
 | Promote reference data   | `promote-reference-data.yml`                                       | By hand: copies each group's newest file Test to Training, or Training to Prod (Prod's approval gates it), then loads them there  |
 | Load reference data      | `load-reference-data.yml`                                          | By hand: loads an environment's reference data files into its database, or empties a quarter's dataset (Prod's approval gates it) |
 
@@ -48,19 +47,6 @@ job:
   `deployWeb=false` and `schemaMigration=true` (the default). Its `Migrate` and `Deploy Web` jobs
   are siblings, not dependent on each other, so this applies `npm run migrate-prod` to the target
   environment's real database without touching the running app or its slots at all.
-- **Data operations**: `.azure/pipelines/db-seed.yml` (`trigger: none`, manually run via
-  `az pipelines run` or the Azure DevOps UI, parameterised by `environment`) is a fully separate
-  pipeline for loading data. Its default is the small built-in sample dataset
-  (`npm run seed`/`seed-prod`); passing `loadFullReferenceData=true` (Dev/Test/Training only)
-  instead runs `npm run import-from-blob` for the two known reference-data blobs
-  (`combined_reference_data_v1.geojson`, `all-project-boundaries.geojson`) in the app's storage
-  container (`infrastructure/storage.tf`). Imports merge by id and never delete, so add
-  `replaceExistingData=true` to clear each table first when the source's ids or areas changed -
-  otherwise old rows stay as stale or duplicate consultees. Each table is cleared only once its
-  blob has downloaded and parsed with features. The pipeline reads the blobs as its own identity,
-  which has Storage Blob Data Contributor on Test's, Training's and Prod's storage accounts, granted
-  by hand (Terraform can't: the pipeline identity's role-assignment rights carry an ABAC condition
-  that refuses it). Dev's has none, so this route fails there with 403 - use the in-app import.
 - **Promoting the reference data**: `.azure/pipelines/promote-reference-data.yml` (`trigger: none`,
   parameterised by `route` - Test to Training, or Training to Prod - and `load`) copies each
   group's newest file from the source's blob storage to the target's, then, with `load`, loads

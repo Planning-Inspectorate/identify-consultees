@@ -22,7 +22,6 @@
     "db-migrate-prod": "npm run migrate-prod --workspace @pins/identify-consultees-database",
     "db-generate": "npm run generate --workspace @pins/identify-consultees-database",
     "db-seed": "npm run seed --workspace @pins/identify-consultees-database",
-    "db-seed-prod": "npm run seed-prod --workspace @pins/identify-consultees-database",
     "db-import": "npm run import --workspace @pins/identify-consultees-database --",
     "db-import-from-blob": "npm run import-from-blob --workspace @pins/identify-consultees-database --",
     "deps:patch-maplibre": "node --experimental-strip-types scripts/patch-maplibre-sanitize.ts",
@@ -41,7 +40,7 @@
     "test:e2e": "npm run test:e2e --workspace identify-consultees-manage",
     "test:visual": "npm run test:visual --workspace identify-consultees-manage",
     "test:frontend-coverage": "npm run test:coverage --workspace identify-consultees-manage",
-    "test:packages-coverage": "node --test --experimental-test-coverage --test-coverage-lines=100 --test-coverage-functions=100 --test-coverage-branches=100 --test-coverage-include=\"packages/database/src/**\" --test-coverage-include=\"scripts/**/*.ts\" --test-coverage-exclude=\"**/*.test.*\" --test-coverage-exclude=\"packages/database/src/client/**\" --test-coverage-exclude=\"packages/database/src/seed/data-dev.ts\" --test-coverage-exclude=\"packages/database/src/seed/seed-dev.ts\" --test-coverage-exclude=\"packages/database/src/seed/seed-prod.ts\" \"packages/**/*.test.*\" \"scripts/**/*.test.*\"",
+    "test:packages-coverage": "node --test --experimental-test-coverage --test-coverage-lines=100 --test-coverage-functions=100 --test-coverage-branches=100 --test-coverage-include=\"packages/database/src/**\" --test-coverage-include=\"scripts/**/*.ts\" --test-coverage-exclude=\"**/*.test.*\" --test-coverage-exclude=\"packages/database/src/client/**\" --test-coverage-exclude=\"packages/database/src/seed/data-dev.ts\" --test-coverage-exclude=\"packages/database/src/seed/seed-dev.ts\" \"packages/**/*.test.*\" \"scripts/**/*.test.*\"",
     "test-coverage": "npm run test:packages-coverage && npm run test:e2e --workspace identify-consultees-manage && npm run test:frontend-coverage",
     "playwright:install": "npm run playwright:install --workspace identify-consultees-manage"
   },

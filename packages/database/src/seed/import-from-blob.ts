@@ -2,8 +2,9 @@
  * Load a real GeoJSON file (reference/consultee area data, or project/case boundary data) from
  * the app's own blob storage container into the database - same import logic as import-cli.ts,
  * just fetching the source file from blob storage first. The real, full-size datasets are too
- * large to check into git (tens of MB each), so they're uploaded to blob storage once and loaded
- * from there by this script via db-seed.yml, rather than from a path on the pipeline agent's disk.
+ * large to check into git (tens of MB each), so they're uploaded to blob storage and loaded from
+ * there. Run by hand, signed in with `az login`; the Load and Promote reference data pipelines use
+ * its listBlobs and downloadBlobToTempFile.
  *
  * Usage:
  *   npm run db-import-from-blob -- --type=consultee-areas --blob=combined_reference_data_v1.geojson
