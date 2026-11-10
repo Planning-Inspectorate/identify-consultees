@@ -50,6 +50,8 @@ export type StaticMapFingerprintInput = {
 	basemap?: string;
 	bufferGeojson?: unknown;
 	pixelRatio?: number;
+	/** Whether the basemap is drawn from OS when it covers the map (see os-maps.ts). */
+	osBasemap?: boolean;
 };
 
 export function buildStaticMapFingerprint(input: StaticMapFingerprintInput): string {
@@ -70,7 +72,8 @@ export function buildStaticMapFingerprint(input: StaticMapFingerprintInput): str
 		labels: input.labels,
 		basemap: input.basemap,
 		bufferGeojson: input.bufferGeojson,
-		pixelRatio: input.pixelRatio
+		pixelRatio: input.pixelRatio,
+		osBasemap: input.osBasemap
 	});
 	return createHash('sha256').update(payload).digest('hex');
 }

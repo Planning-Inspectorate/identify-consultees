@@ -9,6 +9,7 @@ import {
 	clearOsmTileCacheForTests,
 	consulteeColours,
 	escapeXml,
+	fetchBasemapTiles,
 	fetchOsmBasemapTiles,
 	googleMapsApiKeyFromEnv,
 	insideRings,
@@ -378,6 +379,74 @@ describe('static-map helpers', () => {
 			googleMapsApiKey: 'test-key'
 		});
 		assert.ok(url);
+	});
+
+	describe('fetchBasemapTiles', () => {
+		// a small London map, at a zoom OS has
+		const LONDON_MAP = { center: [-0.1276, 51.5072] as const, zoom: 14, width: 128, height: 128 };
+		const fetchingFrom = (respond: (url: string) => Response) => {
+			const hosts: string[] = [];
+			globalThis.fetch = async (url) => {
+				hosts.push(new URL(String(url)).hostname);
+				return respond(String(url));
+			};
+			return hosts;
+		};
+		const png = () => new Response(tinyPng, { status: 200 });
+
+		test("draws on OS's tiles when there's a key and OS covers the map", async () => {
+			clearOsmTileCacheForTests();
+			const hosts = fetchingFrom(png);
+			const basemap = await fetchBasemapTiles(LONDON_MAP, 'os-key');
+			assert.equal(basemap.provider, 'os');
+			assert.ok(basemap.tiles.length >= 1);
+			assert.ok(hosts.every((host) => host === 'api.os.uk'));
+
+			// kept apart from OpenStreetMap's in the cache
+			const cached = await fetchBasemapTiles(LONDON_MAP, 'os-key');
+			assert.equal(cached.tiles.length, basemap.tiles.length);
+			assert.equal(hosts.length, basemap.tiles.length);
+		});
+
+		test("draws on OpenStreetMap's when OS misses a tile - never half on each", async () => {
+			clearOsmTileCacheForTests();
+			let osTiles = 0;
+			const hosts = fetchingFrom((url) =>
+				url.includes('api.os.uk') && ++osTiles > 1 ? new Response('no', { status: 503 }) : png()
+			);
+			const basemap = await fetchBasemapTiles(LONDON_MAP, 'os-key');
+			assert.equal(basemap.provider, 'osm');
+			assert.ok(basemap.tiles.length >= 2);
+			assert.ok(hosts.includes('tile.openstreetmap.org'));
+		});
+
+		test("draws on OpenStreetMap's without a key, or where OS doesn't cover the map", async () => {
+			for (const [options, key] of [
+				[LONDON_MAP, undefined],
+				[{ ...LONDON_MAP, center: [2.35, 48.86] as const }, 'os-key'],
+				// offshore, past OS's 1.9°E
+				[{ ...LONDON_MAP, center: [2.1, 52.2] as const, zoom: 10 }, 'os-key'],
+				[{ ...LONDON_MAP, zoom: 5 }, 'os-key']
+			] as const) {
+				clearOsmTileCacheForTests();
+				const hosts = fetchingFrom(png);
+				const basemap = await fetchBasemapTiles(options, key);
+				assert.equal(basemap.provider, 'osm');
+				assert.ok(hosts.every((host) => host === 'tile.openstreetmap.org'));
+			}
+		});
+
+		test('reads the key from OS_MAPS_API_KEY by default', async () => {
+			clearOsmTileCacheForTests();
+			const original = process.env.OS_MAPS_API_KEY;
+			delete process.env.OS_MAPS_API_KEY;
+			try {
+				fetchingFrom(png);
+				assert.equal((await fetchBasemapTiles(LONDON_MAP)).provider, 'osm');
+			} finally {
+				if (original !== undefined) process.env.OS_MAPS_API_KEY = original;
+			}
+		});
 	});
 
 	test('fetchOsmBasemapTiles caches successful responses and skips failures', async () => {

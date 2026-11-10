@@ -82,6 +82,14 @@ describe('report map PDF', () => {
 		assert.equal(lines.filter((line) => /^Project \d \(EN01000\d\)$/.test(line)).length, 5);
 	});
 
+	it('credits OS on a map drawn on its basemap, with its licence under it', async () => {
+		const lines = pdfTextLines(await buildMapPdf(input({ basemap: 'os' })));
+		const credit = `© Crown copyright and database rights ${new Date().getFullYear()} OS`;
+		assert.ok(lines.includes(credit), `missing "${credit}"`);
+		assert.ok(lines.includes(`Basemap ${credit}. Used under the Public Sector Geospatial Agreement.`));
+		assert.ok(!lines.some((line) => line.includes('OpenStreetMap')));
+	});
+
 	it('keys one buffer, and none when the map draws none', async () => {
 		assert.ok(pdfTextLines(await buildMapPdf(input({ buffers: ['500 m'] }))).includes('Ruleset buffer (500 m)'));
 		assert.ok(!pdfTextLines(await buildMapPdf(input({ buffers: [] }))).some((line) => line.startsWith('Ruleset b')));

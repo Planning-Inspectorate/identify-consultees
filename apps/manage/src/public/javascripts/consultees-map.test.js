@@ -2,6 +2,7 @@ import { JSDOM } from 'jsdom';
 import assert from 'node:assert/strict';
 import { afterEach, describe, mock, test } from 'node:test';
 import {
+	basemapOptions,
 	bufferDataset,
 	buildCategorySublayers,
 	buildDatasets,
@@ -563,6 +564,33 @@ describe('consultees-map client helpers', () => {
 		assert.equal(addEventListener.mock.callCount(), 1);
 
 		registerConsulteeMaps(undefined);
+	});
+
+	test("basemapOptions draws on OS's style through the app, within its zooms and area, else OpenFreeMap", () => {
+		globalThis.window = new JSDOM('', { url: 'https://consultees.example.test/consultees/EN010001' }).window;
+		assert.deepEqual(basemapOptions(undefined).mapStyle.url, 'https://tiles.openfreemap.org/styles/liberty');
+		const os = {
+			url: '/maps/os/style.json',
+			attribution: '© Crown copyright and database rights 2026 OS',
+			backgroundColor: '#f5f5f5',
+			minZoom: 6,
+			maxZoom: 19,
+			maxExtent: [-10.7, 49.5, 1.9, 61.3]
+		};
+		assert.deepEqual(basemapOptions(os), {
+			mapStyle: {
+				url: 'https://consultees.example.test/maps/os/style.json',
+				attribution: os.attribution,
+				backgroundColor: os.backgroundColor
+			},
+			minZoom: 6,
+			maxZoom: 19,
+			maxExtent: os.maxExtent
+		});
+		// a basemap without limits sets none
+		assert.deepEqual(Object.keys(basemapOptions({ url: '/style.json', attribution: 'a', backgroundColor: '#fff' })), [
+			'mapStyle'
+		]);
 	});
 
 	test('interactiveZoom counts MapLibre zoom levels, on 512px tiles, from the page config', () => {
