@@ -3,7 +3,11 @@ import { asyncHandler } from '@planning-inspectorate/core/util';
 import type { IRouter } from 'express';
 import { Router as createRouter } from 'express';
 import { buildBoundaryStaticMap, buildBoundarySubmit, buildConsulteeProjectPage } from './project/controller.ts';
-import { buildReportConsulteeAddPage, buildReportConsulteeAddSubmit } from './report/consultees/add/controller.ts';
+import {
+	buildReportConsulteeAddPage,
+	buildReportConsulteeAddSubmit,
+	buildReportConsulteeAddSuggestions
+} from './report/consultees/add/controller.ts';
 import { buildReportConsulteesPage } from './report/consultees/controller.ts';
 import {
 	buildReportConsulteeRemovePage,
@@ -26,6 +30,7 @@ export function createRoutes(service: ManageService): IRouter {
 	const reportConsulteesPage = buildReportConsulteesPage(service);
 	const reportConsulteeAddPage = buildReportConsulteeAddPage(service);
 	const reportConsulteeAddSubmit = buildReportConsulteeAddSubmit(service);
+	const reportConsulteeAddSuggestions = buildReportConsulteeAddSuggestions(service);
 	const reportConsulteeRemovePage = buildReportConsulteeRemovePage(service);
 	const reportConsulteeRemoveSubmit = buildReportConsulteeRemoveSubmit(service);
 	const reportCreatedPage = buildReportCreatedPage(service);
@@ -49,6 +54,8 @@ export function createRoutes(service: ManageService): IRouter {
 	// its "Add a consultee" page - adds a consultee to the category and returns to the Change page
 	router.get('/:caseId/report/consultees/add', asyncHandler(reportConsulteeAddPage));
 	router.post('/:caseId/report/consultees/add', asyncHandler(reportConsulteeAddSubmit));
+	// its suggestions as a name is typed, from the whole of the category's reference data
+	router.get('/:caseId/report/consultees/add/suggestions', asyncHandler(reportConsulteeAddSuggestions));
 	// its "Remove consultee" form - records the removal reason and returns to the Change page
 	router.get('/:caseId/report/consultees/remove', asyncHandler(reportConsulteeRemovePage));
 	router.post('/:caseId/report/consultees/remove', asyncHandler(reportConsulteeRemoveSubmit));

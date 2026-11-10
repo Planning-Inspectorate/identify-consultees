@@ -32,11 +32,12 @@
 		<div class="govuk-grid-column-two-thirds">
 			<form method="post" action="{{ formAction }}" novalidate>
 				<input type="hidden" name="_csrf" value="{{ _csrf }}">
-				{% if nearbySuggestions | length %}
+				{% if nearbySuggestions | length or suggestionsUrl %}
 					{# typed names are matched to what the page suggests - for a consultee category the consultees
 					near the site the ruleset didn't identify (the faint ones on its map), for Nearby NSIPs the
 					other cases. The datalist suggests them as the name is typed; consultee-autocomplete.js swaps
-					it for the GOV.UK accessible autocomplete #}
+					it for the GOV.UK accessible autocomplete, and for a consultee category adds the rest of its
+					reference data from suggestionsUrl as the name is typed #}
 					{{ govukInput({
 						label: { text: "Name", classes: "govuk-label--m" },
 						hint: nameHint,
@@ -46,7 +47,11 @@
 						errorMessage: addForm.nameError,
 						autocomplete: "off",
 						spellcheck: false,
-						attributes: { list: "nearby-consultees", "data-consultee-autocomplete": "" }
+						attributes: {
+							list: "nearby-consultees",
+							"data-consultee-autocomplete": "",
+							"data-suggestions-url": suggestionsUrl or ""
+						}
 					}) }}
 					<datalist id="nearby-consultees">
 						{% for suggestion in nearbySuggestions %}

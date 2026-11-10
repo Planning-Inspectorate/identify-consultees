@@ -1,7 +1,6 @@
 import type { ManageService } from '#service';
 import { stringifyForInlineScript } from '#util/inline-json.ts';
 import type { CaseBoundaryFeature } from '@pins/identify-consultees-database/src/geospatial/case-boundaries.ts';
-import { consulteeAreaDetails } from '@pins/identify-consultees-database/src/geospatial/consultee-areas.ts';
 import type { ConsulteeMatch, Ruleset } from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
 import { isIdentified } from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
 import type { AsyncRequestHandler } from '@planning-inspectorate/core/util';
@@ -10,7 +9,7 @@ import type { MapMatch } from '../../../../maps/case-geojson.ts';
 import { addedBeyondRun, buildCaseMapConfig, markAddedByHand } from '../../../../maps/case-geojson.ts';
 import { MAP_VIEWPORT } from '../../../../maps/sample-geojson.ts';
 import { categorySettings } from '../../../../report-config.ts';
-import { comparableName, distinguishedLabels } from '../../consultee-labels.ts';
+import { labelsWithReferenceData } from '../../consultee-labels.ts';
 import { NEARBY_NSIPS } from '../../nearby-nsips.ts';
 import { describeReasons } from '../../reasons.ts';
 import { resolveCase } from '../../resolve-case.ts';
@@ -101,24 +100,16 @@ export function nearbyCandidates({ consultees, category, selection }: CategoryCo
 export { comparableName, kilometresFromSite } from '../../consultee-labels.ts';
 
 /**
- * Each listed consultee's name, by id - those sharing a name with what tells them apart, looked up
- * only for them (consultee-labels.ts). Nearby NSIPs' names carry their case reference already.
+ * Each listed consultee's name, by id - those sharing a name, with another in the list or in the
+ * reference data, with what tells them apart (consultee-labels.ts). Nearby NSIPs' names carry their
+ * case reference already.
  */
 async function listLabels(
 	service: ManageService,
 	category: string,
 	rows: { id: string; name: string; distanceMetres?: number }[]
 ): Promise<Map<string, string>> {
-	const names = rows.map((row) => comparableName(row.name));
-	const sharing = rows.filter((row) => names.filter((name) => name === comparableName(row.name)).length > 1);
-	const details =
-		sharing.length > 0 && category !== NEARBY_NSIPS
-			? await consulteeAreaDetails(
-					service.db,
-					sharing.map(({ id }) => id)
-				)
-			: new Map();
-	return distinguishedLabels(rows, category, details);
+	return (await labelsWithReferenceData(service.db, category, category !== NEARBY_NSIPS, rows)).labels;
 }
 
 /** `matches` named as `labels` has them - "Newton (Ribble Valley)" - for the map. */

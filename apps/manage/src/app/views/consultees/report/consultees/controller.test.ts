@@ -51,13 +51,15 @@ const addParam = (name: string, reason = '', category = 'Parish, town and commun
 
 // rows[0] answers the project lookup; rows[1], if given, is what the ruleset matched - returned by
 // the stand-in Python function (see rulesetRunnerFor), and by the database as the map's display geometry
-function dbReturning(rows: unknown[][]) {
+function dbReturning(rows: unknown[][], sharedNames: string[] = []) {
 	let call = 0;
 	return {
 		matchRows: (rows[1] ?? []) as ConsulteeAreaMatchRow[],
 		$queryRaw: mock.fn(async (sql: TemplateStringsArray) => {
 			// the map's search area is a query on the site alone (no table) - answer it with the site
 			if (!/\bFROM\b/.test(sql.join(''))) return [{ wkt: realProjectRow().geometryWkt }];
+			// the names the reference data has more than once - none, unless given
+			if (sql.join('').includes('HAVING COUNT')) return sharedNames.map((name) => ({ name }));
 			return rows[Math.min(call++, rows.length - 1)] ?? [];
 		})
 	};
@@ -236,6 +238,36 @@ describe('report consultees change page', () => {
 		assert.deepStrictEqual(
 			map.consulteeGeojson.features.map((feature: { properties: { name: string } }) => feature.properties.name).sort(),
 			['Little Snoring Parish Council (Breckland)', 'Little Snoring Parish Council (North Norfolk)']
+		);
+	});
+
+	it('should name which consultee one is, alone in the list, when the reference data has its name more than once', async () => {
+		const matchId = parishMatchRow().id;
+		const base = dbReturning([[realProjectRow()], [parishMatchRow()]], ['little snoring parish council']);
+		const db = {
+			...base,
+			$queryRaw: mock.fn(async (sql: TemplateStringsArray, ...values: unknown[]) =>
+				sql.join('').includes('OUTER APPLY')
+					? [{ id: matchId, region: 'East of England', subcategory: null, metadata: '{}', authority: 'Breckland' }]
+					: base.$queryRaw(sql, ...(values as []))
+			)
+		};
+		const mockRes = { status: mock.fn(() => mockRes), render: mock.fn() };
+		await handlerFor(db)(
+			{
+				params: { caseId: realProjectId },
+				query: { ruleset: 'england-wales-post-20240430', category: 'Parish, town and community councils' }
+			},
+			mockRes
+		);
+		assert.deepStrictEqual(
+			mockRes.render.mock.calls[0].arguments[1].rows.map((row: { name: string }) => row.name),
+			['Little Snoring Parish Council (Breckland)']
+		);
+		const map = JSON.parse(mockRes.render.mock.calls[0].arguments[1].mapConfigJson);
+		assert.deepStrictEqual(
+			map.consulteeGeojson.features.map((feature: { properties: { name: string } }) => feature.properties.name),
+			['Little Snoring Parish Council (Breckland)']
 		);
 	});
 

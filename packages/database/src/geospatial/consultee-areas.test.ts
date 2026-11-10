@@ -11,10 +11,12 @@ import {
 	consulteeAreaTable,
 	datasetInUse,
 	findConsulteeAreasByName,
+	findConsulteeAreasByNameStart,
 	getConsulteeAreaById,
 	getConsulteeAreaDisplayGeometries,
 	listConsulteeAreas,
 	loadConsulteeAreas,
+	sharedConsulteeNames,
 	tableSql
 } from './consultee-areas.ts';
 
@@ -310,6 +312,17 @@ describe('consultee areas (requires a local SQL Server - see docker-compose.yml)
 							consultee: testName,
 							region: 'Near'
 						}
+					},
+					// a name starting the same way, nearer the site than the far one
+					{
+						id: thirdAreaId,
+						type: 'Feature',
+						geometry: square(-0.5),
+						properties: {
+							consulteeCategory: 'Parish, town and community councils',
+							consultee: `${testName} North`,
+							region: 'Near'
+						}
 					}
 				]
 			});
@@ -346,6 +359,44 @@ describe('consultee areas (requires a local SQL Server - see docker-compose.yml)
 				await findConsulteeAreasByName(dbClient, 'Parish, town and community councils', 'Banana', site),
 				[]
 			);
+
+			// as a name is typed: those called exactly that first, nearest first, then the ones it starts
+			assert.deepEqual(
+				(
+					await findConsulteeAreasByNameStart(
+						dbClient,
+						'Parish, town and community councils',
+						testName.toLowerCase(),
+						site
+					)
+				).map(({ id }) => id),
+				[secondAreaId, testAreaId, thirdAreaId]
+			);
+			assert.deepEqual(
+				(await findConsulteeAreasByNameStart(dbClient, 'Parish, town and community councils', 'Findconsulteeby', site))
+					.map(({ id }) => id)
+					.sort(),
+				[testAreaId, secondAreaId, thirdAreaId].sort()
+			);
+			// what's typed is matched as it is - a % or _ isn't a wildcard
+			for (const typed of ['%', 'Findconsulteeby_ame', 'Findconsulteebyname Test Parish [']) {
+				assert.deepEqual(
+					await findConsulteeAreasByNameStart(dbClient, 'Parish, town and community councils', typed, site),
+					[],
+					typed
+				);
+			}
+
+			// the name both share - twice in the reference data - and not the one only one has
+			assert.deepEqual(
+				await sharedConsulteeNames(dbClient, 'Parish, town and community councils', [
+					testName.toUpperCase(),
+					`${testName} North`,
+					testName
+				]),
+				new Set([testName.toLowerCase()])
+			);
+			assert.deepEqual(await sharedConsulteeNames(dbClient, 'Parish, town and community councils', []), new Set());
 		} finally {
 			await cleanup();
 		}

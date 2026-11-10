@@ -303,6 +303,16 @@ export function addConsulteeUrl(
 	return reportPageUrl(caseId, 'report/consultees/add', rulesetId, selection, categoryParam(category));
 }
 
+/** Where the add page's autocomplete asks for suggestions as a name is typed - it adds `&q=`. */
+export function addConsulteeSuggestionsUrl(
+	caseId: string,
+	rulesetId: string,
+	category: string,
+	selection: ConsulteeSelection = NO_SELECTION
+): string {
+	return reportPageUrl(caseId, 'report/consultees/add/suggestions', rulesetId, selection, categoryParam(category));
+}
+
 /**
  * The consultee a Change page row's Remove link targets: a ruleset match by feature id, or a
  * hand-added consultee by its index in the `add` params.
