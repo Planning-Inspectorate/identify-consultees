@@ -65,7 +65,7 @@ sql_config = {
     login_username = "pins-consultees-sql-training"
     object_id      = "5373ca0b-f5d2-4935-ad2b-2ca5ea9fe50d"
   }
-  sku_name    = "S1"
+  sku_name    = "Basic"
   max_size_gb = 2
   retention = {
     audit_days             = 90
