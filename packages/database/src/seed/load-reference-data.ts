@@ -18,7 +18,7 @@ import { fileURLToPath } from 'node:url';
 import type { PrismaClient } from '../client/client.ts';
 import { loadConfig } from '../configuration/config.ts';
 import { datasetInUse, listDatasets } from '../geospatial/consultee-areas.ts';
-import { newDatabaseClient, withExtendedTimeout } from '../index.ts';
+import { BULK_REQUEST_TIMEOUT_MS, newDatabaseClient, withExtendedTimeout } from '../index.ts';
 import type { GroupLoad, LatestGroupLoad } from './consultee-area-groups.ts';
 import {
 	clearConsulteeAreas,
@@ -32,9 +32,6 @@ import type { StoredBlob } from './import-from-blob.ts';
 import { downloadBlobToTempFile, listBlobs } from './import-from-blob.ts';
 import type { ReferenceDataConfig } from './reference-data.ts';
 import { REFERENCE_DATA_CONFIG } from './reference-data.ts';
-
-// see withExtendedTimeout in import-cli.ts
-const IMPORT_REQUEST_TIMEOUT_MS = 120_000;
 
 const QUARTER = /^\d{4}Q[1-4]$/;
 
@@ -157,8 +154,8 @@ const BLOB_FILES: Files = { list: listBlobs, download: downloadBlobToTempFile };
 /** The script: `argv`'s options, against the database `connect` opens and the blob container. */
 export async function main(
 	argv: string[],
-	connect: () => PrismaClient = () =>
-		newDatabaseClient(withExtendedTimeout(loadConfig().db, IMPORT_REQUEST_TIMEOUT_MS)),
+	// the admin pages' bulk timeout: on Training's Basic tier a group's statements can take minutes
+	connect: () => PrismaClient = () => newDatabaseClient(withExtendedTimeout(loadConfig().db, BULK_REQUEST_TIMEOUT_MS)),
 	files: Files = BLOB_FILES,
 	log: (line: string) => void = console.log
 ): Promise<void> {

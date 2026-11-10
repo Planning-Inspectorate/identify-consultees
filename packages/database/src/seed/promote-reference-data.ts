@@ -9,12 +9,16 @@
  *   npm run promote-reference-data -- copy --dir=<dir>     (on the target)
  *
  * `export` downloads each group's newest file into <dir> with a manifest of them. `copy` uploads
- * them to the target's blob storage, replacing one already there under the same name but different
- * - a file corrected on the source and copied on again.
+ * them to the target's blob storage, replacing one already there under the same name but with
+ * different contents - a file corrected on the source and copied on again - and leaving one with
+ * the same contents alone, so the target doesn't load it again.
  *
  * Both need BLOB_STORE_HOST and BLOB_STORE_CONTAINER for the environment they run against, and an
  * Azure identity with Storage Blob Data Contributor on that container (see import-from-blob.ts).
  */
+import type { BlockBlobClient } from '@azure/storage-blob';
+import { createHash } from 'node:crypto';
+import { createReadStream } from 'node:fs';
 import { readFile, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -46,11 +50,35 @@ export class PromotionError extends Error {}
 export interface FileStore {
 	list(): Promise<StoredBlob[]>;
 	download(blobName: string, filePath: string): Promise<void>;
-	/** Upload `filePath` as `blobName`: 'unchanged' if the same file is already there. */
+	/** Upload `filePath` as `blobName`: 'unchanged' if a file with the same contents is already there. */
 	upload(filePath: string, blobName: string): Promise<'uploaded' | 'replaced' | 'unchanged'>;
 }
 
-/** BLOB_STORE_HOST's BLOB_STORE_CONTAINER. A file of the same name and size counts as the same file. */
+/** The MD5 of a stream's bytes. */
+async function md5Of(stream: AsyncIterable<Buffer | string> | NodeJS.ReadableStream): Promise<Buffer> {
+	const hash = createHash('md5');
+	for await (const chunk of stream as AsyncIterable<Buffer | string>) {
+		hash.update(chunk);
+	}
+	return hash.digest();
+}
+
+/**
+ * A blob's MD5: the one it was uploaded with, as `copy` uploads - else, for one uploaded without
+ * (as the admin page's upload, in parts, is), worked out from its bytes.
+ */
+async function blobMd5(blob: BlockBlobClient, contentMD5: Uint8Array | undefined): Promise<Buffer> {
+	if (contentMD5) {
+		return Buffer.from(contentMD5);
+	}
+	const { readableStreamBody } = await blob.download();
+	return md5Of(readableStreamBody!);
+}
+
+/**
+ * BLOB_STORE_HOST's BLOB_STORE_CONTAINER. A blob of the same name, size and contents counts as the
+ * same file. Uploads record their MD5, so the next copy compares without downloading.
+ */
 export function blobFileStore(): FileStore {
 	const container = referenceDataContainer();
 	return {
@@ -61,11 +89,15 @@ export function blobFileStore(): FileStore {
 		upload: async (filePath, blobName) => {
 			const blob = container.getBlockBlobClient(blobName);
 			const { size } = await stat(filePath);
+			const md5 = await md5Of(createReadStream(filePath));
 			const exists = await blob.exists();
-			if (exists && (await blob.getProperties()).contentLength === size) {
-				return 'unchanged';
+			if (exists) {
+				const { contentLength, contentMD5 } = await blob.getProperties();
+				if (contentLength === size && (await blobMd5(blob, contentMD5)).equals(md5)) {
+					return 'unchanged';
+				}
 			}
-			await blob.uploadFile(filePath);
+			await blob.uploadFile(filePath, { blobHTTPHeaders: { blobContentMD5: md5 } });
 			return exists ? 'replaced' : 'uploaded';
 		}
 	};
