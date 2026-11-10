@@ -2,14 +2,16 @@
  * Server-side static map generation for progressive enhancement.
  *
  * Prefer Google Maps Static API (PNG) when `GOOGLE_MAPS_API_KEY` is set.
- * Otherwise render SVG with OpenStreetMap raster tiles (PNG) embedded as
- * data URIs, plus the same project / consultee polygons as the interactive map.
+ * Otherwise render SVG with raster basemap tiles (PNG) embedded as data URIs - OS's
+ * (see os-maps.ts) when `OS_MAPS_API_KEY` is set and OS covers the map, else
+ * OpenStreetMap's - plus the same project / consultee polygons as the interactive map.
  *
  * Tile and static-image upstreams must be used sparingly — see AGENTS.md.
  */
 
 import type { Geometry, Position } from '@pins/identify-consultees-database/src/geospatial/wkt.ts';
 import { fetchWithTimeout, MapCache } from '@planning-inspectorate/core/util';
+import { fetchOsTile, osCoversView, osMapsApiKeyFromEnv } from './os-maps.ts';
 import type { GeoJsonFeature, GeoJsonFeatureCollection } from './sample-geojson.ts';
 import { MAP_VIEWPORT } from './sample-geojson.ts';
 
@@ -223,6 +225,68 @@ function tileCacheKey(zoom: number, tileX: number, tileY: number): string {
 	return `${zoom}/${tileX}/${tileY}`;
 }
 
+/** One tile's PNG from a tile server, or undefined if it couldn't be had. */
+type TileSource = (zoom: number, tileX: number, tileY: number) => Promise<Buffer | undefined>;
+
+/**
+ * A viewport's tiles from `source`, a few at a time, reusing the in-process tile cache (under
+ * `cachePrefix`, so each server's tiles are kept apart). A tile that can't be had is left out, and
+ * `complete` false - with `stopOnMiss`, at once, so the basemap can be drawn from another server.
+ */
+async function fetchTiles(
+	options: Pick<StaticMapBuildOptions, 'center' | 'zoom' | 'width' | 'height' | 'pixelRatio'>,
+	source: TileSource,
+	cachePrefix: string,
+	stopOnMiss: boolean
+): Promise<{ tiles: OsmBasemapTile[]; complete: boolean }> {
+	const { zoom, width, height } = basemapFrame(options);
+	const { left, top } = staticMapViewportOrigin(options.center, zoom, width, height);
+	const wanted = listOsmTilesForViewport(left, top, width, height, zoom);
+	const tiles: OsmBasemapTile[] = [];
+	let complete = true;
+
+	for (let i = 0; i < wanted.length && (complete || !stopOnMiss); i += OSM_TILE_FETCH_CONCURRENCY) {
+		const batch = wanted.slice(i, i + OSM_TILE_FETCH_CONCURRENCY);
+		const results = await Promise.all(
+			batch.map(async (tile) => {
+				const key = `${cachePrefix}${tileCacheKey(zoom, tile.tileX, tile.tileY)}`;
+				const cached = osmTileCache.get(key);
+				if (cached) {
+					return { ...tile, png: cached } satisfies OsmBasemapTile;
+				}
+				const png = await source(zoom, tile.tileX, tile.tileY);
+				if (png) {
+					osmTileCache.set(key, png);
+				}
+				return png && ({ ...tile, png } satisfies OsmBasemapTile);
+			})
+		);
+		for (const tile of results) {
+			if (tile) {
+				tiles.push(tile);
+			} else {
+				complete = false;
+			}
+		}
+	}
+
+	return { tiles, complete };
+}
+
+/** One OpenStreetMap tile, fetched as its tile usage policy asks: identified, a couple at a time. */
+async function fetchOsmTile(zoom: number, tileX: number, tileY: number): Promise<Buffer | undefined> {
+	try {
+		const response = await fetchWithTimeout(
+			`https://tile.openstreetmap.org/${zoom}/${tileX}/${tileY}.png`,
+			{ timeoutMs: OSM_TILE_FETCH_TIMEOUT_MS },
+			{ headers: { 'User-Agent': OSM_USER_AGENT, Accept: 'image/png' } }
+		);
+		return response.ok ? Buffer.from(await response.arrayBuffer()) : undefined;
+	} catch {
+		return undefined;
+	}
+}
+
 /**
  * Fetch OSM raster tiles for a viewport, reusing the in-process tile cache.
  * Low concurrency and identifying User-Agent follow OSM tile usage policy.
@@ -230,51 +294,28 @@ function tileCacheKey(zoom: number, tileX: number, tileY: number): string {
 export async function fetchOsmBasemapTiles(
 	options: Pick<StaticMapBuildOptions, 'center' | 'zoom' | 'width' | 'height' | 'pixelRatio'>
 ): Promise<OsmBasemapTile[]> {
-	const { zoom, width, height } = basemapFrame(options);
-	const { left, top } = staticMapViewportOrigin(options.center, zoom, width, height);
-	const wanted = listOsmTilesForViewport(left, top, width, height, zoom);
-	const tiles: OsmBasemapTile[] = [];
+	return (await fetchTiles(options, fetchOsmTile, '', false)).tiles;
+}
 
-	for (let i = 0; i < wanted.length; i += OSM_TILE_FETCH_CONCURRENCY) {
-		const batch = wanted.slice(i, i + OSM_TILE_FETCH_CONCURRENCY);
-		const results = await Promise.all(
-			batch.map(async (tile) => {
-				const key = tileCacheKey(zoom, tile.tileX, tile.tileY);
-				const cached = osmTileCache.get(key);
-				if (cached) {
-					return { ...tile, png: cached } satisfies OsmBasemapTile;
-				}
+/** Whose tiles a map's basemap was drawn from - its credit depends on it. */
+export type BasemapProvider = 'os' | 'osm';
 
-				const url = `https://tile.openstreetmap.org/${zoom}/${tile.tileX}/${tile.tileY}.png`;
-				try {
-					const response = await fetchWithTimeout(
-						url,
-						{
-							timeoutMs: OSM_TILE_FETCH_TIMEOUT_MS
-						},
-						{
-							headers: { 'User-Agent': OSM_USER_AGENT, Accept: 'image/png' }
-						}
-					);
-					if (!response.ok) {
-						return undefined;
-					}
-					const png = Buffer.from(await response.arrayBuffer());
-					osmTileCache.set(key, png);
-					return { ...tile, png } satisfies OsmBasemapTile;
-				} catch {
-					return undefined;
-				}
-			})
-		);
-		for (const tile of results) {
-			if (tile) {
-				tiles.push(tile);
-			}
+/**
+ * A viewport's basemap tiles: OS's when there's a key, OS covers the whole map (Great Britain, zooms
+ * 7 to 20 - see osCoversView) and every tile came - else OpenStreetMap's, so a map is never drawn
+ * half on each.
+ */
+export async function fetchBasemapTiles(
+	options: Pick<StaticMapBuildOptions, 'center' | 'zoom' | 'width' | 'height' | 'pixelRatio'>,
+	osKey: string | undefined = osMapsApiKeyFromEnv()
+): Promise<{ provider: BasemapProvider; tiles: OsmBasemapTile[] }> {
+	if (osKey && osCoversView({ center: options.center, ...basemapFrame(options) })) {
+		const os = await fetchTiles(options, (zoom, x, y) => fetchOsTile(osKey, zoom, x, y), 'os/', true);
+		if (os.complete) {
+			return { provider: 'os', tiles: os.tiles };
 		}
 	}
-
-	return tiles;
+	return { provider: 'osm', tiles: await fetchOsmBasemapTiles(options) };
 }
 
 function encodeGooglePolyline(ring: number[][]): string {

@@ -1,5 +1,6 @@
 import PDFDocument from 'pdfkit';
 import { LOCAL_FILL_OPACITY } from '../../../../maps/case-geojson.ts';
+import { osCredit } from '../../../../maps/os-maps.ts';
 import { formatDate } from './workbook.ts';
 
 /**
@@ -26,6 +27,11 @@ export interface MapPdfInput {
 	category: string;
 	/** The static map as a PNG. */
 	image: Buffer;
+	/**
+	 * Whose basemap `image` is drawn on, for its credit: OS's, or OpenStreetMap's (the default).
+	 * Never Google's, whose static maps can't draw a report map's pixel ratio.
+	 */
+	basemap?: 'os' | 'osm' | 'google';
 	/** How many metres a pixel of `image` covers, at its centre - for the scale bar. */
 	metresPerPixel: number;
 	/** The colours the map draws the category's consultees and the site in, for the key. */
@@ -132,25 +138,32 @@ function drawScaleBar(doc: PDFKit.PDFDocument, left: number, bottom: number, met
 	doc.fillColor(TEXT_COLOUR).text(label, x + padding + length + padding, y + 5, { lineBreak: false });
 }
 
-// the report's maps are always drawn on OpenStreetMap's tiles: Google's static maps can't draw
-// their pixel ratio (see buildConsulteeStaticMapResponse). OpenStreetMap's licence needs this
-// credit beside the map - https://www.openstreetmap.org/copyright
-const BASEMAP_CREDIT = '© OpenStreetMap contributors';
+// the report's maps are drawn on OS's tiles when it covers them, else OpenStreetMap's - never
+// Google's, whose static maps can't draw their pixel ratio (see buildConsulteeStaticMapResponse).
+// Each licence needs its credit beside the map, and in full at the foot of the page: OS's under the
+// Public Sector Geospatial Agreement (see os-maps.ts), OpenStreetMap's at openstreetmap.org/copyright
+function basemapCredit(basemap: MapPdfInput['basemap']): { credit: string; licence: string } {
+	if (basemap === 'os') {
+		const credit = osCredit();
+		return { credit, licence: `Basemap ${credit}. Used under the Public Sector Geospatial Agreement.` };
+	}
+	return {
+		credit: '© OpenStreetMap contributors',
+		licence:
+			'Basemap © OpenStreetMap contributors, available under the Open Database Licence: openstreetmap.org/copyright.'
+	};
+}
 
 /** The basemap's credit in the bottom right corner of the map, on a white panel as the scale bar's. */
-function drawBasemapCredit(doc: PDFKit.PDFDocument, right: number, bottom: number): void {
+function drawBasemapCredit(doc: PDFKit.PDFDocument, credit: string, right: number, bottom: number): void {
 	doc.font('Helvetica').fontSize(7);
 	const [padding, panelHeight] = [4, 12];
-	const panelWidth = padding + doc.widthOfString(BASEMAP_CREDIT) + padding;
+	const panelWidth = padding + doc.widthOfString(credit) + padding;
 	const x = right - SCALE_BAR_INSET - panelWidth;
 	const y = bottom - SCALE_BAR_INSET - panelHeight;
 	doc.save().fillColor('#ffffff').fillOpacity(0.85).rect(x, y, panelWidth, panelHeight).fill().restore();
-	doc.fillColor(TEXT_COLOUR).text(BASEMAP_CREDIT, x + padding, y + 3, { lineBreak: false });
+	doc.fillColor(TEXT_COLOUR).text(credit, x + padding, y + 3, { lineBreak: false });
 }
-
-// the basemap's licence in full, at the foot of the map's page
-const BASEMAP_LICENCE =
-	'Basemap © OpenStreetMap contributors, available under the Open Database Licence: openstreetmap.org/copyright.';
 
 // how many of the projects' colours the key shows, side by side, for "a colour per project"
 const KEY_PROJECT_COLOURS = 4;
@@ -231,7 +244,8 @@ export function buildMapPdf(input: MapPdfInput): Promise<Buffer> {
 	const imageLeft = MARGIN + (width - image.width * pointsPerPixel) / 2;
 	const imageBottom = mapTop + image.height * pointsPerPixel;
 	drawScaleBar(doc, imageLeft, imageBottom, input.metresPerPixel / pointsPerPixel);
-	drawBasemapCredit(doc, imageLeft + image.width * pointsPerPixel, imageBottom);
+	const basemap = basemapCredit(input.basemap);
+	drawBasemapCredit(doc, basemap.credit, imageLeft + image.width * pointsPerPixel, imageBottom);
 	const projectColours = input.consultees.flatMap((consultee) => (consultee.colour ? [consultee.colour] : []));
 	drawKey(doc, mapTop + MAP_HEIGHT + 10, input.colours, input.buffers, projectColours);
 	if (input.mapNote) {
@@ -247,7 +261,7 @@ export function buildMapPdf(input: MapPdfInput): Promise<Buffer> {
 		.font('Helvetica')
 		.fontSize(8)
 		.fillColor(SECONDARY_TEXT_COLOUR)
-		.text(BASEMAP_LICENCE, MARGIN, doc.page.height - MARGIN - doc.currentLineHeight(true), { lineBreak: false });
+		.text(basemap.licence, MARGIN, doc.page.height - MARGIN - doc.currentLineHeight(true), { lineBreak: false });
 
 	doc.addPage();
 	doc

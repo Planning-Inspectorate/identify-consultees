@@ -81,6 +81,24 @@ describe('manage router wiring', () => {
 		assert.match(response.text, /<title>\s*Error: /);
 	});
 
+	test("serves OS's basemap only with a key, and only to someone signed in", async () => {
+		assert.equal((await request(authDisabledApp).get('/maps/os/style.json')).status, 404);
+
+		const original = process.env.OS_MAPS_API_KEY;
+		process.env.OS_MAPS_API_KEY = 'test-os-key';
+		try {
+			const withKey = await request(createManageTestApp(authDisabledService)).get('/maps/os/style.json');
+			assert.equal(withKey.status, 200);
+			assert.deepEqual(withKey.body.sources.os.tiles, ['/maps/os/tiles/{z}/{x}/{y}.png']);
+
+			const signedOut = await request(createManageTestApp(createManageTestService(false))).get('/maps/os/style.json');
+			assert.notEqual(signedOut.status, 200);
+		} finally {
+			if (original === undefined) delete process.env.OS_MAPS_API_KEY;
+			else process.env.OS_MAPS_API_KEY = original;
+		}
+	});
+
 	test('GET /signed-out renders the signed out page', async () => {
 		const response = await request(authDisabledApp).get('/signed-out');
 		assert.equal(response.status, 200);

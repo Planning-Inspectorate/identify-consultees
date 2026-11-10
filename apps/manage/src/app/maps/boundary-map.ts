@@ -8,6 +8,8 @@
 import type { Geometry } from '@pins/identify-consultees-database/src/geospatial/wkt.ts';
 import { computeFittedMapView } from './geometry-bounds.ts';
 import { MAP_VIEW } from './map-view.ts';
+import type { InteractiveBasemap } from './os-maps.ts';
+import { interactiveBasemap } from './os-maps.ts';
 import type { GeoJsonFeature, GeoJsonFeatureCollection } from './sample-geojson.ts';
 import { MAP_VIEWPORT } from './sample-geojson.ts';
 
@@ -60,6 +62,8 @@ export interface BoundaryMapConfig {
 	}[];
 	/** The JS init-failure fallback's static-map image - see CaseMapConfig.fallback. */
 	fallback?: StaticMapFallbackConfig;
+	/** OS's basemap, when there's a key - see os-maps.ts. OpenFreeMap's without. */
+	interactiveBasemap?: InteractiveBasemap;
 }
 
 function toGeojson(file: BoundaryMapFile, caseReference: string): GeoJsonFeatureCollection {
@@ -103,6 +107,7 @@ export function buildBoundaryMapConfig(
 		mapLabel: `Project boundary for ${caseName} (${caseReference})`,
 		shapefileGroupLabel: 'GIS shapefiles',
 		shapefileDatasets: datasets,
-		...(fallback ? { fallback: { ...fallback, width: MAP_VIEWPORT.width, height: MAP_VIEWPORT.height } } : {})
+		...(fallback ? { fallback: { ...fallback, width: MAP_VIEWPORT.width, height: MAP_VIEWPORT.height } } : {}),
+		...interactiveBasemap({ center: view.center, zoom: view.zoom, ...MAP_VIEWPORT })
 	};
 }

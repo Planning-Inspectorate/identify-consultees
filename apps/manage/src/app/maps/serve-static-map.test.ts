@@ -121,6 +121,44 @@ describe('serve-static-map', () => {
 		assert.ok(first.cacheControl.includes('max-age='));
 	});
 
+	it("draws on OS's tiles with a key, says so, and gives the image its own ETag", async () => {
+		const map = {
+			center: [-1.78, 50.62] as const,
+			zoom: 12,
+			projectGeojson: buildProjectSiteGeojson('EN010024', 'Navitus'),
+			consulteeGeojson: buildConsulteeAreaGeojson('Ambulance', [
+				{ name: 'A', code: 'A', offsetLng: 0, offsetLat: 0, size: 0.02 }
+			]),
+			width: 256,
+			height: 256
+		};
+		const hosts = new Set<string>();
+		globalThis.fetch = async (url) => {
+			hosts.add(new URL(String(url)).hostname);
+			return new Response(tinyPng, { status: 200, headers: { 'content-type': 'image/png' } });
+		};
+		const build = (options: { forceSvg?: boolean; osMapsApiKey?: string }) =>
+			buildConsulteeStaticMapResponse({
+				geometryId: 'geo-os',
+				sectionId: 'section',
+				map,
+				accept: 'image/png',
+				...options
+			});
+
+		clearOsmTileCacheForTests();
+		const svg = await build({ forceSvg: true, osMapsApiKey: 'os-key' });
+		const png = await build({ osMapsApiKey: 'os-key' });
+		assert.equal(svg.basemap, 'os');
+		assert.equal(png.basemap, 'os');
+		assert.deepEqual([...hosts], ['api.os.uk']);
+
+		clearOsmTileCacheForTests();
+		const withoutKey = await build({ osMapsApiKey: undefined });
+		assert.equal(withoutKey.basemap, 'osm');
+		assert.notEqual(withoutKey.etag, png.etag);
+	});
+
 	it('caches OSM tiles in-process across builds', async () => {
 		clearOsmTileCacheForTests();
 		let fetchCount = 0;

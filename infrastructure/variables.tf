@@ -58,6 +58,12 @@ variable "reference_data_changes_enabled" {
   default     = false
 }
 
+variable "os_licence_number" {
+  description = "PINS's OS licence number under the Public Sector Geospatial Agreement (AC0000...), credited on maps drawn on OS's basemap"
+  type        = string
+  default     = ""
+}
+
 variable "cbos_subscriber_enabled" {
   description = "Subscribe the web app to CBOS's nsip-document Service Bus topic, so a case's boundaries are imported when CBOS converts a new one (see idas-back-office.tf)"
   type        = bool

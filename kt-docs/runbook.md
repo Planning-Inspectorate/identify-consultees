@@ -44,7 +44,10 @@ then restart (or redeploy/swap) the apps so the Key Vault references re-resolve,
 
 ### Manually populated secrets
 
-`azurerm_key_vault_secret.manual_secrets` (`main.tf`) - currently just **`consultees-client-secret`**, the Entra app registration's client secret. `value` and `expiration_date` are `ignore_changes`, so rotate it directly in the vault (portal or CLI) whenever the Entra secret is rotated, then restart the web app. Sign-in breaks while the two are out of sync - the failure shows at the token-exchange step of the auth redirect.
+`azurerm_key_vault_secret.manual_secrets` (`main.tf`). `value` and `expiration_date` are `ignore_changes`, so each is set and rotated directly in the vault (portal or CLI), then the web app restarted. Terraform creates each with the value `<terraform_placeholder>`.
+
+- **`consultees-client-secret`**: the Entra app registration's client secret. Rotate it whenever the Entra secret is rotated. Sign-in breaks while the two are out of sync - the failure shows at the token-exchange step of the auth redirect.
+- **`consultees-os-maps-api-key`**: the OS Data Hub project's key, which needs the OS Maps API. While it's the placeholder, or OS refuses it, the maps are drawn on OpenStreetMap instead (see [Web app](./web-app.md#basemaps)). Regenerate it in the OS Data Hub if it leaks.
 
 ## Deploys and rollbacks
 
