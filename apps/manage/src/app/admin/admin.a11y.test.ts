@@ -4,8 +4,8 @@ import { configureNunjucks } from '../nunjucks.ts';
 import { assertNoSeriousA11yViolations, pageLocals } from '../testing/a11y.ts';
 import { adminNavigation, adminPages } from './navigation.ts';
 
-// what admin/index.ts puts on every admin page: the header link and the menu
-const adminLocals = { ...pageLocals, adminLink: { href: '/admin', active: true } };
+// what every admin page has besides its menu
+const adminLocals = pageLocals;
 
 describe('admin page accessibility smoke', () => {
 	const nunjucks = configureNunjucks();
@@ -49,7 +49,9 @@ describe('admin page accessibility smoke', () => {
 			html,
 			/<a class="govuk-link govuk-link--no-visited-state" href="\/admin" aria-current="page">Overview<\/a>/
 		);
-		assert.match(html, /<a class="govuk-service-navigation__link" href="\/admin" aria-current="true">/);
+		// the header has no Admin link, and doesn't mark Home here
+		assert.doesNotMatch(html, /govuk-service-navigation__link" href="\/admin"/);
+		assert.doesNotMatch(html, /govuk-service-navigation__link" href="\/" aria-current/);
 		await assertNoSeriousA11yViolations(html);
 	});
 

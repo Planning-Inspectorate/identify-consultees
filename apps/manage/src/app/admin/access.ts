@@ -31,16 +31,3 @@ export function buildAssertAdminAccess(service: AdminAccessService): RequestHand
 		res.status(403).render('views/errors/403.njk');
 	};
 }
-
-/**
- * The header's Admin link, on every page, for those who may use the admin section - set before the
- * routes so any page's header can show it. No link for anyone else.
- */
-export function buildAdminHeaderLink(service: AdminAccessService): RequestHandler {
-	return (req, res, next) => {
-		if (canUseAdmin(service, req.session)) {
-			res.locals.adminLink = { href: '/admin', active: req.path === '/admin' || req.path.startsWith('/admin/') };
-		}
-		next();
-	};
-}
