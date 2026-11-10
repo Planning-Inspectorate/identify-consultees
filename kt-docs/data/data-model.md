@@ -21,11 +21,10 @@ Two spatial datasets drive the service: **consultee areas** (what each potential
 | Repo sample    | `apps/function-python/setup_database/sample_data/`                                                                        | `npm run db-seed` (local setup) and tests                                                             |
 | Ruleset CSV    | `packages/database/src/geospatial/*_ruleset.csv`                                                                          | Read by the web app at start-up                                                                       |
 
-| Environment    | SQL tier                       | Data                                  |
-| -------------- | ------------------------------ | ------------------------------------- |
-| Dev            | S2                             | Full reference dataset                |
-| Test, Training | Basic                          | Full reference dataset                |
-| Prod           | S0, with a UK West geo-replica | Full reference dataset, once promoted |
+| Environment         | SQL tier                       | Data                                  |
+| ------------------- | ------------------------------ | ------------------------------------- |
+| Dev, Test, Training | S1                             | Full reference dataset                |
+| Prod                | S2, with a UK West geo-replica | Full reference dataset, once promoted |
 
 ## Tables
 

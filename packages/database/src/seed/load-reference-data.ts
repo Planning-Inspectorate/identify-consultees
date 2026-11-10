@@ -154,7 +154,7 @@ const BLOB_FILES: Files = { list: listBlobs, download: downloadBlobToTempFile };
 /** The script: `argv`'s options, against the database `connect` opens and the blob container. */
 export async function main(
 	argv: string[],
-	// the admin pages' bulk timeout: on Training's Basic tier a group's statements can take minutes
+	// the admin pages' bulk timeout: on a small tier a group's statements can take minutes
 	connect: () => PrismaClient = () => newDatabaseClient(withExtendedTimeout(loadConfig().db, BULK_REQUEST_TIMEOUT_MS)),
 	files: Files = BLOB_FILES,
 	log: (line: string) => void = console.log
