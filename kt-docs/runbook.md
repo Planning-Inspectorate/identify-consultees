@@ -44,10 +44,13 @@ then restart (or redeploy/swap) the apps so the Key Vault references re-resolve,
 
 ### Manually populated secrets
 
-`azurerm_key_vault_secret.manual_secrets` (`main.tf`). `value` and `expiration_date` are `ignore_changes`, so each is set and rotated directly in the vault (portal or CLI), then the web app restarted. Terraform creates each with the value `<terraform_placeholder>`.
+`azurerm_key_vault_secret.manual_secrets` (`main.tf`) - currently just **`consultees-client-secret`**, the Entra app registration's client secret. `value` and `expiration_date` are `ignore_changes`, so rotate it directly in the vault (portal or CLI) whenever the Entra secret is rotated, then restart the web app. Sign-in breaks while the two are out of sync - the failure shows at the token-exchange step of the auth redirect.
 
-- **`consultees-client-secret`**: the Entra app registration's client secret. Rotate it whenever the Entra secret is rotated. Sign-in breaks while the two are out of sync - the failure shows at the token-exchange step of the auth redirect.
-- **`consultees-os-maps-api-key`**: the OS Data Hub project's key, which needs the OS Maps API. While it's the placeholder, or OS refuses it, the maps are drawn on OpenStreetMap instead (see [Web app](./web-app.md#basemaps)). Regenerate it in the OS Data Hub if it leaks.
+### The OS Maps API key
+
+One OS Data Hub key, with the OS Maps API, for every environment - held once, as the secret variable **`OS_MAPS_API_KEY`** in the Azure DevOps Library variable group **`consultees-os-maps`**. Infrastructure CD passes it to Terraform (`TF_VAR_os_maps_api_key`), which writes it to each environment's Key Vault as `consultees-os-maps-api-key` (`app-web.tf`). To set or rotate it: change the variable, run Infrastructure CD, then restart each web app so its Key Vault reference picks the new version up. Regenerate it in the OS Data Hub if it leaks.
+
+The group has to exist before Infrastructure CD runs - the pipeline won't start without it, and asks for permission to use it the first time. With the variable unset or empty, Terraform makes no secret and the maps are drawn on OpenStreetMap (see [Web app](./web-app.md#basemaps)).
 
 ## Deploys and rollbacks
 

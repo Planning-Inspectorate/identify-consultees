@@ -75,7 +75,7 @@ If the ruleset can't be run (function down, timeout, bad key) the pages say so i
 
 ## Basemaps
 
-The maps are drawn on Ordnance Survey's **Light** style from the OS Maps API (`maps/os-maps.ts`), in Web Mercator (`Light_3857`), when the app has a key: `OS_MAPS_API_KEY`, from the Key Vault secret `consultees-os-maps-api-key` (see [Runbook](./runbook.md)). Without one the interactive maps use OpenFreeMap's Liberty style and the static images and report PDFs OpenStreetMap's tiles, as before.
+The maps are drawn on Ordnance Survey's **Light** style from the OS Maps API (`maps/os-maps.ts`), in Web Mercator (`Light_3857`), when the app has a key: `OS_MAPS_API_KEY`, from the Key Vault secret `consultees-os-maps-api-key` - one key for every environment, set once in Azure DevOps (see [Runbook](./runbook.md#the-os-maps-api-key)). Without one the interactive maps use OpenFreeMap's Liberty style and the static images and report PDFs OpenStreetMap's tiles, as before.
 
 - **The key stays on the server.** The interactive maps load `/maps/os/style.json` and their tiles from `/maps/os/tiles/{z}/{x}/{y}.png`, behind sign-in; the app fetches each from OS with the key in a header, so it isn't in a URL, a log or the browser. Browsers keep a tile for a day, as OS allows. The app doesn't cache them itself.
 - **OS covers Great Britain, at zooms 7 to 20** - its extent stops at about 1.9°E, short of the North Sea's offshore sites. A map is drawn on OS only when the whole of its view is inside that (`osCoversView`); otherwise, or when OS doesn't send every tile, a static image or PDF map is drawn on OpenStreetMap and an interactive one on OpenFreeMap - never half on each. An interactive map on OS can't be panned or zoomed out beyond OS's extent.
