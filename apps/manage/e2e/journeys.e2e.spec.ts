@@ -284,23 +284,27 @@ test.describe('manage journeys', () => {
 
 		// back on the add page, with nearby consultees to suggest, the GOV.UK accessible autocomplete
 		// offers them as a name is typed - picking one adds it by name, and the map draws it as
-		// identified. The seeded data decides whether there are any
+		// identified. The seeded data decides whether there are any: the autocomplete is there for any
+		// consultee category, so it's whether a letter brings one up (the rest of the reference data is
+		// only suggested from three letters)
 		let picked = 0;
 		await page.getByRole('button', { name: 'Add a consultee' }).click();
 		await expect(page).toHaveURL(/\/report\/consultees\/add\?.*category=Parish.*add=/);
+		const suggestions = page.locator('.autocomplete__option');
+		let suggested = false;
 		if ((await page.locator('.autocomplete__wrapper').count()) > 0) {
-			const suggestions = page.locator('.autocomplete__option');
 			for (const letter of 'aeiourn') {
 				await nameInput.fill(letter);
-				if (
-					await suggestions
-						.first()
-						.isVisible({ timeout: 1_000 })
-						.catch(() => false)
-				) {
+				suggested = await suggestions
+					.first()
+					.isVisible({ timeout: 1_000 })
+					.catch(() => false);
+				if (suggested) {
 					break;
 				}
 			}
+		}
+		if (suggested) {
 			await suggestions.first().click();
 			const pickedName = await nameInput.inputValue();
 			await page.getByLabel('Reason for adding').fill('Picked from nearby');
@@ -479,6 +483,12 @@ test.describe('manage journeys', () => {
 			);
 			const nameInput = page.getByLabel('Name', { exact: true });
 			const options = page.locator('.autocomplete__option');
+			// as the name is typed, both are suggested - from anywhere in the reference data, each
+			// saying which it is - before anything is submitted
+			await nameInput.fill(E2E_TWIN_PARISH);
+			await expect(options.filter({ hasText: `${E2E_TWIN_PARISH} (E2E North)` })).toBeVisible();
+			await expect(options.filter({ hasText: `${E2E_TWIN_PARISH} (E2E South)` })).toBeVisible();
+			// submitted as the bare name, the page still asks which is meant
 			for (const expected of [/There is more than one E2E Twin Parish/, /E2E Twin Parish is already listed/]) {
 				await nameInput.fill(E2E_TWIN_PARISH);
 				await page.getByLabel('Reason for adding').fill('Same name as another');
