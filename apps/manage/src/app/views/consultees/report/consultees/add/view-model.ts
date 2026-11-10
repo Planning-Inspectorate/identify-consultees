@@ -9,7 +9,7 @@ export interface AddConsulteeForm {
 export interface AddConsulteeViewModel {
 	/** "Add a consultee" - the heading above the name input and reason form. */
 	pageHeading: string;
-	/** The category being added to - the caption above the heading. */
+	/** The category being added to - the caption above the heading, spelled out for Nearby NSIPs. */
 	pageCaption: string;
 	/** Back to the category page, keeping the current selection. */
 	backLinkUrl: string;

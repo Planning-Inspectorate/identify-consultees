@@ -599,6 +599,8 @@ describe('add a consultee page', () => {
 			res as never
 		);
 
+		// the caption spells NSIPs out, as the check page does
+		assert.strictEqual(viewModelOf(res).pageCaption, 'National infrastructure projects');
 		// Neighbouring Solar Farm is identified by the nearby search, so already listed
 		assert.deepStrictEqual(viewModelOf(res).nearbySuggestions, [
 			{ name: 'Undated Wind Farm (EN010201)', hint: '6.0 km from the site' }
@@ -675,7 +677,7 @@ describe('add a consultee page', () => {
 		const res = await submitNsip({ name: 'Neighbouring Solar Farm (EN010200)', reason: 'r' });
 		assert.strictEqual(
 			viewModelOf(res).addForm.nameError.text,
-			'Neighbouring Solar Farm (EN010200) is already listed in NSIPs'
+			'Neighbouring Solar Farm (EN010200) is already listed in National infrastructure projects'
 		);
 	});
 
@@ -692,7 +694,7 @@ describe('add a consultee page', () => {
 		assert.strictEqual(res.redirect.mock.callCount(), 0);
 		assert.strictEqual(
 			viewModelOf(res).addForm.nameError.text,
-			'Neighbouring Solar Farm (EN010200) is already listed in NSIPs'
+			'Neighbouring Solar Farm (EN010200) is already listed in National infrastructure projects'
 		);
 	});
 

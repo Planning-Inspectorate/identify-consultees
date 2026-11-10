@@ -16,6 +16,7 @@ import {
 } from '../../../consultee-labels.ts';
 import { NEARBY_NSIPS, nearbyNsipName } from '../../../nearby-nsips.ts';
 import { firstQueryValue } from '../../../run-ruleset.ts';
+import { categoryDisplayName } from '../../categories.ts';
 import { consulteeName } from '../../report-consultees.ts';
 import { addConsulteeSuggestionsUrl, addConsulteeUrl, consulteesUrl, excludedMatchIds } from '../../urls.ts';
 import type { CategoryContext } from '../controller.ts';
@@ -219,7 +220,7 @@ async function renderAddPage(
 	];
 	const viewModel: AddConsulteeViewModel = {
 		pageHeading: 'Add a consultee',
-		pageCaption: category,
+		pageCaption: categoryDisplayName(category),
 		backLinkUrl: consulteesUrl(project.id, ruleset.id, category, selection),
 		formAction: addConsulteeUrl(project.id, ruleset.id, category, selection),
 		nearbySuggestions: suggestions,
@@ -347,6 +348,7 @@ async function resolveTypedName(
 	typed: string
 ): Promise<ResolvedName> {
 	const { category } = context;
+	const categoryName = categoryDisplayName(category);
 	const listed = listedNames(context);
 	if (category === NEARBY_NSIPS) {
 		// case names carry their reference, so a name is one case
@@ -359,7 +361,7 @@ async function resolveTypedName(
 				? candidate.name
 				: undefined;
 		if (listedAs) {
-			return { error: `${listedAs} is already listed in ${category}`, matching: [] };
+			return { error: `${listedAs} is already listed in ${categoryName}`, matching: [] };
 		}
 		return candidate
 			? { stored: { id: candidate.id, consultee: candidate.name }, matching: [] }
@@ -384,7 +386,7 @@ async function resolveTypedName(
 		(add) => add.category === category && !add.id && comparableName(add.name) === comparableName(name)
 	);
 	if (addedByNameAlone) {
-		return { error: `${name} is already listed in ${category}`, matching: [] };
+		return { error: `${name} is already listed in ${categoryName}`, matching: [] };
 	}
 	let picked: NameCandidate | undefined;
 	if (asLabel) {
@@ -409,12 +411,12 @@ async function resolveTypedName(
 		return { stored: { id: picked.id, consultee: picked.name }, matching: [] };
 	}
 	if (matching.length === 0) {
-		return { error: nameListed ? `${name} is already listed in ${category}` : 'Consultee not found', matching: [] };
+		return { error: nameListed ? `${name} is already listed in ${categoryName}` : 'Consultee not found', matching: [] };
 	}
 	const spelt = matching[0].name;
 	return {
 		error: nameListed
-			? `${spelt} is already listed in ${category} - to add another ${spelt}, choose it from the list`
+			? `${spelt} is already listed in ${categoryName} - to add another ${spelt}, choose it from the list`
 			: `There is more than one ${spelt} - choose the one you mean from the list`,
 		matching
 	};

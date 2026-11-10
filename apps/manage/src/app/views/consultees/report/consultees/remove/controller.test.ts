@@ -151,6 +151,25 @@ describe('report consultee remove page', () => {
 		assert.strictEqual(rulesetRunner.mock.callCount(), 0);
 	});
 
+	it('should spell out NSIPs in the caption, as the add page does', async () => {
+		const mockRes = { status: mock.fn(() => mockRes), render: mock.fn() };
+		const db = { $queryRaw: mock.fn(async () => [summaryRow()]) };
+		await removePage(db)(
+			{
+				params: { caseId: realProjectId },
+				query: {
+					...parishQuery,
+					category: 'NSIPs',
+					add: addJson('Neighbouring Solar Farm (EN010200)', 'r', 'NSIPs'),
+					added: '0'
+				}
+			},
+			mockRes
+		);
+
+		assert.strictEqual(mockRes.render.mock.calls[0].arguments[1].pageCaption, 'National infrastructure projects');
+	});
+
 	for (const [title, query] of [
 		['neither a match nor an added target', parishQuery],
 		['an unknown match id', { ...parishQuery, match: '99999999-9999-9999-9999-999999999999' }],

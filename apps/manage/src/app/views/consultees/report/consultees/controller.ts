@@ -15,7 +15,7 @@ import { describeReasons } from '../../reasons.ts';
 import { resolveCase } from '../../resolve-case.ts';
 import { buildSearchAreaSafely, firstQueryValue, requestedRuleset, runRulesetSafely } from '../../run-ruleset.ts';
 import { categoryBufferMetres, siteBufferGeojson, siteBuffers } from '../../site-buffers.ts';
-import { rulesetCategories } from '../categories.ts';
+import { categoryDisplayName, rulesetCategories } from '../categories.ts';
 import { addedConsulteeReason, consulteeName } from '../report-consultees.ts';
 import type { ConsulteeSelection } from '../urls.ts';
 import {
@@ -152,8 +152,9 @@ async function renderCategoryPage(
 		service.nearbySearchRadiusMetres,
 		service.logger
 	);
+	const categoryName = categoryDisplayName(category);
 	const staticMapSrc = categoryStaticMapUrl(project.id, ruleset.id, category, selection);
-	const staticMapAlt = `Static map showing ${category} consultees for ${project.properties.caseName}`;
+	const staticMapAlt = `Static map showing ${categoryName} consultees for ${project.properties.caseName}`;
 	// the ruleset's buffers for the category around the site, as the report's map draws them
 	const buffers = await siteBuffers(
 		service,
@@ -213,14 +214,14 @@ async function renderCategoryPage(
 		.sort((a, b) => a.name.localeCompare(b.name, 'en-GB'));
 
 	const viewModel: ReportConsulteesViewModel = {
-		pageHeading: category,
+		pageHeading: categoryName,
 		pageCaption: project.properties.caseName,
 		backLinkUrl: reportUrl(project.id, ruleset.id, selection),
 		backLinkText: 'Back to draft report',
 		rows,
 		addConsulteeUrl: addConsulteeUrl(project.id, ruleset.id, category, selection),
 		mapId: 'case-map',
-		mapRegionLabel: `Map showing ${category} consultees for ${project.properties.caseName}`,
+		mapRegionLabel: `Map showing ${categoryName} consultees for ${project.properties.caseName}`,
 		staticMapSrc,
 		staticMapAlt,
 		mapWidth: MAP_VIEWPORT.width,
