@@ -11,8 +11,6 @@ ENV npm_config_update_notifier=false
 # npm still needs a cache dir the runtime user can write
 ENV npm_config_cache=/home/node/.npm
 
-ARG GIT_SHA
-
 # Fonts for the text sharp draws into map images - the report maps' labels (see
 # src/app/maps/static-map.ts). Alpine has none, so without them the labels draw as nothing.
 RUN apk add --no-cache fontconfig font-dejavu
@@ -57,7 +55,6 @@ RUN npm ci --loglevel notice --workspace=identify-consultees-manage --ignore-scr
 RUN npm run deps:patch-maplibre && npm run deps:patch-im-aria-controls && npm run deps:patch-core-msal-nonce
 
 ENV NODE_ENV=production
-ENV GIT_SHA=$GIT_SHA
 
 RUN npm run build --workspace=identify-consultees-manage
 RUN npm run db-generate
@@ -66,8 +63,6 @@ RUN npm run db-generate
 
 # Stage 2/2 - App run
 FROM base
-
-ARG GIT_SHA
 
 WORKDIR /usr/src/app
 
@@ -80,6 +75,14 @@ RUN npm prune --omit=dev --ignore-scripts
 WORKDIR /usr/src/app/apps/manage
 
 ENV NODE_ENV=production
+
+# ARG/ENV sit as late as possible on purpose: a build ARG invalidates the cache
+# for every layer after its declaration, so declaring GIT_SHA early forced every
+# deploy's image to rebuild (and App Service to re-pull) the heavy npm ci / build
+# layers. Nothing in the RUN steps above reads GIT_SHA - the app only uses it at
+# runtime to report /health - so setting it here keeps every real layer shared
+# between releases and makes the post-swap pull a metadata diff.
+ARG GIT_SHA
 ENV GIT_SHA=$GIT_SHA
 
 # Drop root: the app only needs to read its own tree plus write the empty
