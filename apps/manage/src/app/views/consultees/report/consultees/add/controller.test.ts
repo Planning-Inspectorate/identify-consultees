@@ -751,4 +751,26 @@ describe('add a consultee suggestions, as a name is typed', () => {
 		assert.strictEqual(res.json.mock.callCount(), 0);
 		assert.deepStrictEqual(res.status.mock.calls[0]?.arguments, [404]);
 	});
+
+	it('measures distances from the simplified site, as screening does - from a detailed one, a search timed out', async () => {
+		const svc = {
+			...service(),
+			db: dbReturning([[{ ...realProjectRow(), simplifiedGeometryWkt: 'POINT(-1.4 52.6)' }]])
+		};
+		await suggest({ ...parishQuery, q: 'Middle' }, svc);
+		const res = rendering();
+		await buildReportConsulteeAddSubmit(svc as never)(
+			{ params: { caseId: realProjectId }, query: parishQuery, body: { name: 'Middleton', reason: 'r' } } as never,
+			res as never
+		);
+
+		const sites = svc.db.$queryRaw.mock.calls
+			.filter((call) => /LIKE|LOWER\(consultee\) =/.test(call.arguments[0].join('')))
+			.map((call) => call.arguments.slice(1).find((value) => String(value).startsWith('POINT')));
+		// the prefix search as it's typed, and the name lookup on submit
+		assert.ok(sites.length >= 2);
+		for (const site of sites) {
+			assert.match(String(site), /-1\.4 52\.6/);
+		}
+	});
 });

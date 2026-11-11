@@ -15,7 +15,7 @@ import {
 	nameBeforeLabel
 } from '../../../consultee-labels.ts';
 import { NEARBY_NSIPS, nearbyNsipName } from '../../../nearby-nsips.ts';
-import { firstQueryValue } from '../../../run-ruleset.ts';
+import { firstQueryValue, screenedGeometry } from '../../../run-ruleset.ts';
 import { categoryDisplayName } from '../../categories.ts';
 import { consulteeName } from '../../report-consultees.ts';
 import { addConsulteeSuggestionsUrl, addConsulteeUrl, consulteesUrl, excludedMatchIds } from '../../urls.ts';
@@ -281,7 +281,7 @@ export function buildReportConsulteeAddSuggestions(service: ManageService): Asyn
 		const inList = listedIds(context);
 		const removed = excludedMatchIds(context.selection.removed);
 		const candidates: NameCandidate[] = (
-			await findConsulteeAreasByNameStart(service.db, context.category, typed, context.project.geometry)
+			await findConsulteeAreasByNameStart(service.db, context.category, typed, screenedGeometry(context.project))
 		)
 			.filter((area) => !inList.has(area.id))
 			.map((area) => ({
@@ -312,7 +312,8 @@ async function consulteesNamed(
 		(candidate) => comparableName(candidate.name) === comparableName(name)
 	);
 	const matching: NameCandidate[] = [...suggested];
-	for (const area of await findConsulteeAreasByName(service.db, context.category, name, context.project.geometry)) {
+	const named = await findConsulteeAreasByName(service.db, context.category, name, screenedGeometry(context.project));
+	for (const area of named) {
 		if (!inList.has(area.id) && !matching.some((candidate) => candidate.id === area.id)) {
 			matching.push({
 				id: area.id,

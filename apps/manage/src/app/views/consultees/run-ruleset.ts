@@ -137,9 +137,11 @@ export async function runRulesetSafely(
  * drawn: what's sent to be screened, and grown into the map's search area. The function simplifies
  * the site the same way, so it finds the same consultees either way - but a detailed boundary is a
  * fraction of the size simplified (111,931 points to 4,817), and past config/screening.yaml's limit
- * either way, the function screens its bounding box without simplifying it at all.
+ * either way, the function screens its bounding box without simplifying it at all. The add page
+ * measures its suggestions' distances from it too: from the detailed boundary, a search for a
+ * name timed out.
  */
-function screenedGeometry(project: CaseBoundaryFeature) {
+export function screenedGeometry(project: CaseBoundaryFeature) {
 	return project.simplifiedGeometry ?? project.geometry;
 }
 
