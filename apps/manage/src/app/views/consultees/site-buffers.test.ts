@@ -20,7 +20,7 @@ const RULESET: Ruleset = {
 			name: 'Ambulance near',
 			group: 'Public bodies',
 			logicType: 'intersection',
-			categories: ['Ambulance Trust'],
+			categories: ['Ambulance trusts'],
 			bufferMetres: 1_000
 		},
 		{
@@ -28,7 +28,7 @@ const RULESET: Ruleset = {
 			name: 'Ambulance and hospital',
 			group: 'Public bodies',
 			logicType: 'intersection',
-			categories: ['Ambulance Trust', 'Hospital'],
+			categories: ['Ambulance trusts', 'Hospitals operated by NHS trusts and NHS foundation trusts (England)'],
 			bufferMetres: 10_000
 		},
 		{
@@ -36,7 +36,7 @@ const RULESET: Ruleset = {
 			name: 'Hospital touching',
 			group: 'Public bodies',
 			logicType: 'intersection',
-			categories: ['Hospital'],
+			categories: ['Hospitals operated by NHS trusts and NHS foundation trusts (England)'],
 			bufferMetres: 0
 		},
 		{
@@ -44,25 +44,28 @@ const RULESET: Ruleset = {
 			name: 'Parish host',
 			group: 'Administrative boundaries',
 			logicType: 'intersection',
-			categories: ['Parish Council']
+			categories: ['Parish, town and community councils']
 		},
 		{
 			id: 'parish-bordering',
 			name: 'Parish bordering',
 			group: 'Administrative boundaries',
 			logicType: 'bordering',
-			categories: ['Parish Council'],
-			hostCategory: 'Parish Council'
+			categories: ['Parish, town and community councils'],
+			hostCategory: 'Parish, town and community councils'
 		}
 	]
 };
 
 describe("a category's buffers", () => {
 	it("are its conditions' distances, smallest first, each once - none for touching or bordering", () => {
-		assert.deepStrictEqual(categoryBufferMetres(RULESET, 'Ambulance Trust', 5_000), [1_000, 10_000]);
-		assert.deepStrictEqual(categoryBufferMetres(RULESET, 'Hospital', 5_000), [10_000]);
-		assert.deepStrictEqual(categoryBufferMetres(RULESET, 'Parish Council', 5_000), []);
-		assert.deepStrictEqual(categoryBufferMetres(RULESET, 'Railway', 5_000), []);
+		assert.deepStrictEqual(categoryBufferMetres(RULESET, 'Ambulance trusts', 5_000), [1_000, 10_000]);
+		assert.deepStrictEqual(
+			categoryBufferMetres(RULESET, 'Hospitals operated by NHS trusts and NHS foundation trusts (England)', 5_000),
+			[10_000]
+		);
+		assert.deepStrictEqual(categoryBufferMetres(RULESET, 'Parish, town and community councils', 5_000), []);
+		assert.deepStrictEqual(categoryBufferMetres(RULESET, 'Railways', 5_000), []);
 	});
 
 	it('are the Nearby NSIPs distance for Nearby NSIPs, if it has one', () => {

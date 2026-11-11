@@ -60,7 +60,7 @@ def run_ruleset(
 ) -> Screening:
     """Every consultee the ruleset identifies for the site, plus every area within its category's
     nearby radius (`nearby_radius_metres_by_category`, else `nearby_radius_metres`; any category
-    but Railway), nearest first.
+    but Railways), nearest first.
 
     Each consultee appears once, with every reason it qualified: a ConditionReason for each
     condition it met, in the ruleset's order, then a NearbyReason if the nearby search found it.
@@ -177,7 +177,7 @@ def nearby_radius_for(match: AreaMatch, default_metres: float, radius_by_categor
 def answerable_from_nearby(rule: RuleCondition, nearby_radius_metres: float) -> bool:
     """Whether the nearby search already has every row `rule` could match, so it can be filtered
     in memory instead of queried: an intersection condition within the radius, for categories the
-    search includes. "Every category" (no categories) includes Railway, which the search leaves out.
+    search includes. "Every category" (no categories) includes Railways, which the search leaves out.
     """
     return (
         rule.logic_type == "intersection"

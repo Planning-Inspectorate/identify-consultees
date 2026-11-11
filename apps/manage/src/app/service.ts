@@ -77,9 +77,9 @@ export class ManageService extends BaseService<PrismaClient> {
 		return this.#rulesetRunner;
 	}
 
-	/** Where this environment's reference data files are copied from, if anywhere - see config.ts. */
-	get referenceDataCopy(): Config['referenceDataCopy'] {
-		return this.#config.referenceDataCopy;
+	/** Whether the admin pages can change the reference data, or only report it - see config.ts. */
+	get referenceDataChanges(): boolean {
+		return this.#config.referenceDataChanges;
 	}
 
 	get blobStoreConfig(): Config['blobStore'] {

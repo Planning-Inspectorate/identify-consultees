@@ -2,20 +2,23 @@ import type { ManageService } from '#service';
 import { findOtherCases } from '@pins/identify-consultees-database/src/geospatial/case-boundaries.ts';
 import {
 	consulteeAreaDetails,
-	findConsulteeAreasByName
+	findConsulteeAreasByName,
+	findConsulteeAreasByNameStart
 } from '@pins/identify-consultees-database/src/geospatial/consultee-areas.ts';
 import { isIdentified } from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
 import type { AsyncRequestHandler, AsyncRequestHandlerWithBody } from '@planning-inspectorate/core/util';
 import type { Response } from 'express';
 import {
-	distinguishedLabels,
 	distinguishingDetail,
+	labelsWithReferenceData,
 	labelVariants,
 	nameBeforeLabel
 } from '../../../consultee-labels.ts';
 import { NEARBY_NSIPS, nearbyNsipName } from '../../../nearby-nsips.ts';
+import { firstQueryValue } from '../../../run-ruleset.ts';
+import { categoryDisplayName } from '../../categories.ts';
 import { consulteeName } from '../../report-consultees.ts';
-import { addConsulteeUrl, consulteesUrl, excludedMatchIds } from '../../urls.ts';
+import { addConsulteeSuggestionsUrl, addConsulteeUrl, consulteesUrl, excludedMatchIds } from '../../urls.ts';
 import type { CategoryContext } from '../controller.ts';
 import { categoryContext, comparableName, kilometresFromSite, nearbyCandidates } from '../controller.ts';
 import type { AddConsulteeForm, AddConsulteeViewModel } from './view-model.ts';
@@ -42,9 +45,10 @@ interface LabelledCandidate extends NameCandidate {
 }
 
 /**
- * How each candidate is offered and typed: its name - or, when another candidate or a listed
- * consultee has its name too, its name and what tells it apart, "Middleton (Lancaster)" (see
- * consultee-labels.ts). The hint gives its distance from the site, and its region.
+ * How each candidate is offered and typed: its name - or, when another candidate, a listed
+ * consultee or another in the reference data has its name too, its name and what tells it apart,
+ * "Middleton (Lancaster)" (see consultee-labels.ts). The hint gives its distance from the site, and
+ * its region.
  */
 async function labelCandidates(
 	service: ManageService,
@@ -52,22 +56,17 @@ async function labelCandidates(
 	candidates: NameCandidate[],
 	listed: string[]
 ): Promise<LabelledCandidate[]> {
-	const names = [...candidates.map((candidate) => comparableName(candidate.name)), ...listed];
-	const sharing = candidates.filter(
-		(candidate) => names.filter((name) => name === comparableName(candidate.name)).length > 1
+	const { labels, sharing } = await labelsWithReferenceData(
+		service.db,
+		category,
+		category !== NEARBY_NSIPS,
+		candidates,
+		listed
 	);
-	const details =
-		sharing.length > 0 && category !== NEARBY_NSIPS
-			? await consulteeAreaDetails(
-					service.db,
-					sharing.map(({ id }) => id)
-				)
-			: new Map();
-	const labels = distinguishedLabels(candidates, category, details, listed);
 	return candidates.map((candidate) => {
 		// every candidate has one
 		const label = labels.get(candidate.id)!;
-		const isShared = sharing.includes(candidate);
+		const isShared = sharing.has(candidate.id);
 		const hint = [
 			label.includes(' km from the site') ? undefined : kilometresFromSite(candidate.distanceMetres),
 			isShared && candidate.region && !label.includes(candidate.region) ? candidate.region : undefined,
@@ -221,18 +220,21 @@ async function renderAddPage(
 	];
 	const viewModel: AddConsulteeViewModel = {
 		pageHeading: 'Add a consultee',
-		pageCaption: category,
+		pageCaption: categoryDisplayName(category),
 		backLinkUrl: consulteesUrl(project.id, ruleset.id, category, selection),
 		formAction: addConsulteeUrl(project.id, ruleset.id, category, selection),
 		nearbySuggestions: suggestions,
+		// a consultee category's suggestions come from the whole of its reference data as a name is
+		// typed (buildReportConsulteeAddSuggestions); Nearby NSIPs' are every other case, all on the page
+		...(category === NEARBY_NSIPS
+			? {}
+			: { suggestionsUrl: addConsulteeSuggestionsUrl(project.id, ruleset.id, category, selection) }),
 		nameHint:
 			category === NEARBY_NSIPS
 				? { text: 'Start typing to choose a national infrastructure project by its name or case reference.' }
-				: suggestions.length
-					? {
-							text: 'Start typing to find consultees local to the site or directly copy and paste in a consultee name'
-						}
-					: undefined,
+				: {
+						text: 'Start typing to find a consultee - those near the site come first - or paste in a consultee name'
+					},
 		addForm: form,
 		...(errorSummary.length ? { errorSummary } : {})
 	};
@@ -252,6 +254,46 @@ export function buildReportConsulteeAddPage(service: ManageService): AsyncReques
 		if (context) {
 			await renderAddPage(res, service, context);
 		}
+	};
+}
+
+// what's typed before the reference data is searched - a letter or two would match thousands
+const MIN_SUGGESTION_QUERY = 3;
+
+/**
+ * The add page's suggestions as a name is typed - `?q=` - as JSON, `[{ name, hint }]`: the
+ * category's consultees anywhere in the reference data whose names start with it (every Newton,
+ * for "Newton"), not already listed, each labelled as the page labels it - so "Newton (South
+ * Cambridgeshire)" can be chosen at once, rather than only after submitting "Newton" and being
+ * told there's more than one. consultee-autocomplete.js adds them to the page's own suggestions.
+ */
+export function buildReportConsulteeAddSuggestions(service: ManageService): AsyncRequestHandler {
+	return async (req, res) => {
+		const context = await categoryContext(service, req, res);
+		if (!context) {
+			return;
+		}
+		const typed = firstQueryValue(req.query.q).trim().replace(/\s+/g, ' ');
+		if (context.category === NEARBY_NSIPS || typed.length < MIN_SUGGESTION_QUERY) {
+			res.json([]);
+			return;
+		}
+		const inList = listedIds(context);
+		const removed = excludedMatchIds(context.selection.removed);
+		const candidates: NameCandidate[] = (
+			await findConsulteeAreasByNameStart(service.db, context.category, typed, context.project.geometry)
+		)
+			.filter((area) => !inList.has(area.id))
+			.map((area) => ({
+				id: area.id,
+				name: area.consultee,
+				aliases: [area.consultee],
+				distanceMetres: area.distanceMetres,
+				region: area.region,
+				removed: removed.has(area.id)
+			}));
+		const labelled = await labelCandidates(service, context.category, candidates, listedNames(context));
+		res.json(labelled.map(({ label, hint }) => ({ name: label, hint })));
 	};
 }
 
@@ -306,6 +348,7 @@ async function resolveTypedName(
 	typed: string
 ): Promise<ResolvedName> {
 	const { category } = context;
+	const categoryName = categoryDisplayName(category);
 	const listed = listedNames(context);
 	if (category === NEARBY_NSIPS) {
 		// case names carry their reference, so a name is one case
@@ -318,7 +361,7 @@ async function resolveTypedName(
 				? candidate.name
 				: undefined;
 		if (listedAs) {
-			return { error: `${listedAs} is already listed in ${category}`, matching: [] };
+			return { error: `${listedAs} is already listed in ${categoryName}`, matching: [] };
 		}
 		return candidate
 			? { stored: { id: candidate.id, consultee: candidate.name }, matching: [] }
@@ -343,7 +386,7 @@ async function resolveTypedName(
 		(add) => add.category === category && !add.id && comparableName(add.name) === comparableName(name)
 	);
 	if (addedByNameAlone) {
-		return { error: `${name} is already listed in ${category}`, matching: [] };
+		return { error: `${name} is already listed in ${categoryName}`, matching: [] };
 	}
 	let picked: NameCandidate | undefined;
 	if (asLabel) {
@@ -368,12 +411,12 @@ async function resolveTypedName(
 		return { stored: { id: picked.id, consultee: picked.name }, matching: [] };
 	}
 	if (matching.length === 0) {
-		return { error: nameListed ? `${name} is already listed in ${category}` : 'Consultee not found', matching: [] };
+		return { error: nameListed ? `${name} is already listed in ${categoryName}` : 'Consultee not found', matching: [] };
 	}
 	const spelt = matching[0].name;
 	return {
 		error: nameListed
-			? `${spelt} is already listed in ${category} - to add another ${spelt}, choose it from the list`
+			? `${spelt} is already listed in ${categoryName} - to add another ${spelt}, choose it from the list`
 			: `There is more than one ${spelt} - choose the one you mean from the list`,
 		matching
 	};

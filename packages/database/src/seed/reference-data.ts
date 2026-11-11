@@ -8,11 +8,11 @@ import { CONFIG_DIR } from '../config-dir.ts';
  * config/reference-data.yaml - see the file for what each setting means.
  */
 export interface ReferenceDataConfig {
-	/** Consultee category by dataset code: AMB_EW → Ambulance Trust. */
+	/** Consultee category by dataset code: AMB_EW → Ambulance trusts. */
 	datasets: ReadonlyMap<string, string>;
 	/**
 	 * By dataset code, the category a subcategory of it loads as instead - OWF_EW's Offshore Wind
-	 * Export Cables → Offshore Wind Export Cable. Subcategories are keyed lower case.
+	 * Export Cables → Offshore wind export cables and sites. Subcategories are keyed lower case.
 	 */
 	subcategories: ReadonlyMap<string, ReadonlyMap<string, string>>;
 	/** The groups the reference data is uploaded and loaded in, in the file's order. */

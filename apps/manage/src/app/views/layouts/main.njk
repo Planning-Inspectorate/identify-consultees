@@ -33,7 +33,7 @@
 {% endblock %}
 
 {% block govukServiceNavigation %}
-	{{ pinsServiceNavigation(config.headerTitle, hideSignOut, adminLink) }}
+	{{ pinsServiceNavigation(config.headerTitle, hideSignOut, adminNav != undefined) }}
 {% endblock %}
 
 {% block containerStart %}

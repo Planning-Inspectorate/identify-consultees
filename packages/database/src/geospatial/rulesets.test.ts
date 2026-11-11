@@ -32,15 +32,15 @@ names:
   c: Ruleset C
 consulteeTypes:
   Railways:
-    categories: [Railway]
+    categories: [Railways]
   Parish Councils bordering Host Parish Councils:
-    categories: [Parish Council]
-    hostCategory: Parish Council
+    categories: ['Parish, town and community councils']
+    hostCategory: 'Parish, town and community councils'
 logic:
   Intersects application site: intersection
   Intersects application site buffer: buffer
   Borders host authority: bordering
-categoriesAwaitingData: [Canal]
+categoriesAwaitingData: [Canal or inland navigation authorities]
 `;
 
 describe('parseRulesetSettings', () => {
@@ -51,20 +51,23 @@ describe('parseRulesetSettings', () => {
 		assert.deepEqual(
 			[...settings.consulteeTypes],
 			[
-				['railways', { categories: ['Railway'] }],
+				['railways', { categories: ['Railways'] }],
 				[
 					'parish councils bordering host parish councils',
-					{ categories: ['Parish Council'], hostCategory: 'Parish Council' }
+					{ categories: ['Parish, town and community councils'], hostCategory: 'Parish, town and community councils' }
 				]
 			]
 		);
 		assert.equal(settings.logic.get('intersects application site buffer'), 'buffer');
-		assert.deepEqual([...settings.categoriesAwaitingData], ['Canal']);
+		assert.deepEqual([...settings.categoriesAwaitingData], ['Canal or inland navigation authorities']);
 	});
 
 	test('lists the accepted consultee type wordings as written, and which await data', () => {
 		const settings = parseRulesetSettings(
-			SETTINGS.replace('consulteeTypes:\n', 'consulteeTypes:\n  Canals  England:\n    categories: [Canal]\n')
+			SETTINGS.replace(
+				'consulteeTypes:\n',
+				'consulteeTypes:\n  Canals  England:\n    categories: [Canal or inland navigation authorities]\n'
+			)
 		);
 		assert.deepEqual(acceptedConsulteeTypes(settings), [
 			{ wording: 'Canals  England', awaitingData: true },
@@ -87,7 +90,10 @@ describe('parseRulesetSettings', () => {
 
 	test('treats names and categoriesAwaitingData as optional', () => {
 		const settings = parseRulesetSettings(
-			SETTINGS.replace(/names:\n {2}c: Ruleset C\n/, '').replace('categoriesAwaitingData: [Canal]', '')
+			SETTINGS.replace(/names:\n {2}c: Ruleset C\n/, '').replace(
+				'categoriesAwaitingData: [Canal or inland navigation authorities]',
+				''
+			)
 		);
 		assert.deepEqual(settings.names, {});
 		assert.deepEqual([...settings.categoriesAwaitingData], []);
@@ -111,23 +117,27 @@ describe('parseRulesetSettings', () => {
 		],
 		[
 			'a repeated wording',
-			SETTINGS.replace('  Railways:', '  RAILWAYS:\n    categories: [Railway]\n  Railways:'),
+			SETTINGS.replace('  Railways:', '  RAILWAYS:\n    categories: [Railways]\n  Railways:'),
 			/consulteeTypes lists "Railways" twice/
 		],
 		[
 			'a consultee type without settings',
-			SETTINGS.replace('  Railways:\n    categories: [Railway]', '  Railways: Railway'),
+			SETTINGS.replace('  Railways:\n    categories: [Railways]', '  Railways: Railway'),
 			/consulteeTypes.Railways must set categories/
 		],
 		['a typo in a consultee type', SETTINGS.replace('    hostCategory:', '    host:'), /has "host"/],
-		['no categories', SETTINGS.replace('categories: [Railway]', 'categories: []'), /Railways.categories must list/],
+		['no categories', SETTINGS.replace('categories: [Railways]', 'categories: []'), /Railways.categories must list/],
 		[
 			'a blank host category',
-			SETTINGS.replace('hostCategory: Parish Council', 'hostCategory: ""'),
+			SETTINGS.replace("hostCategory: 'Parish, town and community councils'", 'hostCategory: ""'),
 			/hostCategory must be a consultee category/
 		],
 		['an unknown logic', SETTINGS.replace(': buffer', ': nearby'), /must be intersection, buffer or bordering/],
-		['awaiting categories as text', SETTINGS.replace('[Canal]', 'Canal'), /categoriesAwaitingData must list/]
+		[
+			'awaiting categories as text',
+			SETTINGS.replace('[Canal or inland navigation authorities]', 'Canal or inland navigation authorities'),
+			/categoriesAwaitingData must list/
+		]
 	] as const) {
 		test(`refuses ${title}, naming the setting`, () => {
 			assert.throws(() => parseRulesetSettings(text), message);
@@ -171,7 +181,7 @@ describe('parseRulesetCsv', () => {
 			// the workbook's Group, as written - the report's export tabs follow it
 			group: 'Administative boundaries',
 			logicType: 'intersection',
-			categories: ['Unitary Authority'],
+			categories: ['Unitary authorities'],
 			bufferMetres: 0
 		});
 	});
@@ -185,8 +195,13 @@ describe('parseRulesetCsv', () => {
 			name: '"D" County Councils, Unitary Authorities, National Parks & Broads bordering "C" host County Councils',
 			group: 'Administative boundaries',
 			logicType: 'bordering',
-			categories: ['Upper Tier Authority', 'Unitary Authority', 'National Park'],
-			hostCategory: 'Upper Tier Authority'
+			categories: [
+				'County councils (upper-tier authorities)',
+				'Unitary authorities',
+				'National Parks UK (England)',
+				'National Parks UK (Wales)'
+			],
+			hostCategory: 'County councils (upper-tier authorities)'
 		});
 	});
 
@@ -204,11 +219,11 @@ describe('parseRulesetCsv', () => {
 		assert.deepEqual(
 			rules.map((rule) => [rule.id, rule.name, rule.bufferMetres, rule.categories]),
 			[
-				['ambulance_trusts_1km', 'Ambulance Trusts', 1000, ['Ambulance Trust']],
-				['ambulance_trusts_10km', 'Ambulance Trusts', 10000, ['Ambulance Trust']],
+				['ambulance_trusts_1km', 'Ambulance Trusts', 1000, ['Ambulance trusts']],
+				['ambulance_trusts_10km', 'Ambulance Trusts', 10000, ['Ambulance trusts']],
 				// matched case- and space-insensitively, named as written
-				['cheshire_brine_area', 'cheshire  BRINE area', 0, ['Cheshire Brine Area']],
-				['railways', 'Railways', 0, ['Railway']]
+				['cheshire_brine_area', 'cheshire  BRINE area', 0, ['Cheshire brine subsidence district']],
+				['railways', 'Railways', 0, ['Railways']]
 			]
 		);
 	});
@@ -273,7 +288,7 @@ describe('buildRulesetFromCsv', () => {
 		assert.equal(ruleset.name, 'Test ruleset');
 		assert.deepEqual(
 			ruleset.rules.map((rule) => rule.categories),
-			[['Railway'], ['Hospital']]
+			[['Railways'], ['Hospitals operated by NHS trusts and NHS foundation trusts (England)']]
 		);
 	});
 });
@@ -433,11 +448,11 @@ describe('rulesets registry', () => {
 	test('names each condition matching a category with no data, and each stale category awaiting data', () => {
 		const reference = parseReferenceDataConfig(`version: 1
 datasets:
-  PAR_EW: Parish Council
-  OWF_EW: { category: Offshore Wind Site, subcategories: { Export Cables: Offshore Wind Export Cable } }
+  PAR_EW: Parish, town and community councils
+  OWF_EW: { category: Offshore wind export cables and sites, subcategories: { Export Cables: Offshore wind export cables and sites } }
 groups:
-  Administrative boundaries: [Parish Council, Canal, Railway]
-  Energy: [Offshore Wind Site, Offshore Wind Export Cable]
+  Administrative boundaries: ['Parish, town and community councils', Canal or inland navigation authorities, Railways]
+  Energy: [Offshore wind export cables and sites]
 `);
 		const rule = (name: string, categories: string[], hostCategory?: string) => ({
 			id: name,
@@ -452,24 +467,32 @@ groups:
 				id: 'a',
 				name: 'Ruleset A',
 				rules: [
-					rule('Parishes', ['Parish Council']),
+					rule('Parishes', ['Parish, town and community councils']),
 					// a subcategory's category has data too
-					rule('Cables', ['Offshore Wind Export Cable']),
-					rule('Canals', ['Canal']),
-					rule('Bordering', ['Parish Council'], 'Hospital'),
-					rule('Rail', ['Railway'])
+					rule('Cables', ['Offshore wind export cables and sites']),
+					rule('Canals', ['Canal or inland navigation authorities']),
+					rule(
+						'Bordering',
+						['Parish, town and community councils'],
+						'Hospitals operated by NHS trusts and NHS foundation trusts (England)'
+					),
+					rule('Rail', ['Railways'])
 				]
 			}
 		];
 		const settings = {
 			...RULESET_SETTINGS,
-			categoriesAwaitingData: new Set(['Canal', 'Parish Council', 'Dock or Harbour'])
+			categoriesAwaitingData: new Set([
+				'Canal or inland navigation authorities',
+				'Parish, town and community councils',
+				'Dock and harbour authorities'
+			])
 		};
 		assert.deepEqual(rulesetCategoryProblems(rulesets, settings, reference), [
-			'Ruleset A, Bordering: matches Hospital, which no dataset in reference-data.yaml loads as - add its dataset there, or list it under categoriesAwaitingData in rulesets.yaml',
-			'Ruleset A, Rail: matches Railway, which no dataset in reference-data.yaml loads as - add its dataset there, or list it under categoriesAwaitingData in rulesets.yaml',
-			'rulesets.yaml: categoriesAwaitingData lists Parish Council, which has data now - take it out',
-			'rulesets.yaml: categoriesAwaitingData lists Dock or Harbour, which no ruleset names - take it out'
+			'Ruleset A, Bordering: matches Hospitals operated by NHS trusts and NHS foundation trusts (England), which no dataset in reference-data.yaml loads as - add its dataset there, or list it under categoriesAwaitingData in rulesets.yaml',
+			'Ruleset A, Rail: matches Railways, which no dataset in reference-data.yaml loads as - add its dataset there, or list it under categoriesAwaitingData in rulesets.yaml',
+			'rulesets.yaml: categoriesAwaitingData lists Parish, town and community councils, which has data now - take it out',
+			'rulesets.yaml: categoriesAwaitingData lists Dock and harbour authorities, which no ruleset names - take it out'
 		]);
 	});
 

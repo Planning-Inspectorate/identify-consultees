@@ -161,7 +161,7 @@ async function categoryMap(
 	context: ReportMapsContext,
 	category: string
 ): Promise<
-	Pick<MapPdfInput, 'image' | 'metresPerPixel' | 'colours' | 'buffers' | 'mapNote'> & {
+	Pick<MapPdfInput, 'image' | 'basemap' | 'metresPerPixel' | 'colours' | 'buffers' | 'mapNote'> & {
 		projectColours: Map<string, string>;
 	}
 > {
@@ -227,6 +227,8 @@ async function categoryMap(
 	});
 	return {
 		image: image.body as Buffer,
+		// for its credit
+		basemap: image.basemap,
 		// for the scale bar - the image has MAP_PIXEL_RATIO pixels to a map pixel
 		metresPerPixel: metresPerPixel(view) / MAP_PIXEL_RATIO,
 		colours,

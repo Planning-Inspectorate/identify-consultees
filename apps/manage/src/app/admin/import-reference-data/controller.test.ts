@@ -57,7 +57,7 @@ describe('admin import reference data', () => {
 	it("shows each group's newest file, its rows and its last load, and the tables' counts", async () => {
 		const res = newRes();
 		const db = databaseWith({
-			groupRows: { 'Ambulance Trust': 12_000, 'Parish Council': 11_548 },
+			groupRows: { 'Ambulance trusts': 12_000, 'Parish, town and community councils': 11_548 },
 			loads: [
 				{
 					dataGroup: 'public_bodies',
@@ -76,7 +76,10 @@ describe('admin import reference data', () => {
 			blob('combined_reference_data_v1.geojson'),
 			blob('20261020_energy.geojson', 1_500_000)
 		]);
-		await buildImportReferenceDataPage({ db, logger: mockLogger() } as never, blobs)({}, res);
+		await buildImportReferenceDataPage({ db, logger: mockLogger(), referenceDataChanges: true } as never, blobs)(
+			{},
+			res
+		);
 
 		assert.strictEqual(res.render.mock.calls[0].arguments[0], 'admin/import-reference-data/view.njk');
 		const { groups, loadedConsulteeAreas, loadedCaseBoundaries, blobStorageRead } = viewModelOf(res);
@@ -88,7 +91,7 @@ describe('admin import reference data', () => {
 			name: 'Public bodies',
 			slug: 'public_bodies',
 			categories:
-				'Ambulance Trust, Fire and Rescue Authority, Hospital, ICB, Internal Drainage Board, Internal Drainage District, Local Health Board, Local Resilience Forum, National Landscape, Police',
+				'Ambulance trusts, Fire and rescue authorities, Hospitals operated by NHS trusts and NHS foundation trusts (England), Integrated Care Boards (England), Internal drainage boards (England), Internal drainage boards (Wales), Local health boards (Wales), Local resilience forums (Wales), National Landscapes - areas of outstanding natural beauty (England), National Landscapes - areas of outstanding natural beauty (Wales), Police and crime commissioners',
 			// the newest by the date its data is from, whatever order they're listed in
 			file: { name: '20261020_public_bodies.geojson', dataDate: '20 October 2026', quarter: '2026Q4', size: '250MB' },
 			rows: 12_000,
@@ -119,6 +122,22 @@ describe('admin import reference data', () => {
 		assert.doesNotMatch(html, /Import case boundaries/);
 	});
 
+	it('only reports, as Reference data, where the reference data cannot be changed', async () => {
+		const res = newRes();
+		await buildImportReferenceDataPage(
+			{ db: databaseWith(), logger: mockLogger(), referenceDataChanges: false } as never,
+			files([blob('20261020_public_bodies.geojson')])
+		)({}, res);
+
+		assert.strictEqual(viewModelOf(res).pageHeading, 'Reference data');
+		assert.strictEqual(viewModelOf(res).canChange, false);
+		const html = htmlOf(res);
+		assert.match(html, /20261020_public_bodies.geojson/);
+		assert.doesNotMatch(html, /aria-label="Load Public bodies"/);
+		assert.doesNotMatch(html, /Clear consultee areas/);
+		assert.match(html, /Promote reference data pipeline/);
+	});
+
 	it('still renders the page with what it could read, logging what it could not', async () => {
 		const res = newRes();
 		const logger = mockLogger();
@@ -133,7 +152,7 @@ describe('admin import reference data', () => {
 			}),
 			download: mock.fn()
 		};
-		await buildImportReferenceDataPage({ db, logger } as never, blobs)({}, res);
+		await buildImportReferenceDataPage({ db, logger, referenceDataChanges: true } as never, blobs)({}, res);
 
 		const { loadedConsulteeAreas, blobStorageRead, groups } = viewModelOf(res);
 		assert.strictEqual(loadedConsulteeAreas, undefined);
@@ -155,10 +174,18 @@ describe('admin import reference data', () => {
 				{ name: 'consultee_area_2027Q1', rows: 1_929 },
 				{ name: 'consultee_area_2026Q4', rows: 15_605 }
 			],
-			groupRows: { 'Parish Council': 11_901, 'Ambulance Trust': 316, DNO: 1_929, Canal: 1_459 },
-			pendingGroupRows: { DNO: 1_929 }
+			groupRows: {
+				'Parish, town and community councils': 11_901,
+				'Ambulance trusts': 316,
+				'Electricity distributors with compulsory purchase order powers': 1_929,
+				'Canal or inland navigation authorities': 1_459
+			},
+			pendingGroupRows: { 'Electricity distributors with compulsory purchase order powers': 1_929 }
 		});
-		await buildImportReferenceDataPage({ db, logger: mockLogger() } as never, files())({}, res);
+		await buildImportReferenceDataPage({ db, logger: mockLogger(), referenceDataChanges: true } as never, files())(
+			{},
+			res
+		);
 
 		const { datasets, pending, groups } = viewModelOf(res);
 		assert.deepStrictEqual(datasets, [
@@ -213,7 +240,7 @@ describe('admin import reference data', () => {
 				waitingFor: [{ name: 'Energy', slug: 'energy', categories: new Set<string>() }]
 			}));
 			const run = buildRunImportConsulteeAreaGroup(
-				{ db: databaseWith(), logger: mockLogger() } as never,
+				{ db: databaseWith(), logger: mockLogger(), referenceDataChanges: true } as never,
 				blobs,
 				runImport
 			);
@@ -243,7 +270,7 @@ describe('admin import reference data', () => {
 				waitingFor: []
 			}));
 			const clear = mock.fn(async () => 1);
-			const service = { db: databaseWith(), bulkDb, logger: mockLogger() } as never;
+			const service = { db: databaseWith(), bulkDb, logger: mockLogger(), referenceDataChanges: true } as never;
 			await buildRunImportConsulteeAreaGroup(
 				service,
 				files(),
@@ -264,7 +291,7 @@ describe('admin import reference data', () => {
 				waitingFor: []
 			}));
 			await buildRunImportConsulteeAreaGroup(
-				{ db: databaseWith(), logger: mockLogger() } as never,
+				{ db: databaseWith(), logger: mockLogger(), referenceDataChanges: true } as never,
 				files(),
 				runImport
 			)({ body: { group: 'public_bodies' } } as never, res);
@@ -289,7 +316,7 @@ describe('admin import reference data', () => {
 				const blobFiles = files([...blobs]);
 				const runImport = mock.fn();
 				await buildRunImportConsulteeAreaGroup(
-					{ db: databaseWith(), logger: mockLogger() } as never,
+					{ db: databaseWith(), logger: mockLogger(), referenceDataChanges: true } as never,
 					blobFiles,
 					runImport as never
 				)({ body } as never, res);
@@ -313,7 +340,7 @@ describe('admin import reference data', () => {
 					throw error;
 				});
 				await buildRunImportConsulteeAreaGroup(
-					{ db: databaseWith(), logger: mockLogger() } as never,
+					{ db: databaseWith(), logger: mockLogger(), referenceDataChanges: true } as never,
 					blobFiles,
 					runImport
 				)({ body: { group: 'public_bodies' } } as never, res);
@@ -332,10 +359,10 @@ describe('admin import reference data', () => {
 			blobFiles.download = mock.fn(async () => {
 				throw new Error('AuthorizationPermissionMismatch');
 			});
-			await buildRunImportConsulteeAreaGroup({ db: databaseWith(), logger: mockLogger() } as never, blobFiles)(
-				{ body: { group: 'public_bodies' } } as never,
-				res
-			);
+			await buildRunImportConsulteeAreaGroup(
+				{ db: databaseWith(), logger: mockLogger(), referenceDataChanges: true } as never,
+				blobFiles
+			)({ body: { group: 'public_bodies' } } as never, res);
 			assert.strictEqual(viewModelOf(res).error, 'Could not load Public bodies from blob storage.');
 		});
 	});
@@ -345,7 +372,7 @@ describe('admin import reference data', () => {
 			const res = newRes();
 			const clear = mock.fn(async () => 15_605);
 			await buildClearConsulteeAreas(
-				{ db: databaseWith(), logger: mockLogger() } as never,
+				{ db: databaseWith(), logger: mockLogger(), referenceDataChanges: true } as never,
 				files(),
 				clear
 			)({ body: { quarter: '2026Q4' } } as never, res);
@@ -362,7 +389,10 @@ describe('admin import reference data', () => {
 					{ name: 'consultee_area_2027Q1', rows: 1_929 }
 				]
 			});
-			await buildImportReferenceDataPage({ db, logger: mockLogger() } as never, files())({}, res);
+			await buildImportReferenceDataPage({ db, logger: mockLogger(), referenceDataChanges: true } as never, files())(
+				{},
+				res
+			);
 			const html = htmlOf(res);
 			assert.match(html, /<select class="govuk-select" id="quarter" name="quarter">/);
 			assert.match(html, /<option value="2026Q4" selected>2026Q4 - in use, 15605 consultee areas<\/option>/);
@@ -372,7 +402,7 @@ describe('admin import reference data', () => {
 		it('says there is nothing to clear with no dataset', async () => {
 			const res = newRes();
 			await buildImportReferenceDataPage(
-				{ db: databaseWith({ datasets: [] }), logger: mockLogger() } as never,
+				{ db: databaseWith({ datasets: [] }), logger: mockLogger(), referenceDataChanges: true } as never,
 				files()
 			)({}, res);
 			assert.match(htmlOf(res), /There's no dataset to clear\./);
@@ -387,7 +417,7 @@ describe('admin import reference data', () => {
 				const res = newRes();
 				const clear = mock.fn(async () => 0);
 				await buildClearConsulteeAreas(
-					{ db: databaseWith(), logger: mockLogger() } as never,
+					{ db: databaseWith(), logger: mockLogger(), referenceDataChanges: true } as never,
 					files(),
 					clear
 				)({ body } as never, res);
@@ -402,7 +432,7 @@ describe('admin import reference data', () => {
 				throw new Error('deadlock');
 			});
 			await buildClearConsulteeAreas(
-				{ db: databaseWith(), logger: mockLogger() } as never,
+				{ db: databaseWith(), logger: mockLogger(), referenceDataChanges: true } as never,
 				files(),
 				clear
 			)({ body: { quarter: '2026Q4' } } as never, res);

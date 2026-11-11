@@ -8,5 +8,5 @@ pymssql==2.4.6
 # CBOS (the IDAS back office) is reached as the app's managed identity - see cbos/. mssql-python
 # bundles its own ODBC driver and accepts an azure-identity credential, which pymssql can't.
 azure-identity==1.26.0
-azure-storage-blob==12.31.0
+azure-storage-blob==12.31.1
 mssql-python==1.15.0

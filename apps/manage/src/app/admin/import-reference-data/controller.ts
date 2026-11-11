@@ -7,8 +7,8 @@ import {
 	groupRowCounts,
 	groupsStillToLoad,
 	importConsulteeAreaGroup,
+	latestGroupFiles,
 	latestGroupLoads,
-	parseGroupBlobName,
 	quarterOf
 } from '@pins/identify-consultees-database/src/seed/consultee-area-groups.ts';
 import type { StoredBlob } from '@pins/identify-consultees-database/src/seed/import-from-blob.ts';
@@ -26,6 +26,8 @@ import type { GroupStatus, ImportReferenceDataViewModel } from './view-model.ts'
 
 const VIEW = 'admin/import-reference-data/view.njk';
 const PAGE_HEADING = 'Load into database';
+// where the reference data can't be changed - Training and Prod (see config.ts) - the page only reports
+const REPORT_HEADING = 'Reference data';
 
 /** Where the page finds, and fetches, the files it loads - blob storage, but for tests. */
 export interface BlobFiles {
@@ -34,19 +36,6 @@ export interface BlobFiles {
 }
 
 const BLOB_STORAGE: BlobFiles = { list: listBlobs, download: downloadBlobToTempFile };
-
-/** Each group's newest file in blob storage - by the date its data is from - by slug. */
-function latestGroupFiles(blobs: StoredBlob[]): Map<string, StoredBlob & { dataDate: string }> {
-	const latest = new Map<string, StoredBlob & { dataDate: string }>();
-	for (const blob of blobs) {
-		const file = parseGroupBlobName(blob.name);
-		const current = file ? latest.get(file.group.slug) : undefined;
-		if (file && (!current || file.dataDate > current.dataDate)) {
-			latest.set(file.group.slug, { ...blob, dataDate: file.dataDate });
-		}
-	}
-	return latest;
-}
 
 const formatDate = (date: Date) =>
 	date.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' });
@@ -105,7 +94,7 @@ function groupStatus(
  * what can't be read is left off the page, and logged.
  */
 async function withStatus(
-	service: Pick<ManageService, 'db' | 'logger'>,
+	service: Pick<ManageService, 'db' | 'logger' | 'referenceDataChanges'>,
 	files: BlobFiles,
 	viewModel: ImportReferenceDataViewModel
 ): Promise<ImportReferenceDataViewModel> {
@@ -145,6 +134,7 @@ async function withStatus(
 	const groupFiles = latestGroupFiles(blobs ?? []);
 	return {
 		...viewModel,
+		canChange: service.referenceDataChanges,
 		...(counts ? { loadedConsulteeAreas: counts.consulteeAreas, loadedCaseBoundaries: counts.caseBoundaries } : {}),
 		...(inUse ? { datasetInUse: inUse } : {}),
 		...(datasets
@@ -176,8 +166,9 @@ export function buildImportReferenceDataPage(
 	service: ManageService,
 	files: BlobFiles = BLOB_STORAGE
 ): AsyncRequestHandler {
+	const pageHeading = service.referenceDataChanges ? PAGE_HEADING : REPORT_HEADING;
 	return async (req, res) => {
-		return res.render(VIEW, await withStatus(service, files, { pageHeading: PAGE_HEADING }));
+		return res.render(VIEW, await withStatus(service, files, { pageHeading }));
 	};
 }
 

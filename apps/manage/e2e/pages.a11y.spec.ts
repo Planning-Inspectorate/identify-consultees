@@ -18,15 +18,15 @@ const pages = [
 	{ path: `/consultees/${SAMPLE_CASE_ID}/ruleset`, name: 'ruleset picker' },
 	{ path: `/consultees/${SAMPLE_CASE_ID}/report?ruleset=${SAMPLE_RULESET_ID}`, name: 'report check' },
 	{
-		path: `/consultees/${SAMPLE_CASE_ID}/report/consultees?ruleset=${SAMPLE_RULESET_ID}&category=Parish%20Council`,
+		path: `/consultees/${SAMPLE_CASE_ID}/report/consultees?ruleset=${SAMPLE_RULESET_ID}&category=Parish%2C%20town%20and%20community%20councils`,
 		name: 'report consultees'
 	},
 	{
-		path: `/consultees/${SAMPLE_CASE_ID}/report/consultees/add?ruleset=${SAMPLE_RULESET_ID}&category=Parish%20Council`,
+		path: `/consultees/${SAMPLE_CASE_ID}/report/consultees/add?ruleset=${SAMPLE_RULESET_ID}&category=Parish%2C%20town%20and%20community%20councils`,
 		name: 'report consultee add'
 	},
 	{
-		path: `/consultees/${SAMPLE_CASE_ID}/report/consultees/remove?ruleset=${SAMPLE_RULESET_ID}&category=Parish%20Council&add=${Buffer.from('{"c":"Parish Council","n":"A Consultee","r":"borders"}').toString('base64url')}&added=0`,
+		path: `/consultees/${SAMPLE_CASE_ID}/report/consultees/remove?ruleset=${SAMPLE_RULESET_ID}&category=Parish%2C%20town%20and%20community%20councils&add=${Buffer.from('{"c":"Parish, town and community councils","n":"A Consultee","r":"borders"}').toString('base64url')}&added=0`,
 		name: 'report consultee remove'
 	},
 	{ path: `/consultees/${SAMPLE_CASE_ID}/report/created?ruleset=${SAMPLE_RULESET_ID}`, name: 'report created' },
@@ -88,7 +88,7 @@ test.describe('browser accessibility landmarks and skip link', () => {
 
 	test('a category page keeps its map region labelled', async ({ page }) => {
 		await page.goto(
-			`/consultees/${SAMPLE_CASE_ID}/report/consultees?ruleset=${SAMPLE_RULESET_ID}&category=Parish%20Council`
+			`/consultees/${SAMPLE_CASE_ID}/report/consultees?ruleset=${SAMPLE_RULESET_ID}&category=Parish%2C%20town%20and%20community%20councils`
 		);
 
 		await expect(page.locator('.app-consultee-map[role="region"]').first()).toBeAttached();

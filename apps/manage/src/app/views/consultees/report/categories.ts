@@ -1,4 +1,10 @@
 import type { ConsulteeMatch, Ruleset } from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
+import { NEARBY_NSIPS } from '../nearby-nsips.ts';
+
+/** "NSIPs" spelled out - a category's name as the pages show it; every other category is its own name. */
+export function categoryDisplayName(category: string): string {
+	return category === NEARBY_NSIPS ? 'National infrastructure projects' : category;
+}
 
 /**
  * Every consultee category a ruleset covers, in the order its rules name them (deduplicated) -

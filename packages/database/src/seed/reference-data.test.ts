@@ -13,21 +13,21 @@ import {
 const VALID = `
 version: 1
 datasets:
-  AMB_EW: Ambulance Trust
-  IDB_WA: " Internal Drainage District "
+  AMB_EW: Ambulance trusts
+  IDB_WA: " Internal drainage boards (Wales) "
 groups:
-  Public bodies: [Ambulance Trust, Internal Drainage District, Hospital]
+  Public bodies: [Ambulance trusts, Internal drainage boards (Wales), Hospitals operated by NHS trusts and NHS foundation trusts (England)]
 `;
 
 const WITH_SUBCATEGORIES = `
 version: 1
 datasets:
   OWF_EW:
-    category: Offshore Wind Site
+    category: Offshore wind export cables and sites
     subcategories:
-      Offshore  Wind Export Cables: " Offshore Wind Export Cable "
+      Offshore  Wind Export Cables: " Offshore wind export cables and sites "
 groups:
-  Energy: [Offshore Wind Site, Offshore Wind Export Cable]
+  Energy: [Offshore wind export cables and sites]
 `;
 
 describe('reference data config', () => {
@@ -35,33 +35,46 @@ describe('reference data config', () => {
 		assert.deepEqual(
 			[...parseReferenceDataConfig(VALID).datasets],
 			[
-				['AMB_EW', 'Ambulance Trust'],
-				['IDB_WA', 'Internal Drainage District']
+				['AMB_EW', 'Ambulance trusts'],
+				['IDB_WA', 'Internal drainage boards (Wales)']
 			]
 		);
 	});
 
 	test("reads a dataset's category and the subcategories that load as another", () => {
 		const config = parseReferenceDataConfig(WITH_SUBCATEGORIES);
-		assert.equal(config.datasets.get('OWF_EW'), 'Offshore Wind Site');
+		assert.equal(config.datasets.get('OWF_EW'), 'Offshore wind export cables and sites');
 		assert.deepEqual(
 			[...config.subcategories.get('OWF_EW')!],
-			[['offshore wind export cables', 'Offshore Wind Export Cable']]
+			[['offshore wind export cables', 'Offshore wind export cables and sites']]
 		);
 		assert.equal(parseReferenceDataConfig(VALID).subcategories.size, 0);
 	});
 
 	test('reads each group, its slug and its categories, in order', () => {
-		const config = parseReferenceDataConfig(`${VALID}  Energy & Waste: [DNO]`);
+		const config = parseReferenceDataConfig(
+			`${VALID}  Energy & Waste: [Electricity distributors with compulsory purchase order powers]`
+		);
 		assert.deepEqual(
 			config.groups.map((group) => [group.name, group.slug, [...group.categories]]),
 			[
-				['Public bodies', 'public_bodies', ['Ambulance Trust', 'Internal Drainage District', 'Hospital']],
-				['Energy & Waste', 'energy_waste', ['DNO']]
+				[
+					'Public bodies',
+					'public_bodies',
+					[
+						'Ambulance trusts',
+						'Internal drainage boards (Wales)',
+						'Hospitals operated by NHS trusts and NHS foundation trusts (England)'
+					]
+				],
+				['Energy & Waste', 'energy_waste', ['Electricity distributors with compulsory purchase order powers']]
 			]
 		);
-		assert.equal(groupForCategory('Hospital', config)?.name, 'Public bodies');
-		assert.equal(groupForCategory('Railway', config), undefined);
+		assert.equal(
+			groupForCategory('Hospitals operated by NHS trusts and NHS foundation trusts (England)', config)?.name,
+			'Public bodies'
+		);
+		assert.equal(groupForCategory('Railways', config), undefined);
 		assert.equal(groupForCategory(null, config), undefined);
 		assert.equal(groupBySlug('energy_waste', config)?.name, 'Energy & Waste');
 		assert.equal(groupBySlug('nope', config), undefined);
@@ -72,19 +85,19 @@ describe('reference data config', () => {
 			REFERENCE_DATA_CONFIG.groups.map((group) => group.slug),
 			['administrative_boundaries', 'public_bodies', 'energy', 'transport', 'other']
 		);
-		assert.equal(groupForCategory('Parish Council')?.slug, 'administrative_boundaries');
-		assert.equal(groupForCategory('Offshore Wind Export Cable')?.slug, 'energy');
-		assert.equal(groupBySlug('transport')?.categories.has('Railway'), true);
+		assert.equal(groupForCategory('Parish, town and community councils')?.slug, 'administrative_boundaries');
+		assert.equal(groupForCategory('Offshore wind export cables and sites')?.slug, 'energy');
+		assert.equal(groupBySlug('transport')?.categories.has('Railways'), true);
 	});
 
 	test('reads config/reference-data.yaml', () => {
-		assert.equal(REFERENCE_DATA_CONFIG.datasets.get('AMB_EW'), 'Ambulance Trust');
-		assert.equal(REFERENCE_DATA_CONFIG.datasets.get('CJC_EW'), 'Corporate Joint Committee');
+		assert.equal(REFERENCE_DATA_CONFIG.datasets.get('AMB_EW'), 'Ambulance trusts');
+		assert.equal(REFERENCE_DATA_CONFIG.datasets.get('CJC_EW'), 'Corporate joint committees (Wales)');
 		// the offshore wind dataset holds sites and their export cables, which the rulesets treat apart
-		assert.equal(REFERENCE_DATA_CONFIG.datasets.get('OWF_EW'), 'Offshore Wind Site');
+		assert.equal(REFERENCE_DATA_CONFIG.datasets.get('OWF_EW'), 'Offshore wind export cables and sites');
 		assert.equal(
 			REFERENCE_DATA_CONFIG.subcategories.get('OWF_EW')?.get('offshore wind export cables'),
-			'Offshore Wind Export Cable'
+			'Offshore wind export cables and sites'
 		);
 	});
 
@@ -102,26 +115,26 @@ describe('reference data config', () => {
 		['a group without a name', VALID.replace('Public bodies:', '"--":'), /"--" isn't a group name/],
 		[
 			'a category in two groups',
-			`${VALID}  Other: [Hospital]`,
-			/groups: Hospital is in both Public bodies and Other - it can only be in one/
+			`${VALID}  Other: [Hospitals operated by NHS trusts and NHS foundation trusts (England)]`,
+			/groups: Hospitals operated by NHS trusts and NHS foundation trusts \(England\) is in both Public bodies and Other - it can only be in one/
 		],
 		[
 			'a category no group has',
-			VALID.replace('Internal Drainage District, ', ''),
-			/groups: no group has Internal Drainage District, which a dataset loads as/
+			VALID.replace('Internal drainage boards (Wales), ', ''),
+			/groups: no group has Internal drainage boards \(Wales\), which a dataset loads as/
 		],
 		[
 			"a subcategory's category no group has",
-			WITH_SUBCATEGORIES.replace(', Offshore Wind Export Cable]', ']'),
-			/no group has Offshore Wind Export Cable/
+			WITH_SUBCATEGORIES.replace('Energy: [Offshore wind export cables and sites]', 'Energy: [Railways]'),
+			/no group has Offshore wind export cables and sites/
 		],
 		['datasets as a list', 'version: 1\ndatasets: [AMB_EW]', /datasets must map/],
 		['a code without its area', VALID.replace('AMB_EW', 'AMB'), /"AMB" isn't a dataset code/],
 		['a lower-case code', VALID.replace('AMB_EW', 'amb_ew'), /"amb_ew" isn't a dataset code/],
-		['a blank category', VALID.replace('Ambulance Trust', '""'), /datasets.AMB_EW must be a consultee category/],
+		['a blank category', VALID.replace('Ambulance trusts', '""'), /datasets.AMB_EW must be a consultee category/],
 		[
 			'a category that is not text',
-			VALID.replace('Ambulance Trust', '5'),
+			VALID.replace('Ambulance trusts', '5'),
 			/datasets.AMB_EW must be a consultee category/
 		],
 		[
@@ -131,17 +144,17 @@ describe('reference data config', () => {
 		],
 		[
 			'subcategories without a category',
-			WITH_SUBCATEGORIES.replace('category: Offshore Wind Site', 'category: ""'),
+			WITH_SUBCATEGORIES.replace('category: Offshore wind export cables and sites', 'category: ""'),
 			/datasets.OWF_EW.category must be a consultee category/
 		],
 		[
 			'no subcategories',
-			'version: 1\ndatasets:\n  OWF_EW:\n    category: Offshore Wind Site',
+			'version: 1\ndatasets:\n  OWF_EW:\n    category: Offshore wind export cables and sites',
 			/datasets.OWF_EW.subcategories must map/
 		],
 		[
 			"a subcategory's blank category",
-			WITH_SUBCATEGORIES.replace('" Offshore Wind Export Cable "', '""'),
+			WITH_SUBCATEGORIES.replace('" Offshore wind export cables and sites "', '""'),
 			/datasets.OWF_EW.subcategories.Offshore {2}Wind Export Cables must be a consultee category/
 		]
 	] as const) {
@@ -176,11 +189,14 @@ describe('consulteeCategoryFor', () => {
 	const config = parseReferenceDataConfig(VALID);
 
 	test("gives a feature its dataset's category, over the file's broad group", () => {
-		assert.equal(consulteeCategoryFor('health_AMB_EW_00001', 'Health', null, config), 'Ambulance Trust');
+		assert.equal(consulteeCategoryFor('health_AMB_EW_00001', 'Health', null, config), 'Ambulance trusts');
 	});
 
 	test("keeps the file's category for an id with no dataset code", () => {
-		assert.equal(consulteeCategoryFor('parish_council_E04000001', 'Parish Council', null, config), 'Parish Council');
+		assert.equal(
+			consulteeCategoryFor('parish_council_E04000001', 'Parish, town and community councils', null, config),
+			'Parish, town and community councils'
+		);
 		assert.equal(consulteeCategoryFor('src-1', undefined, undefined, config), undefined);
 	});
 
@@ -200,18 +216,24 @@ describe('consulteeCategoryFor', () => {
 		const cable = 'energy_OWF_EW_00073';
 		assert.equal(
 			consulteeCategoryFor(cable, 'Energy', 'offshore wind  export cables', owf),
-			'Offshore Wind Export Cable'
+			'Offshore wind export cables and sites'
 		);
-		assert.equal(consulteeCategoryFor(cable, 'Energy', 'Offshore Wind Sites', owf), 'Offshore Wind Site');
-		assert.equal(consulteeCategoryFor(cable, 'Energy', null, owf), 'Offshore Wind Site');
+		assert.equal(
+			consulteeCategoryFor(cable, 'Energy', 'Offshore Wind Sites', owf),
+			'Offshore wind export cables and sites'
+		);
+		assert.equal(consulteeCategoryFor(cable, 'Energy', null, owf), 'Offshore wind export cables and sites');
 		// a dataset with no subcategories set keeps its category, whatever its subcategory
 		assert.equal(
 			consulteeCategoryFor('health_AMB_EW_00001', 'Health', 'Ambulance Trusts', parseReferenceDataConfig(VALID)),
-			'Ambulance Trust'
+			'Ambulance trusts'
 		);
 	});
 
 	test("uses the app's own config by default", () => {
-		assert.equal(consulteeCategoryFor('transport_CJC_EW_00001', 'Transport', null), 'Corporate Joint Committee');
+		assert.equal(
+			consulteeCategoryFor('transport_CJC_EW_00001', 'Transport', null),
+			'Corporate joint committees (Wales)'
+		);
 	});
 });

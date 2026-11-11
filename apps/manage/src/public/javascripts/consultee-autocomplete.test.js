@@ -3,11 +3,14 @@ import assert from 'node:assert/strict';
 import { afterEach, describe, mock, test } from 'node:test';
 import {
 	enhanceConsulteeInput,
+	fetchSuggestions,
 	initConsulteeAutocomplete,
 	matchingSuggestions,
+	mergeSuggestions,
 	readSuggestions,
 	registerConsulteeAutocomplete,
-	suggestionHtml
+	suggestionHtml,
+	suggestionSource
 } from './consultee-autocomplete.js';
 
 const FORM = `
@@ -166,5 +169,110 @@ describe('consultee autocomplete', () => {
 
 		// no document (node) - nothing to do
 		registerConsulteeAutocomplete(undefined);
+	});
+});
+
+describe('consultee autocomplete suggestions from the server', () => {
+	const PAGE = [
+		{ name: 'Barton', hint: '1.3 km from the site' },
+		{ name: 'Newton (Ribble Valley)', hint: '3.0 km from the site' }
+	];
+	const reply = (body, ok = true) => mock.fn(async () => ({ ok, json: async () => body }));
+	const settle = () => new Promise((resolve) => setTimeout(resolve, 5));
+
+	test('asks for the typed name, and keeps only suggestions from the reply', async () => {
+		const fetchImpl = reply([{ name: 'Newton (Craven)', hint: '60.0 km from the site' }, { name: 1 }, null]);
+		assert.deepEqual(await fetchSuggestions('/add/suggestions?ruleset=r', 'New ton', fetchImpl), [
+			{ name: 'Newton (Craven)', hint: '60.0 km from the site' }
+		]);
+		const [url, init] = fetchImpl.mock.calls[0].arguments;
+		assert.equal(url, '/add/suggestions?ruleset=r&q=New%20ton');
+		assert.equal(init.headers.Accept, 'application/json');
+	});
+
+	test("has none when the server can't give them", async () => {
+		assert.deepEqual(await fetchSuggestions('/s?', 'New', reply([], false)), []);
+		assert.deepEqual(await fetchSuggestions('/s?', 'New', reply({ not: 'a list' })), []);
+		const offline = mock.fn(async () => {
+			throw new Error('offline');
+		});
+		assert.deepEqual(await fetchSuggestions('/s?', 'New', offline), []);
+	});
+
+	test("adds the server's to the page's own, without repeating a name", () => {
+		assert.deepEqual(
+			mergeSuggestions(PAGE, [
+				{ name: 'newton (ribble valley)', hint: '3.0 km from the site' },
+				{ name: 'Newton (Craven)', hint: '60.0 km from the site' }
+			]),
+			[...PAGE, { name: 'Newton (Craven)', hint: '60.0 km from the site' }]
+		);
+	});
+
+	test("shows the page's matches at once, then the server's once typing pauses", async () => {
+		const fetchImpl = reply([{ name: 'Newton (Craven)', hint: '60.0 km from the site' }]);
+		const source = suggestionSource(PAGE, '/s?ruleset=r', { fetchImpl, delayMs: 0 });
+		const populate = mock.fn();
+
+		source('newt', populate);
+		assert.deepEqual(populate.mock.calls[0].arguments[0], [PAGE[1]]);
+		await settle();
+		assert.deepEqual(populate.mock.calls[1].arguments[0], [
+			PAGE[1],
+			{ name: 'Newton (Craven)', hint: '60.0 km from the site' }
+		]);
+		assert.equal(fetchImpl.mock.callCount(), 1);
+	});
+
+	test("doesn't ask for fewer than three letters, without a URL, or show a reply to an earlier query", async () => {
+		const fetchImpl = reply([{ name: 'Newton (Craven)', hint: '' }]);
+		const populate = mock.fn();
+		suggestionSource(PAGE, '/s?', { fetchImpl, delayMs: 0 })('ne', populate);
+		suggestionSource(PAGE, undefined, { fetchImpl, delayMs: 0 })('newton', populate);
+		await settle();
+		assert.equal(fetchImpl.mock.callCount(), 0);
+
+		// typing on before the first reply: only the latest query's reply shows
+		let answer;
+		const slow = mock.fn(
+			() =>
+				new Promise((resolve) => {
+					answer = resolve;
+				})
+		);
+		const source = suggestionSource(PAGE, '/s?', { fetchImpl: slow, delayMs: 0 });
+		const shown = mock.fn();
+		source('newt', shown);
+		await settle();
+		source('newto', shown);
+		answer({ ok: true, json: async () => [{ name: 'Newton (Craven)', hint: '' }] });
+		await settle();
+		// the page's matches for each query, and no reply to "newt"
+		assert.equal(shown.mock.callCount(), 2);
+
+		// and nothing more when the server has nothing to add
+		const empty = mock.fn();
+		suggestionSource(PAGE, '/s?', { fetchImpl: reply([]), delayMs: 0 })('newton', empty);
+		await settle();
+		assert.equal(empty.mock.callCount(), 1);
+	});
+
+	test("asks the input's suggestions URL once typing pauses", async () => {
+		const document = documentWith(
+			FORM.replace('data-consultee-autocomplete>', 'data-consultee-autocomplete data-suggestions-url="/s?r=1">')
+		);
+		const accessibleAutocomplete = mock.fn();
+		enhanceConsulteeInput(document.getElementById('consultee-name'), accessibleAutocomplete);
+		const fetchImpl = mock.fn(async () => ({ ok: true, json: async () => [] }));
+		const original = globalThis.fetch;
+		globalThis.fetch = fetchImpl;
+		try {
+			accessibleAutocomplete.mock.calls[0].arguments[0].source('barton', () => {});
+			assert.equal(fetchImpl.mock.callCount(), 0);
+			await new Promise((resolve) => setTimeout(resolve, 250));
+			assert.equal(fetchImpl.mock.calls[0].arguments[0], '/s?r=1&q=barton');
+		} finally {
+			globalThis.fetch = original;
+		}
 	});
 });

@@ -12,12 +12,12 @@ const RULESET: Ruleset = {
 			name: 'Parish host',
 			group: 'Administrative boundaries',
 			logicType: 'intersection',
-			categories: ['Parish Council']
+			categories: ['Parish, town and community councils']
 		}
 	]
 };
 
-function match(id: string, consultee: string, category = 'Parish Council'): ConsulteeMatch {
+function match(id: string, consultee: string, category = 'Parish, town and community councils'): ConsulteeMatch {
 	return {
 		feature: {
 			id,
@@ -33,7 +33,7 @@ describe('reportByCategory', () => {
 	it("lists each category's consultees alphabetically by name, hand-added ones among the matches", () => {
 		const [parishes] = reportByCategory(RULESET, [match('a', 'Thorganby'), match('b', 'Cawood')], {
 			removed: [],
-			adds: [{ category: 'Parish Council', name: 'Gateforth', reason: 'Borders the site' }]
+			adds: [{ category: 'Parish, town and community councils', name: 'Gateforth', reason: 'Borders the site' }]
 		});
 		assert.deepStrictEqual(
 			parishes.consultees.map((consultee) => consultee.name),

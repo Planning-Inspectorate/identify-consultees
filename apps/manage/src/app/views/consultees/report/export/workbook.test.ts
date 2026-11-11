@@ -25,7 +25,7 @@ const ruleset: Ruleset = {
 			name: '"B" host Parish Councils',
 			group: 'Administative boundaries',
 			logicType: 'intersection',
-			categories: ['Parish Council'],
+			categories: ['Parish, town and community councils'],
 			bufferMetres: 0
 		},
 		{
@@ -33,7 +33,7 @@ const ruleset: Ruleset = {
 			name: 'Hospitals',
 			group: 'Public bodies',
 			logicType: 'intersection',
-			categories: ['Hospital'],
+			categories: ['Hospitals operated by NHS trusts and NHS foundation trusts (England)'],
 			bufferMetres: 10_000
 		},
 		{ id: 'odd', name: 'Odd', group: 'Unheard of', logicType: 'intersection', categories: ['Odd'], bufferMetres: 0 }
@@ -59,7 +59,7 @@ function record(id: string, overrides: Partial<ConsulteeAreaRecord> = {}): Consu
 		id,
 		geometryType: 'Polygon',
 		sourceId: null,
-		consulteeCategory: 'Parish Council',
+		consulteeCategory: 'Parish, town and community councils',
 		consulteeGroup: null,
 		consulteeSubcategory: null,
 		consulteeSubcategoryDescription: null,
@@ -106,8 +106,17 @@ const rowValues = (row: unknown[]) => row.map(valueOf);
 
 describe('report workbook', () => {
 	it("puts a match on its first condition's group tab, matching either spelling of the first group", () => {
-		assert.equal(tabForMatch(match('a', 'Parish Council', 'X', 'b_host_parish'), ruleset), 'Administrative boundaries');
-		assert.equal(tabForMatch(match('a', 'Hospital', 'X', 'hospitals_10km'), ruleset), 'Public bodies');
+		assert.equal(
+			tabForMatch(match('a', 'Parish, town and community councils', 'X', 'b_host_parish'), ruleset),
+			'Administrative boundaries'
+		);
+		assert.equal(
+			tabForMatch(
+				match('a', 'Hospitals operated by NHS trusts and NHS foundation trusts (England)', 'X', 'hospitals_10km'),
+				ruleset
+			),
+			'Public bodies'
+		);
 		// an unknown group, a retired condition, or only a nearby reason all go on Other
 		assert.equal(tabForMatch(match('a', 'Odd', 'X', 'odd'), ruleset), 'Other');
 		assert.equal(tabForMatch(match('a', 'Odd', 'X', 'retired'), ruleset), 'Other');
@@ -119,7 +128,10 @@ describe('report workbook', () => {
 	});
 
 	it("puts a hand-added consultee on its category's group tab, else Other", () => {
-		assert.equal(tabForCategory('Hospital', ruleset), 'Public bodies');
+		assert.equal(
+			tabForCategory('Hospitals operated by NHS trusts and NHS foundation trusts (England)', ruleset),
+			'Public bodies'
+		);
 		assert.equal(tabForCategory('Landowner', ruleset), 'Other');
 	});
 
@@ -192,9 +204,14 @@ describe('report workbook', () => {
 		const sheets = sheetsOf(
 			report({
 				identified: [
-					match('b', 'Parish Council', 'Zeal Parish Council', 'b_host_parish'),
-					match('a', 'Parish Council', 'Abbey Parish Council', 'b_host_parish', 5),
-					match('h', 'Hospital', 'General Hospital', 'hospitals_10km')
+					match('b', 'Parish, town and community councils', 'Zeal Parish Council', 'b_host_parish'),
+					match('a', 'Parish, town and community councils', 'Abbey Parish Council', 'b_host_parish', 5),
+					match(
+						'h',
+						'Hospitals operated by NHS trusts and NHS foundation trusts (England)',
+						'General Hospital',
+						'hospitals_10km'
+					)
 				],
 				records: new Map([
 					[
@@ -207,9 +224,15 @@ describe('report workbook', () => {
 							consulteeSubcategoryDescription: 'A parish with a town council'
 						})
 					],
-					['h', record('h', { consulteeCategory: 'Hospital', consultee: 'General Hospital' })]
+					[
+						'h',
+						record('h', {
+							consulteeCategory: 'Hospitals operated by NHS trusts and NHS foundation trusts (England)',
+							consultee: 'General Hospital'
+						})
+					]
 				]),
-				added: [{ category: 'Parish Council', name: 'Added Parish', reason: '' }]
+				added: [{ category: 'Parish, town and community councils', name: 'Added Parish', reason: '' }]
 			})
 		);
 		const admin = sheets.find((sheet) => sheet.sheet === 'Administrative boundaries')!;
@@ -229,7 +252,7 @@ describe('report workbook', () => {
 			// the stored row's values win over the run's
 			[
 				'Abbey Parish Council',
-				'Parish Council',
+				'Parish, town and community councils',
 				'Local Authorities',
 				'Town Council',
 				'A parish with a town council',
@@ -239,11 +262,21 @@ describe('report workbook', () => {
 				1
 			],
 			// added by hand, with the default reason
-			['Added Parish', 'Parish Council', null, null, null, null, 'Manually added', 'Manually added', null],
+			[
+				'Added Parish',
+				'Parish, town and community councils',
+				null,
+				null,
+				null,
+				null,
+				'Manually added',
+				'Manually added',
+				null
+			],
 			// no stored row (deleted mid-request) - the run's values, and no metadata
 			[
 				'Zeal Parish Council',
-				'Parish Council',
+				'Parish, town and community councils',
 				null,
 				null,
 				null,
@@ -264,11 +297,16 @@ describe('report workbook', () => {
 		const sheets = sheetsOf(
 			report({
 				identified: [
-					match('a', 'Parish Council', 'Abbey', 'b_host_parish'),
-					match('b', 'Parish Council', 'Barton', 'b_host_parish'),
-					match('c', 'Parish Council', 'Christleton', 'b_host_parish'),
-					match('d', 'Parish Council', 'Dodleston', 'b_host_parish'),
-					match('h', 'Hospital', 'General Hospital', 'hospitals_10km')
+					match('a', 'Parish, town and community councils', 'Abbey', 'b_host_parish'),
+					match('b', 'Parish, town and community councils', 'Barton', 'b_host_parish'),
+					match('c', 'Parish, town and community councils', 'Christleton', 'b_host_parish'),
+					match('d', 'Parish, town and community councils', 'Dodleston', 'b_host_parish'),
+					match(
+						'h',
+						'Hospitals operated by NHS trusts and NHS foundation trusts (England)',
+						'General Hospital',
+						'hospitals_10km'
+					)
 				],
 				records: new Map([
 					['a', record('a', { metadata: '{"PARNCP":"Abbey","FID":7,"open":true,"area":{"ha":12}}' })],
@@ -276,7 +314,13 @@ describe('report workbook', () => {
 					// a list of values as text, and not JSON at all kept whole
 					['c', record('c', { metadata: '[1,2]' })],
 					['d', record('d', { metadata: 'not json' })],
-					['h', record('h', { consulteeCategory: 'Hospital', metadata: '{"ODS":"RX1"}' })]
+					[
+						'h',
+						record('h', {
+							consulteeCategory: 'Hospitals operated by NHS trusts and NHS foundation trusts (England)',
+							metadata: '{"ODS":"RX1"}'
+						})
+					]
 				])
 			})
 		);
@@ -345,13 +389,13 @@ defaults: { columns: [consultee], metadata: none, mapKm: 10 }
 tabs:
   Administrative boundaries:
     categories:
-      Parish Council: { summary: 'Parish, Town and Community Councils' }
-      Lower Tier Authority: { summary: District Councils }
+      Parish, town and community councils: { summary: 'Parish, Town and Community Councils' }
+      District councils (lower-tier authorities): { summary: District Councils }
   Public bodies:
     categories:
-      Ambulance Trust: { summary: { 1: Ambulance Trusts (1km buffer), 10: Ambulance Trusts (10km buffer) } }
-      Internal Drainage Board: { summary: Internal Drainage Boards }
-      Internal Drainage District: { summary: Internal Drainage Boards }
+      Ambulance trusts: { summary: { 1: Ambulance Trusts (1km buffer), 10: Ambulance Trusts (10km buffer) } }
+      Internal drainage boards (England): { summary: Internal Drainage Boards }
+      Internal drainage boards (Wales): { summary: Internal Drainage Boards }
   NSIPs:
     categories:
       NSIPs: { summary: National infrastructure projects }
@@ -365,7 +409,7 @@ tabs:
 					name: 'Drainage',
 					group: 'Public bodies',
 					logicType: 'intersection',
-					categories: ['Internal Drainage Board', 'Internal Drainage District'],
+					categories: ['Internal drainage boards (England)', 'Internal drainage boards (Wales)'],
 					bufferMetres: 0
 				},
 				...[1_000, 10_000].map((bufferMetres) => ({
@@ -373,14 +417,14 @@ tabs:
 					name: 'Ambulance Trusts',
 					group: 'Public bodies',
 					logicType: 'intersection' as const,
-					categories: ['Ambulance Trust'],
+					categories: ['Ambulance trusts'],
 					bufferMetres
 				}))
 			]
 		};
 		// within 1km meets both conditions - counted on the nearest; the other within 10km only
 		const nearAmbulance = {
-			...match('n1', 'Ambulance Trust', 'Near Trust', 'ambulance_1000'),
+			...match('n1', 'Ambulance trusts', 'Near Trust', 'ambulance_1000'),
 			reasons: [
 				{ type: 'condition' as const, conditionId: 'ambulance_10000' },
 				{ type: 'condition' as const, conditionId: 'ambulance_1000' }
@@ -392,11 +436,11 @@ tabs:
 				ruleset: withDrainage,
 				identified: [
 					nearAmbulance,
-					match('n2', 'Ambulance Trust', 'Far Trust', 'ambulance_10000'),
-					match('a', 'Parish Council', 'Abbey', 'b_host_parish'),
-					match('z', 'Parish Council', 'Zeal', 'b_host_parish'),
-					match('b', 'Internal Drainage Board', 'Board', 'idb'),
-					match('d', 'Internal Drainage District', 'District', 'idb'),
+					match('n2', 'Ambulance trusts', 'Far Trust', 'ambulance_10000'),
+					match('a', 'Parish, town and community councils', 'Abbey', 'b_host_parish'),
+					match('z', 'Parish, town and community councils', 'Zeal', 'b_host_parish'),
+					match('b', 'Internal drainage boards (England)', 'Board', 'idb'),
+					match('d', 'Internal drainage boards (Wales)', 'District', 'idb'),
 					match('o', 'Odd', 'Oddity', 'odd'),
 					uncategorised as ConsulteeMatch,
 					{
@@ -405,11 +449,17 @@ tabs:
 					}
 				],
 				added: [
-					{ category: 'Hospital', name: 'Added Hospital', reason: 'Asked to be consulted' },
-					{ category: 'Ambulance Trust', name: 'Added Trust', reason: 'Covers the access road' },
+					{
+						category: 'Hospitals operated by NHS trusts and NHS foundation trusts (England)',
+						name: 'Added Hospital',
+						reason: 'Asked to be consulted'
+					},
+					{ category: 'Ambulance trusts', name: 'Added Trust', reason: 'Covers the access road' },
 					{ category: NEARBY_NSIPS, name: 'Far Highway (TR010099)', reason: 'Shares the access road' }
 				],
-				removed: [{ matchId: 'r', category: 'Parish Council', name: 'Removed Parish', reason: 'Dissolved' }]
+				removed: [
+					{ matchId: 'r', category: 'Parish, town and community councils', name: 'Removed Parish', reason: 'Dissolved' }
+				]
 			}),
 			config
 		);
@@ -453,8 +503,8 @@ tabs:
 			['Ambulance Trusts (1km buffer)', 1],
 			['Ambulance Trusts (10km buffer)', 1],
 			['Internal Drainage Boards', 2],
-			['Ambulance Trust', 1],
-			['Hospital', 1],
+			['Ambulance trusts', 1],
+			['Hospitals operated by NHS trusts and NHS foundation trusts (England)', 1],
 			['Energy - Total', 0],
 			['Transport - Total', 0],
 			['Other - Total', 2],
@@ -482,13 +532,17 @@ tabs:
 			[],
 			['Added consultees'],
 			['Consultee', 'Category', 'Reason'],
-			['Added Hospital', 'Hospital', 'Asked to be consulted'],
-			['Added Trust', 'Ambulance Trust', 'Covers the access road'],
+			[
+				'Added Hospital',
+				'Hospitals operated by NHS trusts and NHS foundation trusts (England)',
+				'Asked to be consulted'
+			],
+			['Added Trust', 'Ambulance trusts', 'Covers the access road'],
 			['Far Highway (TR010099)', NEARBY_NSIPS, 'Shares the access road'],
 			[],
 			['Removed consultees'],
 			['Consultee', 'Category', 'Reason'],
-			['Removed Parish', 'Parish Council', 'Dissolved'],
+			['Removed Parish', 'Parish, town and community councils', 'Dissolved'],
 			[],
 			// those found, with the query that found them, then those added by hand, with the reason given -
 			// each typed from its case reference
@@ -571,12 +625,19 @@ tabs:
 		const admin = sheetsOf(
 			report({
 				records: new Map([['p', record('p', { region: 'Stored region' })]]),
-				added: [{ id: 'p', category: 'Parish Council', name: 'Picked Parish', reason: 'Borders the site' }]
+				added: [
+					{
+						id: 'p',
+						category: 'Parish, town and community councils',
+						name: 'Picked Parish',
+						reason: 'Borders the site'
+					}
+				]
 			})
 		).find((sheet) => sheet.sheet === 'Administrative boundaries')!;
 		assert.deepStrictEqual(rowValues(admin.data[1]), [
 			'Picked Parish',
-			'Parish Council',
+			'Parish, town and community councils',
 			null,
 			null,
 			null,
@@ -620,7 +681,7 @@ tabs:
 
 	it("builds each tab from config/report.yaml's own columns and metadata", () => {
 		const generator = {
-			...match('g', 'Electricity Generator', 'Solar Farm', 'odd', 2_500),
+			...match('g', 'Electricity generators with compulsory purchase order powers', 'Solar Farm', 'odd', 2_500),
 			reasons: [{ type: 'condition' as const, conditionId: 'generators' }]
 		};
 		const withGenerators: Ruleset = {
@@ -632,7 +693,7 @@ tabs:
 					name: 'Electricity generators',
 					group: 'Energy',
 					logicType: 'intersection',
-					categories: ['Electricity Generator'],
+					categories: ['Electricity generators with compulsory purchase order powers'],
 					bufferMetres: 10_000
 				}
 			]
@@ -640,13 +701,13 @@ tabs:
 		const sheets = buildReportSheets(
 			report({
 				ruleset: withGenerators,
-				identified: [generator, match('a', 'Parish Council', 'Abbey', 'b_host_parish')],
+				identified: [generator, match('a', 'Parish, town and community councils', 'Abbey', 'b_host_parish')],
 				records: new Map([
 					[
 						'g',
 						record('g', {
 							consultee: 'Solar Farm',
-							consulteeCategory: 'Electricity Generator',
+							consulteeCategory: 'Electricity generators with compulsory purchase order powers',
 							consulteeSubcategory: 'Solar',
 							metadata: JSON.stringify({ NAME: 'Solar Farm (England)', PRIMARY_TYPE: 'Solar', LAT: '51.3' })
 						})
@@ -705,7 +766,7 @@ tabs:
 		);
 		const admin = sheetsOf(
 			report({
-				identified: [match('a', 'Parish Council', 'Abbey', 'b_host_parish', 2500)],
+				identified: [match('a', 'Parish, town and community councils', 'Abbey', 'b_host_parish', 2500)],
 				records: new Map([
 					[
 						'a',
@@ -720,8 +781,14 @@ tabs:
 				]),
 				// one the run found, with its distance; one added by name alone
 				added: [
-					{ id: 'p', category: 'Parish Council', name: 'Picked', reason: 'r', distanceMetres: 1000 },
-					{ category: 'Parish Council', name: 'Typed', reason: 'r' }
+					{
+						id: 'p',
+						category: 'Parish, town and community councils',
+						name: 'Picked',
+						reason: 'r',
+						distanceMetres: 1000
+					},
+					{ category: 'Parish, town and community councils', name: 'Typed', reason: 'r' }
 				]
 			}),
 			config
@@ -768,11 +835,11 @@ tabs:
 				'tabs:',
 				'  Administrative boundaries:',
 				'    categories:',
-				'      Parish Council: { metadata: { PARNCP23CD: ONS code, PARNCP23NM: Name } }',
-				'      Unitary Authority: { metadata: { LAD24CD: ONS code } }',
+				'      Parish, town and community councils: { metadata: { PARNCP23CD: ONS code, PARNCP23NM: Name } }',
+				'      Unitary authorities: { metadata: { LAD24CD: ONS code } }',
 				'  Public bodies:',
 				'    categories:',
-				'      Hospital: { metadata: none }'
+				'      Hospitals operated by NHS trusts and NHS foundation trusts (England): { metadata: none }'
 			].join('\n')
 		);
 		const withUnitaries: Ruleset = {
@@ -784,7 +851,7 @@ tabs:
 					name: '"B" host Unitary Authorities',
 					group: 'Administative boundaries',
 					logicType: 'intersection',
-					categories: ['Unitary Authority'],
+					categories: ['Unitary authorities'],
 					bufferMetres: 0
 				}
 			]
@@ -793,9 +860,14 @@ tabs:
 			report({
 				ruleset: withUnitaries,
 				identified: [
-					match('p', 'Parish Council', 'Abbey', 'b_host_parish'),
-					match('u', 'Unitary Authority', 'Cheshire West', 'b_host_ua'),
-					match('h', 'Hospital', 'General Hospital', 'hospitals_10km')
+					match('p', 'Parish, town and community councils', 'Abbey', 'b_host_parish'),
+					match('u', 'Unitary authorities', 'Cheshire West', 'b_host_ua'),
+					match(
+						'h',
+						'Hospitals operated by NHS trusts and NHS foundation trusts (England)',
+						'General Hospital',
+						'hospitals_10km'
+					)
 				],
 				records: new Map([
 					[
@@ -806,11 +878,17 @@ tabs:
 						'u',
 						record('u', {
 							consultee: 'Cheshire West',
-							consulteeCategory: 'Unitary Authority',
+							consulteeCategory: 'Unitary authorities',
 							metadata: '{"LAD24CD":"E06000050"}'
 						})
 					],
-					['h', record('h', { consulteeCategory: 'Hospital', metadata: '{"ODS":"RX1"}' })]
+					[
+						'h',
+						record('h', {
+							consulteeCategory: 'Hospitals operated by NHS trusts and NHS foundation trusts (England)',
+							metadata: '{"ODS":"RX1"}'
+						})
+					]
 				])
 			}),
 			config

@@ -11,7 +11,7 @@ function input(overrides: Partial<MapPdfInput> = {}): MapPdfInput {
 		rulesetName: 'Test ruleset',
 		boundaryFileName: 'site.geojson',
 		generatedAt: new Date('2026-10-13T14:00:00Z'),
-		category: 'Parish Council',
+		category: 'Parish, town and community councils',
 		image: ONE_PIXEL_PNG,
 		// the one pixel is drawn 400pt square - 10 m a point
 		metresPerPixel: 4_000,
@@ -34,7 +34,7 @@ describe('report map PDF', () => {
 		assert.equal(pdf.toString('latin1').match(/\/Type \/Page\b/g)?.length, 2);
 		const lines = pdfTextLines(pdf);
 		assert.deepStrictEqual(lines.slice(0, 3), [
-			'Parish Council',
+			'Parish, town and community councils',
 			'Test Solar Farm (EN010001)',
 			'Ruleset: Test ruleset   |   Boundary file: site.geojson   |   Generated 13 October 2026'
 		]);
@@ -47,7 +47,7 @@ describe('report map PDF', () => {
 			'In the report',
 			'The site',
 			'Ruleset buffers (2 km, 10 km)',
-			'Parish Council: 2 in the report',
+			'Parish, town and community councils: 2 in the report',
 			'Abbey Parish Council',
 			'"B" host Parish Councils: intersects the site',
 			'Asked to be consulted',
@@ -80,6 +80,14 @@ describe('report map PDF', () => {
 		assert.ok(lines.includes('Project 5 (EN010005)'));
 		// each project is still listed, each with its own swatch beside its name
 		assert.equal(lines.filter((line) => /^Project \d \(EN01000\d\)$/.test(line)).length, 5);
+	});
+
+	it('credits OS on a map drawn on its basemap, with its licence under it', async () => {
+		const lines = pdfTextLines(await buildMapPdf(input({ basemap: 'os' })));
+		const credit = `© Crown copyright and database rights ${new Date().getFullYear()} OS`;
+		assert.ok(lines.includes(credit), `missing "${credit}"`);
+		assert.ok(lines.includes(`Basemap ${credit}. Used under the Public Sector Geospatial Agreement.`));
+		assert.ok(!lines.some((line) => line.includes('OpenStreetMap')));
 	});
 
 	it('keys one buffer, and none when the map draws none', async () => {

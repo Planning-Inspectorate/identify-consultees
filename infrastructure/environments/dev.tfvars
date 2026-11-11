@@ -70,7 +70,7 @@ sql_config = {
     login_username = "pins-consultees-sql-dev"
     object_id      = "8cba2d98-000c-440b-8e54-5ef4ff231520"
   }
-  sku_name    = "S2"
+  sku_name    = "Basic"
   max_size_gb = 2
   retention = {
     audit_days             = 90
@@ -100,3 +100,7 @@ waf_rate_limits = {
 web_domains = {
   web = "consultees-dev.planninginspectorate.gov.uk"
 }
+
+# the admin pages can upload, load and clear the reference data here; Training and Prod's only report
+# it, loaded by the Load and Promote reference data pipelines
+reference_data_changes_enabled = true

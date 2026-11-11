@@ -32,90 +32,92 @@ version: 1
 
 datasets:
   # local authorities
-  PAR_EW: Parish Council
-  LTA_EW: Lower Tier Authority
-  UTA_EW: Unitary Authority
-  UPT_EW: Upper Tier Authority
+  PAR_EW: Parish, town and community councils
+  LTA_EW: District councils (lower-tier authorities)
+  UTA_EW: Unitary authorities
+  UPT_EW: County councils (upper-tier authorities)
   GLA_EW: Greater London Authority
   # administrative boundaries
-  FRS_EW: Fire and Rescue Authority
-  POL_EW: Police
-  NPK_EN: National Park
-  NPK_WA: National Park
-  NPK_EW: National Park
-  CJC_EW: Corporate Joint Committee
+  FRS_EW: Fire and rescue authorities
+  POL_EW: Police and crime commissioners
+  NPK_EN: National Parks UK (England)
+  NPK_WA: National Parks UK (Wales)
+  # the earlier combined England & Wales parks file (NPK_EW) isn't listed: its features can't be
+  # labelled by country, so only the per-country files load
+  CJC_EW: Corporate joint committees (Wales)
   # health
-  AMB_EW: Ambulance Trust
-  HSP_EN: Hospital
-  ICB_EW: ICB
-  LHB_WA: Local Health Board
+  AMB_EW: Ambulance trusts
+  HSP_EN: Hospitals operated by NHS trusts and NHS foundation trusts (England)
+  ICB_EW: Integrated Care Boards (England)
+  LHB_WA: Local health boards (Wales)
   # landscape and water
-  NLA_EN: National Landscape
-  NLA_WA: National Landscape
-  IDB_EN: Internal Drainage Board
-  IDB_WA: Internal Drainage District
+  NLA_EN: National Landscapes - areas of outstanding natural beauty (England)
+  NLA_WA: National Landscapes - areas of outstanding natural beauty (Wales)
+  IDB_EN: Internal drainage boards (England)
+  IDB_WA: Internal drainage boards (Wales)
   # emergency planning
-  LRF_EW: Local Resilience Forum
+  LRF_EW: Local resilience forums (Wales)
   # transport
-  RAIL_EW: Railway
-  CAN_EW: Canal
-  DKH_WE: Dock or Harbour
-  ITA_EW: Integrated Transport Authority
-  PTE_EW: Passenger Transport Executive
+  RAIL_EW: Railways
+  CAN_EW: Canal or inland navigation authorities
+  DKH_WE: Dock and harbour authorities
+  ITA_EW: Integrated transport authorities
+  PTE_EW: Passenger transport executives
   # energy
-  ELG_EW: Electricity Generator
-  DNO_EW: DNO
-  ICN_EW: Interconnector
-  # sites and their export cables, which the rulesets treat separately
+  ELG_EW: Electricity generators with compulsory purchase order powers
+  DNO_EW: Electricity distributors with compulsory purchase order powers
+  ICN_EW: Electricity interconnectors with compulsory purchase order powers
+  # sites and their export cables, which the report tells apart by subcategory - one layer
   OWF_EW:
-    category: Offshore Wind Site
+    category: Offshore wind export cables and sites
     subcategories:
-      Offshore Wind Export Cables: Offshore Wind Export Cable
-  ONR_EW: ONR Site
+      Offshore Wind Export Cables: Offshore wind export cables and sites
+  ONR_EW: Office for Nuclear Regulation sites
   # other - safeguarding and reporting areas
-  MSG_EW: MOD Safeguarding Area
-  MLF_EW: MOD Low Flying Area
-  CMA_EW: Coal Mining Reporting Area
-  CBA_EN: Cheshire Brine Area
+  MSG_EW: Ministry of Defence safeguarding areas
+  MLF_EW: Ministry of Defence low flying areas
+  CMA_EW: Mining remediation authority
+  CBA_EN: Cheshire brine subsidence district
   # earlier exports' codes for the same datasets
-  OWS_NA: Offshore Wind Site
-  ONR_NA: ONR Site
+  OWS_NA: Offshore wind export cables and sites
+  ONR_NA: Office for Nuclear Regulation sites
 
 groups:
   Administrative boundaries:
-    - Parish Council
-    - Lower Tier Authority
-    - Unitary Authority
-    - Upper Tier Authority
+    - Parish, town and community councils
+    - District councils (lower-tier authorities)
+    - Unitary authorities
+    - County councils (upper-tier authorities)
     - Greater London Authority
-    - National Park
+    - National Parks UK (England)
+    - National Parks UK (Wales)
   Public bodies:
-    - Ambulance Trust
-    - Fire and Rescue Authority
-    - Hospital
-    - ICB
-    - Internal Drainage Board
-    - Internal Drainage District
-    - Local Health Board
-    - Local Resilience Forum
-    - National Landscape
-    - Police
+    - Ambulance trusts
+    - Fire and rescue authorities
+    - Hospitals operated by NHS trusts and NHS foundation trusts (England)
+    - Integrated Care Boards (England)
+    - Internal drainage boards (England)
+    - Internal drainage boards (Wales)
+    - Local health boards (Wales)
+    - Local resilience forums (Wales)
+    - National Landscapes - areas of outstanding natural beauty (England)
+    - National Landscapes - areas of outstanding natural beauty (Wales)
+    - Police and crime commissioners
   Energy:
-    - DNO
-    - Electricity Generator
-    - Interconnector
-    - Offshore Wind Site
-    - Offshore Wind Export Cable
-    - ONR Site
+    - Electricity distributors with compulsory purchase order powers
+    - Electricity generators with compulsory purchase order powers
+    - Electricity interconnectors with compulsory purchase order powers
+    - Offshore wind export cables and sites
+    - Office for Nuclear Regulation sites
   Transport:
-    - Canal
-    - Corporate Joint Committee
-    - Dock or Harbour
-    - Integrated Transport Authority
-    - Passenger Transport Executive
-    - Railway
+    - Canal or inland navigation authorities
+    - Corporate joint committees (Wales)
+    - Dock and harbour authorities
+    - Integrated transport authorities
+    - Passenger transport executives
+    - Railways
   Other:
-    - MOD Safeguarding Area
-    - MOD Low Flying Area
-    - Coal Mining Reporting Area
-    - Cheshire Brine Area
+    - Ministry of Defence safeguarding areas
+    - Ministry of Defence low flying areas
+    - Mining remediation authority
+    - Cheshire brine subsidence district

@@ -50,43 +50,48 @@ tabs:
   Administrative boundaries:
     columns: [sourceId, consultee, category, whyIdentified, source]
     categories:
-      Parish Council: { summary: 'Parish, Town and Community Councils' }
-      Lower Tier Authority: { summary: District Councils (Lower Tier Authorities) }
-      Unitary Authority: { summary: Unitary Authorities }
-      National Park: { summary: National Parks and Broads }
-      Upper Tier Authority: { summary: County Councils (Upper Tier Authorities) }
+      'Parish, town and community councils': { summary: 'Parish, town and community councils' }
+      District councils (lower-tier authorities): { summary: District councils (lower-tier authorities) }
+      Unitary authorities: { summary: Unitary authorities }
+      National Parks UK (England): { summary: National Parks UK (England) }
+      National Parks UK (Wales): { summary: National Parks UK (Wales) }
+      County councils (upper-tier authorities): { summary: County councils (upper-tier authorities) }
       Greater London Authority: { summary: Greater London Authority }
 
   Public bodies:
     columns: [sourceId, consultee, category, whyIdentified, source]
     categories:
       # a line for each buffer its conditions find it within, each trust on its nearest
-      Ambulance Trust: { summary: { 1: Ambulance Trusts (1km buffer), 10: Ambulance Trusts (10km buffer) } }
-      Fire and Rescue Authority:
-        summary: Fire and Rescue Authorities
+      Ambulance trusts: { summary: { 1: Ambulance trusts (1km buffer), 10: Ambulance trusts (10km buffer) } }
+      Fire and rescue authorities:
+        summary: Fire and rescue authorities
         metadata: { ONS_CODE: External code }
-      Police:
-        summary: Police and Crime Commissioners
+      Police and crime commissioners:
+        summary: Police and crime commissioners
         metadata: { PFA22CD: External code, PFA22NM: Police force area }
-      Hospital: { summary: Hospitals operated by NHS Trusts and NHS Foundation Trusts (England) }
-      ICB:
+      Hospitals operated by NHS trusts and NHS foundation trusts (England):
+        { summary: Hospitals operated by NHS trusts and NHS foundation trusts (England) }
+      Integrated Care Boards (England):
         summary: Integrated Care Boards (England)
         metadata: { ICB26CD: External code }
       # a drainage district's consultee is its board
-      Internal Drainage Board: { summary: Internal Drainage Boards }
-      Internal Drainage District: { summary: Internal Drainage Boards }
-      Local Resilience Forum: { summary: Local Resilience Forums }
-      Local Health Board: { summary: Local Health Boards (Wales) }
-      National Landscape:
-        summary: National Landscapes
+      Internal drainage boards (England): { summary: Internal drainage boards (England) }
+      Internal drainage boards (Wales): { summary: Internal drainage boards (Wales) }
+      Local resilience forums (Wales): { summary: Local resilience forums (Wales) }
+      Local health boards (Wales): { summary: Local health boards (Wales) }
+      National Landscapes - areas of outstanding natural beauty (England):
+        summary: National Landscapes - areas of outstanding natural beauty (England)
+        metadata: { CODE: External code, NAT_ENG_CODE: Natural England code }
+      National Landscapes - areas of outstanding natural beauty (Wales):
+        summary: National Landscapes - areas of outstanding natural beauty (Wales)
         metadata: { CODE: External code, NAT_ENG_CODE: Natural England code }
 
   Energy:
     columns: [sourceId, consultee, category, subcategory, subcategoryDescription, distanceKm, whyIdentified, source]
     metadata: none
     categories:
-      Electricity Generator:
-        summary: Electricity Generators
+      Electricity generators with compulsory purchase order powers:
+        summary: Electricity generators with compulsory purchase order powers
         metadata:
           COMPANY_NAME: Operator
           PRIMARY_TYPE: Technology
@@ -95,49 +100,47 @@ tabs:
           COMMISSIONED_DATE: Commissioned
           PINS_REFERENCE: PINS reference
           DUKES_REFERENCE: DUKES reference
-      Offshore Wind Site:
-        summary: Offshore Wind Sites
+      Offshore wind export cables and sites:
+        summary: Offshore wind export cables and sites
         metadata: { TENANT: Operator }
-      Offshore Wind Export Cable:
-        summary: Wind Export Cables
-        metadata: { TENANT: Operator }
-      ONR Site: { summary: Office for Nuclear Regulation Sites }
-      DNO: { summary: Distribution Network Operators }
-      Interconnector:
-        summary: Interconnectors
+      Office for Nuclear Regulation sites: { summary: Office for Nuclear Regulation sites }
+      Electricity distributors with compulsory purchase order powers:
+        { summary: Electricity distributors with compulsory purchase order powers }
+      Electricity interconnectors with compulsory purchase order powers:
+        summary: Electricity interconnectors with compulsory purchase order powers
         metadata: { LICENSEE: Operator, STATUS: Status }
 
   Transport:
     columns: [sourceId, consultee, category, subcategory, subcategoryDescription, distanceKm, whyIdentified, source]
     metadata: none
     categories:
-      Canal: { summary: Canals }
-      Railway:
+      Canal or inland navigation authorities: { summary: Canal or inland navigation authorities }
+      Railways:
         summary: Railways
         metadata: { STATUS: Status, HS2: HS2 }
-      Passenger Transport Executive:
-        summary: Passenger Transport Executives
+      Passenger transport executives:
+        summary: Passenger transport executives
         metadata: &combined_authority { COMB_AUTH_CODE: External code, PTE_NAME: Passenger transport executive }
-      Integrated Transport Authority:
-        summary: Integrated Transport Authorities
+      Integrated transport authorities:
+        summary: Integrated transport authorities
         metadata: *combined_authority
-      Dock or Harbour:
-        summary: Docks and Harbours operated by Statutory Harbour Authorities
+      Dock and harbour authorities:
+        summary: Dock and harbour authorities
         metadata:
           STATUS: Ownership
           MAJOR_PORT: Major port
           STATUTORY_HARBOUR_AUTHORITY: Statutory harbour authority
           COMPETENT_HARBOUR_AUTHORITY: Competent harbour authority
-      Corporate Joint Committee:
-        summary: Corporate Joint Committees (Wales)
+      Corporate joint committees (Wales):
+        summary: Corporate joint committees (Wales)
         metadata: { CTYUA23NM: Member councils }
 
   Other:
     categories:
-      MOD Safeguarding Area: { summary: Ministry of Defence Safeguarding Areas }
-      MOD Low Flying Area: { summary: Ministry of Defence Low Flying Areas }
-      Coal Mining Reporting Area: { summary: Coal Mining Reporting Areas }
-      Cheshire Brine Area: { summary: Cheshire Brine Area }
+      Ministry of Defence safeguarding areas: { summary: Ministry of Defence safeguarding areas }
+      Ministry of Defence low flying areas: { summary: Ministry of Defence low flying areas }
+      Mining remediation authority: { summary: Mining remediation authority }
+      Cheshire brine subsidence district: { summary: Cheshire brine subsidence district }
 
   NSIPs:
     # its own fields alone (see NSIP_FIELDS in workbook.ts): the project, its case reference, its

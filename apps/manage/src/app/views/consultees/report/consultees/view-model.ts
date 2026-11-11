@@ -18,7 +18,7 @@ export interface RemovedConsulteeRow {
 }
 
 export interface ReportConsulteesViewModel {
-	/** The category name - the page's h1; the case name sits above it as a caption. */
+	/** The category as the page names it - Nearby NSIPs spelled out; the case name sits above it as a caption. */
 	pageHeading: string;
 	pageCaption: string;
 	/** Back to the draft report, with the changes made since the page was opened kept. */

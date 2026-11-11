@@ -4,7 +4,8 @@
  * Pattern ported from PINS-data-spike `uploads-map.js` / `case-map.js`:
  * - datasetsPlugin (its own Layers menu hidden) + layers-key-plugin for a combined
  *   layers/legend panel
- * - OpenFreeMap Liberty basemap
+ * - OS's Light basemap when the page config has one (`config.interactiveBasemap`, see app/maps/os-maps.ts -
+ *   its tiles come through this app, so the OS key stays on the server), else OpenFreeMap Liberty
  * - Static map fallback (PNG or SVG) via `config.fallback` when interactive init fails,
  *   owned by static-map-plugin.mjs. Fallback details travel in the page's JSON
  *   config, not data-* attributes - the InteractiveMap constructor JSON.parses
@@ -395,11 +396,7 @@ export function initConsulteeMap(mapId) {
 		const map = new defra.InteractiveMap(mapId, {
 			behaviour: 'inline',
 			mapProvider: defra.maplibreProvider(),
-			mapStyle: {
-				url: 'https://tiles.openfreemap.org/styles/liberty',
-				attribution: 'OpenFreeMap © OpenMapTiles Data from OpenStreetMap',
-				backgroundColor: '#f5f5f0'
-			},
+			...basemapOptions(config.interactiveBasemap),
 			center: config.center,
 			zoom: interactiveZoom(config.zoom),
 			containerHeight: `${config.height ?? 516}px`,
@@ -412,6 +409,32 @@ export function initConsulteeMap(mapId) {
 	} catch {
 		staticMapPlugin.showFallback();
 	}
+}
+
+const OPENFREEMAP_STYLE = {
+	url: 'https://tiles.openfreemap.org/styles/liberty',
+	attribution: 'OpenFreeMap © OpenMapTiles Data from OpenStreetMap',
+	backgroundColor: '#f5f5f0'
+};
+
+/**
+ * The InteractiveMap options for the page's basemap: OS's, with the zooms and area its tiles cover,
+ * or OpenFreeMap's when the page has none.
+ * @param {{ url: string, attribution: string, backgroundColor: string, minZoom?: number, maxZoom?: number, maxExtent?: number[] } | undefined} basemap
+ * @returns {object}
+ */
+export function basemapOptions(basemap) {
+	if (!basemap) {
+		return { mapStyle: OPENFREEMAP_STYLE };
+	}
+	const { minZoom, maxZoom, maxExtent, ...style } = basemap;
+	return {
+		// MapLibre fetches the style itself: an absolute URL, whatever page it's on
+		mapStyle: { ...style, url: new URL(style.url, window.location.href).href },
+		...(minZoom === undefined ? {} : { minZoom }),
+		...(maxZoom === undefined ? {} : { maxZoom }),
+		...(maxExtent ? { maxExtent } : {})
+	};
 }
 
 /**

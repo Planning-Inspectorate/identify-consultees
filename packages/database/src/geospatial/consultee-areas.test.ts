@@ -11,10 +11,12 @@ import {
 	consulteeAreaTable,
 	datasetInUse,
 	findConsulteeAreasByName,
+	findConsulteeAreasByNameStart,
 	getConsulteeAreaById,
 	getConsulteeAreaDisplayGeometries,
 	listConsulteeAreas,
 	loadConsulteeAreas,
+	sharedConsulteeNames,
 	tableSql
 } from './consultee-areas.ts';
 
@@ -181,8 +183,8 @@ describe('consultee areas (requires a local SQL Server - see docker-compose.yml)
 						geometry: { type: 'Point', coordinates: [0, 0] },
 						properties: {
 							sourceId: 'railway_RAIL_EW_00001',
-							consulteeCategory: 'Railway',
-							consulteeGroup: 'Railway',
+							consulteeCategory: 'Railways',
+							consulteeGroup: 'Railways',
 							consulteeSubcategory: 'Active',
 							consulteeSubcategoryDescription: 'Railway line in use',
 							currentVersion: 2,
@@ -219,8 +221,8 @@ describe('consultee areas (requires a local SQL Server - see docker-compose.yml)
 			assert.ok(stored);
 			assert.deepEqual(stored.properties, {
 				sourceId: 'railway_RAIL_EW_00001',
-				consulteeCategory: 'Railway',
-				consulteeGroup: 'Railway',
+				consulteeCategory: 'Railways',
+				consulteeGroup: 'Railways',
 				consulteeSubcategory: 'Active',
 				consulteeSubcategoryDescription: 'Railway line in use',
 				consultee: 'Network Rail',
@@ -299,20 +301,40 @@ describe('consultee areas (requires a local SQL Server - see docker-compose.yml)
 						id: testAreaId,
 						type: 'Feature',
 						geometry: square(-2),
-						properties: { consulteeCategory: 'Parish Council', consultee: testName, region: 'Far' }
+						properties: { consulteeCategory: 'Parish, town and community councils', consultee: testName, region: 'Far' }
 					},
 					{
 						id: secondAreaId,
 						type: 'Feature',
 						geometry: square(-0.15),
-						properties: { consulteeCategory: 'Parish Council', consultee: testName, region: 'Near' }
+						properties: {
+							consulteeCategory: 'Parish, town and community councils',
+							consultee: testName,
+							region: 'Near'
+						}
+					},
+					// a name starting the same way, nearer the site than the far one
+					{
+						id: thirdAreaId,
+						type: 'Feature',
+						geometry: square(-0.5),
+						properties: {
+							consulteeCategory: 'Parish, town and community councils',
+							consultee: `${testName} North`,
+							region: 'Near'
+						}
 					}
 				]
 			});
 			const site = { type: 'Point' as const, coordinates: [-0.14, 51.505] };
 
 			// both, nearest first, with their regions to tell them apart - case aside
-			const found = await findConsulteeAreasByName(dbClient, 'Parish Council', testName.toUpperCase(), site);
+			const found = await findConsulteeAreasByName(
+				dbClient,
+				'Parish, town and community councils',
+				testName.toUpperCase(),
+				site
+			);
 			assert.deepEqual(
 				found.map(({ id, consultee, region }) => ({ id, consultee, region })),
 				[
@@ -324,8 +346,57 @@ describe('consultee areas (requires a local SQL Server - see docker-compose.yml)
 			assert.ok(found[1].distanceMetres > 100_000);
 
 			// another category, or a name that isn't a consultee - none
-			assert.deepEqual(await findConsulteeAreasByName(dbClient, 'Hospital', testName, site), []);
-			assert.deepEqual(await findConsulteeAreasByName(dbClient, 'Parish Council', 'Banana', site), []);
+			assert.deepEqual(
+				await findConsulteeAreasByName(
+					dbClient,
+					'Hospitals operated by NHS trusts and NHS foundation trusts (England)',
+					testName,
+					site
+				),
+				[]
+			);
+			assert.deepEqual(
+				await findConsulteeAreasByName(dbClient, 'Parish, town and community councils', 'Banana', site),
+				[]
+			);
+
+			// as a name is typed: those called exactly that first, nearest first, then the ones it starts
+			assert.deepEqual(
+				(
+					await findConsulteeAreasByNameStart(
+						dbClient,
+						'Parish, town and community councils',
+						testName.toLowerCase(),
+						site
+					)
+				).map(({ id }) => id),
+				[secondAreaId, testAreaId, thirdAreaId]
+			);
+			assert.deepEqual(
+				(await findConsulteeAreasByNameStart(dbClient, 'Parish, town and community councils', 'Findconsulteeby', site))
+					.map(({ id }) => id)
+					.sort(),
+				[testAreaId, secondAreaId, thirdAreaId].sort()
+			);
+			// what's typed is matched as it is - a % or _ isn't a wildcard
+			for (const typed of ['%', 'Findconsulteeby_ame', 'Findconsulteebyname Test Parish [']) {
+				assert.deepEqual(
+					await findConsulteeAreasByNameStart(dbClient, 'Parish, town and community councils', typed, site),
+					[],
+					typed
+				);
+			}
+
+			// the name both share - twice in the reference data - and not the one only one has
+			assert.deepEqual(
+				await sharedConsulteeNames(dbClient, 'Parish, town and community councils', [
+					testName.toUpperCase(),
+					`${testName} North`,
+					testName
+				]),
+				new Set([testName.toLowerCase()])
+			);
+			assert.deepEqual(await sharedConsulteeNames(dbClient, 'Parish, town and community councils', []), new Set());
 		} finally {
 			await cleanup();
 		}
@@ -357,7 +428,7 @@ describe('consultee areas (requires a local SQL Server - see docker-compose.yml)
 						type: 'Feature',
 						geometry: square(-30, 50, 0.01),
 						properties: {
-							consulteeCategory: 'Parish Council',
+							consulteeCategory: 'Parish, town and community councils',
 							consultee: 'Detail Test Parish',
 							region: 'Test Region',
 							consulteeSubcategory: 'Parish Councils'
@@ -367,13 +438,20 @@ describe('consultee areas (requires a local SQL Server - see docker-compose.yml)
 						id: secondAreaId,
 						type: 'Feature',
 						geometry: square(-30.05, 49.95, 0.2),
-						properties: { consulteeCategory: 'Lower Tier Authority', consultee: 'Detail Test District' }
+						properties: {
+							consulteeCategory: 'District councils (lower-tier authorities)',
+							consultee: 'Detail Test District'
+						}
 					},
 					{
 						id: thirdAreaId,
 						type: 'Feature',
 						geometry: square(-35, 50, 0.01),
-						properties: { consulteeCategory: 'Parish Council', consultee: 'Detail Test Parish', region: 'Elsewhere' }
+						properties: {
+							consulteeCategory: 'Parish, town and community councils',
+							consultee: 'Detail Test Parish',
+							region: 'Elsewhere'
+						}
 					}
 				]
 			});

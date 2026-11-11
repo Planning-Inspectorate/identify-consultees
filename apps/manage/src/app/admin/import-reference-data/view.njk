@@ -15,10 +15,18 @@
 {% block adminContent %}
     <h1 class="govuk-heading-l">{{ pageHeading }}</h1>
 
-    <p class="govuk-body">
-        Loads each group's newest file in <a class="govuk-link" href="/admin/upload-to-blob">Reference data files</a>.
-        A load can take minutes: if the page times out, it carries on - reload later and check the counts.
-    </p>
+    {% if canChange %}
+        <p class="govuk-body">
+            Loads each group's newest file in <a class="govuk-link" href="/admin/upload-to-blob">Reference data files</a>.
+            A load can take minutes: if the page times out, it carries on - reload later and check the counts.
+        </p>
+    {% else %}
+        <p class="govuk-body">
+            What's in this environment's blob storage and loaded into its database. The files are
+            copied here and loaded by the Promote reference data pipeline in Azure DevOps; the Load
+            reference data pipeline loads them again, or empties a quarter's dataset.
+        </p>
+    {% endif %}
 
     {% if error %}
         {{ govukErrorMessage({ text: error }) }}
@@ -113,7 +121,7 @@
             {% endif %}
         {% endset %}
         {% set actionHtml %}
-            {% if group.file %}
+            {% if group.file and canChange %}
                 <form method="post" action="/admin/import-reference-data/run-consultee-area-group" novalidate>
                     <input type="hidden" name="_csrf" value="{{ _csrf }}">
                     <input type="hidden" name="group" value="{{ group.slug }}">
@@ -121,12 +129,15 @@
                 </form>
             {% endif %}
         {% endset %}
-        {% set groupRows = (groupRows.push([
+        {% set groupRow = [
             { html: "<strong>" ~ (group.name | escape) ~ "</strong><br><span class=\"govuk-hint\">" ~ (group.categories | escape) ~ "</span>" },
             { html: fileHtml },
-            { html: loadedHtml },
-            { html: actionHtml }
-        ]), groupRows) %}
+            { html: loadedHtml }
+        ] %}
+        {% if canChange %}
+            {% set groupRow = (groupRow.push({ html: actionHtml }), groupRow) %}
+        {% endif %}
+        {% set groupRows = (groupRows.push(groupRow), groupRows) %}
     {% endfor %}
     {{ govukTable({
         caption: "Consultee area groups",
@@ -134,37 +145,38 @@
         head: [
             { text: "Group" },
             { text: "In blob storage" },
-            { text: "Loaded" },
-            { html: "<span class=\"govuk-visually-hidden\">Action</span>" }
-        ],
+            { text: "Loaded" }
+        ].concat([{ html: "<span class=\"govuk-visually-hidden\">Action</span>" }] if canChange else []),
         rows: groupRows
     }) }}
 
-    <h2 class="govuk-heading-m">Clear consultee areas</h2>
-    {% if datasets and datasets.length > 0 %}
-        {{ govukWarningText({
-            text: "Deletes every consultee area in the dataset you choose, in every group. Its table, other quarters' datasets and the files in blob storage are left as they are - load each group again afterwards.",
-            iconFallbackText: "Warning"
-        }) }}
-        {% set datasetItems = [] %}
-        {% for dataset in datasets %}
-            {% set datasetItems = (datasetItems.push({
-                value: dataset.quarter,
-                text: dataset.quarter ~ " - " ~ (dataset.status | lower) ~ ", " ~ dataset.rows ~ " consultee areas",
-                selected: dataset.quarter == datasetInUse
-            }), datasetItems) %}
-        {% endfor %}
-        <form method="post" action="/admin/import-reference-data/clear-consultee-areas" novalidate>
-            <input type="hidden" name="_csrf" value="{{ _csrf }}">
-            {{ govukSelect({
-                id: "quarter",
-                name: "quarter",
-                label: { text: "Dataset to clear" },
-                items: datasetItems
+    {% if canChange %}
+        <h2 class="govuk-heading-m">Clear consultee areas</h2>
+        {% if datasets and datasets.length > 0 %}
+            {{ govukWarningText({
+                text: "Deletes every consultee area in the dataset you choose, in every group. Its table, other quarters' datasets and the files in blob storage are left as they are - load each group again afterwards.",
+                iconFallbackText: "Warning"
             }) }}
-            {{ govukButton({ text: "Clear consultee areas", classes: "govuk-button--warning" }) }}
-        </form>
-    {% else %}
-        <p class="govuk-body">There's no dataset to clear.</p>
+            {% set datasetItems = [] %}
+            {% for dataset in datasets %}
+                {% set datasetItems = (datasetItems.push({
+                    value: dataset.quarter,
+                    text: dataset.quarter ~ " - " ~ (dataset.status | lower) ~ ", " ~ dataset.rows ~ " consultee areas",
+                    selected: dataset.quarter == datasetInUse
+                }), datasetItems) %}
+            {% endfor %}
+            <form method="post" action="/admin/import-reference-data/clear-consultee-areas" novalidate>
+                <input type="hidden" name="_csrf" value="{{ _csrf }}">
+                {{ govukSelect({
+                    id: "quarter",
+                    name: "quarter",
+                    label: { text: "Dataset to clear" },
+                    items: datasetItems
+                }) }}
+                {{ govukButton({ text: "Clear consultee areas", classes: "govuk-button--warning" }) }}
+            </form>
+        {% else %}
+            <p class="govuk-body">There's no dataset to clear.</p>
+        {% endif %}
     {% endif %}
 {% endblock %}

@@ -18,7 +18,7 @@ const boundaryId = '22222222-2222-2222-2222-222222222222';
 function area(overrides: Record<string, unknown> = {}) {
 	return {
 		id: areaId.toUpperCase(),
-		consulteeCategory: 'Parish Council',
+		consulteeCategory: 'Parish, town and community councils',
 		consultee: 'Barton',
 		region: 'North West',
 		geometryType: 'Polygon',
@@ -46,8 +46,8 @@ function dbWith({
 	boundaries = [boundary()] as unknown[],
 	boundaryCount = 1,
 	categories = [
-		{ consulteeCategory: 'Hospital', _count: { _all: 2 } },
-		{ consulteeCategory: 'Parish Council', _count: { _all: 1 } },
+		{ consulteeCategory: 'Hospitals operated by NHS trusts and NHS foundation trusts (England)', _count: { _all: 2 } },
+		{ consulteeCategory: 'Parish, town and community councils', _count: { _all: 1 } },
 		{ consulteeCategory: null, _count: { _all: 3 } }
 	] as unknown[],
 	areaRow = null as unknown,
@@ -95,8 +95,16 @@ describe('admin database pages', () => {
 			]
 		);
 		assert.deepEqual(model.categories, [
-			{ name: 'Hospital', rows: '2', href: '/admin/database/consultee-areas?category=Hospital' },
-			{ name: 'Parish Council', rows: '1', href: '/admin/database/consultee-areas?category=Parish+Council' },
+			{
+				name: 'Hospitals operated by NHS trusts and NHS foundation trusts (England)',
+				rows: '2',
+				href: '/admin/database/consultee-areas?category=Hospitals+operated+by+NHS+trusts+and+NHS+foundation+trusts+%28England%29'
+			},
+			{
+				name: 'Parish, town and community councils',
+				rows: '1',
+				href: '/admin/database/consultee-areas?category=Parish%2C+town+and+community+councils'
+			},
 			// rows with no category can't be filtered to
 			{ name: 'No category', rows: '3', href: undefined }
 		]);
@@ -109,12 +117,15 @@ describe('admin database pages', () => {
 		});
 		const res = response();
 		await buildConsulteeAreasPage({ db } as never)(
-			{ query: { category: 'Parish Council', q: ' bart ', page: '2' } } as never,
+			{ query: { category: 'Parish, town and community councils', q: ' bart ', page: '2' } } as never,
 			res as never
 		);
 
 		const [query] = db.consulteeArea.findMany.mock.calls[0].arguments as unknown as [Record<string, any>];
-		assert.deepEqual(query.where, { consulteeCategory: 'Parish Council', consultee: { contains: 'bart' } });
+		assert.deepEqual(query.where, {
+			consulteeCategory: 'Parish, town and community councils',
+			consultee: { contains: 'bart' }
+		});
 		assert.equal(query.skip, 50);
 		assert.equal(query.take, 50);
 		const { view, model } = rendered(res);
@@ -124,14 +135,18 @@ describe('admin database pages', () => {
 		// every named category to filter by, the requested one selected
 		assert.deepEqual(model.categoryItems, [
 			{ value: '', text: 'Every category', selected: false },
-			{ value: 'Hospital', text: 'Hospital', selected: false },
-			{ value: 'Parish Council', text: 'Parish Council', selected: true }
+			{
+				value: 'Hospitals operated by NHS trusts and NHS foundation trusts (England)',
+				text: 'Hospitals operated by NHS trusts and NHS foundation trusts (England)',
+				selected: false
+			},
+			{ value: 'Parish, town and community councils', text: 'Parish, town and community councils', selected: true }
 		]);
 		assert.deepEqual(model.rows, [
 			{
 				href: `/admin/database/consultee-areas/${areaId}`,
 				consultee: 'Barton',
-				category: 'Parish Council',
+				category: 'Parish, town and community councils',
 				region: 'North West',
 				geometryType: 'Polygon',
 				lastUpdated: '13 Oct 2026, 14:39'
@@ -146,8 +161,14 @@ describe('admin database pages', () => {
 			}
 		]);
 		// the page links keep the filters
-		assert.equal(model.pagination.previous.href, '/admin/database/consultee-areas?category=Parish+Council&q=bart');
-		assert.equal(model.pagination.next.href, '/admin/database/consultee-areas?category=Parish+Council&q=bart&page=3');
+		assert.equal(
+			model.pagination.previous.href,
+			'/admin/database/consultee-areas?category=Parish%2C+town+and+community+councils&q=bart'
+		);
+		assert.equal(
+			model.pagination.next.href,
+			'/admin/database/consultee-areas?category=Parish%2C+town+and+community+councils&q=bart&page=3'
+		);
 	});
 
 	test('reads a missing, repeated or nonsense filter as none, and an empty list as no rows', async () => {

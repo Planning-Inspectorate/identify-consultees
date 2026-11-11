@@ -34,12 +34,12 @@ const pages = [
 	{ path: `/consultees/${SAMPLE_CASE_ID}/ruleset`, name: 'ruleset-picker' },
 	{ path: `/consultees/${SAMPLE_CASE_ID}/report?ruleset=${SAMPLE_RULESET_ID}`, name: 'report-check' },
 	{
-		path: `/consultees/${SAMPLE_CASE_ID}/report/consultees?ruleset=${SAMPLE_RULESET_ID}&category=Parish%20Council`,
+		path: `/consultees/${SAMPLE_CASE_ID}/report/consultees?ruleset=${SAMPLE_RULESET_ID}&category=Parish%2C%20town%20and%20community%20councils`,
 		name: 'report-consultees',
 		mask: MAP_MASK
 	},
 	{
-		path: `/consultees/${SAMPLE_CASE_ID}/report/consultees/add?ruleset=${SAMPLE_RULESET_ID}&category=Parish%20Council`,
+		path: `/consultees/${SAMPLE_CASE_ID}/report/consultees/add?ruleset=${SAMPLE_RULESET_ID}&category=Parish%2C%20town%20and%20community%20councils`,
 		name: 'report-consultee-add'
 	},
 	{
