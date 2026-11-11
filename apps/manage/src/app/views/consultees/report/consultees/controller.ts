@@ -1,7 +1,6 @@
 import type { ManageService } from '#service';
 import { stringifyForInlineScript } from '#util/inline-json.ts';
 import type { CaseBoundaryFeature } from '@pins/identify-consultees-database/src/geospatial/case-boundaries.ts';
-import { consulteeAreaDetails } from '@pins/identify-consultees-database/src/geospatial/consultee-areas.ts';
 import type { ConsulteeMatch, Ruleset } from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
 import { isIdentified } from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
 import type { AsyncRequestHandler } from '@planning-inspectorate/core/util';
@@ -10,13 +9,13 @@ import type { MapMatch } from '../../../../maps/case-geojson.ts';
 import { addedBeyondRun, buildCaseMapConfig, markAddedByHand } from '../../../../maps/case-geojson.ts';
 import { MAP_VIEWPORT } from '../../../../maps/sample-geojson.ts';
 import { categorySettings } from '../../../../report-config.ts';
-import { comparableName, distinguishedLabels } from '../../consultee-labels.ts';
+import { labelsWithReferenceData } from '../../consultee-labels.ts';
 import { NEARBY_NSIPS } from '../../nearby-nsips.ts';
 import { describeReasons } from '../../reasons.ts';
 import { resolveCase } from '../../resolve-case.ts';
 import { buildSearchAreaSafely, firstQueryValue, requestedRuleset, runRulesetSafely } from '../../run-ruleset.ts';
 import { categoryBufferMetres, siteBufferGeojson, siteBuffers } from '../../site-buffers.ts';
-import { rulesetCategories } from '../categories.ts';
+import { categoryDisplayName, rulesetCategories } from '../categories.ts';
 import { addedConsulteeReason, consulteeName } from '../report-consultees.ts';
 import type { ConsulteeSelection } from '../urls.ts';
 import {
@@ -101,24 +100,16 @@ export function nearbyCandidates({ consultees, category, selection }: CategoryCo
 export { comparableName, kilometresFromSite } from '../../consultee-labels.ts';
 
 /**
- * Each listed consultee's name, by id - those sharing a name with what tells them apart, looked up
- * only for them (consultee-labels.ts). Nearby NSIPs' names carry their case reference already.
+ * Each listed consultee's name, by id - those sharing a name, with another in the list or in the
+ * reference data, with what tells them apart (consultee-labels.ts). Nearby NSIPs' names carry their
+ * case reference already.
  */
 async function listLabels(
 	service: ManageService,
 	category: string,
 	rows: { id: string; name: string; distanceMetres?: number }[]
 ): Promise<Map<string, string>> {
-	const names = rows.map((row) => comparableName(row.name));
-	const sharing = rows.filter((row) => names.filter((name) => name === comparableName(row.name)).length > 1);
-	const details =
-		sharing.length > 0 && category !== NEARBY_NSIPS
-			? await consulteeAreaDetails(
-					service.db,
-					sharing.map(({ id }) => id)
-				)
-			: new Map();
-	return distinguishedLabels(rows, category, details);
+	return (await labelsWithReferenceData(service.db, category, category !== NEARBY_NSIPS, rows)).labels;
 }
 
 /** `matches` named as `labels` has them - "Newton (Ribble Valley)" - for the map. */
@@ -161,8 +152,9 @@ async function renderCategoryPage(
 		service.nearbySearchRadiusMetres,
 		service.logger
 	);
+	const categoryName = categoryDisplayName(category);
 	const staticMapSrc = categoryStaticMapUrl(project.id, ruleset.id, category, selection);
-	const staticMapAlt = `Static map showing ${category} consultees for ${project.properties.caseName}`;
+	const staticMapAlt = `Static map showing ${categoryName} consultees for ${project.properties.caseName}`;
 	// the ruleset's buffers for the category around the site, as the report's map draws them
 	const buffers = await siteBuffers(
 		service,
@@ -222,14 +214,14 @@ async function renderCategoryPage(
 		.sort((a, b) => a.name.localeCompare(b.name, 'en-GB'));
 
 	const viewModel: ReportConsulteesViewModel = {
-		pageHeading: category,
+		pageHeading: categoryName,
 		pageCaption: project.properties.caseName,
 		backLinkUrl: reportUrl(project.id, ruleset.id, selection),
 		backLinkText: 'Back to draft report',
 		rows,
 		addConsulteeUrl: addConsulteeUrl(project.id, ruleset.id, category, selection),
 		mapId: 'case-map',
-		mapRegionLabel: `Map showing ${category} consultees for ${project.properties.caseName}`,
+		mapRegionLabel: `Map showing ${categoryName} consultees for ${project.properties.caseName}`,
 		staticMapSrc,
 		staticMapAlt,
 		mapWidth: MAP_VIEWPORT.width,

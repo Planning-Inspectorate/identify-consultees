@@ -19,15 +19,15 @@ Front Door speaks HTTP/2 or later to browsers and HTTP/1.1 to the app. Keep Expr
 
 Azure DevOps project [identify-consultees](https://dev.azure.com/planninginspectorate/identify-consultees/_build).
 
-| Pipeline                 | File                                                               | When                                                                                                                                                                                      |
-| ------------------------ | ------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| PR                       | `.azure/pipelines/pr.yml`                                          | Every PR and `main`: commitlint, lint, types, tests against SQL in a container, Docker smoke test, Python lint and tests                                                                  |
-| Build                    | `build.yml`                                                        | After PR passes on `main`: web image and function package                                                                                                                                 |
-| Deploy                   | `deploy.yml`                                                       | After Build: migrate, deploy to the staging slot, swap. Dev, then Test, Training and Prod in turn                                                                                         |
-| Rollback                 | `rollback.yml`                                                     | By hand                                                                                                                                                                                   |
-| Infrastructure CI and CD | `infrastructure/pipelines/terraform-ci*.yaml`, `terraform-cd.yaml` | Plan on PR; plan and apply per environment on merge                                                                                                                                       |
-| DB Seed                  | `db-seed.yml`                                                      | By hand: sample data, or the full reference data                                                                                                                                          |
-| Promote reference data   | `promote-reference-data.yml`                                       | By hand, or from Training's or Prod's **Reference data files** page: copies a checked quarter's files, Test to Training or Training to Prod (Prod's approval gates it), for loading there |
+| Pipeline                 | File                                                               | When                                                                                                                              |
+| ------------------------ | ------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------- |
+| PR                       | `.azure/pipelines/pr.yml`                                          | Every PR and `main`: commitlint, lint, types, tests against SQL in a container, Docker smoke test, Python lint and tests          |
+| Build                    | `build.yml`                                                        | After PR passes on `main`: web image and function package                                                                         |
+| Deploy                   | `deploy.yml`                                                       | After Build: migrate, deploy to the staging slot, swap. Dev, then Test, Training and Prod in turn                                 |
+| Rollback                 | `rollback.yml`                                                     | By hand                                                                                                                           |
+| Infrastructure CI and CD | `infrastructure/pipelines/terraform-ci*.yaml`, `terraform-cd.yaml` | Plan on PR; plan and apply per environment on merge                                                                               |
+| Promote reference data   | `promote-reference-data.yml`                                       | By hand: copies each group's newest file Test to Training, or Training to Prod (Prod's approval gates it), then loads them there  |
+| Load reference data      | `load-reference-data.yml`                                          | By hand: loads an environment's reference data files into its database, or empties a quarter's dataset (Prod's approval gates it) |
 
 ## Overlapping deploys
 
@@ -47,30 +47,18 @@ job:
   `deployWeb=false` and `schemaMigration=true` (the default). Its `Migrate` and `Deploy Web` jobs
   are siblings, not dependent on each other, so this applies `npm run migrate-prod` to the target
   environment's real database without touching the running app or its slots at all.
-- **Data operations**: `.azure/pipelines/db-seed.yml` (`trigger: none`, manually run via
-  `az pipelines run` or the Azure DevOps UI, parameterised by `environment`) is a fully separate
-  pipeline for loading data. Its default is the small built-in sample dataset
-  (`npm run seed`/`seed-prod`); passing `loadFullReferenceData=true` (Dev/Test/Training only)
-  instead runs `npm run import-from-blob` for the two known reference-data blobs
-  (`combined_reference_data_v1.geojson`, `all-project-boundaries.geojson`) in the app's storage
-  container (`infrastructure/storage.tf`). Imports merge by id and never delete, so add
-  `replaceExistingData=true` to clear each table first when the source's ids or areas changed -
-  otherwise old rows stay as stale or duplicate consultees. Each table is cleared only once its
-  blob has downloaded and parsed with features. The pipeline reads the blobs as its own identity,
-  which has Storage Blob Data Contributor on Test's, Training's and Prod's storage accounts, granted
-  by hand (Terraform can't: the pipeline identity's role-assignment rights carry an ABAC condition
-  that refuses it). Dev's has none, so this route fails there with 403 - use the in-app import.
-- **Promoting a checked quarter**: `.azure/pipelines/promote-reference-data.yml` (`trigger: none`,
-  parameterised by `route` - Test to Training, or Training to Prod - and an optional `quarter`)
-  exports the source's dataset in use - its group files and the rows each loaded - and copies the
-  files into the target's blob storage. It loads nothing: each group is loaded on the target's
-  `/admin/import-reference-data` page. Training's and Prod's `/admin/upload-to-blob` page starts it
-  (the Copy section), as the web app's managed identity, which needs adding to the Azure DevOps
-  project with queue and view rights on the pipeline. Case boundaries are never promoted. It needs
-  Storage Blob Data Contributor on each environment's `consultees-data` container for the same
-  identity. See "Promoting a quarter" in `kt-docs/data/data-model.md`.
-- **In-app import**: the same blobs can be imported from the manage app itself at
-  `/admin/import-reference-data` (with `/admin/upload-to-blob` for getting files into the
+- **Promoting the reference data**: `.azure/pipelines/promote-reference-data.yml` (`trigger: none`,
+  parameterised by `route` - Test to Training, or Training to Prod - and `load`) copies each
+  group's newest file from the source's blob storage to the target's, then, with `load`, loads
+  them as `load-reference-data.yml` does. Case boundaries are never promoted.
+- **Loading the reference data**: `.azure/pipelines/load-reference-data.yml` (`trigger: none`,
+  parameterised by `environment`, `clearQuarter` and `load`) loads each group's newest file in
+  the environment's blob storage, skipping one already loaded, after emptying `clearQuarter`'s
+  dataset if given. Both need Storage Blob Data Contributor on each environment's
+  `consultees-data` container for the pipeline's identity. See "Moving the reference data on" in
+  `kt-docs/data/data-model.md`.
+- **In-app import** (Dev and Test only - `REFERENCE_DATA_CHANGES_ENABLED`): the same blobs can be
+  imported from the manage app itself at `/admin/import-reference-data` (with `/admin/upload-to-blob` for getting files into the
   container) - the app's managed identity has Storage Blob Data Contributor. Consultee areas load a
   group at a time (`config/reference-data.yaml`'s `groups`, one file each) into its quarter's
   table (`consultee_area_2026Q4`); the `consultee_area` synonym points at the newest quarter with

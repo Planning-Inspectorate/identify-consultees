@@ -1,25 +1,22 @@
 import { BlobServiceClient } from '@azure/storage-blob';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { after, afterEach, before, beforeEach, describe, mock, test } from 'node:test';
+import { Readable } from 'node:stream';
+import { afterEach, beforeEach, describe, mock, test } from 'node:test';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import type { PrismaClient } from '../client/client.ts';
-import { loadConfig } from '../configuration/config.ts';
-import { newDatabaseClient } from '../index.ts';
-import type { LatestGroupLoad } from './consultee-area-groups.ts';
-import type { Dataset, FileStore, Manifest } from './promote-reference-data.ts';
+import type { StoredBlob } from './import-from-blob.ts';
+import type { FileStore, Manifest } from './promote-reference-data.ts';
 import {
 	blobFileStore,
-	copyQuarter,
-	databaseDataset,
-	exportQuarter,
+	copyFiles,
+	exportFiles,
 	MANIFEST_FILE,
 	parseManifest,
 	parsePromotionArgs,
-	PromotionError,
 	run
 } from './promote-reference-data.ts';
 
@@ -27,44 +24,24 @@ const ADMIN = '20261020_administrative_boundaries.geojson';
 const PUBLIC = '20261020_public_bodies.geojson';
 
 const FILES: Manifest['files'] = [
-	{ group: 'administrative_boundaries', blobName: ADMIN, rowsLoaded: 9_000 },
-	{ group: 'public_bodies', blobName: PUBLIC, rowsLoaded: 316 }
+	{ group: 'administrative_boundaries', blobName: ADMIN, size: 9_000 },
+	{ group: 'public_bodies', blobName: PUBLIC, size: 316 }
 ];
 
-function load(blobName: string, rowsLoaded: number): LatestGroupLoad {
-	return {
-		blobName,
-		dataDate: new Date('2026-10-20'),
-		quarter: '2026Q4',
-		rowsLoaded,
-		loadedAt: new Date('2026-10-21')
-	};
-}
+const stored = (name: string, size = 1): StoredBlob => ({ name, size, lastModified: new Date('2026-10-21') });
 
-/** A database whose quarter `inUse` holds `rows` of each group, as `loads` loaded them. */
-function fakeDataset(options: { inUse: string; loads?: Map<string, LatestGroupLoad>; rows?: Map<string, number> }) {
-	const dataset: Dataset = {
-		inUse: async () => options.inUse,
-		latestLoads: async () => options.loads ?? new Map(),
-		rowCounts: async () => options.rows ?? new Map()
-	};
-	return { dataset };
-}
-
-function fakeStore(existing: Record<string, 'same' | 'different'> = {}) {
+function fakeStore(blobs: StoredBlob[] = [], existing: Record<string, 'same' | 'different'> = {}) {
 	const downloaded: string[] = [];
 	const uploaded: string[] = [];
 	const store: FileStore = {
+		list: async () => blobs,
 		download: async (blobName, filePath) => {
 			downloaded.push(blobName);
 			writeFileSync(filePath, `{"name":"${blobName}"}`);
 		},
 		upload: async (_filePath, blobName) => {
-			if (existing[blobName] === 'different') {
-				throw new PromotionError(`${blobName} is already there but isn't the same file`);
-			}
 			uploaded.push(blobName);
-			return existing[blobName] === 'same' ? 'unchanged' : 'uploaded';
+			return existing[blobName] === 'same' ? 'unchanged' : existing[blobName] === 'different' ? 'replaced' : 'uploaded';
 		}
 	};
 	return { store, downloaded, uploaded };
@@ -80,7 +57,7 @@ afterEach(() => {
 
 /** The export `files` describes, written to the test's `dir`. */
 function writeExport(files: Manifest['files']) {
-	writeFileSync(path.join(dir, MANIFEST_FILE), JSON.stringify({ version: 1, quarter: '2026Q4', files }));
+	writeFileSync(path.join(dir, MANIFEST_FILE), JSON.stringify({ version: 2, files }));
 	for (const file of files) {
 		writeFileSync(path.join(dir, file.blobName), '{}');
 	}
@@ -104,160 +81,78 @@ function withBlobEnv(host: string | undefined, container: string | undefined, fn
 
 const BLOB_ENV = { BLOB_STORE_HOST: 'https://blob.example.test', BLOB_STORE_CONTAINER: 'test-container' };
 
-describe('exportQuarter', () => {
-	test("writes the quarter's group files and what each loaded, skipping a group with no data", async () => {
-		const { dataset } = fakeDataset({
-			inUse: '2026Q4',
-			loads: new Map([
-				['administrative_boundaries', load(ADMIN, 9_000)],
-				['public_bodies', load(PUBLIC, 316)]
-			]),
-			rows: new Map([
-				['administrative_boundaries', 9_000],
-				['public_bodies', 316],
-				['other', 0]
-			])
-		});
-		const { store, downloaded } = fakeStore();
+describe('exportFiles', () => {
+	test("writes each group's newest file and their manifest, leaving out older files and other files", async () => {
+		const { store, downloaded } = fakeStore([
+			stored('20260715_public_bodies.geojson'),
+			stored(PUBLIC, 316),
+			stored(ADMIN, 9_000),
+			stored('notes.txt')
+		]);
 
-		const manifest = await exportQuarter(dataset, store, '2026Q4', dir);
+		const manifest = await exportFiles(store, dir);
 
 		assert.deepEqual(downloaded, [ADMIN, PUBLIC]);
-		assert.deepEqual(manifest, {
-			version: 1,
-			quarter: '2026Q4',
-			files: [
-				{ group: 'administrative_boundaries', blobName: ADMIN, rowsLoaded: 9_000 },
-				{ group: 'public_bodies', blobName: PUBLIC, rowsLoaded: 316 }
-			]
-		});
+		assert.deepEqual(manifest, { version: 2, files: FILES });
 		assert.deepEqual(JSON.parse(readFileSync(path.join(dir, MANIFEST_FILE), 'utf8')), manifest);
 		assert.equal(readFileSync(path.join(dir, PUBLIC), 'utf8'), `{"name":"${PUBLIC}"}`);
 	});
 
-	test('copies the dataset in use when no quarter is given', async () => {
-		const { dataset } = fakeDataset({
-			inUse: '2026Q4',
-			loads: new Map([['public_bodies', load(PUBLIC, 316)]]),
-			rows: new Map([['public_bodies', 316]])
-		});
-		const manifest = await exportQuarter(dataset, fakeStore().store, undefined, dir);
-		assert.equal(manifest.quarter, '2026Q4');
-		assert.deepEqual(manifest.files, [{ group: 'public_bodies', blobName: PUBLIC, rowsLoaded: 316 }]);
-	});
-
-	test('copies only the dataset in use, as it was loaded, and something', async () => {
-		const { store, downloaded } = fakeStore();
-		await assert.rejects(
-			exportQuarter(fakeDataset({ inUse: '2026Q4' }).dataset, store, '2026-Q4', dir),
-			/isn't a quarter/
-		);
-		await assert.rejects(
-			exportQuarter(fakeDataset({ inUse: '2026Q3' }).dataset, store, '2026Q4', dir),
-			/this environment uses 2026Q3, not 2026Q4/
-		);
-		const edited = fakeDataset({
-			inUse: '2026Q4',
-			loads: new Map([['public_bodies', load(PUBLIC, 316)]]),
-			rows: new Map([['public_bodies', 300]])
-		});
-		await assert.rejects(
-			exportQuarter(edited.dataset, store, '2026Q4', dir),
-			/300 rows in 2026Q4, but its last load .* put in 316/
-		);
-		const unlogged = fakeDataset({ inUse: '2026Q4', rows: new Map([['energy', 12]]) });
-		await assert.rejects(
-			exportQuarter(unlogged.dataset, store, '2026Q4', dir),
-			/Energy has 12 rows in 2026Q4 but no load on record/
-		);
-		await assert.rejects(
-			exportQuarter(fakeDataset({ inUse: '2026Q4' }).dataset, store, '2026Q4', dir),
-			/nothing to copy/
-		);
+	test('refuses when there are no group files to copy', async () => {
+		const { store, downloaded } = fakeStore([stored('notes.txt')]);
+		await assert.rejects(exportFiles(store, dir), /nothing to copy/);
 		assert.deepEqual(downloaded, []);
 	});
 });
 
 describe('parseManifest', () => {
-	const manifest = (files: unknown, quarter = '2026Q4') => JSON.stringify({ version: 1, quarter, files });
+	const manifest = (files: unknown) => JSON.stringify({ version: 2, files });
 
 	test("accepts export's manifest", () => {
-		const text = manifest([{ group: 'public_bodies', blobName: PUBLIC, rowsLoaded: 316 }]);
+		const text = manifest(FILES);
 		assert.deepEqual(parseManifest(text), JSON.parse(text) as Manifest);
 	});
 
 	test('refuses anything else', () => {
-		assert.throws(() => parseManifest('{"version":2}'), /isn't one export wrote/);
-		assert.throws(
-			() => parseManifest(manifest([{ group: 'public_bodies', blobName: 'notes.txt', rowsLoaded: 1 }])),
-			/isn't a 2026Q4 group file/
-		);
-		assert.throws(
-			() => parseManifest(manifest([{ group: 'energy', blobName: PUBLIC, rowsLoaded: 1 }])),
-			/isn't a 2026Q4 group file/
-		);
-		assert.throws(
-			() => parseManifest(manifest([{ group: 'public_bodies', blobName: PUBLIC, rowsLoaded: 1 }], '2027Q1')),
-			/isn't a 2027Q1 group file/
-		);
-		assert.throws(
-			() => parseManifest(manifest([{ group: 'public_bodies', blobName: PUBLIC, rowsLoaded: 0 }])),
-			/no rows/
-		);
-	});
-
-	test('refuses a manifest with no quarter or an entry that is not a file', () => {
 		assert.throws(() => parseManifest('null'), /isn't one export wrote/);
-		assert.throws(() => parseManifest('{"version":1,"files":[]}'), /isn't one export wrote/);
-		assert.throws(() => parseManifest(manifest([null])), /isn't a 2026Q4 group file/);
+		assert.throws(() => parseManifest('{"version":1,"quarter":"2026Q4","files":[]}'), /isn't one export wrote/);
+		assert.throws(() => parseManifest('{"version":2}'), /isn't one export wrote/);
+		assert.throws(() => parseManifest(manifest([null])), /isn't a group's file/);
 		assert.throws(
-			() => parseManifest(manifest([{ group: 'public_bodies', blobName: PUBLIC, rowsLoaded: '316' }])),
-			/no rows/
+			() => parseManifest(manifest([{ group: 'public_bodies', blobName: 'notes.txt', size: 1 }])),
+			/notes.txt, which isn't a group's file/
+		);
+		assert.throws(
+			() => parseManifest(manifest([{ group: 'energy', blobName: PUBLIC, size: 1 }])),
+			/isn't a group's file/
 		);
 	});
 });
 
-describe('copyQuarter', () => {
-	test("uploads each group's file, saying which were already there", async () => {
-		writeExport(FILES);
-		const { store, uploaded } = fakeStore({ [ADMIN]: 'same' });
+describe('copyFiles', () => {
+	test("uploads each group's file, saying which were there already and which it replaced", async () => {
+		writeExport([...FILES, { group: 'energy', blobName: '20261020_energy.geojson', size: 5 }]);
+		const { store, uploaded } = fakeStore([], { [ADMIN]: 'same', '20261020_energy.geojson': 'different' });
 		const lines: string[] = [];
 
-		const manifest = await copyQuarter(store, dir, (line) => lines.push(line));
+		const manifest = await copyFiles(store, dir, (line) => lines.push(line));
 
-		assert.equal(manifest.quarter, '2026Q4');
-		assert.deepEqual(uploaded, [ADMIN, PUBLIC]);
-		assert.deepEqual(lines, [`${ADMIN}: already in blob storage`, `${PUBLIC}: copied`]);
-	});
-
-	test('stops at a different file already there under the same name', async () => {
-		writeExport(FILES);
-		const { store, uploaded } = fakeStore({ [ADMIN]: 'different' });
-		await assert.rejects(
-			copyQuarter(store, dir, () => undefined),
-			/isn't the same file/
-		);
-		assert.deepEqual(uploaded, []);
+		assert.equal(manifest.files.length, 3);
+		assert.deepEqual(uploaded, [ADMIN, PUBLIC, '20261020_energy.geojson']);
+		assert.deepEqual(lines, [
+			`${ADMIN}: already in blob storage`,
+			`${PUBLIC}: copied`,
+			'20261020_energy.geojson: copied, replacing a different file of the same name'
+		]);
 	});
 });
 
 describe('parsePromotionArgs', () => {
-	test('reads export and copy - a quarter only if one is given', () => {
-		assert.deepEqual(parsePromotionArgs(['export', '--quarter=2026Q4', '--dir=/tmp/x']), {
-			command: 'export',
-			dir: '/tmp/x',
-			quarter: '2026Q4'
-		});
-		// the pipeline's default, the dataset in use
-		assert.deepEqual(parsePromotionArgs(['export', '--quarter=', '--dir=/tmp/x']), {
-			command: 'export',
-			dir: '/tmp/x',
-			quarter: undefined
-		});
-		assert.deepEqual(parsePromotionArgs(['copy', 'stray', '--dir=/tmp/x']), {
+	test('reads export and copy, ignoring anything else', () => {
+		assert.deepEqual(parsePromotionArgs(['export', '--dir=/tmp/x']), { command: 'export', dir: '/tmp/x' });
+		assert.deepEqual(parsePromotionArgs(['copy', 'stray', '--quarter=', '--dir=/tmp/x']), {
 			command: 'copy',
-			dir: '/tmp/x',
-			quarter: undefined
+			dir: '/tmp/x'
 		});
 	});
 
@@ -269,182 +164,148 @@ describe('parsePromotionArgs', () => {
 });
 
 describe('run', () => {
-	test('exports the quarter in use and logs the manifest it wrote', async () => {
-		const { dataset } = fakeDataset({
-			inUse: '2026Q4',
-			loads: new Map([['public_bodies', load(PUBLIC, 316)]]),
-			rows: new Map([['public_bodies', 316]])
-		});
+	test('exports and logs the files it wrote', async () => {
 		const lines: string[] = [];
-
-		await run(
-			['export', '--quarter=2026Q4', `--dir=${dir}`],
-			() => dataset,
-			fakeStore().store,
-			(line) => lines.push(line)
-		);
-
-		assert.deepEqual(lines, ['Exported 2026Q4:', `  ${PUBLIC}: 316 rows`]);
+		await run(['export', `--dir=${dir}`], fakeStore([stored(PUBLIC)]).store, (line) => lines.push(line));
+		assert.deepEqual(lines, ['Exported:', `  ${PUBLIC}`]);
 	});
 
-	test('copies the export in the directory, never opening the database, and logs the manifest', async () => {
+	test('copies the export in the directory and logs the files', async () => {
 		writeExport(FILES);
 		const lines: string[] = [];
-		const openDataset = mock.fn((): Dataset => assert.fail('a copy reads no database'));
-
-		await run(['copy', `--dir=${dir}`], openDataset, fakeStore().store, (line) => lines.push(line));
-
-		assert.equal(openDataset.mock.callCount(), 0);
-		assert.deepEqual(lines, [
-			`${ADMIN}: copied`,
-			`${PUBLIC}: copied`,
-			'Copied 2026Q4:',
-			`  ${ADMIN}: 9000 rows`,
-			`  ${PUBLIC}: 316 rows`
-		]);
-	});
-});
-
-describe('databaseDataset', () => {
-	test('answers the promotion questions from the database', async () => {
-		const client = {
-			$queryRaw: async (strings: TemplateStringsArray) => {
-				const sql = strings.join(' ');
-				if (sql.includes('base_object_name')) {
-					return [{ baseObjectName: '[dbo].[consultee_area_2026Q4]' }];
-				}
-				if (sql.includes('COUNT')) {
-					return [{ count: 3 }];
-				}
-				return [];
-			}
-		} as unknown as PrismaClient;
-
-		const dataset = databaseDataset(client);
-
-		assert.equal(await dataset.inUse(), '2026Q4');
-		assert.deepEqual(await dataset.latestLoads('2026Q4'), new Map());
-		const counts = await dataset.rowCounts('2026Q4');
-		assert.ok(counts.size > 0);
-		assert.ok([...counts.values()].every((count) => count === 3));
+		await run(['copy', `--dir=${dir}`], fakeStore().store, (line) => lines.push(line));
+		assert.deepEqual(lines, [`${ADMIN}: copied`, `${PUBLIC}: copied`, 'Copied:', `  ${ADMIN}`, `  ${PUBLIC}`]);
 	});
 });
 
 describe('blobFileStore', () => {
-	// a stand-in container client lets the download/upload paths run without real blob storage
-	function stubContainer(blob: { exists: boolean; contentLength?: number }) {
-		const uploaded: string[] = [];
+	const md5 = (text: string) => createHash('md5').update(text).digest();
+
+	// a stand-in container client lets the download/upload paths run without real blob storage. The
+	// blob there holds `content`, uploaded with its MD5 recorded or not
+	function stubContainer(blob: { exists: boolean; content?: string; md5Recorded?: boolean }) {
+		const uploads: { filePath: string; contentMD5: Uint8Array | undefined }[] = [];
+		const downloads = { count: 0 };
+		const content = blob.content ?? '';
 		const getContainerClient = mock.method(BlobServiceClient.prototype, 'getContainerClient', () => ({
 			containerName: 'test-container',
 			getBlobClient: () => ({
 				downloadToFile: async (filePath: string) => writeFileSync(filePath, '{"downloaded":true}')
 			}),
+			listBlobsFlat: async function* () {
+				yield { name: 'a.geojson', properties: { contentLength: 3, lastModified: new Date('2026-10-21') } };
+			},
 			getBlockBlobClient: () => ({
 				exists: async () => blob.exists,
-				getProperties: async () => ({ contentLength: blob.contentLength ?? 0 }),
-				uploadFile: async () => uploaded.push('file')
+				getProperties: async () => ({
+					contentLength: Buffer.byteLength(content),
+					contentMD5: blob.md5Recorded ? new Uint8Array(md5(content)) : undefined
+				}),
+				download: async () => {
+					downloads.count++;
+					return { readableStreamBody: Readable.from([Buffer.from(content)]) };
+				},
+				uploadFile: async (filePath: string, options: { blobHTTPHeaders?: { blobContentMD5?: Uint8Array } } = {}) =>
+					uploads.push({ filePath, contentMD5: options.blobHTTPHeaders?.blobContentMD5 })
 			})
 		}));
-		return { getContainerClient, uploaded };
+		return { getContainerClient, uploads, downloads };
 	}
 
-	test('downloads a blob and uploads a file that is not there yet', async () => {
-		const { getContainerClient, uploaded } = stubContainer({ exists: false });
+	async function uploadTo(blob: Parameters<typeof stubContainer>[0], fileContent = 'data') {
+		const filePath = path.join(dir, 'b.geojson');
+		writeFileSync(filePath, fileContent);
+		const stub = stubContainer(blob);
+		try {
+			let outcome: string | undefined;
+			await withBlobEnv(BLOB_ENV.BLOB_STORE_HOST, BLOB_ENV.BLOB_STORE_CONTAINER, async () => {
+				outcome = await blobFileStore().upload(filePath, 'b.geojson');
+			});
+			return { outcome, uploads: stub.uploads, downloads: stub.downloads.count };
+		} finally {
+			stub.getContainerClient.mock.restore();
+		}
+	}
+
+	test('downloads a blob and uploads a file that is not there yet, recording its MD5', async () => {
+		const { getContainerClient, uploads } = stubContainer({ exists: false });
 		try {
 			await withBlobEnv(BLOB_ENV.BLOB_STORE_HOST, BLOB_ENV.BLOB_STORE_CONTAINER, async () => {
 				const store = blobFileStore();
+				assert.deepEqual(await store.list(), [{ name: 'a.geojson', size: 3, lastModified: new Date('2026-10-21') }]);
 				const target = path.join(dir, 'a.geojson');
 				await store.download('a.geojson', target);
 				assert.equal(readFileSync(target, 'utf8'), '{"downloaded":true}');
 
 				writeFileSync(target, 'data');
 				assert.equal(await store.upload(target, 'a.geojson'), 'uploaded');
-				assert.equal(uploaded.length, 1);
+				assert.deepEqual(uploads, [{ filePath: target, contentMD5: md5('data') }]);
 			});
 		} finally {
 			getContainerClient.mock.restore();
 		}
 	});
 
-	test('leaves a file already in the container alone, and refuses a different one', async () => {
-		const filePath = path.join(dir, 'b.geojson');
-		writeFileSync(filePath, 'data');
+	test('leaves a blob with the same contents alone, by its recorded MD5 or else its bytes', async () => {
+		assert.deepEqual(await uploadTo({ exists: true, content: 'data', md5Recorded: true }), {
+			outcome: 'unchanged',
+			uploads: [],
+			downloads: 0
+		});
+		// uploaded by the admin page, without an MD5
+		assert.deepEqual(await uploadTo({ exists: true, content: 'data' }), {
+			outcome: 'unchanged',
+			uploads: [],
+			downloads: 1
+		});
+	});
 
-		const same = stubContainer({ exists: true, contentLength: 4 });
-		try {
-			await withBlobEnv(BLOB_ENV.BLOB_STORE_HOST, BLOB_ENV.BLOB_STORE_CONTAINER, async () => {
-				assert.equal(await blobFileStore().upload(filePath, 'b.geojson'), 'unchanged');
-			});
-		} finally {
-			same.getContainerClient.mock.restore();
-		}
-
-		const different = stubContainer({ exists: true, contentLength: 999 });
-		try {
-			await withBlobEnv(BLOB_ENV.BLOB_STORE_HOST, BLOB_ENV.BLOB_STORE_CONTAINER, async () => {
-				await assert.rejects(() => blobFileStore().upload(filePath, 'b.geojson'), /isn't the same file/);
-			});
-		} finally {
-			different.getContainerClient.mock.restore();
+	test('replaces a blob with different contents, even one of the same size', async () => {
+		for (const blob of [
+			{ exists: true, content: 'atad', md5Recorded: true },
+			{ exists: true, content: 'atad' },
+			{ exists: true, content: 'longer data' }
+		]) {
+			const { outcome, uploads, downloads } = await uploadTo(blob);
+			assert.equal(outcome, 'replaced');
+			assert.deepEqual(
+				uploads.map((upload) => upload.contentMD5),
+				[md5('data')]
+			);
+			// a different size needs no download to tell
+			assert.equal(downloads, blob.md5Recorded || blob.content.length !== 4 ? 0 : 1);
 		}
 	});
 });
 
 // the isMain block only runs as a script, so this spawns the real CLI in a child process - child
-// coverage still counts towards this file's numbers. The export asks for a quarter that isn't in
-// use, so it fails with the PromotionError the run logs
+// coverage still counts towards this file's numbers
 const cliPath = fileURLToPath(new URL('./promote-reference-data.ts', import.meta.url));
 
-let dbClient: PrismaClient;
-let dbAvailable = false;
-let connectionString: string | undefined;
-
-before(async () => {
-	try {
-		connectionString = loadConfig().db;
-		dbClient = newDatabaseClient(connectionString);
-		await dbClient.$queryRaw`SELECT 1 AS probe`;
-		dbAvailable = true;
-	} catch {
-		dbAvailable = false;
-	}
-});
-
-after(async () => {
-	await dbClient?.$disconnect();
-});
-
-describe('running as a script (requires a local SQL Server - see docker-compose.yml)', () => {
-	test('copies a manifest with nothing to copy, with no database, logging what it did', () => {
-		writeFileSync(path.join(dir, MANIFEST_FILE), JSON.stringify({ version: 1, quarter: '2026Q4', files: [] }));
-		const { SQL_CONNECTION_STRING: _none, ...env } = process.env;
+describe('running as a script', () => {
+	test('copies a manifest with nothing to copy, logging what it did', () => {
+		writeFileSync(path.join(dir, MANIFEST_FILE), JSON.stringify({ version: 2, files: [] }));
 
 		const stdout = execFileSync(process.execPath, ['--experimental-strip-types', cliPath, 'copy', `--dir=${dir}`], {
-			env: { ...env, ...BLOB_ENV },
+			env: { ...process.env, ...BLOB_ENV },
 			encoding: 'utf8'
 		});
 
-		assert.match(stdout, /Copied 2026Q4:/);
+		assert.match(stdout, /Copied:/);
 	});
 
-	test('fails with the PromotionError a real export raises', async (t) => {
-		if (!dbAvailable) return t.skip('SQL Server database not available');
-		// a quarter long before any dataset, so it's never the one in use: the export refuses it
-		// before reading a load or touching blob storage, whatever this database has loaded
+	test('fails when there is no export to copy', () => {
 		try {
-			execFileSync(
-				process.execPath,
-				['--experimental-strip-types', cliPath, 'export', '--quarter=1999Q1', `--dir=${dir}`],
-				{
-					env: { ...process.env, SQL_CONNECTION_STRING: connectionString!, ...BLOB_ENV },
-					encoding: 'utf8'
-				}
-			);
-			assert.fail('expected the export to exit non-zero');
+			execFileSync(process.execPath, ['--experimental-strip-types', cliPath, 'copy', `--dir=${dir}`], {
+				env: { ...process.env, ...BLOB_ENV },
+				encoding: 'utf8',
+				stdio: 'pipe'
+			});
+			assert.fail('expected the copy to exit non-zero');
 		} catch (error) {
 			const failure = error as { status: number; stderr: string };
 			assert.equal(failure.status, 1);
-			assert.match(failure.stderr, /PromotionError/);
+			assert.match(failure.stderr, /ENOENT/);
 		}
 	});
 

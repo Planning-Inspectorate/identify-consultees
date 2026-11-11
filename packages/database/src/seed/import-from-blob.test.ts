@@ -234,7 +234,7 @@ describe('running as a script (requires a local SQL Server - see docker-compose.
 			const payload = geoJsonFile([
 				{
 					geometry: { type: 'Point', coordinates: [0, 0] },
-					properties: { id: 'import-blob-test-1', consultee: 'Blob Trust', consulteeCategory: 'Ambulance Trust' }
+					properties: { id: 'import-blob-test-1', consultee: 'Blob Trust', consulteeCategory: 'Ambulance trusts' }
 				}
 			]);
 			const stdout = runCliViaStubbedBlob(payload, ['--type=consultee-areas', '--blob=reference.geojson'], {

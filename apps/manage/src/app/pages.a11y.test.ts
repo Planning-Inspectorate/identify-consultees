@@ -192,7 +192,7 @@ describe('manage page accessibility smoke', () => {
 					name: 'Administrative boundaries',
 					consultees: [
 						{
-							name: 'Parish Council',
+							name: 'Parish, town and community councils',
 							names: [
 								'Little Snoring Parish Council',
 								'Great Snoring Parish Council',
@@ -214,7 +214,7 @@ describe('manage page accessibility smoke', () => {
 							names: ['Norfolk Police and Crime Commissioner'],
 							changeUrl: '#'
 						},
-						{ name: 'Railway', names: [], changeUrl: '#' }
+						{ name: 'Railways', names: [], changeUrl: '#' }
 					]
 				}
 			],
@@ -251,7 +251,7 @@ describe('manage page accessibility smoke', () => {
 	test('report consultees change page has no serious a11y violations', async () => {
 		const html = nunjucks.render('views/consultees/report/consultees/view.njk', {
 			...pageLocals,
-			pageHeading: 'Parish Council',
+			pageHeading: 'Parish, town and community councils',
 			pageCaption: 'Longfield Solar Farm',
 			backLinkUrl: '/consultees/11111111-1111-1111-1111-111111111111/report?ruleset=england-wales-post-20240430',
 			backLinkText: 'Back to draft report',
@@ -260,16 +260,16 @@ describe('manage page accessibility smoke', () => {
 					name: 'Little Snoring Parish Council',
 					identified: ['"B" host Parishes or Community Councils: intersects the site', 'Within 20km of the site'],
 					removeUrl:
-						'/consultees/11111111-1111-1111-1111-111111111111/report/consultees?ruleset=england-wales-post-20240430&category=Parish%20Council&exclude=55555555-5555-5555-5555-555555555555'
+						'/consultees/11111111-1111-1111-1111-111111111111/report/consultees?ruleset=england-wales-post-20240430&category=Parish%2C%20town%20and%20community%20councils&exclude=55555555-5555-5555-5555-555555555555'
 				}
 			],
 			addConsulteeUrl:
-				'/consultees/11111111-1111-1111-1111-111111111111/report/consultees/add?ruleset=england-wales-post-20240430&category=Parish%20Council',
+				'/consultees/11111111-1111-1111-1111-111111111111/report/consultees/add?ruleset=england-wales-post-20240430&category=Parish%2C%20town%20and%20community%20councils',
 			mapId: 'case-map',
-			mapRegionLabel: 'Map showing Parish Council consultees for Longfield Solar Farm',
+			mapRegionLabel: 'Map showing Parish, town and community councils consultees for Longfield Solar Farm',
 			staticMapSrc:
-				'/consultees/11111111-1111-1111-1111-111111111111/results/static-map?ruleset=england-wales-post-20240430&category=Parish%20Council',
-			staticMapAlt: 'Static map showing Parish Council consultees for Longfield Solar Farm',
+				'/consultees/11111111-1111-1111-1111-111111111111/results/static-map?ruleset=england-wales-post-20240430&category=Parish%2C%20town%20and%20community%20councils',
+			staticMapAlt: 'Static map showing Parish, town and community councils consultees for Longfield Solar Farm',
 			mapWidth: 900,
 			mapHeight: 506,
 			mapConfigJson: '{"type":"FeatureCollection","features":[]}',
@@ -277,7 +277,7 @@ describe('manage page accessibility smoke', () => {
 			removedOpen: true,
 			rulesetFailed: false,
 			retryUrl:
-				'/consultees/11111111-1111-1111-1111-111111111111/report/consultees?ruleset=england-wales-post-20240430&category=Parish%20Council'
+				'/consultees/11111111-1111-1111-1111-111111111111/report/consultees?ruleset=england-wales-post-20240430&category=Parish%2C%20town%20and%20community%20councils'
 		});
 		assert.match(html, /Removed consultees/);
 		assert.match(html, /Outside the search area/);
@@ -287,18 +287,18 @@ describe('manage page accessibility smoke', () => {
 	test('report consultees change page with no remaining consultees has no serious a11y violations', async () => {
 		const html = nunjucks.render('views/consultees/report/consultees/view.njk', {
 			...pageLocals,
-			pageHeading: 'Parish Council',
+			pageHeading: 'Parish, town and community councils',
 			pageCaption: 'Longfield Solar Farm',
 			backLinkUrl: '/consultees/11111111-1111-1111-1111-111111111111/report?ruleset=england-wales-post-20240430',
 			backLinkText: 'Back to draft report',
 			rows: [],
 			addConsulteeUrl:
-				'/consultees/11111111-1111-1111-1111-111111111111/report/consultees/add?ruleset=england-wales-post-20240430&category=Parish%20Council',
+				'/consultees/11111111-1111-1111-1111-111111111111/report/consultees/add?ruleset=england-wales-post-20240430&category=Parish%2C%20town%20and%20community%20councils',
 			mapId: 'case-map',
-			mapRegionLabel: 'Map showing Parish Council consultees for Longfield Solar Farm',
+			mapRegionLabel: 'Map showing Parish, town and community councils consultees for Longfield Solar Farm',
 			staticMapSrc:
-				'/consultees/11111111-1111-1111-1111-111111111111/results/static-map?ruleset=england-wales-post-20240430&category=Parish%20Council',
-			staticMapAlt: 'Static map showing Parish Council consultees for Longfield Solar Farm',
+				'/consultees/11111111-1111-1111-1111-111111111111/results/static-map?ruleset=england-wales-post-20240430&category=Parish%2C%20town%20and%20community%20councils',
+			staticMapAlt: 'Static map showing Parish, town and community councils consultees for Longfield Solar Farm',
 			mapWidth: 900,
 			mapHeight: 506,
 			mapConfigJson: '{"type":"FeatureCollection","features":[]}',
@@ -306,7 +306,7 @@ describe('manage page accessibility smoke', () => {
 			removedOpen: false,
 			rulesetFailed: false,
 			retryUrl:
-				'/consultees/11111111-1111-1111-1111-111111111111/report/consultees?ruleset=england-wales-post-20240430&category=Parish%20Council'
+				'/consultees/11111111-1111-1111-1111-111111111111/report/consultees?ruleset=england-wales-post-20240430&category=Parish%2C%20town%20and%20community%20councils'
 		});
 		assert.match(html, /No consultees identified in this category/);
 		await assertNoSeriousA11yViolations(html);
@@ -316,11 +316,11 @@ describe('manage page accessibility smoke', () => {
 		const html = nunjucks.render('views/consultees/report/consultees/add/view.njk', {
 			...pageLocals,
 			pageHeading: 'Add a consultee',
-			pageCaption: 'Parish Council',
+			pageCaption: 'Parish, town and community councils',
 			backLinkUrl:
-				'/consultees/11111111-1111-1111-1111-111111111111/report/consultees?ruleset=england-wales-post-20240430&category=Parish%20Council',
+				'/consultees/11111111-1111-1111-1111-111111111111/report/consultees?ruleset=england-wales-post-20240430&category=Parish%2C%20town%20and%20community%20councils',
 			formAction:
-				'/consultees/11111111-1111-1111-1111-111111111111/report/consultees/add?ruleset=england-wales-post-20240430&category=Parish%20Council',
+				'/consultees/11111111-1111-1111-1111-111111111111/report/consultees/add?ruleset=england-wales-post-20240430&category=Parish%2C%20town%20and%20community%20councils',
 			nearbySuggestions: [
 				{ name: 'Great Snoring Parish Council', hint: '1.3 km from the site' },
 				{ name: 'Barton', hint: '4.0 km from the site' }
@@ -335,11 +335,11 @@ describe('manage page accessibility smoke', () => {
 		const html = nunjucks.render('views/consultees/report/consultees/add/view.njk', {
 			...pageLocals,
 			pageHeading: 'Add a consultee',
-			pageCaption: 'Parish Council',
+			pageCaption: 'Parish, town and community councils',
 			backLinkUrl:
-				'/consultees/11111111-1111-1111-1111-111111111111/report/consultees?ruleset=england-wales-post-20240430&category=Parish%20Council',
+				'/consultees/11111111-1111-1111-1111-111111111111/report/consultees?ruleset=england-wales-post-20240430&category=Parish%2C%20town%20and%20community%20councils',
 			formAction:
-				'/consultees/11111111-1111-1111-1111-111111111111/report/consultees/add?ruleset=england-wales-post-20240430&category=Parish%20Council',
+				'/consultees/11111111-1111-1111-1111-111111111111/report/consultees/add?ruleset=england-wales-post-20240430&category=Parish%2C%20town%20and%20community%20councils',
 			nearbySuggestions: [],
 			addForm: {
 				nameValue: '',
@@ -362,15 +362,15 @@ describe('manage page accessibility smoke', () => {
 			pageHeading: 'Remove consultee',
 			pageCaption: 'Longfield Solar Farm',
 			backLinkUrl:
-				'/consultees/11111111-1111-1111-1111-111111111111/report/consultees?ruleset=england-wales-post-20240430&category=Parish%20Council',
+				'/consultees/11111111-1111-1111-1111-111111111111/report/consultees?ruleset=england-wales-post-20240430&category=Parish%2C%20town%20and%20community%20councils',
 			formAction:
-				'/consultees/11111111-1111-1111-1111-111111111111/report/consultees/remove?ruleset=england-wales-post-20240430&category=Parish%20Council&match=55555555-5555-5555-5555-555555555555',
+				'/consultees/11111111-1111-1111-1111-111111111111/report/consultees/remove?ruleset=england-wales-post-20240430&category=Parish%2C%20town%20and%20community%20councils&match=55555555-5555-5555-5555-555555555555',
 			name: 'Little Snoring Parish Council',
 			identified: ['"B" host Parishes or Community Councils: intersects the site'],
 			reasonValue: '',
 			rulesetFailed: false,
 			retryUrl:
-				'/consultees/11111111-1111-1111-1111-111111111111/report/consultees/remove?ruleset=england-wales-post-20240430&category=Parish%20Council&match=55555555-5555-5555-5555-555555555555'
+				'/consultees/11111111-1111-1111-1111-111111111111/report/consultees/remove?ruleset=england-wales-post-20240430&category=Parish%2C%20town%20and%20community%20councils&match=55555555-5555-5555-5555-555555555555'
 		});
 		assert.match(html, /Reason for removing/);
 		await assertNoSeriousA11yViolations(html);
@@ -382,9 +382,9 @@ describe('manage page accessibility smoke', () => {
 			pageHeading: 'Remove consultee',
 			pageCaption: 'Longfield Solar Farm',
 			backLinkUrl:
-				'/consultees/11111111-1111-1111-1111-111111111111/report/consultees?ruleset=england-wales-post-20240430&category=Parish%20Council',
+				'/consultees/11111111-1111-1111-1111-111111111111/report/consultees?ruleset=england-wales-post-20240430&category=Parish%2C%20town%20and%20community%20councils',
 			formAction:
-				'/consultees/11111111-1111-1111-1111-111111111111/report/consultees/remove?ruleset=england-wales-post-20240430&category=Parish%20Council&match=55555555-5555-5555-5555-555555555555',
+				'/consultees/11111111-1111-1111-1111-111111111111/report/consultees/remove?ruleset=england-wales-post-20240430&category=Parish%2C%20town%20and%20community%20councils&match=55555555-5555-5555-5555-555555555555',
 			name: 'Little Snoring Parish Council',
 			identified: ['"B" host Parishes or Community Councils: intersects the site'],
 			reasonValue: '   ',
@@ -392,7 +392,7 @@ describe('manage page accessibility smoke', () => {
 			errorSummary: [{ text: 'Enter a reason for removing this consultee', href: '#removal-reason' }],
 			rulesetFailed: false,
 			retryUrl:
-				'/consultees/11111111-1111-1111-1111-111111111111/report/consultees/remove?ruleset=england-wales-post-20240430&category=Parish%20Council&match=55555555-5555-5555-5555-555555555555'
+				'/consultees/11111111-1111-1111-1111-111111111111/report/consultees/remove?ruleset=england-wales-post-20240430&category=Parish%2C%20town%20and%20community%20councils&match=55555555-5555-5555-5555-555555555555'
 		});
 		assert.match(html, /There is a problem/);
 		await assertNoSeriousA11yViolations(html);

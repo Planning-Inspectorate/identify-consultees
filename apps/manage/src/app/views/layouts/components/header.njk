@@ -15,25 +15,17 @@
 {% endmacro %}
 
 {#
-  adminLink: { href, active } when the admin section is mounted (admin/index.ts sets it) - its
-  header link, active on the admin pages.
+  Home and Sign out only. The admin section has no link here - it's reached at /admin (see
+  admin/index.ts) - and Home isn't marked on its pages (inAdmin: admin/index.ts sets adminNav).
 #}
-{% macro pinsServiceNavigation(serviceName, hideSignOut = false, adminLink = undefined) %}
+{% macro pinsServiceNavigation(serviceName, hideSignOut = false, inAdmin = false) %}
 	{% set navigationItems = [
 		{
 			href: "/",
 			text: "Home",
-			active: not hideSignOut and not (adminLink and adminLink.active)
+			active: not hideSignOut and not inAdmin
 		}
 	] %}
-
-	{% if adminLink %}
-		{% set navigationItems = (navigationItems.push({
-			href: adminLink.href,
-			text: "Admin",
-			active: adminLink.active
-		}), navigationItems) %}
-	{% endif %}
 
 	{% if not hideSignOut %}
 		{% set navigationItems = (navigationItems.push({

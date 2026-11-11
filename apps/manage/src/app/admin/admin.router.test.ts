@@ -32,7 +32,7 @@ describe('admin section', () => {
 					type: 'Feature',
 					geometry: { type: 'Point', coordinates: [1.5, 55.5] },
 					properties: {
-						consulteeCategory: 'Parish Council',
+						consulteeCategory: 'Parish, town and community councils',
 						consultee: 'Admin Test Parish',
 						metadata: { FID: 612 }
 					}
@@ -58,20 +58,26 @@ describe('admin section', () => {
 		await service.db.$disconnect().catch(() => undefined);
 	});
 
-	test('GET /admin lists the admin pages, with the menu and the header link marked', async () => {
+	test('GET /admin lists the admin pages, with the menu marked', async () => {
 		const response = await request(app).get('/admin');
 		assert.equal(response.status, 200);
 		assert.match(response.text, /<h1 class="govuk-heading-l">Admin<\/h1>/);
 		assert.match(response.text, /href="\/admin" aria-current="page">Overview<\/a>/);
-		assert.match(response.text, /<a class="govuk-service-navigation__link" href="\/admin" aria-current="true">/);
 		for (const page of ['/admin/database', '/admin/upload-to-blob', '/admin/import-reference-data']) {
 			assert.match(response.text, new RegExp(`<h2[^>]*><a class="govuk-link" href="${page}">`));
 		}
 	});
 
-	test('the header links to the admin section from any page, without marking it there', async () => {
-		const response = await request(app).get('/');
-		assert.match(response.text, /<a class="govuk-service-navigation__link" href="\/admin">\s*Admin/);
+	test("the header has only Home and Sign out - the admin section isn't linked from it", async () => {
+		for (const page of ['/', '/admin']) {
+			const response = await request(app).get(page);
+			const links = [...response.text.matchAll(/class="govuk-service-navigation__link" href="([^"]+)"/g)];
+			assert.deepEqual(
+				links.map((link) => link[1]),
+				['/', '/auth/signout'],
+				page
+			);
+		}
 	});
 
 	test('GET /admin/database counts the tables and the consultee areas by category', async () => {
@@ -82,12 +88,14 @@ describe('admin section', () => {
 		assert.match(response.text, /<code>case_boundary<\/code>/);
 		assert.match(
 			response.text,
-			/href="\/admin\/database\/consultee-areas\?category=Parish\+Council">Parish Council<\/a>/
+			/href="\/admin\/database\/consultee-areas\?category=Parish%2C\+town\+and\+community\+councils">Parish, town and community councils<\/a>/
 		);
 	});
 
 	test('the consultee areas list finds a row by name, and its page shows it whole', async () => {
-		const list = await request(app).get('/admin/database/consultee-areas?category=Parish+Council&q=Admin+Test');
+		const list = await request(app).get(
+			'/admin/database/consultee-areas?category=Parish%2C+town+and+community+councils&q=Admin+Test'
+		);
 		assert.equal(list.status, 200);
 		assert.match(list.text, /Showing 1 to 1 of 1 rows\./);
 		assert.match(
@@ -126,12 +134,27 @@ describe('admin section', () => {
 		assert.equal(response.status, 200);
 		assert.match(response.text, /<h1 class="govuk-heading-l">Reference data files<\/h1>/);
 		assert.match(response.text, /aria-current="page">Reference data files<\/a>/);
-		// no copying set up here, so no Copy section, and no route to start one
-		assert.doesNotMatch(response.text, /Copy from/);
-		const agent = request.agent(app);
-		const token = /data-csrf-token="([^"]+)"/.exec((await agent.get('/admin/upload-to-blob')).text)?.[1];
-		assert.ok(token);
-		assert.equal((await agent.post('/admin/upload-to-blob/copy').type('form').send({ _csrf: token })).status, 404);
+		// copying is the Promote reference data pipeline's, not a button here
+		assert.doesNotMatch(response.text, /Copy the files/);
+	});
+
+	test('where the reference data cannot be changed, the pages only report it', async () => {
+		const reportOnly = createManageTestApp(createManageTestService(true, { referenceDataChanges: false }));
+		const agent = request.agent(reportOnly);
+		const page = await agent.get('/admin/import-reference-data');
+		assert.equal(page.status, 200);
+		assert.match(page.text, /<h1 class="govuk-heading-l">Reference data<\/h1>/);
+		assert.doesNotMatch(page.text, /Reference data files/);
+		assert.equal((await agent.get('/admin/upload-to-blob')).status, 404);
+		// no route to load or clear, even with a CSRF token
+		const token = /name="_csrf" value="([^"]+)"/.exec((await agent.get('/')).text)?.[1];
+		for (const path of [
+			'/import-reference-data/run-consultee-area-group',
+			'/import-reference-data/clear-consultee-areas'
+		]) {
+			const response = await agent.post(`/admin${path}`).type('form').send({ _csrf: token, group: 'energy' });
+			assert.equal(response.status, 404, path);
+		}
 	});
 
 	test("POST /admin/upload-to-blob/blocks and /commit take a file's parts with the page's CSRF token", async () => {

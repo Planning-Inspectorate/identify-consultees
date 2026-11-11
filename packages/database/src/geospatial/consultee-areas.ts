@@ -473,6 +473,77 @@ export async function findConsulteeAreasByName(
 	}));
 }
 
+// the Add a consultee page suggests this many as a name is typed - every one of the most shared
+// name (Middleton, 12) and the nearest of the names that start with what's typed
+const MAX_SUGGESTED_AREAS = 30;
+
+/** `text` matched literally by LIKE, its wildcards escaped with "!" (see ESCAPE below). */
+function likeLiteral(text: string): string {
+	return text.replace(/[!%_[]/g, '!$&');
+}
+
+/**
+ * The consultee_area rows in `category` whose names start with `typed` - case aside - for the Add a
+ * consultee page to suggest as a name is typed, anywhere in the reference data: those called exactly
+ * that first (every Newton, for "Newton"), then the rest, each nearest `site` first.
+ */
+export async function findConsulteeAreasByNameStart(
+	dbClient: PrismaClient,
+	category: string,
+	typed: string,
+	site: Geometry
+): Promise<NamedConsulteeArea[]> {
+	const rows = await withDeadlockRetry(
+		() => dbClient.$queryRaw<{ id: string; consultee: string; distanceMetres: number; region: string | null }[]>`
+			SELECT TOP (${MAX_SUGGESTED_AREAS}) id, consultee, region,
+				geometrySimplified.STDistance(geography::STGeomFromText(${geometryToWkt(site)}, 4326)) AS distanceMetres
+			FROM consultee_area
+			WHERE consulteeCategory = ${category}
+				AND LOWER(consultee) LIKE LOWER(${`${likeLiteral(typed)}%`}) ESCAPE '!'
+			ORDER BY CASE WHEN LOWER(consultee) = LOWER(${typed}) THEN 0 ELSE 1 END, distanceMetres, id
+		`
+	);
+	return rows.map((row) => ({
+		id: row.id.toLowerCase(),
+		consultee: row.consultee,
+		distanceMetres: row.distanceMetres,
+		region: row.region
+	}));
+}
+
+// names asked about at a time - well inside SQL Server's 2,100 parameters to a query
+const SHARED_NAME_BATCH_SIZE = 500;
+
+/**
+ * Which of `names` more than one consultee in `category` has in the reference data - lowercased,
+ * as names are compared. A list that shows only one Newton still names which Newton it is.
+ */
+export async function sharedConsulteeNames(
+	dbClient: PrismaClient,
+	category: string,
+	names: readonly string[]
+): Promise<Set<string>> {
+	const wanted = [...new Set(names.map((name) => name.trim().toLowerCase()))];
+	const shared = new Set<string>();
+	for (let i = 0; i < wanted.length; i += SHARED_NAME_BATCH_SIZE) {
+		const batch = wanted.slice(i, i + SHARED_NAME_BATCH_SIZE);
+		const rows = await withDeadlockRetry(
+			() => dbClient.$queryRaw<{ name: string }[]>`
+				SELECT LOWER(consultee) AS name
+				FROM consultee_area
+				WHERE consulteeCategory = ${category}
+					AND LOWER(consultee) IN (${Prisma.join(batch)})
+				GROUP BY LOWER(consultee)
+				HAVING COUNT(*) > 1
+			`
+		);
+		for (const row of rows) {
+			shared.add(row.name);
+		}
+	}
+	return shared;
+}
+
 /** What tells a consultee from others of its name - see consulteeAreaDetails. */
 export interface ConsulteeAreaDetail {
 	region: string | null;
@@ -484,7 +555,7 @@ export interface ConsulteeAreaDetail {
 }
 
 // the categories whose areas lie within a council area - named for it when they share a name
-const WITHIN_A_COUNCIL_AREA = ['Parish Council'];
+const WITHIN_A_COUNCIL_AREA = ['Parish, town and community councils'];
 
 // a consultee_area id - anything else in a list of ids would fail the whole query's conversion
 const AREA_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -520,11 +591,11 @@ export async function consulteeAreaDetails(
 					SELECT TOP 1 c.consultee
 					FROM consultee_area c WITH (INDEX(consultee_area_geometry_simplified_sidx))
 					WHERE a.consulteeCategory IN (${Prisma.join(WITHIN_A_COUNCIL_AREA)})
-						AND c.consulteeCategory IN ('Lower Tier Authority', 'Unitary Authority')
+						AND c.consulteeCategory IN ('District councils (lower-tier authorities)', 'Unitary authorities')
 						AND c.geometrySimplified.STIntersects(a.geometrySimplified) = 1
 					ORDER BY
 						CASE WHEN c.geometrySimplified.STIntersects(a.geometrySimplified.EnvelopeCenter()) = 1 THEN 0 ELSE 1 END,
-						CASE c.consulteeCategory WHEN 'Lower Tier Authority' THEN 0 ELSE 1 END
+						CASE c.consulteeCategory WHEN 'District councils (lower-tier authorities)' THEN 0 ELSE 1 END
 				) AS council
 				WHERE a.id IN (${Prisma.join(batch)})
 			`

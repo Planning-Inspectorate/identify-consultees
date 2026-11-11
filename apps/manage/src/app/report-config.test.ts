@@ -24,9 +24,9 @@ tabs:
     columns: [consultee, region]
     mapKm: 20
     categories:
-      ICB: { metadata: { ICB26CD: Code, ICB26NM: Official name } }
-      Police: { metadata: none, mapKm: 30 }
-      Ambulance Trust: { mapKm: 5 }
+      Integrated Care Boards (England): { metadata: { ICB26CD: Code, ICB26NM: Official name } }
+      Police and crime commissioners: { metadata: none, mapKm: 30 }
+      Ambulance trusts: { mapKm: 5 }
   Energy:
     metadata: all
   Other: {}
@@ -44,10 +44,12 @@ describe('report config', () => {
 		assert.deepEqual(tabSettings('NSIPs').columns, []);
 		// the combined authorities share their metadata
 		assert.deepEqual(
-			categorySettings('Passenger Transport Executive').metadata,
-			categorySettings('Integrated Transport Authority').metadata
+			categorySettings('Passenger transport executives').metadata,
+			categorySettings('Integrated transport authorities').metadata
 		);
-		assert.deepEqual(categorySettings('Parish Council').metadata, [{ attribute: 'CODE', heading: 'External code' }]);
+		assert.deepEqual(categorySettings('Parish, town and community councils').metadata, [
+			{ attribute: 'CODE', heading: 'External code' }
+		]);
 		// every consultee tab opens with the reference data's own id
 		for (const tab of REPORT_TABS.filter((tab) => tab !== 'NSIPs')) {
 			assert.equal(tabSettings(tab).columns[0], 'sourceId', tab);
@@ -76,22 +78,28 @@ describe('report config', () => {
 		assert.deepEqual(tabSettings('Other', config), config.defaults);
 		assert.equal(tabSettings('Energy', config).metadata, 'all');
 
-		assert.deepEqual(categorySettings('ICB', config), {
+		assert.deepEqual(categorySettings('Integrated Care Boards (England)', config), {
 			metadata: [
 				{ attribute: 'ICB26CD', heading: 'Code' },
 				{ attribute: 'ICB26NM', heading: 'Official name' }
 			],
 			mapMarginMetres: 20_000
 		});
-		assert.deepEqual(categorySettings('Police', config), { metadata: 'none', mapMarginMetres: 30_000 });
+		assert.deepEqual(categorySettings('Police and crime commissioners', config), {
+			metadata: 'none',
+			mapMarginMetres: 30_000
+		});
 		// a category not listed takes its tab's - its group's in config/reference-data.yaml
-		assert.deepEqual(categorySettings('Fire and Rescue Authority', config), publicBodies);
+		assert.deepEqual(categorySettings('Fire and rescue authorities', config), publicBodies);
 		// one setting its map size alone keeps its tab's metadata
-		assert.deepEqual(categorySettings('Ambulance Trust', config), {
+		assert.deepEqual(categorySettings('Ambulance trusts', config), {
 			metadata: publicBodies.metadata,
 			mapMarginMetres: 5_000
 		});
-		assert.equal(categorySettings('DNO', config).metadata, 'all');
+		assert.equal(
+			categorySettings('Electricity distributors with compulsory purchase order powers', config).metadata,
+			'all'
+		);
 		// and with no tab, the defaults
 		for (const category of ['Not a category', null, undefined, 'constructor']) {
 			assert.deepEqual(categorySettings(category, config), config.defaults, String(category));
@@ -100,8 +108,8 @@ describe('report config', () => {
 	});
 
 	test("finds a category's tab from its group, Nearby NSIPs from its own", () => {
-		assert.equal(tabForCategorySettings('Parish Council'), 'Administrative boundaries');
-		assert.equal(tabForCategorySettings('Offshore Wind Export Cable'), 'Energy');
+		assert.equal(tabForCategorySettings('Parish, town and community councils'), 'Administrative boundaries');
+		assert.equal(tabForCategorySettings('Offshore wind export cables and sites'), 'Energy');
 		assert.equal(tabForCategorySettings('NSIPs'), 'NSIPs');
 		assert.equal(tabForCategorySettings('Nowhere'), undefined);
 		assert.equal(tabForCategorySettings(null), undefined);
@@ -114,14 +122,17 @@ defaults: { columns: [consultee], metadata: none, mapKm: 1 }
 tabs:
   Public bodies:
     categories:
-      Police: { summary: ' Police and Crime Commissioners ', metadata: all }
-      Internal Drainage Board: { summary: Internal Drainage Boards }
-      Hospital: { mapKm: 5 }
-      Internal Drainage District: { summary: Internal Drainage Boards }
+      Police and crime commissioners: { summary: ' Police and Crime Commissioners ', metadata: all }
+      Internal drainage boards (England): { summary: Internal Drainage Boards }
+      Hospitals operated by NHS trusts and NHS foundation trusts (England): { mapKm: 5 }
+      Internal drainage boards (Wales): { summary: Internal Drainage Boards }
 `);
 		assert.deepStrictEqual(summaryLines('Public bodies', config), [
-			{ label: 'Police and Crime Commissioners', categories: ['Police'] },
-			{ label: 'Internal Drainage Boards', categories: ['Internal Drainage Board', 'Internal Drainage District'] }
+			{ label: 'Police and Crime Commissioners', categories: ['Police and crime commissioners'] },
+			{
+				label: 'Internal Drainage Boards',
+				categories: ['Internal drainage boards (England)', 'Internal drainage boards (Wales)']
+			}
 		]);
 		// a label for each buffer: a line each, in order
 		const split = parseReportConfig(`
@@ -130,22 +141,26 @@ defaults: { columns: [consultee], metadata: none, mapKm: 1 }
 tabs:
   Public bodies:
     categories:
-      Ambulance Trust: { summary: { 1: Within 1km, 10: Within 10km } }
-      Fire and Rescue Authority: { summary: { 10: Within 10km } }
+      Ambulance trusts: { summary: { 1: Within 1km, 10: Within 10km } }
+      Fire and rescue authorities: { summary: { 10: Within 10km } }
 `);
 		assert.deepStrictEqual(summaryLines('Public bodies', split), [
-			{ label: 'Within 1km', categories: ['Ambulance Trust'], bufferKm: 1 },
-			{ label: 'Within 10km', categories: ['Ambulance Trust', 'Fire and Rescue Authority'], bufferKm: 10 }
+			{ label: 'Within 1km', categories: ['Ambulance trusts'], bufferKm: 1 },
+			{ label: 'Within 10km', categories: ['Ambulance trusts', 'Fire and rescue authorities'], bufferKm: 10 }
 		]);
 		// a label leaves the category's other settings as they were
-		assert.equal(categorySettings('Police', config).metadata, 'all');
+		assert.equal(categorySettings('Police and crime commissioners', config).metadata, 'all');
 		assert.deepStrictEqual(summaryLines('Energy', config), []);
 		// config/report.yaml labels every tab's categories in the Summary's order - every category in
 		// config/reference-data.yaml, so none is left to show under its bare name
-		assert.equal(summaryLines('Administrative boundaries')[0].label, 'Parish, Town and Community Councils');
+		assert.equal(summaryLines('Administrative boundaries')[0].label, 'Parish, town and community councils');
 		assert.deepStrictEqual(summaryLabelProblems(), []);
 		// every category but the three that file labels
-		const labelled = ['Police', 'Internal Drainage Board', 'Internal Drainage District'];
+		const labelled = [
+			'Police and crime commissioners',
+			'Internal drainage boards (England)',
+			'Internal drainage boards (Wales)'
+		];
 		assert.deepStrictEqual(
 			summaryLabelProblems(config),
 			REFERENCE_DATA_CONFIG.groups
@@ -186,7 +201,11 @@ tabs:
 			VALID.replace('[consultee, region]', '[region, region]'),
 			/Public bodies.columns lists "region" twice/
 		],
-		['a negative distance', VALID.replace('mapKm: 30', 'mapKm: -30'), /categories.Police.mapKm must be/],
+		[
+			'a negative distance',
+			VALID.replace('mapKm: 30', 'mapKm: -30'),
+			/categories\.Police and crime commissioners\.mapKm must be/
+		],
 		['a distance as text', VALID.replace('mapKm: 10', 'mapKm: "10"'), /defaults.mapKm must be a number/],
 		['an unknown tab', `${VALID}  Health: {}`, /"Health" isn't a tab/],
 		['tabs as a list', VALID.replace(/tabs:[^]*$/, 'tabs: [Energy]'), /tabs must map each tab/],
@@ -194,8 +213,11 @@ tabs:
 		['a typo in a tab', VALID.replace('    metadata: all', '    metdata: all'), /tabs.Energy has "metdata"/],
 		[
 			'a category on the wrong tab',
-			VALID.replace('  Other: {}', '  Other:\n    categories:\n      DNO: { mapKm: 5 }'),
-			/categories.DNO: DNO isn't on Other - config\/reference-data.yaml puts it in Energy/
+			VALID.replace(
+				'  Other: {}',
+				'  Other:\n    categories:\n      Electricity distributors with compulsory purchase order powers: { mapKm: 5 }'
+			),
+			/categories\.Electricity distributors with compulsory purchase order powers: Electricity distributors with compulsory purchase order powers isn't on Other - config\/reference-data.yaml puts it in Energy/
 		],
 		[
 			'a category in no group',
@@ -204,50 +226,63 @@ tabs:
 		],
 		[
 			'categories as a list',
-			VALID.replace('  Other: {}', '  Other:\n    categories: [DNO]'),
+			VALID.replace(
+				'  Other: {}',
+				'  Other:\n    categories: [Electricity distributors with compulsory purchase order powers]'
+			),
 			/Other.categories must map/
 		],
 		[
 			'a category without settings',
-			VALID.replace('Police: { metadata: none, mapKm: 30 }', 'Police: 5'),
-			/Police must set metadata, mapKm or summary/
+			VALID.replace(
+				'Police and crime commissioners: { metadata: none, mapKm: 30 }',
+				'Police and crime commissioners: 5'
+			),
+			/Police and crime commissioners must set metadata, mapKm or summary/
 		],
 		[
 			'a blank summary label',
-			VALID.replace('Ambulance Trust: { mapKm: 5 }', "Ambulance Trust: { summary: ' ' }"),
-			/categories.Ambulance Trust.summary must be the label the Summary tab gives it/
+			VALID.replace('Ambulance trusts: { mapKm: 5 }', "Ambulance trusts: { summary: ' ' }"),
+			/categories\.Ambulance trusts\.summary must be the label the Summary tab gives it/
 		],
 		[
 			'a buffer that is not a number',
-			VALID.replace('Ambulance Trust: { mapKm: 5 }', 'Ambulance Trust: { summary: { one: Within 1km } }'),
-			/Ambulance Trust.summary must be the label the Summary tab gives it, or a label for each buffer in km/
+			VALID.replace('Ambulance trusts: { mapKm: 5 }', 'Ambulance trusts: { summary: { one: Within 1km } }'),
+			/Ambulance trusts\.summary must be the label the Summary tab gives it, or a label for each buffer in km/
 		],
 		[
 			'a buffer without a label',
-			VALID.replace('Ambulance Trust: { mapKm: 5 }', "Ambulance Trust: { summary: { 1: ' ' } }"),
-			/Ambulance Trust.summary must be/
+			VALID.replace('Ambulance trusts: { mapKm: 5 }', "Ambulance trusts: { summary: { 1: ' ' } }"),
+			/Ambulance trusts\.summary must be/
 		],
 		[
 			'no buffers',
-			VALID.replace('Ambulance Trust: { mapKm: 5 }', 'Ambulance Trust: { summary: {} }'),
-			/Ambulance Trust.summary must be/
+			VALID.replace('Ambulance trusts: { mapKm: 5 }', 'Ambulance trusts: { summary: {} }'),
+			/Ambulance trusts\.summary must be/
 		],
 		[
 			'a summary label that is not text',
-			VALID.replace('Ambulance Trust: { mapKm: 5 }', 'Ambulance Trust: { summary: 5 }'),
-			/Ambulance Trust.summary must be the label/
+			VALID.replace('Ambulance trusts: { mapKm: 5 }', 'Ambulance trusts: { summary: 5 }'),
+			/Ambulance trusts\.summary must be the label/
 		],
 		[
 			'a typo in a category',
-			VALID.replace('Police: { metadata: none', 'Police: { metdata: none'),
-			/categories.Police has "metdata"/
+			VALID.replace(
+				'Police and crime commissioners: { metadata: none',
+				'Police and crime commissioners: { metdata: none'
+			),
+			/categories\.Police and crime commissioners has "metdata"/
 		],
 		[
 			'an unknown metadata choice',
 			VALID.replace('metadata: none', 'metadata: some'),
-			/Police.metadata must be all, none/
+			/Police and crime commissioners\.metadata must be all, none/
 		],
-		['an empty metadata list', VALID.replace('metadata: none', 'metadata: {}'), /Police.metadata must be all, none/],
+		[
+			'an empty metadata list',
+			VALID.replace('metadata: none', 'metadata: {}'),
+			/Police and crime commissioners\.metadata must be all, none/
+		],
 		[
 			'a blank heading',
 			VALID.replace('ICB26NM: Official name', 'ICB26NM: "  "'),

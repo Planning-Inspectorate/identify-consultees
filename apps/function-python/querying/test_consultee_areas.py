@@ -62,7 +62,7 @@ def test_fetch_consultee_areas_normalises_each_row(connection_params):
                 """
                 INSERT INTO consultee_area (id, geometryType, geometry, geometrySimplified, consulteeCategory,
                     consultee, metadata)
-                SELECT %s, 'Point', g.geometry, g.geometry.Reduce(10).MakeValid(), 'Hospital', 'Test Trust', '{}'
+                SELECT %s, 'Point', g.geometry, g.geometry.Reduce(10).MakeValid(), 'Hospitals operated by NHS trusts and NHS foundation trusts (England)', 'Test Trust', '{}'
                 FROM (SELECT geography::STGeomFromText('POINT(0 0)', 4326).MakeValid() AS geometry) AS g
                 """,
                 (area_id,),

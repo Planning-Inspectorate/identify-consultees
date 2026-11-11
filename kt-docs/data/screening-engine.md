@@ -33,7 +33,7 @@ Every consultee type the rulesets name has reference data: the last four - MoD s
 Python decides which queries to run and combines the results; the geometry maths runs in SQL Server, as `geography` methods against the spatial index. The SQL is all in `intersector/queries.py`.
 
 1. **Simplify the site** to 10m, once. Detailed boundaries are the main cost: Silvertown Tunnel goes from 2,536 points to 66.
-2. **Fetch everything nearby, once**: every consultee area within the largest nearby distance in [`config/nearby-consultees.yaml`](../../config/nearby-consultees.yaml) (20km by default), in any category except Railway. Each area counts as nearby only within its own category's distance, sent with the request; a category set to 0 is never nearby. This answers every condition of 20km or less, filtered in memory, except Railway's, which runs as its own query, and every area it finds gets a `nearby` reason whether or not a condition matched it.
+2. **Fetch everything nearby, once**: every consultee area within the largest nearby distance in [`config/nearby-consultees.yaml`](../../config/nearby-consultees.yaml) (20km by default), in any category except Railways. Each area counts as nearby only within its own category's distance, sent with the request; a category set to 0 is never nearby. This answers every condition of 20km or less, filtered in memory, except Railways's, which runs as its own query, and every area it finds gets a `nearby` reason whether or not a condition matched it.
 3. **Run the other conditions**, six at a time, each on its own connection:
    - **Wider than 20km** (three 35km conditions): one query each, limited to their category.
    - **Bordering** (four): find **hosts** (host-category areas intersecting the site), grow each by 50m, and find **neighbours** (matching-category areas intersecting a grown host, excluding the host).
@@ -69,7 +69,7 @@ Screening runs on simplified shapes on both sides, which can shift a distance by
 
 ## Worked example: London Luton Airport Expansion (TR020001)
 
-The site straddles Luton and Central Bedfordshire (unitary), Hertfordshire (county), and North Hertfordshire and Dacorum (districts). An exact calculation finds 90 consultees; the margins add Sundon parish for 91: 37 parish councils, 17 hospitals, 10 lower tier, 9 unitary and 3 upper tier authorities, 2 each of ambulance trust, fire and rescue, ICB, resilience forum, police and drainage district, and 1 each of National Landscape and the GLA.
+The site straddles Luton and Central Bedfordshire (unitary), Hertfordshire (county), and North Hertfordshire and Dacorum (districts). An exact calculation finds 90 consultees; the margins add Sundon parish for 91: 37 parish councils, 17 hospitals, 10 lower tier, 9 unitary and 3 upper tier authorities, 2 each of ambulance trust, fire and rescue, ICB, resilience forum, police and drainage district, and 1 each of national landscape and the GLA.
 
 Bordering results can be far from the site. "County, unitary or national park bordering the host county" uses Hertfordshire as host, so everything bordering Hertfordshire is included, among them Hillingdon, Barnet and Harrow, about 24km away. That's the rule as written: bordering is about the host's neighbours, not distance.
 
@@ -119,14 +119,14 @@ Long linear schemes are by far the slowest. Azure SQL is slower than a laptop an
 
 Data processing is being redeveloped with new ids and a new schema. Repointing screening at new tables is contained to `intersector/queries.py` and the web app's `consultee-areas.ts` and `case-boundaries.ts`. The new data must provide:
 
-| Need                                                    | Why                                                                           | Today                                                           |
-| ------------------------------------------------------- | ----------------------------------------------------------------------------- | --------------------------------------------------------------- |
-| Consultee areas with a category, a name and a unique id | Conditions match on category; the id de-duplicates and fetches map geometry   | `consulteeCategory`, `consultee`, `id`                          |
-| Categories matching the ruleset vocabulary              | A renamed category silently matches nothing                                   | 27 categories                                                   |
-| Valid, correctly wound `geography` (SRID 4326)          | Invalid shapes fail the whole query; a backwards ring matches the whole globe | `MakeValid()` and winding correction on import                  |
-| A 10m simplified copy with a spatial index              | Every screening query runs on it, and the margins assume 10m                  | `geometrySimplified`, `consultee_area_geometry_simplified_sidx` |
-| The original geometry                                   | Source of truth                                                               | `geometry`                                                      |
-| Features split at a sensible scale                      | A national shape like merged Railway matches everywhere and slows every query | Railway excluded                                                |
-| Case boundaries as valid `geography`                    | The site being screened                                                       | `case_boundary.geometry`                                        |
+| Need                                                    | Why                                                                            | Today                                                           |
+| ------------------------------------------------------- | ------------------------------------------------------------------------------ | --------------------------------------------------------------- |
+| Consultee areas with a category, a name and a unique id | Conditions match on category; the id de-duplicates and fetches map geometry    | `consulteeCategory`, `consultee`, `id`                          |
+| Categories matching the ruleset vocabulary              | A renamed category silently matches nothing                                    | 27 categories                                                   |
+| Valid, correctly wound `geography` (SRID 4326)          | Invalid shapes fail the whole query; a backwards ring matches the whole globe  | `MakeValid()` and winding correction on import                  |
+| A 10m simplified copy with a spatial index              | Every screening query runs on it, and the margins assume 10m                   | `geometrySimplified`, `consultee_area_geometry_simplified_sidx` |
+| The original geometry                                   | Source of truth                                                                | `geometry`                                                      |
+| Features split at a sensible scale                      | A national shape like merged Railways matches everywhere and slows every query | Railways excluded                                               |
+| Case boundaries as valid `geography`                    | The site being screened                                                        | `case_boundary.geometry`                                        |
 
 If ids change, `ruleset-golden-cases.json` needs regenerating: it's keyed by today's ids.

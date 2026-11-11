@@ -11,7 +11,7 @@ import {
 	buildDatabaseOverviewPage
 } from './database/controller.ts';
 import { createRoutes as createImportReferenceDataRoutes } from './import-reference-data/index.ts';
-import { ADMIN_PAGES, adminNavigation } from './navigation.ts';
+import { adminNavigation, adminPages } from './navigation.ts';
 import { createRoutes as createUploadToBlobRoutes } from './upload-to-blob/index.ts';
 
 /**
@@ -31,20 +31,24 @@ export function createAdminRoutes(service: ManageService): IRouter {
 	router.use(buildAssertAdminAccess(service));
 
 	// every admin page's menu, with the current page marked
+	const pages = adminPages(service.referenceDataChanges);
 	router.use((req, res, next) => {
-		res.locals.adminNav = adminNavigation(req.baseUrl + req.path);
+		res.locals.adminNav = adminNavigation(req.baseUrl + req.path, pages);
 		next();
 	});
 
 	router.get('/', (_req, res) => {
-		res.render('admin/home/view.njk', { pageHeading: 'Admin', pages: ADMIN_PAGES.slice(1) });
+		res.render('admin/home/view.njk', { pageHeading: 'Admin', pages: pages.slice(1) });
 	});
 	router.get('/database', asyncHandler(buildDatabaseOverviewPage(service)));
 	router.get('/database/consultee-areas', asyncHandler(buildConsulteeAreasPage(service)));
 	router.get('/database/consultee-areas/:id', asyncHandler(buildConsulteeAreaRowPage(service)));
 	router.get('/database/case-boundaries', asyncHandler(buildCaseBoundariesPage(service)));
 	router.get('/database/case-boundaries/:id', asyncHandler(buildCaseBoundaryRowPage(service)));
-	router.use('/upload-to-blob', createUploadToBlobRoutes(service));
+	// uploading files - only where the reference data can be changed: Dev and Test (see config.ts)
+	if (service.referenceDataChanges) {
+		router.use('/upload-to-blob', createUploadToBlobRoutes(service));
+	}
 	router.use('/import-reference-data', createImportReferenceDataRoutes(service));
 
 	return router;

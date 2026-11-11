@@ -4,7 +4,11 @@ import { describe, it, mock } from 'node:test';
 import { configureNunjucks } from '../../../../../nunjucks.ts';
 import { failingRulesetRunner, rulesetRunnerReturning } from '../../../../../testing/ruleset-runner-stub.ts';
 import { consulteesUrl } from '../../urls.ts';
-import { buildReportConsulteeAddPage, buildReportConsulteeAddSubmit } from './controller.ts';
+import {
+	buildReportConsulteeAddPage,
+	buildReportConsulteeAddSubmit,
+	buildReportConsulteeAddSuggestions
+} from './controller.ts';
 
 // a selection entry as the app's URLs carry it - base64url-encoded JSON (see urls.ts's ENCODED_JSON)
 const urlParam = (json: string) => Buffer.from(json).toString('base64url');
@@ -33,7 +37,7 @@ function parishMatchRow(id = matchId, consultee = 'Little Snoring Parish Council
 		reasons: [{ type: 'condition' as const, conditionId: 'b_host_parish_town_community_councils' }],
 		id,
 		geometryType: 'MultiLineString',
-		consulteeCategory: 'Parish Council',
+		consulteeCategory: 'Parish, town and community councils',
 		consultee,
 		region: 'East of England',
 		metadata: '{}',
@@ -44,12 +48,12 @@ function parishMatchRow(id = matchId, consultee = 'Little Snoring Parish Council
 
 // `query.add`/`query.exclude` hold the raw param values (Express has already decoded them);
 // expected URLs hold the encoded forms
-const addJson = (name: string, reason = '', category = 'Parish Council') =>
+const addJson = (name: string, reason = '', category = 'Parish, town and community councils') =>
 	JSON.stringify({ c: category, n: name, r: reason });
 
-const parishQuery = { ruleset: 'england-wales-post-20240430', category: 'Parish Council' };
-const categoryUrl = `/consultees/${realProjectId}/report/consultees?ruleset=england-wales-post-20240430&category=Parish%20Council`;
-const addUrl = `/consultees/${realProjectId}/report/consultees/add?ruleset=england-wales-post-20240430&category=Parish%20Council`;
+const parishQuery = { ruleset: 'england-wales-post-20240430', category: 'Parish, town and community councils' };
+const categoryUrl = `/consultees/${realProjectId}/report/consultees?ruleset=england-wales-post-20240430&category=Parish%2C%20town%20and%20community%20councils`;
+const addUrl = `/consultees/${realProjectId}/report/consultees/add?ruleset=england-wales-post-20240430&category=Parish%2C%20town%20and%20community%20councils`;
 
 const nearby = [{ type: 'nearby' as const, radiusMetres: 20_000 }];
 // one identified parish; two nearby-only parishes sharing a name, and one more; a nearby-only
@@ -61,7 +65,7 @@ const RUN = [
 	{ ...parishMatchRow('99999999-9999-9999-9999-999999999999', 'Christleton', 7_300), reasons: nearby },
 	{
 		...parishMatchRow('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'Nearby Hospital', 900),
-		consulteeCategory: 'Hospital',
+		consulteeCategory: 'Hospitals operated by NHS trusts and NHS foundation trusts (England)',
 		reasons: nearby
 	}
 ];
@@ -72,14 +76,14 @@ const STORED = [
 	{
 		id: storedId.toUpperCase(),
 		consultee: 'Mr Smith',
-		consulteeCategory: 'Parish Council',
+		consulteeCategory: 'Parish, town and community councils',
 		distanceMetres: 31_000,
 		region: 'East of England'
 	},
 	{
 		id: nearbyId.toUpperCase(),
 		consultee: 'Barton',
-		consulteeCategory: 'Parish Council',
+		consulteeCategory: 'Parish, town and community councils',
 		distanceMetres: 1_250,
 		region: 'East of England',
 		authority: 'South Cambridgeshire'
@@ -87,7 +91,7 @@ const STORED = [
 	{
 		id: fartherNearbyId.toUpperCase(),
 		consultee: 'Barton',
-		consulteeCategory: 'Parish Council',
+		consulteeCategory: 'Parish, town and community councils',
 		distanceMetres: 4_000,
 		region: 'East of England',
 		authority: 'Bedford'
@@ -100,7 +104,7 @@ const STORED = [
 	].map(([id, distanceMetres, region, authority]) => ({
 		id: String(id).toUpperCase(),
 		consultee: 'Middleton',
-		consulteeCategory: 'Parish Council',
+		consulteeCategory: 'Parish, town and community councils',
 		distanceMetres: Number(distanceMetres),
 		region: String(region),
 		authority: String(authority)
@@ -108,7 +112,7 @@ const STORED = [
 	{
 		id: 'cccccccc-cccc-cccc-cccc-cccccccccccc',
 		consultee: 'Banana Hospital',
-		consulteeCategory: 'Hospital',
+		consulteeCategory: 'Hospitals operated by NHS trusts and NHS foundation trusts (England)',
 		distanceMetres: 5,
 		region: null
 	}
@@ -163,6 +167,33 @@ function dbReturning(rows: unknown[][], otherCases: unknown[] = OTHER_CASES) {
 					metadata: '{}',
 					authority: 'authority' in row ? row.authority : null
 				}));
+			}
+			// which names the reference data has more than once
+			if (text.includes('HAVING COUNT')) {
+				const [category, ...names] = (values as unknown[]).flatMap((value) =>
+					value && typeof value === 'object' && 'values' in value ? (value as { values: unknown[] }).values : [value]
+				) as string[];
+				return names
+					.filter(
+						(name) =>
+							STORED.filter((row) => row.consulteeCategory === category && row.consultee.toLowerCase() === name)
+								.length > 1
+					)
+					.map((name) => ({ name }));
+			}
+			// the names starting with what's typed - those called exactly that first
+			if (text.includes(' LIKE ')) {
+				// the limit and the site come first
+				const [category, , typed] = (values as string[]).slice(-3);
+				return STORED.filter(
+					(row) => row.consulteeCategory === category && row.consultee.toLowerCase().startsWith(typed.toLowerCase())
+				)
+					.sort(
+						(a, b) =>
+							Number(b.consultee.toLowerCase() === typed.toLowerCase()) -
+							Number(a.consultee.toLowerCase() === typed.toLowerCase())
+					)
+					.map(({ id, consultee, distanceMetres, region }) => ({ id, consultee, distanceMetres, region }));
 			}
 			if (text.includes('LOWER(consultee)')) {
 				const [category, name] = (values as string[]).slice(-2);
@@ -229,7 +260,7 @@ describe('add a consultee page', () => {
 		assert.strictEqual(res.render.mock.calls[0].arguments[0], 'views/consultees/report/consultees/add/view.njk');
 		const viewModel = viewModelOf(res);
 		assert.strictEqual(viewModel.pageHeading, 'Add a consultee');
-		assert.strictEqual(viewModel.pageCaption, 'Parish Council');
+		assert.strictEqual(viewModel.pageCaption, 'Parish, town and community councils');
 		assert.strictEqual(viewModel.backLinkUrl, categoryUrl);
 		assert.strictEqual(viewModel.formAction, addUrl);
 		assert.deepStrictEqual(viewModel.addForm, { nameValue: '', reasonValue: '' });
@@ -270,10 +301,15 @@ describe('add a consultee page', () => {
 	});
 
 	// the identified parish, removed on the category page
-	const removal = { i: matchId, c: 'Parish Council', n: 'Little Snoring Parish Council', r: 'Dissolved' };
+	const removal = {
+		i: matchId,
+		c: 'Parish, town and community councils',
+		n: 'Little Snoring Parish Council',
+		r: 'Dissolved'
+	};
 	const otherRemoval = {
 		i: 'cccccccc-cccc-cccc-cccc-cccccccccccc',
-		c: 'Parish Council',
+		c: 'Parish, town and community councils',
 		n: 'Gone Parish',
 		r: 'Merged'
 	};
@@ -291,7 +327,7 @@ describe('add a consultee page', () => {
 			{ name: 'Barton (Bedford)', hint: '4.0 km from the site, East of England' },
 			{ name: 'Christleton', hint: '7.3 km from the site' }
 		]);
-		assert.match(viewModelOf(res).nameHint.text, /find consultees local to the site/);
+		assert.match(viewModelOf(res).nameHint.text, /those near the site come first/);
 	});
 
 	it('adds a removed consultee back by undoing its removal - as the ruleset found it, not added by hand', async () => {
@@ -300,7 +336,7 @@ describe('add a consultee page', () => {
 		// its removal gone, the other kept, and nothing added by hand
 		assert.strictEqual(
 			res.redirect.mock.calls[0].arguments[0],
-			`${consulteesUrl(realProjectId, 'england-wales-post-20240430', 'Parish Council', {
+			`${consulteesUrl(realProjectId, 'england-wales-post-20240430', 'Parish, town and community councils', {
 				removed: [{ id: otherRemoval.i, category: otherRemoval.c, name: otherRemoval.n, reason: otherRemoval.r }],
 				adds: []
 			})}#consultees`
@@ -309,7 +345,7 @@ describe('add a consultee page', () => {
 
 	it('stops suggesting a nearby consultee once it has been added', async () => {
 		const res = rendering();
-		const added = JSON.stringify({ i: nearbyId, c: 'Parish Council', n: 'Barton', r: 'r' });
+		const added = JSON.stringify({ i: nearbyId, c: 'Parish, town and community councils', n: 'Barton', r: 'r' });
 		await buildReportConsulteeAddPage(service() as never)(
 			{ params: { caseId: realProjectId }, query: { ...parishQuery, add: added } } as never,
 			res as never
@@ -326,7 +362,7 @@ describe('add a consultee page', () => {
 
 		assert.strictEqual(
 			res.redirect.mock.calls[0].arguments[0],
-			`${categoryUrl}&add=${urlParam(JSON.stringify({ i: '99999999-9999-9999-9999-999999999999', c: 'Parish Council', n: 'Christleton', r: 'Borders the site' }))}#consultees`
+			`${categoryUrl}&add=${urlParam(JSON.stringify({ i: '99999999-9999-9999-9999-999999999999', c: 'Parish, town and community councils', n: 'Christleton', r: 'Borders the site' }))}#consultees`
 		);
 	});
 
@@ -340,7 +376,7 @@ describe('add a consultee page', () => {
 			const res = await submit({ name: typed, reason: 'r' });
 			assert.strictEqual(
 				res.redirect.mock.calls[0].arguments[0],
-				`${categoryUrl}&add=${urlParam(JSON.stringify({ i: id, c: 'Parish Council', n: 'Barton', r: 'r' }))}#consultees`
+				`${categoryUrl}&add=${urlParam(JSON.stringify({ i: id, c: 'Parish, town and community councils', n: 'Barton', r: 'r' }))}#consultees`
 			);
 		}
 	});
@@ -374,7 +410,7 @@ describe('add a consultee page', () => {
 		const chosen = await submit({ name: 'Middleton (North Yorkshire, 40.0 km from the site)', reason: 'r' });
 		assert.strictEqual(
 			chosen.redirect.mock.calls[0].arguments[0],
-			`${categoryUrl}&add=${urlParam(JSON.stringify({ i: 'f1f1f1f1-0000-0000-0000-000000000002', c: 'Parish Council', n: 'Middleton', r: 'r' }))}#consultees`
+			`${categoryUrl}&add=${urlParam(JSON.stringify({ i: 'f1f1f1f1-0000-0000-0000-000000000002', c: 'Parish, town and community councils', n: 'Middleton', r: 'r' }))}#consultees`
 		);
 		// one that doesn't tell them apart - North Yorkshire has two - asks again
 		const stale = await submit({ name: 'Middleton (North Yorkshire)', reason: 'r' });
@@ -382,18 +418,23 @@ describe('add a consultee page', () => {
 	});
 
 	it('adds another consultee of a name already listed, chosen from the list', async () => {
-		const added = { ...parishQuery, add: JSON.stringify({ i: nearbyId, c: 'Parish Council', n: 'Barton', r: 'r' }) };
+		const added = {
+			...parishQuery,
+			add: JSON.stringify({ i: nearbyId, c: 'Parish, town and community councils', n: 'Barton', r: 'r' })
+		};
 		// the name alone could be the one listed - so it asks
 		const bare = await submit({ name: 'Barton', reason: 'r' }, added);
 		assert.strictEqual(
 			viewModelOf(bare).addForm.nameError.text,
-			'Barton is already listed in Parish Council - to add another Barton, choose it from the list'
+			'Barton is already listed in Parish, town and community councils - to add another Barton, choose it from the list'
 		);
 		// the other Barton, chosen, is added after the first
 		const other = await submit({ name: 'Barton (Bedford)', reason: 'r2' }, added);
 		const location = other.redirect.mock.calls[0].arguments[0] as string;
 		assert.ok(
-			location.includes(urlParam(JSON.stringify({ i: fartherNearbyId, c: 'Parish Council', n: 'Barton', r: 'r2' })))
+			location.includes(
+				urlParam(JSON.stringify({ i: fartherNearbyId, c: 'Parish, town and community councils', n: 'Barton', r: 'r2' }))
+			)
 		);
 		// the listed one itself is never offered again
 		assert.ok(
@@ -414,7 +455,12 @@ describe('add a consultee page', () => {
 		assert.match(location, /exclude=55555555/);
 		// the stored spelling and its id, lowercase as the report's ids are
 		const newAdd = urlParam(
-			JSON.stringify({ i: storedId, c: 'Parish Council', n: 'Mr Smith', r: 'Owns the access road' })
+			JSON.stringify({
+				i: storedId,
+				c: 'Parish, town and community councils',
+				n: 'Mr Smith',
+				r: 'Owns the access road'
+			})
 		);
 		assert.ok(location.indexOf(urlParam(earlier)) > 0);
 		assert.ok(location.indexOf(urlParam(earlier)) < location.indexOf(newAdd));
@@ -482,14 +528,17 @@ describe('add a consultee page', () => {
 		const identified = await submit({ name: 'little snoring parish council', reason: 'r' });
 		assert.strictEqual(
 			viewModelOf(identified).addForm.nameError.text,
-			'little snoring parish council is already listed in Parish Council'
+			'little snoring parish council is already listed in Parish, town and community councils'
 		);
 
 		const added = await submit(
 			{ name: 'Mr Smith', reason: 'r' },
 			{ ...parishQuery, add: addJson('MR SMITH', 'first time') }
 		);
-		assert.strictEqual(viewModelOf(added).addForm.nameError.text, 'Mr Smith is already listed in Parish Council');
+		assert.strictEqual(
+			viewModelOf(added).addForm.nameError.text,
+			'Mr Smith is already listed in Parish, town and community councils'
+		);
 	});
 
 	it('treats a missing or non-string name, or no body at all, as no name', async () => {
@@ -504,7 +553,7 @@ describe('add a consultee page', () => {
 		const res = await submit({ name: 'Mr Smith', reason: 'r' }, parishQuery, failingRulesetRunner());
 		assert.ok(
 			(res.redirect.mock.calls[0].arguments[0] as string).endsWith(
-				`&add=${urlParam(JSON.stringify({ i: storedId, c: 'Parish Council', n: 'Mr Smith', r: 'r' }))}#consultees`
+				`&add=${urlParam(JSON.stringify({ i: storedId, c: 'Parish, town and community councils', n: 'Mr Smith', r: 'r' }))}#consultees`
 			)
 		);
 	});
@@ -526,7 +575,7 @@ describe('add a consultee page', () => {
 		assert.strictEqual(res.status.mock.calls[0].arguments[0], 404);
 	});
 
-	it('renders no datalist or hint for a consultee category with nothing nearby to suggest', async () => {
+	it('still offers suggestions as a name is typed for a consultee category with nothing nearby', async () => {
 		const res = rendering();
 		await buildReportConsulteeAddPage(service(rulesetRunnerReturning([parishMatchRow()])) as never)(
 			{ params: { caseId: realProjectId }, query: parishQuery } as never,
@@ -534,10 +583,13 @@ describe('add a consultee page', () => {
 		);
 
 		assert.deepStrictEqual(viewModelOf(res).nearbySuggestions, []);
-		assert.strictEqual(viewModelOf(res).nameHint, undefined);
+		assert.match(viewModelOf(res).nameHint.text, /Start typing/);
 		const html = res.render.mock.calls[0].result as string;
-		assert.match(html, /<input[^>]*name="name"/);
-		assert.doesNotMatch(html, /datalist|data-consultee-autocomplete|Start typing/);
+		assert.match(html, /<input[^>]*name="name"[^>]*data-consultee-autocomplete/);
+		assert.match(
+			html,
+			new RegExp(`data-suggestions-url="/consultees/${realProjectId}/report/consultees/add/suggestions\\?ruleset=`)
+		);
 	});
 
 	it('suggests the other cases on the Nearby NSIPs page, nearest first, less any already listed', async () => {
@@ -547,6 +599,8 @@ describe('add a consultee page', () => {
 			res as never
 		);
 
+		// the caption spells NSIPs out, as the check page does
+		assert.strictEqual(viewModelOf(res).pageCaption, 'National infrastructure projects');
 		// Neighbouring Solar Farm is identified by the nearby search, so already listed
 		assert.deepStrictEqual(viewModelOf(res).nearbySuggestions, [
 			{ name: 'Undated Wind Farm (EN010201)', hint: '6.0 km from the site' }
@@ -623,7 +677,7 @@ describe('add a consultee page', () => {
 		const res = await submitNsip({ name: 'Neighbouring Solar Farm (EN010200)', reason: 'r' });
 		assert.strictEqual(
 			viewModelOf(res).addForm.nameError.text,
-			'Neighbouring Solar Farm (EN010200) is already listed in NSIPs'
+			'Neighbouring Solar Farm (EN010200) is already listed in National infrastructure projects'
 		);
 	});
 
@@ -640,7 +694,7 @@ describe('add a consultee page', () => {
 		assert.strictEqual(res.redirect.mock.callCount(), 0);
 		assert.strictEqual(
 			viewModelOf(res).addForm.nameError.text,
-			'Neighbouring Solar Farm (EN010200) is already listed in NSIPs'
+			'Neighbouring Solar Farm (EN010200) is already listed in National infrastructure projects'
 		);
 	});
 
@@ -649,5 +703,52 @@ describe('add a consultee page', () => {
 
 		assert.strictEqual(res.redirect.mock.callCount(), 0);
 		assert.strictEqual(viewModelOf(res).addForm.nameError.text, 'Consultee not found');
+	});
+});
+
+describe('add a consultee suggestions, as a name is typed', () => {
+	const suggest = async (query: Record<string, unknown>, svc: unknown = service()) => {
+		const res = { json: mock.fn(), status: mock.fn(() => res), render: mock.fn() };
+		await buildReportConsulteeAddSuggestions(svc as never)(
+			{ params: { caseId: realProjectId }, query } as never,
+			res as never
+		);
+		return res;
+	};
+	const suggested = (res: Awaited<ReturnType<typeof suggest>>) => res.json.mock.calls[0].arguments[0];
+
+	it('suggests every consultee of the category whose name starts with what is typed, telling apart those that share it', async () => {
+		// none near the site - before, these were only offered after submitting "Middleton"
+		assert.deepStrictEqual(suggested(await suggest({ ...parishQuery, q: ' middle ' })), [
+			{ name: 'Middleton (Lancaster)', hint: '40.0 km from the site, North West' },
+			{ name: 'Middleton (North Yorkshire, 40.0 km from the site)', hint: 'Yorkshire and The Humber' },
+			{ name: 'Middleton (North Yorkshire, 95.0 km from the site)', hint: 'Yorkshire and The Humber' }
+		]);
+	});
+
+	it('leaves out one already listed, and says which were removed', async () => {
+		const added = JSON.stringify({ i: nearbyId, c: 'Parish, town and community councils', n: 'Barton', r: 'r' });
+		const removal = JSON.stringify({
+			i: fartherNearbyId,
+			c: 'Parish, town and community councils',
+			n: 'Barton',
+			r: 'r'
+		});
+		// the one left is still told apart from the listed Barton
+		assert.deepStrictEqual(suggested(await suggest({ ...parishQuery, q: 'Barton', add: added, exclude: removal })), [
+			{ name: 'Barton (Bedford)', hint: '4.0 km from the site, East of England, removed' }
+		]);
+	});
+
+	it('suggests nothing for fewer than three letters, or on the Nearby NSIPs page', async () => {
+		assert.deepStrictEqual(suggested(await suggest({ ...parishQuery, q: 'mi' })), []);
+		assert.deepStrictEqual(suggested(await suggest({ ...parishQuery })), []);
+		assert.deepStrictEqual(suggested(await suggest({ ...nsipQuery, q: 'Undated' }, nsipService())), []);
+	});
+
+	it("is a 404 page for a category the ruleset doesn't cover, as the add page is", async () => {
+		const res = await suggest({ ...parishQuery, category: 'Not A Category', q: 'Middle' });
+		assert.strictEqual(res.json.mock.callCount(), 0);
+		assert.deepStrictEqual(res.status.mock.calls[0]?.arguments, [404]);
 	});
 });

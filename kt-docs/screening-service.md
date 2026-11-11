@@ -19,17 +19,25 @@ Request:
 {
 	"siteWkt": "POLYGON((...))",
 	"nearbyRadiusMetres": 20000,
-	"nearbyRadiusMetresByCategory": { "Parish Council": 5000, "Hospital": 0 },
+	"nearbyRadiusMetresByCategory": {
+		"Parish, town and community councils": 5000,
+		"Hospitals operated by NHS trusts and NHS foundation trusts (England)": 0
+	},
 	"boundingBoxAbovePoints": 2000,
 	"boundingBox": false,
 	"dataset": "2026Q4",
 	"rules": [
-		{ "id": "hospital", "logicType": "intersection", "categories": ["Hospital"], "bufferMetres": 10000 },
+		{
+			"id": "hospital",
+			"logicType": "intersection",
+			"categories": ["Hospitals operated by NHS trusts and NHS foundation trusts (England)"],
+			"bufferMetres": 10000
+		},
 		{
 			"id": "a_bordering_b_host_parish_comm_council",
 			"logicType": "bordering",
-			"categories": ["Parish Council"],
-			"hostCategory": "Parish Council"
+			"categories": ["Parish, town and community councils"],
+			"hostCategory": "Parish, town and community councils"
 		}
 	]
 }
@@ -45,7 +53,12 @@ Response (200):
 		{
 			"feature": {
 				"id": "<lowercase uuid>",
-				"properties": { "consulteeCategory": "Hospital", "consultee": "...", "region": "...", "...": "..." }
+				"properties": {
+					"consulteeCategory": "Hospitals operated by NHS trusts and NHS foundation trusts (England)",
+					"consultee": "...",
+					"region": "...",
+					"...": "..."
+				}
 			},
 			"distanceMetres": 6512.3,
 			"reasons": [

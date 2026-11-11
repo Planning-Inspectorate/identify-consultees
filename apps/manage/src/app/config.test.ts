@@ -3,13 +3,7 @@ import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, test } from 'node:test';
-import {
-	cbosSubscriberSettings,
-	loadConfig,
-	parseImportHours,
-	referenceDataCopySettings,
-	resetConfigCache
-} from './config.ts';
+import { cbosSubscriberSettings, loadConfig, parseImportHours, resetConfigCache } from './config.ts';
 import { loadNearbyConsultees } from './nearby-consultees.ts';
 import { loadScreeningConfig } from './screening-config.ts';
 
@@ -37,6 +31,7 @@ const managedKeys = [
 	'NODE_ENV',
 	'PORT',
 	'PYTHON_FUNCTION_URL',
+	'REFERENCE_DATA_CHANGES_ENABLED',
 	'SESSION_SECRET',
 	'SQL_CONNECTION_STRING'
 ] as const;
@@ -277,34 +272,18 @@ describe('the CBOS subscriber settings', () => {
 	});
 });
 
-describe('the reference data copy settings', () => {
-	const PROJECT = 'https://dev.azure.com/planninginspectorate/identify-consultees';
+describe('reference data changes on the admin pages', () => {
+	test('are on locally, and in production only where turned on - Dev and Test', () => {
+		// empty strings (not delete): loadEnvFile must not restore values from a local .env
+		setBaseEnv({ REFERENCE_DATA_CHANGES_ENABLED: '' });
+		assert.equal(loadConfig().referenceDataChanges, true);
 
-	test("are where this environment's files are copied from, and to - Training's from Test, Prod's from Training", () => {
-		assert.deepEqual(
-			referenceDataCopySettings({ REFERENCE_DATA_COPY_FROM: ' Test ', AZURE_DEVOPS_PROJECT_URL: `${PROJECT}/` }),
-			{
-				projectUrl: PROJECT,
-				from: 'Test',
-				to: 'Training'
-			}
-		);
-		assert.deepEqual(
-			referenceDataCopySettings({ REFERENCE_DATA_COPY_FROM: 'Training', AZURE_DEVOPS_PROJECT_URL: PROJECT }),
-			{ projectUrl: PROJECT, from: 'Training', to: 'Prod' }
-		);
-	});
+		resetConfigCache();
+		setBaseEnv({ NODE_ENV: 'production', REFERENCE_DATA_CHANGES_ENABLED: '' });
+		assert.equal(loadConfig().referenceDataChanges, false);
 
-	test('are none - no Copy section - unless both are set, and refuse a route the pipeline has not got', () => {
-		assert.equal(referenceDataCopySettings({}), undefined);
-		assert.equal(referenceDataCopySettings({ REFERENCE_DATA_COPY_FROM: 'Test' }), undefined);
-		assert.equal(
-			referenceDataCopySettings({ AZURE_DEVOPS_PROJECT_URL: PROJECT, REFERENCE_DATA_COPY_FROM: ' ' }),
-			undefined
-		);
-		assert.throws(
-			() => referenceDataCopySettings({ AZURE_DEVOPS_PROJECT_URL: PROJECT, REFERENCE_DATA_COPY_FROM: 'Dev' }),
-			/REFERENCE_DATA_COPY_FROM must be Test or Training, not "Dev"/
-		);
+		resetConfigCache();
+		setBaseEnv({ NODE_ENV: 'production', REFERENCE_DATA_CHANGES_ENABLED: 'true' });
+		assert.equal(loadConfig().referenceDataChanges, true);
 	});
 });

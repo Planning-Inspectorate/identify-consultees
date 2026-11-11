@@ -7,10 +7,10 @@ import type { Handler } from 'express';
 export function addLocalsConfiguration(): Handler {
 	return (req, res, next) => {
 		res.locals.config = {
-			styleFile: 'style-8f9d0702.css',
+			styleFile: 'style-52a6b33d.css',
 			govukFrontendJs: 'assets/js/govuk-frontend.min-0391e416.js',
-			consulteesMapJs: 'javascripts/consultees-map-c7f25d7b.js',
-			consulteeAutocompleteJs: 'javascripts/consultee-autocomplete-c649c327.js',
+			consulteesMapJs: 'javascripts/consultees-map-fa9eb6e8.js',
+			consulteeAutocompleteJs: 'javascripts/consultee-autocomplete-aea54bb1.js',
 			blobUploadJs: 'javascripts/blob-upload-cfe8ea96.js',
 			accessibleAutocompleteJs: 'assets/js/accessible-autocomplete.min-876870ee.js',
 			accessibleAutocompleteCss: 'assets/css/accessible-autocomplete.min-4b7a52dc.css',
@@ -28,10 +28,12 @@ export function addLocalsConfiguration(): Handler {
 			headerTitle: 'Identify consultees',
 			// the support links the site footer lists - generic Planning Inspectorate pages.
 			// Help and Contact are deliberately left out until their content has had a proper
-			// audit; the pages themselves stay routed.
+			// audit; the pages themselves stay routed. `hidden` keeps a page routed but takes
+			// its link out of the footer (the list item gets pins-footer__item--hidden): the
+			// accessibility statement is hidden until its content has had a proper audit.
 			footerLinks: [
 				{ text: 'Terms and conditions', link: '/terms-and-conditions' },
-				{ text: 'Accessibility statement', link: '/accessibility-statement' },
+				{ text: 'Accessibility statement', link: '/accessibility-statement', hidden: true },
 				{
 					text: 'Privacy',
 					link: 'https://www.gov.uk/government/publications/planning-inspectorate-privacy-notices/customer-privacy-notice'

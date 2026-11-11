@@ -8,6 +8,7 @@
 
 import { fetchWithTimeout } from '@planning-inspectorate/core/util';
 import type { Response } from 'express';
+import { osMapsApiKeyFromEnv } from './os-maps.ts';
 import {
 	STATIC_MAP_CACHE_CONTROL_PRIVATE,
 	buildStaticMapFingerprint,
@@ -24,9 +25,10 @@ import {
 } from './static-map-raster.ts';
 import {
 	buildGoogleStaticMapUrl,
-	fetchOsmBasemapTiles,
+	fetchBasemapTiles,
 	googleMapsApiKeyFromEnv,
 	renderStaticMapSvg,
+	type BasemapProvider,
 	type StaticMapBuildOptions
 } from './static-map.ts';
 
@@ -43,6 +45,8 @@ export type StaticMapResponseBody = {
 	cacheControl: string;
 	etag: string;
 	vary?: string;
+	/** Whose basemap the image was drawn on - absent for a 304, which sends no image. */
+	basemap?: BasemapProvider | 'google';
 };
 
 /** Write a built static-map response onto an Express response - shared by every static-map route. */
@@ -70,6 +74,8 @@ export type BuildConsulteeStaticMapOptions = {
 	map: StaticMapBuildOptions;
 	forceSvg?: boolean;
 	googleMapsApiKey?: string;
+	/** OS_MAPS_API_KEY by default - see os-maps.ts. */
+	osMapsApiKey?: string;
 	ifNoneMatch?: string;
 	accept?: string;
 };
@@ -91,6 +97,7 @@ export async function buildConsulteeStaticMapResponse(
 ): Promise<StaticMapResponseBody> {
 	const forceSvg = options.forceSvg === true;
 	const googleMapsApiKey = options.googleMapsApiKey ?? googleMapsApiKeyFromEnv();
+	const osMapsApiKey = 'osMapsApiKey' in options ? options.osMapsApiKey : osMapsApiKeyFromEnv();
 	const format: StaticMapFormat | 'svg' = forceSvg ? 'svg' : negotiateStaticMapFormat(options.accept);
 	// Google's static maps draw whole zooms at one pixel ratio - any other map takes OSM tiles
 	const preferGoogle =
@@ -117,7 +124,8 @@ export async function buildConsulteeStaticMapResponse(
 		labels: options.map.labels,
 		basemap: options.map.basemap,
 		bufferGeojson: options.map.bufferGeojson,
-		pixelRatio: options.map.pixelRatio
+		pixelRatio: options.map.pixelRatio,
+		osBasemap: Boolean(osMapsApiKey)
 	};
 	const etag = etagFromFingerprint(buildStaticMapFingerprint(fingerprintInput));
 
@@ -144,22 +152,23 @@ export async function buildConsulteeStaticMapResponse(
 	};
 
 	if (format === 'svg') {
-		const basemapTiles = await fetchOsmBasemapTiles(buildOptions);
-		const basemapImage = await renderSvgBasemapImage(buildOptions, basemapTiles);
+		const basemap = await fetchBasemapTiles(buildOptions, osMapsApiKey);
+		const basemapImage = await renderSvgBasemapImage(buildOptions, basemap.tiles);
 		const svg = renderStaticMapSvg(buildOptions, basemapImage);
 		return {
 			status: 200,
 			body: svg,
 			contentType: SVG_CONTENT_TYPE,
 			cacheControl,
-			etag
+			etag,
+			basemap: basemap.provider
 		};
 	}
 
 	const googleUrl = preferGoogle ? buildGoogleStaticMapUrl(buildOptions) : undefined;
 	const basemapPng = googleUrl ? await fetchGoogleBasemap(googleUrl) : undefined;
-	const basemapTiles = basemapPng ? [] : await fetchOsmBasemapTiles(buildOptions);
-	const raster = await renderStaticMapRaster(buildOptions, format, basemapTiles, basemapPng);
+	const basemap = basemapPng ? undefined : await fetchBasemapTiles(buildOptions, osMapsApiKey);
+	const raster = await renderStaticMapRaster(buildOptions, format, basemap?.tiles ?? [], basemapPng);
 
 	return {
 		status: 200,
@@ -167,6 +176,7 @@ export async function buildConsulteeStaticMapResponse(
 		contentType,
 		cacheControl,
 		etag,
-		vary
+		vary,
+		basemap: basemap?.provider ?? 'google'
 	};
 }

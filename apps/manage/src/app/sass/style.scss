@@ -117,6 +117,12 @@ $font-family: arial, helvetica, sans-serif;
 	}
 }
 
+// a footer link kept routed but taken out of the list (config-middleware marks it `hidden`)
+// while its content is unaudited - hiding the whole list item leaves no gap in the inline list
+.pins-footer__item--hidden {
+	display: none;
+}
+
 // Align a GOV.UK input and button on one row (search pattern)
 .pins-inline-search {
 	display: flex;

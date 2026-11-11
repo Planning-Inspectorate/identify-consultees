@@ -52,15 +52,23 @@ variable "cbos_import_hours" {
   default     = "7,10,13,16,19"
 }
 
-variable "reference_data_copy_from" {
-  description = "The environment whose reference data files the admin page copies here - Test (for Training) or Training (for Prod) - or empty for none"
+variable "reference_data_changes_enabled" {
+  description = "Let the admin pages upload, load and clear the reference data (Dev and Test); otherwise they only report it, and the Load and Promote reference data pipelines load it"
+  type        = bool
+  default     = false
+}
+
+variable "os_maps_api_key" {
+  description = "The OS Data Hub key, with the OS Maps API, the maps' basemap is drawn from - one for every environment, from the consultees-os-maps variable group (see infrastructure/pipelines/terraform-cd.yaml). Unset, the maps stay on OpenStreetMap"
   type        = string
   default     = ""
+  sensitive   = true
+}
 
-  validation {
-    condition     = contains(["", "Test", "Training"], var.reference_data_copy_from)
-    error_message = "reference_data_copy_from must be \"\", \"Test\" or \"Training\": the Promote reference data pipeline's routes."
-  }
+variable "os_licence_number" {
+  description = "PINS's OS licence number under the Public Sector Geospatial Agreement (AC0000...), credited on maps drawn on OS's basemap"
+  type        = string
+  default     = ""
 }
 
 variable "cbos_subscriber_enabled" {

@@ -9,7 +9,7 @@ export interface AddConsulteeForm {
 export interface AddConsulteeViewModel {
 	/** "Add a consultee" - the heading above the name input and reason form. */
 	pageHeading: string;
-	/** The category being added to - the caption above the heading. */
+	/** The category being added to - the caption above the heading, spelled out for Nearby NSIPs. */
 	pageCaption: string;
 	/** Back to the category page, keeping the current selection. */
 	backLinkUrl: string;
@@ -23,7 +23,12 @@ export interface AddConsulteeViewModel {
 	 * apart, "Middleton (Lancaster)".
 	 */
 	nearbySuggestions: { name: string; hint: string }[];
-	/** The name input's hint - absent for a consultee category with nothing to suggest. */
+	/**
+	 * For a consultee category, where the autocomplete asks for more suggestions as a name is typed -
+	 * the rest of the category's reference data (see buildReportConsulteeAddSuggestions).
+	 */
+	suggestionsUrl?: string;
+	/** The name input's hint. */
 	nameHint?: { text: string };
 	/** The form's entered values and errors - errors only after a failed submit. */
 	addForm: AddConsulteeForm;

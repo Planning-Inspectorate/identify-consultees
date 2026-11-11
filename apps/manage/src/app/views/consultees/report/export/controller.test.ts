@@ -41,7 +41,7 @@ function matchRow(
 ): ConsulteeAreaMatchRow {
 	return {
 		id,
-		consulteeCategory: 'Parish Council',
+		consulteeCategory: 'Parish, town and community councils',
 		consultee: `Parish ${id.slice(-1)}`,
 		region: 'East',
 		...(geometryWkt ? { geometryWkt } : {}),
@@ -78,7 +78,7 @@ function serviceWith(
 					where.id.in.map((id) => ({
 						id: id.toUpperCase(),
 						geometryType: 'Point',
-						consulteeCategory: 'Parish Council',
+						consulteeCategory: 'Parish, town and community councils',
 						consultee: `Parish ${id}`,
 						region: 'East',
 						metadata: '{}',
@@ -109,8 +109,18 @@ function zipOf(res: ReturnType<typeof response>) {
 	return unzipSync(new Uint8Array(res.send.mock.calls[0].arguments[0] as unknown as Buffer));
 }
 
-const removal = JSON.stringify({ i: removedParish, c: 'Parish Council', n: 'Parish 2', r: 'Dissolved' });
-const pickedAdd = JSON.stringify({ i: pickedParish, c: 'Parish Council', n: 'Parish 3', r: 'Borders the site' });
+const removal = JSON.stringify({
+	i: removedParish,
+	c: 'Parish, town and community councils',
+	n: 'Parish 2',
+	r: 'Dissolved'
+});
+const pickedAdd = JSON.stringify({
+	i: pickedParish,
+	c: 'Parish, town and community councils',
+	n: 'Parish 3',
+	r: 'Borders the site'
+});
 const typedAdd = JSON.stringify({ c: 'Landowner', n: 'Typed Landowner', r: 'Owns the access road' });
 
 describe('report download', () => {
@@ -155,7 +165,10 @@ describe('report download', () => {
 		);
 		const files = zipOf(res);
 		const names = Object.keys(files);
-		assert.deepStrictEqual(names.slice(1), ['maps/01 Parish Council.pdf', 'maps/02 Landowner.pdf']);
+		assert.deepStrictEqual(names.slice(1), [
+			'maps/01 Parish, town and community councils.pdf',
+			'maps/02 Landowner.pdf'
+		]);
 		assert.match(names[0], /^EN010099 England and Wales \(Post 30 April 2024\) consultees \d{4}-\d{2}-\d{2}\.xlsx$/);
 		// the workbook lists the picked parish, manually added, with the reason given - and none of
 		// the columns the report leaves out
@@ -168,8 +181,8 @@ describe('report download', () => {
 		assert.ok(sheets.includes('Manually added'));
 		assert.ok(!sheets.includes(pickedParish) && !sheets.includes('Consultee area id'));
 
-		const parish = pdfTextLines(Buffer.from(files['maps/01 Parish Council.pdf']));
-		assert.ok(parish.includes('Parish Council: 2 in the report'));
+		const parish = pdfTextLines(Buffer.from(files['maps/01 Parish, town and community councils.pdf']));
+		assert.ok(parish.includes('Parish, town and community councils: 2 in the report'));
 		assert.ok(parish.includes('Parish 1'));
 		assert.ok(parish.includes('Parish 3'));
 		assert.ok(parish.includes('Borders the site'));
@@ -263,7 +276,7 @@ describe('report download', () => {
 		]);
 		const files = zipOf(res);
 		const names = Object.keys(files);
-		assert.deepStrictEqual(names.slice(1), ['maps/01 Parish Council.pdf', 'maps/02 NSIPs.pdf']);
+		assert.deepStrictEqual(names.slice(1), ['maps/01 Parish, town and community councils.pdf', 'maps/02 NSIPs.pdf']);
 		const workbook = unzipSync(files[names[0]]);
 		const xml = Object.entries(workbook)
 			.filter(([name]) => name.startsWith('xl/'))
@@ -304,7 +317,7 @@ describe('report download', () => {
 		await buildReportDownload(service as never)(request, res as never);
 
 		assert.equal(runner.mock.callCount(), 1);
-		const parish = pdfTextLines(Buffer.from(zipOf(res)['maps/01 Parish Council.pdf']));
+		const parish = pdfTextLines(Buffer.from(zipOf(res)['maps/01 Parish, town and community councils.pdf']));
 		assert.ok(parish.includes('The consultee areas could not be drawn on this map. They are listed on the next page.'));
 	});
 

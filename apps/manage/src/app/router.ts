@@ -5,9 +5,9 @@ import { cacheNoCacheMiddleware } from '@planning-inspectorate/core/middleware';
 import type { IRouter, RequestHandler } from 'express';
 import { Router as createRouter } from 'express';
 import rateLimit from 'express-rate-limit';
-import { buildAdminHeaderLink } from './admin/access.ts';
 import { createAdminRoutes } from './admin/index.ts';
 import { buildSanitisingErrorHandler } from './error-handler.ts';
+import { createOsMapRoutes, osMapsApiKeyFromEnv } from './maps/os-maps.ts';
 import { createDefraVendorRouter } from './maps/vendor.ts';
 import { createRoutes as createConsulteeRoutes } from './views/consultees/index.ts';
 import { createFooterRoutes } from './views/footer/index.ts';
@@ -101,8 +101,11 @@ export function buildRouter(service: ManageService, options: BuildRouterOptions 
 		});
 	}
 
-	// the header's Admin link, for those who may use the admin section - see admin/access.ts
-	router.use(buildAdminHeaderLink(service));
+	// the interactive maps' OS basemap, through this app so the key stays here - only with a key
+	const osMapsApiKey = osMapsApiKeyFromEnv();
+	if (osMapsApiKey) {
+		router.use('/maps/os', createOsMapRoutes(osMapsApiKey));
+	}
 	router.use('/', homeRoutes);
 	router.use('/consultees', consulteeRoutes);
 	// the user guide - behind sign-in, as it describes how rulesets are changed

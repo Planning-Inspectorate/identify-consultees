@@ -12,6 +12,8 @@ import { REPORT_CONFIG } from '../report-config.ts';
 import { isNearbyNsip } from '../views/consultees/nearby-nsips.ts';
 import { assignCategoryColours, colourFor, CONSULTEE_CATEGORY_COLOURS, UNCATEGORISED } from './category-colours.ts';
 import { computeBounds, computeFittedMapView } from './geometry-bounds.ts';
+import type { InteractiveBasemap } from './os-maps.ts';
+import { interactiveBasemap } from './os-maps.ts';
 import type { GeoJsonFeature, GeoJsonFeatureCollection } from './sample-geojson.ts';
 import { MAP_VIEWPORT } from './sample-geojson.ts';
 
@@ -227,6 +229,8 @@ export interface CaseMapConfig {
 	 * data-* attributes on the map container are JSON.parsed by the InteractiveMap constructor.
 	 */
 	fallback?: StaticMapFallbackConfig;
+	/** OS's basemap, when there's a key - see os-maps.ts. OpenFreeMap's without. */
+	interactiveBasemap?: InteractiveBasemap;
 }
 
 // regional areas (police force, ambulance trust, county) cover most of the search area, and a dozen
@@ -329,6 +333,7 @@ export function buildCaseMapConfig(
 		consulteeLayerLabel: rulesetName,
 		projectGeojson,
 		consulteeGeojson,
-		...(fallback ? { fallback: { ...fallback, width: MAP_VIEWPORT.width, height: MAP_VIEWPORT.height } } : {})
+		...(fallback ? { fallback: { ...fallback, width: MAP_VIEWPORT.width, height: MAP_VIEWPORT.height } } : {}),
+		...interactiveBasemap({ center: view.center, zoom: view.zoom, ...MAP_VIEWPORT })
 	};
 }

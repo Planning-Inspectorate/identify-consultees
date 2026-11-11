@@ -58,7 +58,9 @@ describe('ruleset picker page', () => {
 	});
 
 	it('should go back to the check page as it was when changing its ruleset, and post back to say so', async () => {
-		const exclude = urlParam('{"i":"m1","c":"Parish Council","n":"Abbey Parish","r":"Not affected"}');
+		const exclude = urlParam(
+			'{"i":"m1","c":"Parish, town and community councils","n":"Abbey Parish","r":"Not affected"}'
+		);
 		const render = async (query: Record<string, unknown>) => {
 			const mockRes = { status: mock.fn(() => mockRes), render: mock.fn() };
 			await buildRulesetPickerPage({ db: summaryDb() })({ params: { caseId: realProjectId }, query }, mockRes);
@@ -115,7 +117,7 @@ describe('ruleset picker page', () => {
 			render: mock.fn()
 		};
 		const handler = buildRulesetPickerPage({ db: summaryDb() });
-		const add = JSON.stringify({ c: 'Parish Council', n: 'Test Consultee', r: 'Adjacent' });
+		const add = JSON.stringify({ c: 'Parish, town and community councils', n: 'Test Consultee', r: 'Adjacent' });
 		await handler(
 			{
 				params: { caseId: realProjectId },
@@ -183,7 +185,7 @@ describe('ruleset picker submit', () => {
 			redirect: mock.fn()
 		};
 		const handler = buildRulesetPickerSubmit({ db: summaryDb() });
-		const add = JSON.stringify({ c: 'Parish Council', n: 'Test Consultee', r: 'Adjacent' });
+		const add = JSON.stringify({ c: 'Parish, town and community councils', n: 'Test Consultee', r: 'Adjacent' });
 		await handler(
 			{
 				params: { caseId: realProjectId },

@@ -61,7 +61,7 @@ sql_config = {
     login_username = "pins-consultees-sql-prod"
     object_id      = "c6573a18-8982-43b2-b389-f9ef35d64b72"
   }
-  sku_name    = "S0"
+  sku_name    = "S2"
   max_size_gb = 100
   retention = {
     audit_days             = 90
@@ -91,6 +91,3 @@ waf_rate_limits = {
 web_domains = {
   web = "identify-consultees.planninginspectorate.gov.uk"
 }
-
-# the admin files page copies the reference data files from here (the Promote reference data pipeline)
-reference_data_copy_from = "Training"

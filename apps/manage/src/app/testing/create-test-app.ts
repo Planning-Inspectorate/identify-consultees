@@ -29,6 +29,7 @@ export function buildManageTestConfig(authDisabled = true, overrides: Partial<Co
 		blobStore: undefined,
 		nearbyConsulteeRadiusMetres: 20_000,
 		cbosImportHours: [],
+		referenceDataChanges: true,
 		nearbyNsipRadiusMetres: 10_000,
 		auth: {
 			authority: 'https://login.microsoftonline.com/tenant-id',

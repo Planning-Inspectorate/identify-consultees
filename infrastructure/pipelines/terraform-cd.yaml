@@ -44,3 +44,11 @@ extends:
     containerPrefix: terraform-state-consultees-
     workingDirectory: $(Build.Repository.LocalPath)/infrastructure
     environmentVarFilePath: $(Build.Repository.LocalPath)/infrastructure/environments
+    # the OS Maps API key, held once for every environment: the Library variable group
+    # consultees-os-maps's secret OS_MAPS_API_KEY, which Terraform writes to each Key Vault (see
+    # infrastructure/app-web.tf). A secret variable only reaches a step mapped like this
+    extraVariables:
+      - group: consultees-os-maps
+    extraEnvironmentVariables:
+      - name: TF_VAR_os_maps_api_key
+        value: $(OS_MAPS_API_KEY)

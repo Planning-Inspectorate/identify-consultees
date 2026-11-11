@@ -72,6 +72,25 @@ export function parseGroupBlobName(
 	return isRealDate(dataDate) ? { group, dataDate } : undefined;
 }
 
+/**
+ * Each group's newest file - by the date its data is from - by slug: what a load takes, and what
+ * a promotion copies on. Files not named as a group's are left out.
+ */
+export function latestGroupFiles<T extends { name: string }>(
+	files: T[],
+	config: ReferenceDataConfig = REFERENCE_DATA_CONFIG
+): Map<string, T & { dataDate: string }> {
+	const latest = new Map<string, T & { dataDate: string }>();
+	for (const file of files) {
+		const parsed = parseGroupBlobName(file.name, config);
+		const current = parsed ? latest.get(parsed.group.slug) : undefined;
+		if (parsed && (!current || parsed.dataDate > current.dataDate)) {
+			latest.set(parsed.group.slug, { ...file, dataDate: parsed.dataDate });
+		}
+	}
+	return latest;
+}
+
 /** The quarter a date (YYYY-MM-DD) is in, as the tables name it: 2026-10-20 → 2026Q4. */
 export function quarterOf(dataDate: string): string {
 	return `${dataDate.slice(0, 4)}Q${Math.ceil(Number(dataDate.slice(5, 7)) / 3)}`;
