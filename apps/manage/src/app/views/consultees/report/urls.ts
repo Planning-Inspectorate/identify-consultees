@@ -6,6 +6,8 @@
  * counts, the category page's rows and the maps drawn from the same URL always agree.
  */
 
+import { deflateRawSync, inflateRawSync } from 'node:zlib';
+
 // Front Door's firewall (the managed rule set in infrastructure/front-door.tf) scores plain JSON in
 // a query string as an injection attempt - its quotes, colons and words add up past the block
 // threshold, and the request never reaches the app. So each entry travels base64url-encoded
@@ -161,25 +163,101 @@ export interface ConsulteeSelection {
 	adds: readonly AddedConsultee[];
 }
 
-/** The selection a report-page request's query params carry (`?exclude=` and `?add=`). */
+/**
+ * A long selection's single param: `selection=`, the removals and adds as one JSON object
+ * (`{"x":[[id,category,name,reason],...],"a":[...]}`), deflated and base64url-encoded. An entry a
+ * param each is about 200 characters, so a big scheme's 30 removals made a 6KB URL - past which
+ * Front Door and Node refuse it. Deflated, the repeated categories and keys shrink: 100 removals
+ * come to about 4KB. Short selections keep a param an entry (appendSelection), which read better.
+ */
+const COMPACT_PARAM = 'selection';
+// the per-entry params' length past which a URL carries the compact param instead
+const COMPACT_ABOVE = 1_500;
+// a compact param inflates to no more than this - a crafted one can't make the app inflate gigabytes
+const MAX_INFLATED_BYTES = 1_000_000;
+
+/**
+ * The longest report URL the add and remove forms will make: Front Door refuses a URL past 8KB, and
+ * the static map's and download's links carry the selection too. A change that would pass it is
+ * refused on its form (fitsInReportUrl) rather than leading to a page that can't load.
+ */
+export const MAX_REPORT_URL_LENGTH = 7_000;
+
+/** What the add and remove forms say when the change wouldn't fit (fitsInReportUrl). */
+export const TOO_MANY_CHANGES =
+	"This report can't keep any more changes - shorten the reason, or create the report with the changes made so far";
+
+/** Whether a report URL is short enough to use - see MAX_REPORT_URL_LENGTH. */
+export function fitsInReportUrl(url: string): boolean {
+	return url.length <= MAX_REPORT_URL_LENGTH;
+}
+
+const entryFields = (entry: SelectionEntry): string[] => [entry.id ?? '', entry.category, entry.name, entry.reason];
+
+function encodeCompactSelection(selection: ConsulteeSelection): string {
+	const json = JSON.stringify({ x: selection.removed.map(entryFields), a: selection.adds.map(entryFields) });
+	return deflateRawSync(json, { level: 9 }).toString('base64url');
+}
+
+/** One compact entry, as its param-per-entry form reads: a removal may be a bare id. */
+function compactEntry(fields: unknown, bareIdAllowed: boolean): SelectionEntry | undefined {
+	if (!Array.isArray(fields) || !fields.every((field) => typeof field === 'string')) {
+		return undefined;
+	}
+	const [id, category, name, reason = ''] = fields as string[];
+	if (category && name) {
+		return { ...(id ? { id } : {}), category, name, reason };
+	}
+	return bareIdAllowed && id && !name ? { id, category: '', name: '', reason: '' } : undefined;
+}
+
+/** A compact `selection=` param's removals and adds - none when it can't be read. */
+function decodeCompactSelection(raw: unknown): ConsulteeSelection {
+	const [value] = queryValues(raw);
+	if (!value) {
+		return NO_SELECTION;
+	}
+	try {
+		const json = inflateRawSync(Buffer.from(value, 'base64url'), { maxOutputLength: MAX_INFLATED_BYTES });
+		const { x, a } = JSON.parse(json.toString('utf8')) as { x?: unknown; a?: unknown };
+		const entries = (list: unknown, bareIdAllowed: boolean) =>
+			Array.isArray(list) ? list.flatMap((fields) => compactEntry(fields, bareIdAllowed) ?? []) : [];
+		return { removed: entries(x, true), adds: entries(a, false) };
+	} catch {
+		return NO_SELECTION;
+	}
+}
+
+/**
+ * The selection a report-page request's query params carry: the compact `selection=` param, and
+ * `exclude=` and `add=` a param an entry - a link may have either, from before or after the change.
+ */
 export function consulteeSelection(query?: Record<string, unknown>): ConsulteeSelection {
-	return { removed: removedConsultees(query?.exclude), adds: addedConsultees(query?.add) };
+	const compact = decodeCompactSelection(query?.[COMPACT_PARAM]);
+	return {
+		removed: [...compact.removed, ...removedConsultees(query?.exclude)],
+		adds: [...compact.adds, ...addedConsultees(query?.add)]
+	};
 }
 
 /** No removals and no additions - the selection the map page's links carry. */
 const NO_SELECTION: ConsulteeSelection = { removed: [], adds: [] };
 
 function appendSelection(url: string, selection: ConsulteeSelection): string {
-	// the picker URL only carries a query string once a ruleset is chosen, so the first param
-	// may need to open it
-	const separator = () => (url.includes('?') ? '&' : '?');
-	for (const removal of selection.removed) {
-		url += `${separator()}exclude=${encodeURIComponent(encodeEntry(removal))}`;
+	const params = [
+		...selection.removed.map((removal) => `exclude=${encodeURIComponent(encodeEntry(removal))}`),
+		...selection.adds.map((add) => `add=${encodeURIComponent(encodeEntry(add))}`)
+	];
+	if (params.length === 0) {
+		return url;
 	}
-	for (const add of selection.adds) {
-		url += `${separator()}add=${encodeURIComponent(encodeEntry(add))}`;
-	}
-	return url;
+	const query = params.join('&');
+	// the picker URL only carries a query string once a ruleset is chosen, so the param may need
+	// to open it
+	const separator = url.includes('?') ? '&' : '?';
+	return query.length > COMPACT_ABOVE
+		? `${url}${separator}${COMPACT_PARAM}=${encodeCompactSelection(selection)}`
+		: `${url}${separator}${query}`;
 }
 
 /** A report page's URL: the case's page at `path`, its ruleset, any `params`, then the selection. */

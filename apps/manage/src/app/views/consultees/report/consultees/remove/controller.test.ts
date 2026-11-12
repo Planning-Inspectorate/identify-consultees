@@ -1,5 +1,6 @@
 import { mockLogger } from '@planning-inspectorate/core/testing';
 import assert from 'node:assert';
+import { randomBytes } from 'node:crypto';
 import { describe, it, mock } from 'node:test';
 import { configureNunjucks } from '../../../../../nunjucks.ts';
 import type { ConsulteeAreaMatchRow } from '../../../../../testing/ruleset-runner-stub.ts';
@@ -265,6 +266,23 @@ describe('report consultee remove page', () => {
 });
 
 describe('report consultee remove submit', () => {
+	it("refuses a removal that would make the report's link too long, on its form", async () => {
+		const nunjucks = configureNunjucks();
+		const mockRes = {
+			status: mock.fn(() => mockRes),
+			render: mock.fn((view, data) => nunjucks.render(view, data)),
+			redirect: mock.fn()
+		};
+		// random text, which no compression shrinks
+		const reason = randomBytes(6_000).toString('base64');
+		await removeSubmit(dbReturning([[realProjectRow()]], [parishMatchRow()]))(request({ body: { reason } }), mockRes);
+
+		assert.strictEqual(mockRes.redirect.mock.callCount(), 0);
+		const viewModel = mockRes.render.mock.calls[0].arguments[1];
+		assert.match(viewModel.reasonError.text, /This report can't keep any more changes/);
+		assert.strictEqual(viewModel.reasonValue, reason);
+	});
+
 	const request = (overrides: Record<string, unknown> = {}) => ({
 		params: { caseId: realProjectId },
 		query: { ...parishQuery, match: matchId },
