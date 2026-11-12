@@ -402,6 +402,89 @@ describe('consultee areas (requires a local SQL Server - see docker-compose.yml)
 		}
 	});
 
+	test('keeps a representative point on each area, which suggestions are ranked by - their distances are exact', async (t) => {
+		if (!dbAvailable) return t.skip('SQL Server database not available');
+
+		await cleanup();
+		try {
+			// out in the Atlantic: a U whose envelope centre falls in its notch, off the area
+			const u = {
+				type: 'Polygon' as const,
+				coordinates: [
+					[
+						[-30, 50],
+						[-29.9, 50],
+						[-29.9, 50.1],
+						[-29.93, 50.1],
+						[-29.93, 50.03],
+						[-29.97, 50.03],
+						[-29.97, 50.1],
+						[-30, 50.1],
+						[-30, 50]
+					]
+				]
+			};
+			const square = {
+				...u,
+				coordinates: [
+					[
+						[-31, 50],
+						[-30.99, 50],
+						[-30.99, 50.01],
+						[-31, 50.01],
+						[-31, 50]
+					]
+				]
+			};
+			const category = 'Parish, town and community councils';
+			await loadConsulteeAreas(dbClient, {
+				type: 'FeatureCollection',
+				features: [
+					{
+						id: testAreaId,
+						type: 'Feature',
+						geometry: u,
+						properties: { consulteeCategory: category, consultee: 'Pointtest Bay' }
+					},
+					{
+						id: secondAreaId,
+						type: 'Feature',
+						geometry: square,
+						properties: { consulteeCategory: category, consultee: 'Pointtest Square' }
+					}
+				]
+			});
+
+			const [onArea] = await dbClient.$queryRaw<{ pointOnArea: boolean; centreOnArea: boolean }[]>`
+				SELECT CAST(representativePoint.STIntersects(geometrySimplified) AS BIT) AS pointOnArea,
+					CAST(geometrySimplified.STIntersects(geometrySimplified.EnvelopeCenter()) AS BIT) AS centreOnArea
+				FROM consultee_area WHERE id = ${testAreaId}`;
+			assert.deepEqual(onArea, { pointOnArea: true, centreOnArea: false });
+
+			// an area without one is still suggested, ranked by its envelope centre
+			await dbClient.$executeRaw`UPDATE consultee_area SET representativePoint = NULL WHERE id = ${secondAreaId}`;
+
+			// a site in the U's notch: 0.02° of longitude from either arm
+			const site = { type: 'Point' as const, coordinates: [-29.95, 50.06] };
+			const found = await findConsulteeAreasByNameStart(dbClient, category, 'pointtest', site);
+			assert.deepEqual(
+				found.map(({ id }) => id),
+				[testAreaId, secondAreaId]
+			);
+			const exact = await dbClient.$queryRaw<{ id: string; metres: number }[]>`
+				SELECT LOWER(CAST(id AS NVARCHAR(36))) AS id,
+					geometrySimplified.STDistance(geography::Point(50.06, -29.95, 4326)) AS metres
+				FROM consultee_area WHERE id IN (${testAreaId}, ${secondAreaId})`;
+			for (const area of found) {
+				const metres = exact.find(({ id }) => id === area.id)!.metres;
+				assert.ok(Math.abs(area.distanceMetres - metres) < 1, `${area.id}: ${area.distanceMetres} vs ${metres}`);
+			}
+			assert.ok(found[0].distanceMetres > 1_000 && found[0].distanceMetres < 2_000);
+		} finally {
+			await cleanup();
+		}
+	});
+
 	test("gives each consultee's details, and a parish the council area it's in", async (t) => {
 		if (!dbAvailable) return t.skip('SQL Server database not available');
 

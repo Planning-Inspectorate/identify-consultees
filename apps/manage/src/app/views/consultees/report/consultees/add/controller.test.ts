@@ -183,8 +183,8 @@ function dbReturning(rows: unknown[][], otherCases: unknown[] = OTHER_CASES) {
 			}
 			// the names starting with what's typed - those called exactly that first
 			if (text.includes(' LIKE ')) {
-				// the limit and the site come first
-				const [category, , typed] = (values as string[]).slice(-3);
+				// the site, the limit, the name typed, the category, then the LIKE pattern
+				const [, , typed, category] = values as string[];
 				return STORED.filter(
 					(row) => row.consulteeCategory === category && row.consultee.toLowerCase().startsWith(typed.toLowerCase())
 				)
