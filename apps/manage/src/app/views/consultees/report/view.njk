@@ -123,10 +123,11 @@
 				rows: consulteeRows
 			}) }}
 		{% endfor %}
+
+		{{ govukButton({
+			text: "Create report",
+			href: generateReportUrl
+		}) }}
 	{% endif %}
 
-	{{ govukButton({
-		text: "Create report",
-		href: generateReportUrl
-	}) }}
 {% endblock %}
