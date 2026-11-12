@@ -676,4 +676,21 @@ describe('manage router wiring', () => {
 			await service.db.$disconnect().catch(() => undefined);
 		}
 	});
+
+	test("gives each client behind Front Door its own limit, not the edge's", async () => {
+		const service = new ManageService(buildManageTestConfig(false));
+		const app = createManageTestApp(service, {
+			authRateLimiter: buildAuthRateLimiter({ limit: 1, windowMs: 60_000 })
+		});
+		const from = (address: string) => request(app).get('/auth/signin').set('X-Azure-ClientIP', address);
+
+		try {
+			assert.notEqual((await from('203.0.113.7')).status, 429);
+			assert.equal((await from('203.0.113.7')).status, 429);
+			// another client through the same edge - the same socket address here - isn't blocked
+			assert.notEqual((await from('203.0.113.8')).status, 429);
+		} finally {
+			await service.db.$disconnect().catch(() => undefined);
+		}
+	});
 });

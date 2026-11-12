@@ -4,6 +4,7 @@ import rateLimit from 'express-rate-limit';
 import { createReadStream, existsSync, readdirSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { pipeline } from 'node:stream/promises';
+import { clientAddressKey } from './client-address.ts';
 import { isFingerprintedAssetPath } from './fingerprint-assets.ts';
 
 export const FINGERPRINTED_CACHE_CONTROL = 'public, max-age=31536000, immutable';
@@ -104,6 +105,8 @@ export function buildStaticAssetsRateLimiter(options: StaticAssetsRateLimiterOpt
 		limit: options.limit ?? 1000,
 		standardHeaders: 'draft-8',
 		legacyHeaders: false,
+		// each client its own limit, not each Front Door edge's (see clientAddressKey)
+		keyGenerator: clientAddressKey,
 		validate: { xForwardedForHeader: false }
 	});
 }
