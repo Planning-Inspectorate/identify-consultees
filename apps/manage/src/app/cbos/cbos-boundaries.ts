@@ -82,6 +82,10 @@ export interface CbosImportResult {
 	casesImported: number;
 	/** How many were already saved at their version, so weren't fetched - with `onlyNewOrChanged`. */
 	unchanged?: number;
+	/** How many boundaries saved from CBOS were removed because CBOS no longer lists them. */
+	removed: number;
+	/** Why none were removed, when CBOS stopped listing too many at once to trust (see removeUnlisted). */
+	removalSkipped?: string;
 	failures: CbosImportFailure[];
 }
 
@@ -98,6 +102,10 @@ const FETCH_CONCURRENCY = 4;
 const BATCH_POINTS = 100_000;
 // well under SQL Server's 2,100 parameters a query
 const LOOKUP_BATCH_SIZE = 1000;
+// the share of the boundaries saved from CBOS that an import of every case may remove at once.
+// Past it, it's more likely CBOS's list has gone wrong - a folder renamed, a permission lost - than
+// that so many boundaries were deleted, so it removes none and says so
+const MAX_REMOVED_SHARE = 0.5;
 
 function functionUrl(pythonFunctionUrl: string, path: string): string {
 	// PYTHON_FUNCTION_URL names the consultee-areas route, so CBOS routes are its siblings under
@@ -335,7 +343,7 @@ async function savedUnchanged(db: PrismaClient, files: CbosBoundaryFile[]): Prom
 	return unchanged;
 }
 
-function parseMetadata(metadata: string): { cbosDocumentGuid?: unknown; cbosVersion?: unknown } {
+function parseMetadata(metadata: string): { source?: unknown; cbosDocumentGuid?: unknown; cbosVersion?: unknown } {
 	try {
 		return JSON.parse(metadata) ?? {};
 	} catch {
@@ -364,6 +372,63 @@ export function importDb(service: Pick<ManageService, 'db'> & Partial<Pick<Manag
 	return service.bulkDb ?? service.db;
 }
 
+/** The CBOS file a listed file's row holds - `documentGuid:version`. */
+const fileKey = (guid: unknown, version: unknown) => `${String(guid).toLowerCase()}:${String(version)}`;
+
+/**
+ * Removes the boundaries saved from CBOS that CBOS no longer lists - a file, or one of its versions,
+ * deleted there - so case_boundary follows CBOS. Only rows saved from CBOS (`metadata.source` "cbos")
+ * are looked at, and only `options.caseReference`'s when the import is of one case: a boundary
+ * loaded from a file stays. A row stays while a listed file is saved to it: the one its name gives
+ * it, one fetched this time, or - for a file without a name, whose row is named from its GeoJSON -
+ * the CBOS document and version it holds. An import of every case removes none when that would be
+ * more than half of them (MAX_REMOVED_SHARE).
+ */
+async function removeUnlisted(
+	db: PrismaClient,
+	options: CbosImportOptions,
+	listed: CbosBoundaryFile[],
+	fetchedIds: Set<string>
+): Promise<Pick<CbosImportResult, 'removed' | 'removalSkipped'>> {
+	const keepIds = new Set([
+		...listed.flatMap((file) => (file.fileName ? [boundaryId({ ...file, fileName: file.fileName })] : [])),
+		...fetchedIds
+	]);
+	const keepUnnamed = new Set(
+		listed.filter((file) => !file.fileName).map((file) => fileKey(file.documentGuid, file.version))
+	);
+	const rows = await db.caseBoundary.findMany({
+		where: {
+			metadata: { contains: '"source":"cbos"' },
+			...(options.caseReference ? { caseReference: options.caseReference } : {})
+		},
+		select: { id: true, metadata: true }
+	});
+	const saved = rows.flatMap((row) => {
+		const metadata = parseMetadata(row.metadata);
+		return metadata.source === 'cbos' ? [{ id: row.id, metadata }] : [];
+	});
+	const gone = saved
+		.filter(
+			({ id, metadata }) =>
+				!keepIds.has(id.toLowerCase()) && !keepUnnamed.has(fileKey(metadata.cbosDocumentGuid, metadata.cbosVersion))
+		)
+		.map(({ id }) => id);
+	if (gone.length === 0) {
+		return { removed: 0 };
+	}
+	if (!options.caseReference && gone.length > saved.length * MAX_REMOVED_SHARE) {
+		return {
+			removed: 0,
+			removalSkipped: `CBOS no longer lists ${gone.length} of the ${saved.length} boundaries saved from it - more than half, so none were removed`
+		};
+	}
+	for (let i = 0; i < gone.length; i += LOOKUP_BATCH_SIZE) {
+		await db.caseBoundary.deleteMany({ where: { id: { in: gone.slice(i, i + LOOKUP_BATCH_SIZE) } } });
+	}
+	return { removed: gone.length };
+}
+
 export interface CbosImportDependencies {
 	listFiles: typeof listCbosBoundaryFiles;
 	fetchGeoJson: typeof fetchCbosBoundaryGeoJson;
@@ -378,11 +443,12 @@ const DEFAULT_DEPENDENCIES: CbosImportDependencies = {
 
 /**
  * Save every CBOS boundary file - every version of each, of every case or of `options.caseReference`'s
- * - to case_boundary. It merges: rows are upserted by id and nothing is
- * deleted, so boundaries loaded from elsewhere stay. A file that can't be fetched, read or saved
- * is reported and skipped rather than failing the rest; failing to list the files rejects. Run it
- * on the bulk client (ManageService.bulkDb): one very large boundary can take longer to save than
- * the app's request timeout allows.
+ * - to case_boundary, then remove the boundaries saved from CBOS that it no longer lists
+ * (removeUnlisted). Rows are upserted by id, and boundaries loaded from elsewhere stay. A file that
+ * can't be fetched, read or saved is reported and skipped rather than failing the rest, and its row
+ * is kept; failing to list the files rejects, before anything is saved or removed. Run it on the
+ * bulk client (ManageService.bulkDb): one very large boundary can take longer to save than the
+ * app's request timeout allows.
  * With `options.onlyNewOrChanged`, files already saved at their version aren't fetched again.
  */
 export async function importCaseBoundariesFromCbos(
@@ -399,6 +465,7 @@ export async function importCaseBoundariesFromCbos(
 	}
 	const failures: CbosImportFailure[] = [];
 	const casesSaved = new Set<string>();
+	const fetchedIds = new Set<string>();
 	let imported = 0;
 
 	// saved a batch at a time as the files arrive, each batch up to BATCH_POINTS points, one at a
@@ -437,6 +504,7 @@ export async function importCaseBoundariesFromCbos(
 			const file = files[next++];
 			try {
 				const boundary = toCaseBoundaryFromCbos(file, await dependencies.fetchGeoJson(options, file));
+				fetchedIds.add(boundary.id.toLowerCase());
 				pending.push({ file, boundary });
 				pendingPoints += positions(boundary.geometry).length;
 			} catch (error) {
@@ -454,6 +522,7 @@ export async function importCaseBoundariesFromCbos(
 		await flush();
 	}
 	await saving;
+	const removal = await removeUnlisted(db, options, listed, fetchedIds);
 
 	const casesImported = casesSaved.size;
 	return {
@@ -461,6 +530,7 @@ export async function importCaseBoundariesFromCbos(
 		imported,
 		casesImported,
 		...(options.onlyNewOrChanged ? { unchanged: unchanged.size } : {}),
+		...removal,
 		failures
 	};
 }

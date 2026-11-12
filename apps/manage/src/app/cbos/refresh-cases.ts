@@ -36,10 +36,14 @@ export function createCbosCaseRefresh(
 					filesFound: result.filesFound,
 					unchanged: result.unchanged,
 					imported: result.imported,
-					casesImported: result.casesImported
+					casesImported: result.casesImported,
+					removed: result.removed
 				},
 				'Refreshed cases from CBOS'
 			);
+			if (result.removalSkipped) {
+				logger.warn({ reason: result.removalSkipped }, 'CBOS import removed no boundaries');
+			}
 			if (result.failures.length > 0) {
 				logger.warn({ failures: result.failures }, 'Some CBOS boundary files could not be imported');
 			}

@@ -270,7 +270,10 @@ describe('CBOS boundaries', () => {
 	});
 
 	describe('importCaseBoundariesFromCbos', () => {
-		const db = {} as Parameters<typeof importCaseBoundariesFromCbos>[0];
+		// nothing saved from CBOS yet, so nothing to remove
+		const db = {
+			caseBoundary: { findMany: async () => [], deleteMany: async () => ({ count: 0 }) }
+		} as unknown as Parameters<typeof importCaseBoundariesFromCbos>[0];
 
 		it('saves every file it can read and reports the rest', async () => {
 			const files = [
@@ -293,6 +296,7 @@ describe('CBOS boundaries', () => {
 				filesFound: 3,
 				imported: 1,
 				casesImported: 1,
+				removed: 0,
 				failures: [
 					{ caseReference: 'EN010001', fileName: 'broken.geojson', reason: 'status 500' },
 					{ caseReference: 'EN010001', fileName: 'empty.geojson', reason: 'the GeoJSON has no geometry' }
@@ -412,7 +416,8 @@ describe('CBOS boundaries', () => {
 			const dbWith = (rows: object[]) => ({
 				caseBoundary: {
 					findMany: mock.fn(async () => rows),
-					update: mock.fn(async () => ({}))
+					update: mock.fn(async () => ({})),
+					deleteMany: mock.fn(async () => ({ count: 0 }))
 				}
 			});
 
@@ -442,7 +447,14 @@ describe('CBOS boundaries', () => {
 					),
 					['changed', 'new', 'unnamed']
 				);
-				assert.deepStrictEqual(result, { filesFound: 4, imported: 3, casesImported: 1, unchanged: 1, failures: [] });
+				assert.deepStrictEqual(result, {
+					filesFound: 4,
+					imported: 3,
+					casesImported: 1,
+					unchanged: 1,
+					removed: 0,
+					failures: []
+				});
 				const [query] = fakeDb.caseBoundary.findMany.mock.calls[0].arguments as unknown as [
 					{ where: { id: { in: string[] } } }
 				];
@@ -519,9 +531,114 @@ describe('CBOS boundaries', () => {
 			});
 		});
 
-		it('rejects when the files cannot be listed', async () => {
+		describe('removing what CBOS no longer lists', () => {
+			const idFor = (fileName: string, caseReference = FILE.caseReference) =>
+				deterministicId(`case-boundary:${caseReference}:${fileName}`);
+			const fromCbos = (id: string, guid: string, version: number) => ({
+				id,
+				metadata: JSON.stringify({ source: 'cbos', cbosDocumentGuid: guid, cbosVersion: version })
+			});
+			const dbWith = (rows: object[]) => ({
+				caseBoundary: {
+					findMany: mock.fn(async () => rows),
+					deleteMany: mock.fn(async (args: { where: { id: { in: string[] } } }) => ({ count: args.where.id.in.length }))
+				}
+			});
+			const run = (fakeDb: ReturnType<typeof dbWith>, files: CbosBoundaryFile[], options: object = OPTIONS) =>
+				importCaseBoundariesFromCbos(fakeDb as never, options as never, {
+					listFiles: async () => files,
+					fetchGeoJson: async () => collection({ geometry: SQUARE }),
+					load: (async (_db: unknown, features: { features: unknown[] }) => features.features.length) as never
+				});
+			const deleted = (fakeDb: ReturnType<typeof dbWith>) =>
+				fakeDb.caseBoundary.deleteMany.mock.calls.flatMap((call) => call.arguments[0].where.id.in);
+
+			it('removes the boundaries saved from CBOS that it no longer lists, and keeps everything else', async () => {
+				const fakeDb = dbWith([
+					// still listed: by its name, and an unnamed one by its CBOS document and version
+					fromCbos(idFor('site.geojson').toUpperCase(), FILE.documentGuid, FILE.version),
+					fromCbos('unnamed-row', 'unnamed', 1),
+					// deleted in CBOS
+					fromCbos(idFor('old.geojson'), 'deleted', 1),
+					// no longer saved here: version 2 had its own row until version 4 was deleted
+					fromCbos(idFor('site.geojson (version 2)'), FILE.documentGuid, 2),
+					// loaded from a file, or with details that can't be read
+					{ id: 'from-a-file', metadata: '{}' },
+					{ id: 'unreadable', metadata: 'not json' },
+					{ id: 'named-cbos-elsewhere', metadata: JSON.stringify({ note: '"source":"cbos"' }) },
+					// and two more, so the two removed are under half
+					fromCbos(idFor('a.geojson'), 'a', 1),
+					fromCbos(idFor('b.geojson'), 'b', 1)
+				]);
+				const result = await run(fakeDb, [
+					FILE,
+					{ ...FILE, documentGuid: 'unnamed', version: 1, fileName: null },
+					{ ...FILE, documentGuid: 'a', version: 1, fileName: 'a.geojson' },
+					{ ...FILE, documentGuid: 'b', version: 1, fileName: 'b.geojson' }
+				]);
+
+				assert.deepStrictEqual(
+					deleted(fakeDb).sort(),
+					[idFor('old.geojson'), idFor('site.geojson (version 2)')].sort()
+				);
+				assert.strictEqual(result.removed, 2);
+				assert.strictEqual(result.removalSkipped, undefined);
+				const [query] = fakeDb.caseBoundary.findMany.mock.calls[0].arguments as unknown as [{ where: object }];
+				assert.deepStrictEqual(query.where, { metadata: { contains: '"source":"cbos"' } });
+			});
+
+			it('keeps the row an unnamed file was saved to this time', async () => {
+				// its row is named from its GeoJSON, which the fake gives as the document's
+				const fakeDb = dbWith([fromCbos(idFor(`${FILE.documentGuid}.geojson`), 'some-other-version', 9)]);
+				const result = await run(fakeDb, [{ ...FILE, fileName: null }]);
+				assert.strictEqual(result.removed, 0);
+				assert.deepStrictEqual(deleted(fakeDb), []);
+			});
+
+			it('removes none in an import of every case when that would be more than half', async () => {
+				const fakeDb = dbWith([
+					fromCbos(idFor('site.geojson'), FILE.documentGuid, FILE.version),
+					fromCbos(idFor('a.geojson'), 'a', 1),
+					fromCbos(idFor('b.geojson'), 'b', 1)
+				]);
+				const result = await run(fakeDb, [FILE]);
+				assert.strictEqual(result.removed, 0);
+				assert.match(result.removalSkipped ?? '', /no longer lists 2 of the 3 boundaries saved from it/);
+				assert.deepStrictEqual(deleted(fakeDb), []);
+
+				// an empty list, too
+				assert.strictEqual((await run(fakeDb, [])).removed, 0);
+				assert.deepStrictEqual(deleted(fakeDb), []);
+			});
+
+			it("removes every one of a case's in an import of that case, when CBOS lists none of them", async () => {
+				const fakeDb = dbWith([fromCbos(idFor('site.geojson'), FILE.documentGuid, FILE.version)]);
+				const result = await run(fakeDb, [], { ...OPTIONS, caseReference: 'EN010001' });
+				assert.strictEqual(result.removed, 1);
+				assert.deepStrictEqual(deleted(fakeDb), [idFor('site.geojson')]);
+				const [query] = fakeDb.caseBoundary.findMany.mock.calls[0].arguments as unknown as [{ where: object }];
+				assert.deepStrictEqual(query.where, {
+					metadata: { contains: '"source":"cbos"' },
+					caseReference: 'EN010001'
+				});
+			});
+
+			it('removes them a thousand at a time', async () => {
+				const rows = Array.from({ length: 2_500 }, (_, i) => fromCbos(`gone-${i}`, `gone-${i}`, 1));
+				const fakeDb = dbWith(rows);
+				const result = await run(fakeDb, [], { ...OPTIONS, caseReference: 'EN010001' });
+				assert.strictEqual(result.removed, 2_500);
+				assert.deepStrictEqual(
+					fakeDb.caseBoundary.deleteMany.mock.calls.map((call) => call.arguments[0].where.id.in.length),
+					[1000, 1000, 500]
+				);
+			});
+		});
+
+		it('rejects when the files cannot be listed, removing nothing', async () => {
+			const fakeDb = { caseBoundary: { findMany: mock.fn(async () => []), deleteMany: mock.fn(async () => ({})) } };
 			await assert.rejects(
-				importCaseBoundariesFromCbos(db, OPTIONS, {
+				importCaseBoundariesFromCbos(fakeDb as never, OPTIONS, {
 					listFiles: async () => {
 						throw new Error('status 500');
 					},
@@ -530,6 +647,7 @@ describe('CBOS boundaries', () => {
 				}),
 				/status 500/
 			);
+			assert.strictEqual(fakeDb.caseBoundary.deleteMany.mock.callCount(), 0);
 		});
 	});
 

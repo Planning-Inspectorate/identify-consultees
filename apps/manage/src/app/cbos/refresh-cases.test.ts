@@ -4,7 +4,14 @@ import { describe, it, mock } from 'node:test';
 import type { CbosImportResult } from './cbos-boundaries.ts';
 import { createCbosCaseRefresh } from './refresh-cases.ts';
 
-const RESULT: CbosImportResult = { filesFound: 5, unchanged: 2, imported: 3, casesImported: 2, failures: [] };
+const RESULT: CbosImportResult = {
+	filesFound: 5,
+	unchanged: 2,
+	imported: 3,
+	casesImported: 2,
+	removed: 1,
+	failures: []
+};
 
 function newService() {
 	return {
@@ -48,7 +55,7 @@ describe('refreshing cases from CBOS', () => {
 		await settle();
 		const [logged, message] = service.logger.info.mock.calls[0].arguments;
 		assert.strictEqual(message, 'Refreshed cases from CBOS');
-		assert.deepStrictEqual(logged, { filesFound: 5, unchanged: 2, imported: 3, casesImported: 2 });
+		assert.deepStrictEqual(logged, { filesFound: 5, unchanged: 2, imported: 3, casesImported: 2, removed: 1 });
 		assert.strictEqual(service.logger.warn.mock.callCount(), 0);
 	});
 
@@ -77,6 +84,21 @@ describe('refreshing cases from CBOS', () => {
 		assert.deepStrictEqual(service.logger.warn.mock.calls[0].arguments, [
 			{ failures },
 			'Some CBOS boundary files could not be imported'
+		]);
+	});
+
+	it('warns when it removed no boundaries because CBOS stopped listing too many', async () => {
+		const service = newService();
+		const { runImport, finish } = controlledImport();
+		createCbosCaseRefresh(service, runImport).start();
+
+		const removalSkipped =
+			'CBOS no longer lists 3 of the 4 boundaries saved from it - more than half, so none were removed';
+		finish({ ...RESULT, removed: 0, removalSkipped });
+		await settle();
+		assert.deepStrictEqual(service.logger.warn.mock.calls[0].arguments, [
+			{ reason: removalSkipped },
+			'CBOS import removed no boundaries'
 		]);
 	});
 
