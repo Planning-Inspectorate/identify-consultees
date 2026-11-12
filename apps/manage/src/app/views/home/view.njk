@@ -73,6 +73,8 @@
 	</form>
 
 	{% if errorSummary %}
+	{% elif searchFailed %}
+		<p class="govuk-body govuk-!-margin-top-6">Sorry, the search is not working at the moment. Try again later.</p>
 	{% elif geometries.length %}
 		<p class="govuk-body govuk-!-margin-top-6 govuk-!-margin-bottom-3">
 			Showing {{ resultsFrom }} to {{ resultsTo }} of {{ resultsTotal }} results
