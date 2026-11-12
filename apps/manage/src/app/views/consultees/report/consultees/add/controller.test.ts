@@ -1,5 +1,6 @@
 import { mockLogger } from '@planning-inspectorate/core/testing';
 import assert from 'node:assert';
+import { randomBytes } from 'node:crypto';
 import { describe, it, mock } from 'node:test';
 import { configureNunjucks } from '../../../../../nunjucks.ts';
 import { failingRulesetRunner, rulesetRunnerReturning } from '../../../../../testing/ruleset-runner-stub.ts';
@@ -415,6 +416,14 @@ describe('add a consultee page', () => {
 		// one that doesn't tell them apart - North Yorkshire has two - asks again
 		const stale = await submit({ name: 'Middleton (North Yorkshire)', reason: 'r' });
 		assert.match(viewModelOf(stale).addForm.nameError.text, /There is more than one Middleton/);
+	});
+
+	it("refuses an addition that would make the report's link too long, on its form", async () => {
+		const reason = randomBytes(6_000).toString('base64');
+		const res = await submit({ name: 'Christleton', reason });
+		assert.strictEqual(res.redirect.mock.callCount(), 0);
+		assert.match(viewModelOf(res).addForm.reasonError.text, /This report can't keep any more changes/);
+		assert.strictEqual(viewModelOf(res).addForm.reasonValue, reason);
 	});
 
 	it('adds another consultee of a name already listed, chosen from the list', async () => {

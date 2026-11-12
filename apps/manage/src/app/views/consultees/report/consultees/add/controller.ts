@@ -18,7 +18,14 @@ import { NEARBY_NSIPS, nearbyNsipName } from '../../../nearby-nsips.ts';
 import { firstQueryValue, screenedGeometry } from '../../../run-ruleset.ts';
 import { categoryDisplayName } from '../../categories.ts';
 import { consulteeName } from '../../report-consultees.ts';
-import { addConsulteeSuggestionsUrl, addConsulteeUrl, consulteesUrl, excludedMatchIds } from '../../urls.ts';
+import {
+	addConsulteeSuggestionsUrl,
+	addConsulteeUrl,
+	consulteesUrl,
+	excludedMatchIds,
+	fitsInReportUrl,
+	TOO_MANY_CHANGES
+} from '../../urls.ts';
 import type { CategoryContext } from '../controller.ts';
 import { categoryContext, comparableName, kilometresFromSite, nearbyCandidates } from '../controller.ts';
 import type { AddConsulteeForm, AddConsulteeViewModel } from './view-model.ts';
@@ -488,6 +495,14 @@ export function buildReportConsulteeAddSubmit(
 		const next = removal
 			? { ...selection, removed: selection.removed.filter((removed) => removed !== removal) }
 			: { ...selection, adds: [...selection.adds, { id: stored.id, category, name: stored.consultee, reason }] };
-		return res.redirect(`${consulteesUrl(project.id, ruleset.id, category, next)}#consultees`);
+		const nextUrl = consulteesUrl(project.id, ruleset.id, category, next);
+		if (!fitsInReportUrl(nextUrl)) {
+			return renderAddPage(res, service, context, {
+				nameValue,
+				reasonValue,
+				reasonError: { text: TOO_MANY_CHANGES }
+			});
+		}
+		return res.redirect(`${nextUrl}#consultees`);
 	};
 }

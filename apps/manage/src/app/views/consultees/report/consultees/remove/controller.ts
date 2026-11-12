@@ -10,7 +10,14 @@ import { firstQueryValue, requestedRuleset, runRulesetSafely } from '../../../ru
 import { categoryDisplayName } from '../../categories.ts';
 import { addedConsulteeReason, consulteeName } from '../../report-consultees.ts';
 import type { ConsulteeSelection, RemovalTarget } from '../../urls.ts';
-import { consulteeSelection, consulteesUrl, excludedMatchIds, removeConsulteeUrl } from '../../urls.ts';
+import {
+	consulteeSelection,
+	consulteesUrl,
+	excludedMatchIds,
+	fitsInReportUrl,
+	removeConsulteeUrl,
+	TOO_MANY_CHANGES
+} from '../../urls.ts';
 import type { RemoveConsulteeViewModel } from './view-model.ts';
 
 interface RemoveConsulteeContext {
@@ -200,6 +207,13 @@ export function buildReportConsulteeRemoveSubmit(
 		];
 		const adds =
 			'addedIndex' in target ? selection.adds.filter((_, index) => index !== target.addedIndex) : selection.adds;
-		return res.redirect(`${consulteesUrl(caseId, ruleset.id, category, { ...selection, removed, adds })}&removed=open`);
+		const nextUrl = consulteesUrl(caseId, ruleset.id, category, { ...selection, removed, adds });
+		if (!fitsInReportUrl(nextUrl)) {
+			return res.render(
+				'views/consultees/report/consultees/remove/view.njk',
+				viewModel(context, reason, TOO_MANY_CHANGES)
+			);
+		}
+		return res.redirect(`${nextUrl}&removed=open`);
 	};
 }
