@@ -56,8 +56,8 @@ export interface Config extends BaseConfig {
 		groups: {
 			// group ID for accessing the application
 			applicationAccess: string;
-			// group ID for the admin section (/admin) - from AUTH_GROUP_ADMIN. Empty - unset - leaves it
-			// open to everyone with application access, as before there was one (admin/access.ts)
+			// group ID for the admin section (/admin) - from AUTH_GROUP_ADMIN. Empty - unset - keeps it
+			// shut while sign-in is on (admin/access.ts)
 			admin: string;
 		};
 		redirectUri: string;

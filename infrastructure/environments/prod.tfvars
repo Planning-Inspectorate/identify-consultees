@@ -9,7 +9,7 @@ apps_config = {
   auth = {
     client_id                = "e7e0f029-4600-4292-9d98-c920c289f0b8"
     group_application_access = "6aed478e-1da5-475f-ba7f-31dc89aeb305"
-    # the admin section's Entra group's object id - "" until it's created
+    # the admin section's Entra group's object id - "" keeps the section shut until it's set
     group_admin = ""
     # groups = {
     #   inspectors    = ""
