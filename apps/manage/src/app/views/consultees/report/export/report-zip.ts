@@ -180,21 +180,23 @@ async function categoryMap(
 	const drawn = [...markAddedByHand(visible, added), ...addedBeyondRun(consultees, selection.adds, category)];
 	// its own search area, as its Change page builds - an area that can't be drawn spoils only its
 	// category's map
-	const searchArea = await buildSearchAreaSafely(
-		service.db,
-		project,
-		drawn,
-		service.nearbySearchRadiusMetres,
-		service.logger,
-		context.searchAreas
-	);
-	const buffers = await siteBuffers(
-		service,
-		project,
-		context.siteScreenedAs,
-		categoryBufferMetres(ruleset, category, service.nearbyNsipRadiusMetres),
-		context.buffers
-	);
+	const [searchArea, buffers] = await Promise.all([
+		buildSearchAreaSafely(
+			service.db,
+			project,
+			drawn,
+			service.nearbySearchRadiusMetres,
+			service.logger,
+			context.searchAreas
+		),
+		siteBuffers(
+			service,
+			project,
+			context.siteScreenedAs,
+			categoryBufferMetres(ruleset, category, service.nearbyNsipRadiusMetres),
+			context.buffers
+		)
+	]);
 	const map = buildCaseMapConfig(project, drawn, category, searchArea);
 	const view = reportMapView(
 		map,
@@ -288,13 +290,17 @@ export async function buildReportZip({
 		siteScreenedAs,
 		generatedAt: new Date(),
 		identified,
-		records: new Map([
-			...(await consulteeAreaRecords(db, [
-				...identified.filter((match) => !isNearbyNsip(match)).map((match) => match.feature.id),
-				...addedMatchIds(addedConsultees)
-			])),
-			...(await nearbyNsipRecords(db, identified.filter(isNearbyNsip), addedMatchIds(addedNsips)))
-		]),
+		records: new Map(
+			(
+				await Promise.all([
+					consulteeAreaRecords(db, [
+						...identified.filter((match) => !isNearbyNsip(match)).map((match) => match.feature.id),
+						...addedMatchIds(addedConsultees)
+					]),
+					nearbyNsipRecords(db, identified.filter(isNearbyNsip), addedMatchIds(addedNsips))
+				])
+			).flatMap((records) => [...records])
+		),
 		// a hand-added consultee the run found has its distance - for the distanceKm column
 		added: selection.adds.map((add) => {
 			const found = add.id ? consultees.find((match) => match.feature.id === add.id) : undefined;

@@ -1,10 +1,10 @@
 import type { ManageService } from '#service';
 import type { CaseBoundaryFeature } from '@pins/identify-consultees-database/src/geospatial/case-boundaries.ts';
-import { bufferGeometryForDisplay } from '@pins/identify-consultees-database/src/geospatial/consultee-areas.ts';
 import type { Ruleset, SiteScreenedAs } from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
 import type { Geometry } from '@pins/identify-consultees-database/src/geospatial/wkt.ts';
 import { computeBounds } from '../../maps/geometry-bounds.ts';
 import type { GeoJsonFeatureCollection } from '../../maps/sample-geojson.ts';
+import { grownSite } from './grown-site.ts';
 import { NEARBY_NSIPS } from './nearby-nsips.ts';
 
 /**
@@ -93,12 +93,10 @@ export async function siteBuffers(
 		metres.map(async (distance) => {
 			let buffer = cache.get(distance);
 			if (!buffer) {
-				buffer = bufferGeometryForDisplay(service.db, screenedSite(project, siteScreenedAs), distance).catch(
-					(error: unknown) => {
-						service.logger.warn({ error, caseId: project.id, metres: distance }, 'could not draw a buffer on a map');
-						return undefined;
-					}
-				);
+				buffer = grownSite(service.db, screenedSite(project, siteScreenedAs), distance).catch((error: unknown) => {
+					service.logger.warn({ error, caseId: project.id, metres: distance }, 'could not draw a buffer on a map');
+					return undefined;
+				});
 				cache.set(distance, buffer);
 			}
 			return { metres: distance, geometry: await buffer };

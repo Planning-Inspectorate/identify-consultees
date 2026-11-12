@@ -6,7 +6,7 @@ import { pino } from 'pino';
 // whether it's reached through the package specifier or a relative path, and only the former is
 // the class initDatabaseClient/newDatabaseClient instantiate
 import { PrismaClient } from '@pins/identify-consultees-database/src/client/client.ts';
-import { initDatabaseClient, newDatabaseClient, withExtendedTimeout } from './index.ts';
+import { initDatabaseClient, newDatabaseClient, withConnectionLimit, withExtendedTimeout } from './index.ts';
 
 const TEST_CONNECTION_STRING =
 	'sqlserver://localhost:1434;database=identify-consultees;user=sa;password=pw;trustServerCertificate=true';
@@ -24,6 +24,20 @@ describe('withExtendedTimeout', () => {
 		assert.match(result, /^sqlserver:\/\/localhost:1434;/);
 		assert.match(result, /;socketTimeout=60000$/);
 		assert.match(result, /trustServerCertificate=true/);
+	});
+});
+
+describe('withConnectionLimit', () => {
+	test('appends a connectionLimit segment to the connection string', () => {
+		assert.equal(
+			withConnectionLimit('sqlserver://host:1433;database=db;user=u;password=p', 20),
+			'sqlserver://host:1433;database=db;user=u;password=p;connectionLimit=20'
+		);
+	});
+
+	test('keeps a limit the connection string sets itself - the adapter refuses one named twice', () => {
+		const own = 'sqlserver://host:1433;database=db;user=u;password=p;connectionLimit=5';
+		assert.equal(withConnectionLimit(own, 20), own);
 	});
 });
 

@@ -145,23 +145,9 @@ async function renderCategoryPage(
 		...markAddedByHand(visible, addedMatchIds(selection.adds)),
 		...addedBeyondRun(consultees, selection.adds, category)
 	];
-	const searchArea = await buildSearchAreaSafely(
-		service.db,
-		project,
-		drawn,
-		service.nearbySearchRadiusMetres,
-		service.logger
-	);
 	const categoryName = categoryDisplayName(category);
 	const staticMapSrc = categoryStaticMapUrl(project.id, ruleset.id, category, selection);
 	const staticMapAlt = `Static map showing ${categoryName} consultees for ${project.properties.caseName}`;
-	// the ruleset's buffers for the category around the site, as the report's map draws them
-	const buffers = await siteBuffers(
-		service,
-		project,
-		screenedBoundingBox ? 'boundingBox' : 'outline',
-		categoryBufferMetres(ruleset, category, service.nearbyNsipRadiusMetres)
-	);
 	// consultees alphabetically by name, ruleset matches and hand-added ones together - every
 	// Remove link opens the "Remove consultee" page, which records the reason before excluding
 	// the match or dropping the add
@@ -197,7 +183,18 @@ async function renderCategoryPage(
 	const mappedOnly = drawn
 		.filter((match) => !listedIds.has(match.feature.id))
 		.map((match) => ({ id: match.feature.id, name: consulteeName(match), distanceMetres: match.distanceMetres }));
-	const labels = await listLabels(service, category, [...listedRows, ...mappedOnly]);
+	// the search area, the ruleset's buffers for the category around the site (as the report's map
+	// draws them) and the labels don't depend on each other - asked for together
+	const [searchArea, buffers, labels] = await Promise.all([
+		buildSearchAreaSafely(service.db, project, drawn, service.nearbySearchRadiusMetres, service.logger),
+		siteBuffers(
+			service,
+			project,
+			screenedBoundingBox ? 'boundingBox' : 'outline',
+			categoryBufferMetres(ruleset, category, service.nearbyNsipRadiusMetres)
+		),
+		listLabels(service, category, [...listedRows, ...mappedOnly])
+	]);
 	const map = {
 		...buildCaseMapConfig(
 			project,
