@@ -73,9 +73,17 @@ export function startScheduledCbosImport(
 		try {
 			const result = await dependencies.runImport(importDb(service), options);
 			logger.info(
-				{ filesFound: result.filesFound, imported: result.imported, casesImported: result.casesImported },
+				{
+					filesFound: result.filesFound,
+					imported: result.imported,
+					casesImported: result.casesImported,
+					removed: result.removed
+				},
 				'Scheduled CBOS import finished'
 			);
+			if (result.removalSkipped) {
+				logger.warn({ reason: result.removalSkipped }, 'CBOS import removed no boundaries');
+			}
 			if (result.failures.length > 0) {
 				logger.warn({ failures: result.failures }, 'Some CBOS boundary files could not be imported');
 			}

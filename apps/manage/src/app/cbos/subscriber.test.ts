@@ -62,7 +62,13 @@ describe('CBOS subscriber', () => {
 	describe('buildCbosEventHandler', () => {
 		it("imports the case's boundaries for a boundary event, through the function", async () => {
 			const subscriberService = service();
-			const runImport = mock.fn(async () => ({ filesFound: 2, imported: 2, casesImported: 1, failures: [] }));
+			const runImport = mock.fn(async () => ({
+				filesFound: 2,
+				imported: 2,
+				casesImported: 1,
+				removed: 0,
+				failures: []
+			}));
 			await buildCbosEventHandler(subscriberService, runImport as never)({ body: GEOJSON_EVENT, messageId: 'm1' });
 
 			assert.deepEqual(runImport.mock.calls[0].arguments.slice(1), [

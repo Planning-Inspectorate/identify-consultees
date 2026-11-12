@@ -14,8 +14,8 @@ import { importCaseBoundariesFromCbos, importDb } from './cbos-boundaries.ts';
  * import - so a new boundary arrives without anyone importing it.
  *
  * The subscription (infrastructure/idas-back-office.tf) passes only Create and Update events, and
- * most of those are other documents, ignored here. Nothing is deleted when CBOS deletes a document:
- * the import only adds and updates.
+ * most of those are other documents, ignored here. A document CBOS deletes sends no event we take:
+ * its boundary goes at the next import of every case (see importCaseBoundariesFromCbos).
  */
 
 const GEOJSON_MIME = 'application/geo+json';
@@ -81,7 +81,13 @@ export function buildCbosEventHandler(
 			caseReference
 		});
 		service.logger.info(
-			{ caseReference, messageId: message.messageId, filesFound: result.filesFound, imported: result.imported },
+			{
+				caseReference,
+				messageId: message.messageId,
+				filesFound: result.filesFound,
+				imported: result.imported,
+				removed: result.removed
+			},
 			'imported a case boundary update from CBOS'
 		);
 		if (result.failures.length > 0) {

@@ -4,7 +4,7 @@ import { describe, it, mock } from 'node:test';
 import type { ScheduledImportDependencies } from './scheduled-import.ts';
 import { dueImport, startScheduledCbosImport, ukTime } from './scheduled-import.ts';
 
-const RESULT = { filesFound: 3, imported: 3, casesImported: 2, failures: [] };
+const RESULT = { filesFound: 3, imported: 3, casesImported: 2, removed: 0, failures: [] };
 
 describe('scheduled CBOS import', () => {
 	it('reads the clock in UK time, in British Summer Time or not', () => {
@@ -104,6 +104,18 @@ describe('scheduled CBOS import', () => {
 		// the hour's import starts late, once the last has finished
 		await at('2026-12-01T08:01:00Z');
 		assert.strictEqual(dependencies.runImport.mock.callCount(), 2);
+	});
+
+	it('warns when it removed no boundaries because CBOS stopped listing too many', async () => {
+		const removalSkipped =
+			'CBOS no longer lists 3 of the 4 boundaries saved from it - more than half, so none were removed';
+		const { service, at } = start({ hours: [7], runImport: async () => ({ ...RESULT, removalSkipped }) });
+
+		await at('2026-12-01T07:00:00Z');
+		assert.deepStrictEqual(service.logger.warn.mock.calls[0].arguments, [
+			{ reason: removalSkipped },
+			'CBOS import removed no boundaries'
+		]);
 	});
 
 	it('logs files it could not import, and a failed import, and tries again next hour', async () => {
