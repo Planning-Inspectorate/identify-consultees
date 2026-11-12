@@ -17,7 +17,7 @@ What affects which consultees screening finds, and how fast, as of October 2026.
 
 | Issue                                                   | Effect                                                                              | Next step                                                                                                  |
 | ------------------------------------------------------- | ----------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
-| **SQL tiers**: Dev and Training Basic; Test S1; Prod S2 | Screening is CPU-heavy. Dev was unusable on Basic                                   | Prod moved from S0 to S2, as Dev ran. Check its DTU use under real load, and go to S3 if it runs near 100% |
+| **SQL tiers**: Dev and Training Basic; Test and Prod S2 | Screening is CPU-heavy. Dev was unusable on Basic                                   | Prod moved from S0 to S2, as Dev ran. Check its DTU use under real load, and go to S3 if it runs near 100% |
 | Prod has a geo-replica                                  | A tier change resizes the replica too, which needed extra deploy permissions in Dev | Confirm the permissions in Prod before resizing                                                            |
 | **Large linear schemes**: 28s locally for a 180km route | Could reach the web app's 60s timeout on a busy or small tier                       | If latency must be predictable, precompute results per case                                                |
 
