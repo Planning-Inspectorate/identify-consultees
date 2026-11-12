@@ -446,10 +446,20 @@ export interface NamedConsulteeArea {
 	id: string;
 	/** As the reference data spells it. */
 	consultee: string;
+	/**
+	 * Approximate: from the site to the area's representativePoint (its envelope centre if it has
+	 * none), not to its nearest edge - quick, but off by up to the area's own size. A list of names
+	 * is ordered by it and shows it as "about"; nothing is decided by it.
+	 */
 	distanceMetres: number;
 	/** Its region, to tell apart areas that share a name. */
 	region: string | null;
 }
+
+/** The SQL for an area's approximate distance from `@site` - see NamedConsulteeArea.distanceMetres. */
+const APPROXIMATE_DISTANCE = Prisma.raw(
+	'ISNULL(representativePoint, geometrySimplified.EnvelopeCenter()).STDistance(@site)'
+);
 
 // a name more areas share than this is listed only this far - Middleton, the most shared parish
 // name, has 12
@@ -469,8 +479,8 @@ export async function findConsulteeAreasByName(
 ): Promise<NamedConsulteeArea[]> {
 	const rows = await withDeadlockRetry(
 		() => dbClient.$queryRaw<{ id: string; consultee: string; distanceMetres: number; region: string | null }[]>`
-			SELECT TOP (${MAX_NAMED_AREAS}) id, consultee, region,
-				geometrySimplified.STDistance(geography::STGeomFromText(${geometryToWkt(site)}, 4326)) AS distanceMetres
+			DECLARE @site geography = geography::STGeomFromText(${geometryToWkt(site)}, 4326);
+			SELECT TOP (${MAX_NAMED_AREAS}) id, consultee, region, ${APPROXIMATE_DISTANCE} AS distanceMetres
 			FROM consultee_area
 			WHERE consulteeCategory = ${category}
 				AND LOWER(consultee) = LOWER(${name})
@@ -499,10 +509,8 @@ function likeLiteral(text: string): string {
  * consultee page to suggest as a name is typed, anywhere in the reference data: those called exactly
  * that first (every Newton, for "Newton"), then the rest, each nearest `site` first.
  *
- * Which ones come back is decided by the distance to each area's representativePoint (its envelope
- * centre, if it has none), which is quick; only those returned are measured exactly, from
- * geometrySimplified. Measuring every match exactly took 1.5s for "New" (128 parishes) on the
- * largest site; this takes 0.3s, and with 30 or fewer matches gives the same list.
+ * Their distances are approximate (NamedConsulteeArea.distanceMetres), so none is measured exactly:
+ * measuring every match exactly took 1.5s for "New" (128 parishes) on the largest site.
  */
 export async function findConsulteeAreasByNameStart(
 	dbClient: PrismaClient,
@@ -513,17 +521,11 @@ export async function findConsulteeAreasByNameStart(
 	const rows = await withDeadlockRetry(
 		() => dbClient.$queryRaw<{ id: string; consultee: string; distanceMetres: number; region: string | null }[]>`
 			DECLARE @site geography = geography::STGeomFromText(${geometryToWkt(site)}, 4326);
-			WITH shortlist AS (
-				SELECT TOP (${MAX_SUGGESTED_AREAS}) id, consultee, region, geometrySimplified,
-					CASE WHEN LOWER(consultee) = LOWER(${typed}) THEN 0 ELSE 1 END AS otherName
-				FROM consultee_area
-				WHERE consulteeCategory = ${category}
-					AND LOWER(consultee) LIKE LOWER(${`${likeLiteral(typed)}%`}) ESCAPE '!'
-				ORDER BY otherName, ISNULL(representativePoint, geometrySimplified.EnvelopeCenter()).STDistance(@site), id
-			)
-			SELECT id, consultee, region, geometrySimplified.STDistance(@site) AS distanceMetres
-			FROM shortlist
-			ORDER BY otherName, distanceMetres, id
+			SELECT TOP (${MAX_SUGGESTED_AREAS}) id, consultee, region, ${APPROXIMATE_DISTANCE} AS distanceMetres
+			FROM consultee_area
+			WHERE consulteeCategory = ${category}
+				AND LOWER(consultee) LIKE LOWER(${`${likeLiteral(typed)}%`}) ESCAPE '!'
+			ORDER BY CASE WHEN LOWER(consultee) = LOWER(${typed}) THEN 0 ELSE 1 END, distanceMetres, id
 		`
 	);
 	return rows.map((row) => ({
