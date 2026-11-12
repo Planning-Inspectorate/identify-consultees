@@ -65,7 +65,7 @@ model ConsulteeArea {
   // when the row was loaded
   lastUpdated                     DateTime                  @default(now())
   // a point on the area (inside a polygon) - PointOnSurface of geometrySimplified, as shapely's
-  // representative_point() - that the add page's suggestions are ranked by; see the migration
+  // representative_point() - the add page's approximate distances; see the migration
   representativePoint             Unsupported("geography")?
 
   @@index([consulteeCategory])

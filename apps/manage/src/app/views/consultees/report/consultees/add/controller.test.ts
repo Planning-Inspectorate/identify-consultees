@@ -183,8 +183,8 @@ function dbReturning(rows: unknown[][], otherCases: unknown[] = OTHER_CASES) {
 			}
 			// the names starting with what's typed - those called exactly that first
 			if (text.includes(' LIKE ')) {
-				// the site, the limit, the name typed, the category, then the LIKE pattern
-				const [, , typed, category] = values as string[];
+				// the site and the limit come first
+				const [category, , typed] = (values as string[]).slice(-3);
 				return STORED.filter(
 					(row) => row.consulteeCategory === category && row.consultee.toLowerCase().startsWith(typed.toLowerCase())
 				)
@@ -402,12 +402,12 @@ describe('add a consultee page', () => {
 				.map((suggestion: { name: string }) => suggestion.name),
 			[
 				'Middleton (Lancaster)',
-				'Middleton (North Yorkshire, 40.0 km from the site)',
-				'Middleton (North Yorkshire, 95.0 km from the site)'
+				'Middleton (North Yorkshire, about 40 km from the site)',
+				'Middleton (North Yorkshire, about 95 km from the site)'
 			]
 		);
-		// and the one chosen is added
-		const chosen = await submit({ name: 'Middleton (North Yorkshire, 40.0 km from the site)', reason: 'r' });
+		// and the one chosen is added - its distance is approximate, as the reference data's are
+		const chosen = await submit({ name: 'Middleton (North Yorkshire, about 40 km from the site)', reason: 'r' });
 		assert.strictEqual(
 			chosen.redirect.mock.calls[0].arguments[0],
 			`${categoryUrl}&add=${urlParam(JSON.stringify({ i: 'f1f1f1f1-0000-0000-0000-000000000002', c: 'Parish, town and community councils', n: 'Middleton', r: 'r' }))}#consultees`
@@ -720,9 +720,9 @@ describe('add a consultee suggestions, as a name is typed', () => {
 	it('suggests every consultee of the category whose name starts with what is typed, telling apart those that share it', async () => {
 		// none near the site - before, these were only offered after submitting "Middleton"
 		assert.deepStrictEqual(suggested(await suggest({ ...parishQuery, q: ' middle ' })), [
-			{ name: 'Middleton (Lancaster)', hint: '40.0 km from the site, North West' },
-			{ name: 'Middleton (North Yorkshire, 40.0 km from the site)', hint: 'Yorkshire and The Humber' },
-			{ name: 'Middleton (North Yorkshire, 95.0 km from the site)', hint: 'Yorkshire and The Humber' }
+			{ name: 'Middleton (Lancaster)', hint: 'about 40 km from the site, North West' },
+			{ name: 'Middleton (North Yorkshire, about 40 km from the site)', hint: 'Yorkshire and The Humber' },
+			{ name: 'Middleton (North Yorkshire, about 95 km from the site)', hint: 'Yorkshire and The Humber' }
 		]);
 	});
 

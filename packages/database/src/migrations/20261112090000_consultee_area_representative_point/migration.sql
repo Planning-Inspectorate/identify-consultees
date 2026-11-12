@@ -4,8 +4,8 @@ BEGIN TRAN;
 
 -- A representative point for each consultee area: a point guaranteed to lie on it (inside a
 -- polygon, on a line) - OGC's PointOnSurface, as shapely's representative_point() is. The add page
--- ranks the consultees whose names start with what's typed by their distance from the site to this
--- point, which is quick, and then measures only the ones it shows exactly, from geometrySimplified.
+-- gives the consultees it looks up by name an approximate distance from the site to this point,
+-- which is quick, rather than measuring each to its nearest edge.
 -- SQL Server has PointOnSurface only for geometry, not geography, so each area goes to geometry
 -- and back: its point lies on the simplified area, within 10m of the original.
 --

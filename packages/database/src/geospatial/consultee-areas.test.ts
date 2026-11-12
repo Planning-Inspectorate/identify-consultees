@@ -342,7 +342,8 @@ describe('consultee areas (requires a local SQL Server - see docker-compose.yml)
 					{ id: testAreaId, consultee: testName, region: 'Far' }
 				]
 			);
-			assert.equal(found[0].distanceMetres, 0);
+			// approximate - to a point on each, so the near one, on the site's edge, is under a kilometre
+			assert.ok(found[0].distanceMetres < 1_000);
 			assert.ok(found[1].distanceMetres > 100_000);
 
 			// another category, or a name that isn't a consultee - none
@@ -402,7 +403,7 @@ describe('consultee areas (requires a local SQL Server - see docker-compose.yml)
 		}
 	});
 
-	test('keeps a representative point on each area, which suggestions are ranked by - their distances are exact', async (t) => {
+	test('keeps a representative point on each area, which name lookups measure an approximate distance to', async (t) => {
 		if (!dbAvailable) return t.skip('SQL Server database not available');
 
 		await cleanup();
@@ -461,25 +462,29 @@ describe('consultee areas (requires a local SQL Server - see docker-compose.yml)
 				FROM consultee_area WHERE id = ${testAreaId}`;
 			assert.deepEqual(onArea, { pointOnArea: true, centreOnArea: false });
 
-			// an area without one is still suggested, ranked by its envelope centre
+			// an area without one is measured to its envelope centre instead
 			await dbClient.$executeRaw`UPDATE consultee_area SET representativePoint = NULL WHERE id = ${secondAreaId}`;
 
 			// a site in the U's notch: 0.02° of longitude from either arm
 			const site = { type: 'Point' as const, coordinates: [-29.95, 50.06] };
+			const [expected] = await dbClient.$queryRaw<{ bay: number; bayEdge: number; square: number }[]>`
+				SELECT
+					(SELECT representativePoint.STDistance(geography::Point(50.06, -29.95, 4326)) FROM consultee_area WHERE id = ${testAreaId}) AS bay,
+					(SELECT geometrySimplified.STDistance(geography::Point(50.06, -29.95, 4326)) FROM consultee_area WHERE id = ${testAreaId}) AS bayEdge,
+					(SELECT geometrySimplified.EnvelopeCenter().STDistance(geography::Point(50.06, -29.95, 4326)) FROM consultee_area WHERE id = ${secondAreaId}) AS square`;
 			const found = await findConsulteeAreasByNameStart(dbClient, category, 'pointtest', site);
 			assert.deepEqual(
 				found.map(({ id }) => id),
 				[testAreaId, secondAreaId]
 			);
-			const exact = await dbClient.$queryRaw<{ id: string; metres: number }[]>`
-				SELECT LOWER(CAST(id AS NVARCHAR(36))) AS id,
-					geometrySimplified.STDistance(geography::Point(50.06, -29.95, 4326)) AS metres
-				FROM consultee_area WHERE id IN (${testAreaId}, ${secondAreaId})`;
-			for (const area of found) {
-				const metres = exact.find(({ id }) => id === area.id)!.metres;
-				assert.ok(Math.abs(area.distanceMetres - metres) < 1, `${area.id}: ${area.distanceMetres} vs ${metres}`);
-			}
-			assert.ok(found[0].distanceMetres > 1_000 && found[0].distanceMetres < 2_000);
+			assert.ok(Math.abs(found[0].distanceMetres - expected.bay) < 1);
+			assert.ok(Math.abs(found[1].distanceMetres - expected.square) < 1);
+			// not its nearest edge, 1.4km away
+			assert.ok(expected.bayEdge > 1_000 && expected.bayEdge < 2_000);
+			assert.ok(Math.abs(found[0].distanceMetres - expected.bayEdge) > 100);
+			// and the same distance when it's looked up by its whole name
+			const [named] = await findConsulteeAreasByName(dbClient, category, 'Pointtest Bay', site);
+			assert.ok(Math.abs(named.distanceMetres - expected.bay) < 1);
 		} finally {
 			await cleanup();
 		}
