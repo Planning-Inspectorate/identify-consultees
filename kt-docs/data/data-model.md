@@ -24,7 +24,7 @@ Two spatial datasets drive the service: **consultee areas** (what each potential
 | Environment   | SQL tier                       | Data                                  |
 | ------------- | ------------------------------ | ------------------------------------- |
 | Dev, Training | Basic                          | Full reference dataset                |
-| Test          | S1                             | Full reference dataset                |
+| Test          | S2, as Prod                    | Full reference dataset                |
 | Prod          | S2, with a UK West geo-replica | Full reference dataset, once promoted |
 
 ## Tables
