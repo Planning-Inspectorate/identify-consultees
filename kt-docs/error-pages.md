@@ -51,6 +51,8 @@ for i in $(seq 105); do curl -s -o /dev/null https://<host>/auth/signin; done
 
 Expected: HTTP 429, body "Too many requests, please try again later." Run it against a test environment, not one other people are using. With dev pages on, `/error-test/rate-limited` shows the same plain-text 429 after three refreshes, no scripting needed.
 
+Front Door's firewall has a limit of its own, before the app: each client address gets `waf_rate_limits.threshold` requests (1,500) in `duration_in_minutes` (5), then is blocked for the rest of the window and sent to its firewall error page (`infrastructure/front-door.tf`). The interactive maps' OS tiles (`/maps/os/tiles/`) are left out of it: each pan or zoom is dozens of them, and people at one office or VPN address share the limit.
+
 ### Malformed body
 
 ```bash
