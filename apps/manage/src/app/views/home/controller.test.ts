@@ -153,8 +153,9 @@ describe('home page', () => {
 		assert.strictEqual(viewModel.resultsTotal, 0);
 	});
 
-	it('should render an empty result set (not throw) when the query fails', async () => {
-		const mockRes = { render: mock.fn() };
+	it('should say the search is not working (not throw, nor show "no match") when the query fails', async () => {
+		const nunjucks = configureNunjucks();
+		const mockRes = { render: mock.fn((view: string, data: object) => nunjucks.render(view, data)) };
 		const db = {
 			$queryRaw: mock.fn(async () => {
 				throw new Error('db down');
@@ -166,6 +167,10 @@ describe('home page', () => {
 		const viewModel = mockRes.render.mock.calls[0].arguments[1];
 		assert.strictEqual(viewModel.geometries.length, 0);
 		assert.strictEqual(viewModel.resultsTotal, 0);
+		assert.strictEqual(viewModel.searchFailed, true);
+		const html = mockRes.render.mock.calls[0].result;
+		assert.match(html, /Sorry, the search is not working at the moment/);
+		assert.doesNotMatch(html, /No project geometries match/);
 	});
 
 	it('should respect the requested page size', async () => {

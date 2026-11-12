@@ -8,7 +8,8 @@ import {
 	buildClearConsulteeAreas,
 	buildImportReferenceDataPage,
 	buildRunImportConsulteeAreaGroup,
-	loadOutcome
+	loadOutcome,
+	referenceDataChange
 } from './controller.ts';
 
 const lastModified = new Date('2026-10-21T09:00:00Z');
@@ -364,6 +365,57 @@ describe('admin import reference data', () => {
 				blobFiles
 			)({ body: { group: 'public_bodies' } } as never, res);
 			assert.strictEqual(viewModelOf(res).error, 'Could not load Public bodies from blob storage.');
+		});
+	});
+
+	describe('one change at a time', () => {
+		const service = { db: databaseWith(), logger: mockLogger(), referenceDataChanges: true } as never;
+
+		it('turns a load or a clear away while another is running, doing nothing', async () => {
+			let finish: () => void = () => undefined;
+			const runImport = mock.fn(
+				() =>
+					new Promise((resolve) => {
+						finish = () =>
+							resolve({ group: {}, quarter: '2026Q4', rowsLoaded: 1, datasetInUse: '2026Q4', waitingFor: [] });
+					})
+			);
+			const clear = mock.fn(async () => 1);
+			const first = buildRunImportConsulteeAreaGroup(
+				service,
+				files(),
+				runImport as never
+			)({ body: { group: 'public_bodies' } } as never, newRes());
+			// the first load is under way
+			await new Promise((resolve) => setImmediate(resolve));
+			assert.strictEqual(referenceDataChange.running, 'loading Public bodies');
+
+			const secondLoad = newRes();
+			await buildRunImportConsulteeAreaGroup(
+				service,
+				files(),
+				runImport as never
+			)({ body: { group: 'public_bodies' } } as never, secondLoad);
+			const aClear = newRes();
+			await buildClearConsulteeAreas(service, files(), clear)({ body: { quarter: '2026Q4' } } as never, aClear);
+
+			const busy = 'Could not start - loading Public bodies is still running. Wait for it to finish, then try again.';
+			assert.strictEqual(viewModelOf(secondLoad).error, busy);
+			assert.strictEqual(viewModelOf(aClear).error, busy);
+			assert.strictEqual(runImport.mock.callCount(), 1);
+			assert.strictEqual(clear.mock.callCount(), 0);
+
+			finish();
+			await first;
+			assert.strictEqual(referenceDataChange.running, undefined);
+		});
+
+		it('frees the way once a change fails, too', async () => {
+			const clear = mock.fn(async () => {
+				throw new Error('Timeout');
+			});
+			await buildClearConsulteeAreas(service, files(), clear)({ body: { quarter: '2026Q4' } } as never, newRes());
+			assert.strictEqual(referenceDataChange.running, undefined);
 		});
 	});
 
