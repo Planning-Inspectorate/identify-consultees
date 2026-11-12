@@ -20,6 +20,12 @@ const APP_REQUEST_TIMEOUT_MS = 45_000;
 // Door's timeout, but the load carries on.
 export const BULK_REQUEST_TIMEOUT_MS = 10 * 60 * 1000;
 
+// The app's connection pool (mssql's, through @prisma/adapter-mssql): 10 connections by default.
+// A category page asks for its search area, buffers and labels together - up to 8 queries at once -
+// so two people opening one would queue for a connection. 20 leaves room for a few at a time, well
+// within what the database allows (an S2 takes 120 concurrent requests).
+const APP_CONNECTION_LIMIT = 20;
+
 export function initDatabaseClient(
 	config: { database: DatabaseConfig; NODE_ENV: string },
 	logger: Logger
@@ -34,7 +40,13 @@ export function initDatabaseClient(
 		throw new Error('database connectionString is required');
 	}
 
-	return newDatabaseClient(withExtendedTimeout(config.database.connectionString, APP_REQUEST_TIMEOUT_MS), prismaLogger);
+	return newDatabaseClient(
+		withConnectionLimit(
+			withExtendedTimeout(config.database.connectionString, APP_REQUEST_TIMEOUT_MS),
+			APP_CONNECTION_LIMIT
+		),
+		prismaLogger
+	);
 }
 
 /**
@@ -50,6 +62,16 @@ export function initDatabaseClient(
  */
 export function withExtendedTimeout(connectionString: string, timeoutMs: number): string {
 	return `${connectionString};socketTimeout=${timeoutMs}`;
+}
+
+/**
+ * Set a SQL_CONNECTION_STRING's pool size, `@prisma/adapter-mssql`'s connectionLimit - unless it
+ * sets one already, which it keeps: the adapter refuses a string that names a setting twice.
+ */
+export function withConnectionLimit(connectionString: string, limit: number): string {
+	return /(^|;)\s*connectionLimit\s*=/.test(connectionString)
+		? connectionString
+		: `${connectionString};connectionLimit=${limit}`;
 }
 
 export function newDatabaseClient(connectionString: string, logger?: Logger): PrismaClient {

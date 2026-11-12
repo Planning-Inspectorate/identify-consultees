@@ -59,8 +59,19 @@ export function buildResultsStaticMap(service: ManageService, forceSvg = false):
 					)
 				: [])
 		];
-		// same search area as the interactive map, so both open on the same view
-		const searchArea = await buildSearchAreaSafely(db, project, drawn, service.nearbySearchRadiusMetres, logger);
+		// the same search area as the interactive map, so both open on the same view - and the
+		// category's ruleset buffers around the site, as its interactive map draws them: asked for together
+		const [searchArea, buffers] = await Promise.all([
+			buildSearchAreaSafely(db, project, drawn, service.nearbySearchRadiusMetres, logger),
+			category
+				? siteBuffers(
+						service,
+						project,
+						siteScreenedAs,
+						categoryBufferMetres(ruleset, category, service.nearbyNsipRadiusMetres)
+					)
+				: Promise.resolve([])
+		]);
 		// a category's map is framed as config/report.yaml sets for the category
 		const map = buildCaseMapConfig(
 			project,
@@ -70,15 +81,6 @@ export function buildResultsStaticMap(service: ManageService, forceSvg = false):
 			undefined,
 			categorySettings(category).mapMarginMetres
 		);
-		// with the category's ruleset buffers around the site, as its interactive map draws them
-		const buffers = category
-			? await siteBuffers(
-					service,
-					project,
-					siteScreenedAs,
-					categoryBufferMetres(ruleset, category, service.nearbyNsipRadiusMetres)
-				)
-			: [];
 		const ifNoneMatch = typeof req.headers['if-none-match'] === 'string' ? req.headers['if-none-match'] : undefined;
 		const accept = typeof req.headers.accept === 'string' ? req.headers.accept : undefined;
 

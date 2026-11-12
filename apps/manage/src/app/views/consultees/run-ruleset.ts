@@ -1,10 +1,7 @@
 import type { ManageService } from '#service';
 import type { CaseBoundaryFeature } from '@pins/identify-consultees-database/src/geospatial/case-boundaries.ts';
 import { getCaseBoundaryDisplayGeometries } from '@pins/identify-consultees-database/src/geospatial/case-boundaries.ts';
-import {
-	bufferGeometryForDisplay,
-	getConsulteeAreaDisplayGeometries
-} from '@pins/identify-consultees-database/src/geospatial/consultee-areas.ts';
+import { getConsulteeAreaDisplayGeometries } from '@pins/identify-consultees-database/src/geospatial/consultee-areas.ts';
 import type {
 	ConsulteeMatch,
 	Ruleset,
@@ -14,6 +11,7 @@ import type {
 import { getRuleset, RULESETS } from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
 import type { Geometry } from '@pins/identify-consultees-database/src/geospatial/wkt.ts';
 import type { MapMatch, SearchAreaDisplay } from '../../maps/case-geojson.ts';
+import { grownSite } from './grown-site.ts';
 import { findNearbyNsips, isNearbyNsip } from './nearby-nsips.ts';
 
 /**
@@ -170,7 +168,7 @@ export async function buildSearchAreaSafely(
 	try {
 		let grown = cache.get(nearbyRadiusMetres);
 		if (!grown) {
-			grown = bufferGeometryForDisplay(db, screenedGeometry(project), nearbyRadiusMetres);
+			grown = grownSite(db, screenedGeometry(project), nearbyRadiusMetres);
 			cache.set(nearbyRadiusMetres, grown);
 		}
 		const area = await grown;

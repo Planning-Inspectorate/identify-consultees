@@ -33,18 +33,32 @@ import { formatUploadedAt } from './format-uploaded.ts';
 import type { BoundaryFileRadio, ConsulteeProjectViewModel } from './view-model.ts';
 
 /**
- * The boundary page's geometry for each file option. Geometry lookups are per case_boundary id -
- * the page's own row is already loaded, so only sibling submissions need a round trip each (never
- * more than a handful).
+ * Each of `ids`' case_boundary rows, in order - none for one that's gone. The page's own row is
+ * already loaded; the case's other files are read together, as a case has only a handful, each a
+ * round trip with its whole geometry.
  */
+async function boundaryRows(
+	db: ManageService['db'],
+	project: CaseBoundaryFeature,
+	ids: string[]
+): Promise<(CaseBoundaryFeature | null)[]> {
+	return Promise.all(ids.map((id) => (id === project.id ? project : getCaseBoundaryById(db, id))));
+}
+
+/** The boundary page's geometry for each file option. */
 async function mapFiles(
 	db: ManageService['db'],
 	project: CaseBoundaryFeature,
 	options: BoundaryFileOption[]
 ): Promise<BoundaryMapFile[]> {
 	const files: BoundaryMapFile[] = [];
-	for (const option of options) {
-		const row = option.id === project.id ? project : await getCaseBoundaryById(db, option.id);
+	const rows = await boundaryRows(
+		db,
+		project,
+		options.map((option) => option.id)
+	);
+	for (const [index, option] of options.entries()) {
+		const row = rows[index];
 		if (row) {
 			files.push({
 				id: option.id,
@@ -220,10 +234,15 @@ async function allBoundaryFilesGeojson(
 		: [...listed, { id: project.id, receivedDate: project.properties.receivedDate ?? null }];
 	const ranks = recencyRanks(files.map((file) => file.receivedDate));
 	const features: GeoJsonFeature[] = [];
+	const rows = await boundaryRows(
+		db,
+		project,
+		files.map((file) => file.id)
+	);
 	// highest rank (oldest) first, so the most recent is drawn over the rest
 	for (const index of files.map((_file, i) => i).sort((a, b) => ranks[b] - ranks[a])) {
 		const file = files[index];
-		const row = file.id === project.id ? project : await getCaseBoundaryById(db, file.id);
+		const row = rows[index];
 		if (row) {
 			const style = styleForRank(ranks[index]);
 			// each file drawn with its own geometry - and simplified one, if it's that large

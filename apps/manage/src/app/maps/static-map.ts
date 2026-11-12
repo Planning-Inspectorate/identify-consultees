@@ -9,8 +9,9 @@
  * Tile and static-image upstreams must be used sparingly — see AGENTS.md.
  */
 
+import { BoundedCache } from '#util/bounded-cache.ts';
 import type { Geometry, Position } from '@pins/identify-consultees-database/src/geospatial/wkt.ts';
-import { fetchWithTimeout, MapCache } from '@planning-inspectorate/core/util';
+import { fetchWithTimeout } from '@planning-inspectorate/core/util';
 import { fetchOsTile, osCoversView, osMapsApiKeyFromEnv } from './os-maps.ts';
 import type { GeoJsonFeature, GeoJsonFeatureCollection } from './sample-geojson.ts';
 import { MAP_VIEWPORT } from './sample-geojson.ts';
@@ -149,21 +150,30 @@ export function projectColours(feature: GeoJsonFeature): FeatureColours {
 	return featureColours(feature, PROJECT_COLOUR);
 }
 
-// tiles keep for a day - core's MapCache is the TTL map this needs
-const osmTileCache = new MapCache<Buffer>(24 * 60);
+// tiles keep for a day, as OS's and OSM's own cache headers allow
+const TILE_TTL_MS = 24 * 60 * 60 * 1000;
+// the most tiles kept, OS's and OSM's together - each is 10-30KB, so tens of MB at most. A report's
+// maps share a view, so a few hundred tiles cover several reports
+const MAX_CACHED_TILES = 2_000;
+// added to the cache's clock - only ageOsmTileCacheForTests moves it
+let tileClockOffsetMs = 0;
+const osmTileCache = new BoundedCache<Buffer>({
+	maxEntries: MAX_CACHED_TILES,
+	ttlMs: TILE_TTL_MS,
+	now: () => Date.now() + tileClockOffsetMs
+});
 
 export function clearOsmTileCacheForTests(): void {
-	osmTileCache.cache.clear();
+	osmTileCache.clear();
 }
 
 export function osmTileCacheSizeForTests(): number {
-	return osmTileCache.cache.size;
+	return osmTileCache.size;
 }
 
+/** Make every tile cached so far older than a day. */
 export function ageOsmTileCacheForTests(): void {
-	for (const entry of osmTileCache.cache.values()) {
-		entry.updated = new Date(0);
-	}
+	tileClockOffsetMs += TILE_TTL_MS + 1;
 }
 
 export function googleMapsApiKeyFromEnv(env: NodeJS.ProcessEnv = process.env): string | undefined {
