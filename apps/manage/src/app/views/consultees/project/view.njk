@@ -28,6 +28,40 @@
 		{% include "views/partials/consultee-map-region.njk" %}
 	{% endif %}
 
+	{% set radioItems = [] %}
+
+	{% for file in files %}
+		{% set fileLabelHtml %}
+			<svg
+				width="1em"
+				height="1em"
+				viewBox="0 0 20 20"
+				aria-label="Boundary colour: {{ file.style.description }}"
+			>
+				<rect
+					width=18.5
+					height=18.5
+					x=0.75
+					y=0.75
+					rx=1.5
+					ry=1.5
+					fill="rgb(from {{ file.style.colour }} R G B / {{ file.style.fillOpacity }})"
+					stroke={{ file.style.colour }}
+					stroke-width=1.5
+					stroke-linejoin="round"
+				/>
+			</svg>
+			<span>{{ file.text }}</span>
+		{% endset %}
+
+		{% set _ = radioItems.push({
+			value: file.value,
+			html: fileLabelHtml,
+			hint: file.hint,
+			checked: file.checked
+		}) %}
+	{% endfor %}
+
 	<form method="post" action="{{ formAction }}" novalidate class="govuk-!-margin-top-6">
 		<input type="hidden" name="_csrf" value="{{ _csrf }}">
 		{{ govukRadios({
@@ -40,7 +74,7 @@
 				}
 			},
 			errorMessage: shapefileError,
-			items: files
+			items: radioItems
 		}) }}
 
 		{{ govukButton({

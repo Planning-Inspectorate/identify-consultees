@@ -83,6 +83,7 @@ export function buildHomePage(service: ManageService): AsyncRequestHandler {
 
 		let geometries: ProjectGeometry[] = [];
 		let resultsTotal = 0;
+		let searchFailed = false;
 		if (!blankSearch) {
 			try {
 				const { features, total } = await searchCaseBoundaries(db, {
@@ -94,6 +95,8 @@ export function buildHomePage(service: ManageService): AsyncRequestHandler {
 				resultsTotal = total;
 			} catch (error) {
 				logger.error({ error }, 'Failed to search case boundaries');
+				// said so on the page - an empty table would read as no project matching
+				searchFailed = true;
 			}
 		}
 
@@ -116,6 +119,7 @@ export function buildHomePage(service: ManageService): AsyncRequestHandler {
 			pagination: buildPagination(page, totalPages, hrefForPage),
 			...(changingProject ? { changingProject } : {}),
 			...(req.query.refreshing === '1' ? { refreshing: true } : {}),
+			...(searchFailed ? { searchFailed: true } : {}),
 			...(blankSearch
 				? {
 						searchError: { text: 'Enter a search term' },

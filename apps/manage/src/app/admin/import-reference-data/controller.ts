@@ -187,6 +187,32 @@ export function loadOutcome(load: Pick<GroupLoad, 'quarter' | 'datasetInUse' | '
 }
 
 /**
+ * What the admin pages are changing in the reference data right now - a load or a clear - so a
+ * second, pressed while the first runs (they take minutes), is turned away rather than run over the
+ * same quarter's table at the same time. In this process only: the web app runs one instance.
+ */
+export const referenceDataChange: { running?: string } = {};
+
+/** Run `change` as the one reference data change under way, or say what is. */
+async function asTheOnlyChange<T>(
+	what: string,
+	change: () => Promise<T>
+): Promise<{ result: T } | { busyWith: string }> {
+	if (referenceDataChange.running) {
+		return { busyWith: referenceDataChange.running };
+	}
+	referenceDataChange.running = what;
+	try {
+		return { result: await change() };
+	} finally {
+		referenceDataChange.running = undefined;
+	}
+}
+
+const busyMessage = (running: string) =>
+	`Could not start - ${running} is still running. Wait for it to finish, then try again.`;
+
+/**
  * Load a group: its newest file in blob storage replaces its rows in its quarter's table, which
  * becomes the dataset in use once every group has been loaded into it (see importConsulteeAreaGroup).
  */
@@ -211,9 +237,18 @@ export function buildRunImportConsulteeAreaGroup(
 			if (!file) {
 				throw new GroupLoadError(`There's no ${group.name} file in blob storage - upload one first`);
 			}
-			const { filePath, cleanup } = await files.download(file.name);
-			try {
-				const load = await runImport(db, filePath, file.name);
+			const outcome = await asTheOnlyChange(`loading ${group.name}`, async () => {
+				const { filePath, cleanup } = await files.download(file.name);
+				try {
+					return await runImport(db, filePath, file.name);
+				} finally {
+					await cleanup();
+				}
+			});
+			if ('busyWith' in outcome) {
+				viewModel.error = busyMessage(outcome.busyWith);
+			} else {
+				const load = outcome.result;
 				viewModel.groupLoaded = `Loaded ${group.name} from ${file.name} into ${load.quarter}: ${load.rowsLoaded} consultee areas. ${loadOutcome(load)}`;
 				logger.info(
 					{
@@ -225,8 +260,6 @@ export function buildRunImportConsulteeAreaGroup(
 					},
 					'loaded a reference data group'
 				);
-			} finally {
-				await cleanup();
 			}
 		} catch (error) {
 			logger.error({ error, group: group.slug }, 'Failed to load a reference data group');
@@ -262,9 +295,13 @@ export function buildClearConsulteeAreas(
 				viewModel.error = 'Choose a dataset to clear.';
 				return res.render(VIEW, await withStatus(service, files, viewModel));
 			}
-			const deleted = await clear(db, quarter);
-			viewModel.consulteeAreasCleared = { quarter, deleted };
-			logger.info({ quarter, rows: deleted }, 'cleared a consultee area dataset');
+			const outcome = await asTheOnlyChange(`clearing ${quarter}`, () => clear(db, quarter));
+			if ('busyWith' in outcome) {
+				viewModel.error = busyMessage(outcome.busyWith);
+			} else {
+				viewModel.consulteeAreasCleared = { quarter, deleted: outcome.result };
+				logger.info({ quarter, rows: outcome.result }, 'cleared a consultee area dataset');
+			}
 		} catch (error) {
 			logger.error({ error, quarter }, 'Failed to clear a consultee area dataset');
 			viewModel.error = 'Could not clear the consultee areas.';

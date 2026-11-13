@@ -1,4 +1,5 @@
 import type { ManageService } from '#service';
+import { clientAddressKey } from '#util/client-address.ts';
 import { createRoutesAndGuards as createAuthRoutesAndGuards } from '@planning-inspectorate/core/auth';
 import { createMonitoringRoutes } from '@planning-inspectorate/core/controllers';
 import { cacheNoCacheMiddleware } from '@planning-inspectorate/core/middleware';
@@ -30,6 +31,8 @@ export function buildAuthRateLimiter(options: AuthRateLimiterOptions = {}): Requ
 		limit: options.limit ?? 100,
 		standardHeaders: 'draft-8',
 		legacyHeaders: false,
+		// each client its own limit, not each Front Door edge's (see clientAddressKey)
+		keyGenerator: clientAddressKey,
 		// Tests and local setups often omit X-Forwarded-For
 		validate: { xForwardedForHeader: false }
 	});

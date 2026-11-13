@@ -3,7 +3,13 @@ import assert from 'node:assert';
 import { describe, it, mock } from 'node:test';
 import { BOUNDARY_MAP_STYLES } from '../../../maps/boundary-map-styles.ts';
 import { configureNunjucks } from '../../../nunjucks.ts';
-import { buildBoundaryStaticMap, buildBoundarySubmit, buildConsulteeProjectPage } from './controller.ts';
+import type { BoundaryFileOption } from './boundary-files.ts';
+import {
+	buildBoundaryFileStyles,
+	buildBoundaryStaticMap,
+	buildBoundarySubmit,
+	buildConsulteeProjectPage
+} from './controller.ts';
 
 const realProjectId = '44444444-4444-4444-4444-444444444444';
 const siblingProjectId = '55555555-5555-5555-5555-555555555555';
@@ -77,6 +83,13 @@ describe('consultee project boundary page', () => {
 		assert.strictEqual(viewModel.files.length, 1);
 		assert.strictEqual(viewModel.files[0].value, realProjectId);
 		assert.strictEqual(viewModel.files[0].text, 'EN010099.geojson');
+		assert.deepStrictEqual(viewModel.files[0].style, {
+			colour: '#ff0000',
+			fillOpacity: 0.2,
+			strokeWidth: 1.5,
+			description: 'red, solid fill'
+		});
+		console.log(viewModel.files[0]);
 		assert.strictEqual('checked' in viewModel.files[0], false);
 		assert.match(viewModel.files[0].hint.text, /Uploaded: /);
 
@@ -435,5 +448,27 @@ describe('project boundary static map', () => {
 		assert.strictEqual(mockRes.status.mock.calls[0].arguments[0], 404);
 		await handler({ params: { caseId: 'not-a-uuid' }, query: {}, headers: {} }, mockRes);
 		assert.strictEqual(mockRes.status.mock.calls[1].arguments[0], 404);
+	});
+});
+
+describe('buildBoundaryFileStyles', () => {
+	const option = (id: string, receivedDate: Date | null): BoundaryFileOption => ({
+		id,
+		label: id,
+		receivedDate,
+		current: false
+	});
+
+	it("gives each file its map style by how recent it is - the radios' colours match the map's", () => {
+		const styles = buildBoundaryFileStyles([
+			option('older', new Date('2026-01-15')),
+			option('newest', new Date('2026-06-01')),
+			option('undated', null)
+		]);
+		assert.deepStrictEqual(styles, [
+			BOUNDARY_MAP_STYLES.earlier[0],
+			BOUNDARY_MAP_STYLES.mostRecent,
+			BOUNDARY_MAP_STYLES.earlier[1 % BOUNDARY_MAP_STYLES.earlier.length]
+		]);
 	});
 });

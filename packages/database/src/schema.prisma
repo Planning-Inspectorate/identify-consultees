@@ -35,35 +35,38 @@ datasource db {
 /// seed/consultee-area-groups.ts. Prisma reads and writes through the synonym as if it were the
 /// table; `prisma migrate dev` would see a table missing, so migrations are written by hand.
 model ConsulteeArea {
-  id                              String                   @id @default(dbgenerated("newid()")) @db.UniqueIdentifier
+  id                              String                    @id @default(dbgenerated("newid()")) @db.UniqueIdentifier
   geometry                        Unsupported("geography")
   // simplified copy of `geometry` that ruleset distance checks run against - see the migration
   geometrySimplified              Unsupported("geography")
-  geometryType                    String                   @db.NVarChar(50)
+  geometryType                    String                    @db.NVarChar(50)
   // the reference data export's own id - `id` is derived from it, so a re-import keeps each row's id
-  sourceId                        String?                  @db.NVarChar(200)
+  sourceId                        String?                   @db.NVarChar(200)
   // the category the rulesets match (config/reference-data.yaml maps each dataset to one)
-  consulteeCategory               String?                  @db.NVarChar(200)
+  consulteeCategory               String?                   @db.NVarChar(200)
   // the export's own consultee_category: a broad group (Health, Local Authorities, Transport...)
-  consulteeGroup                  String?                  @db.NVarChar(100)
+  consulteeGroup                  String?                   @db.NVarChar(100)
   // what kind of consultee within its category - a port's Statutory/NonStatutory, a railway's
   // Active/Inactive, an interconnector's build status - and what that means: the export's consultee_subcategory
   // and consultee_subcategory_description
-  consulteeSubcategory            String?                  @db.NVarChar(200)
-  consulteeSubcategoryDescription String?                  @db.NVarChar(500)
-  consultee                       String?                  @db.NVarChar(200)
-  region                          String?                  @db.NVarChar(100)
+  consulteeSubcategory            String?                   @db.NVarChar(200)
+  consulteeSubcategoryDescription String?                   @db.NVarChar(500)
+  consultee                       String?                   @db.NVarChar(200)
+  region                          String?                   @db.NVarChar(100)
   // the export's metadata as it gives it: each source dataset's own attributes. SQL Server has no
   // native JSON column type (and Prisma no SQL Server Json); query it with JSON_VALUE()/OPENJSON().
   // A CHECK constraint (ISJSON) in the migrations refuses anything that isn't JSON
-  metadata                        String                   @default("{}") @db.NVarChar(Max)
+  metadata                        String                    @default("{}") @db.NVarChar(Max)
   // which version of the area this is, and the dates it applies from and until (null while
   // current): the export's current_version, valid_from and valid_to
-  currentVersion                  Int                      @default(1)
-  validFrom                       DateTime?                @db.Date
-  validTo                         DateTime?                @db.Date
+  currentVersion                  Int                       @default(1)
+  validFrom                       DateTime?                 @db.Date
+  validTo                         DateTime?                 @db.Date
   // when the row was loaded
-  lastUpdated                     DateTime                 @default(now())
+  lastUpdated                     DateTime                  @default(now())
+  // a point on the area (inside a polygon) - PointOnSurface of geometrySimplified, as shapely's
+  // representative_point() - the add page's approximate distances; see the migration
+  representativePoint             Unsupported("geography")?
 
   @@index([consulteeCategory])
   @@map("consultee_area")

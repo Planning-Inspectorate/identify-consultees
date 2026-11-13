@@ -13,7 +13,8 @@ import { interactiveBasemap } from './os-maps.ts';
 import type { GeoJsonFeature, GeoJsonFeatureCollection } from './sample-geojson.ts';
 import { MAP_VIEWPORT } from './sample-geojson.ts';
 
-import type { BoundaryDatasetStyle } from './boundary-map-styles.ts';
+import type { BoundaryFileOption } from '../views/consultees/project/boundary-files.ts';
+import type { BoundaryDatasetStyle, BoundaryFileStyle } from './boundary-map-styles.ts';
 import { recencyRanks, styleForRank, toDatasetStyle } from './boundary-map-styles.ts';
 import type { StaticMapFallbackConfig } from './case-geojson.ts';
 
@@ -80,17 +81,23 @@ function toGeojson(file: BoundaryMapFile, caseReference: string): GeoJsonFeature
 	return { type: 'FeatureCollection', features: [feature] };
 }
 
+export function boundaryFileStyle(files: BoundaryFileOption[]): BoundaryFileStyle[] {
+	const ranks = recencyRanks(files.map((file) => file.receivedDate));
+
+	return files.map((file, index) => styleForRank(ranks[index]));
+}
+
 export function buildBoundaryMapConfig(
 	caseName: string,
 	caseReference: string,
 	files: BoundaryMapFile[],
+	styles: BoundaryFileStyle[],
 	fallback?: { src: string; alt: string }
 ): BoundaryMapConfig {
-	const ranks = recencyRanks(files.map((file) => file.receivedDate));
 	const datasets = files.map((file, index) => ({
 		id: `shapefile-${file.id}`,
 		label: file.label,
-		style: toDatasetStyle(styleForRank(ranks[index])),
+		style: toDatasetStyle(styles[index]),
 		geojson: toGeojson(file, caseReference)
 	}));
 	const view = computeFittedMapView(

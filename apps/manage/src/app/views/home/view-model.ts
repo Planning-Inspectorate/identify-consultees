@@ -19,6 +19,8 @@ export interface HomeViewModel {
 	changingProject?: { step: 'project'; rulesetId: string };
 	/** Refresh cases was just pressed - the page says CBOS's cases are being imported. */
 	refreshing?: true;
+	/** The search couldn't be run - the database didn't answer - so there are no results to show. */
+	searchFailed?: true;
 }
 
 export interface ProjectGeometry {

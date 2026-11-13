@@ -43,7 +43,7 @@ Expected: HTTP 500 (lusca marks the response 403 internally, but the default han
 
 ### Rate limiting
 
-Two limiters, both plain-text 429s from `express-rate-limit` rather than branded pages: `/auth/*` at 100 requests per 15 minutes, and the static-asset/`/vendor/*` mounts at 1000. The auth one only exists when auth is on (`AUTH_DISABLED` unset), so this is a deployed-environment check:
+Two limiters, both plain-text 429s from `express-rate-limit` rather than branded pages: `/auth/*` at 100 requests per 15 minutes, and the static-asset/`/vendor/*` mounts at 1000. Each counts per client address - Front Door's `X-Azure-ClientIP`, or the request's own address locally (`util/client-address.ts`) - so users coming through one Front Door edge don't share a limit. The auth one only exists when auth is on (`AUTH_DISABLED` unset), so this is a deployed-environment check:
 
 ```bash
 for i in $(seq 105); do curl -s -o /dev/null https://<host>/auth/signin; done
