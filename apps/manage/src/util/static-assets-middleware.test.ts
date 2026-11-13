@@ -12,6 +12,7 @@ import {
 	buildStaticAssetsRateLimiter,
 	createStaticAssetsMiddleware,
 	FINGERPRINTED_CACHE_CONTROL,
+	MODULE_CACHE_CONTROL,
 	staticAssetRequestKey,
 	UNFINGERPRINTED_CACHE_CONTROL
 } from './static-assets-middleware.ts';
@@ -156,6 +157,26 @@ describe('static-assets-middleware', () => {
 		const response = await request(app).get(`/${relative}`);
 		assert.equal(response.status, 200);
 		assert.equal(response.headers['cache-control'], UNFINGERPRINTED_CACHE_CONTROL);
+	});
+
+	test('serves .mjs modules with no-cache so un-fingerprinted imports always revalidate', async () => {
+		tempDir = await mkdtemp(path.join(tmpdir(), 'static-assets-mw-mjs-'));
+		const relative = 'javascripts/plugin.mjs';
+		const absolute = path.join(tempDir, ...relative.split('/'));
+		await mkdir(path.dirname(absolute), { recursive: true });
+		await writeFile(absolute, 'export const x = 1;');
+
+		const app = express();
+		app.use(
+			createStaticAssetsMiddleware(tempDir, {
+				rateLimiter: buildStaticAssetsRateLimiter({ limit: 100, windowMs: 60_000 })
+			})
+		);
+		app.use((_req, res) => res.status(404).end());
+
+		const response = await request(app).get(`/${relative}`);
+		assert.equal(response.status, 200);
+		assert.equal(response.headers['cache-control'], MODULE_CACHE_CONTROL);
 	});
 
 	test('does not serve path traversal requests', async () => {
