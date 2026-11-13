@@ -7,9 +7,9 @@ import type { Handler } from 'express';
 export function addLocalsConfiguration(): Handler {
 	return (req, res, next) => {
 		res.locals.config = {
-			styleFile: 'style-52a6b33d.css',
+			styleFile: 'style-218ef0e8.css',
 			govukFrontendJs: 'assets/js/govuk-frontend.min-0391e416.js',
-			consulteesMapJs: 'javascripts/consultees-map-fa9eb6e8.js',
+			consulteesMapJs: 'javascripts/consultees-map-c631e8b5.js',
 			consulteeAutocompleteJs: 'javascripts/consultee-autocomplete-aea54bb1.js',
 			blobUploadJs: 'javascripts/blob-upload-cfe8ea96.js',
 			accessibleAutocompleteJs: 'assets/js/accessible-autocomplete.min-876870ee.js',
