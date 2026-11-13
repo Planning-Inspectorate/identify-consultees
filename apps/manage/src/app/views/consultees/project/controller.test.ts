@@ -1,9 +1,16 @@
 import { mockLogger } from '@planning-inspectorate/core/testing';
 import assert from 'node:assert';
 import { describe, it, mock } from 'node:test';
+import type { BoundaryFileStyle } from '../../../maps/boundary-map-styles.ts';
 import { BOUNDARY_MAP_STYLES } from '../../../maps/boundary-map-styles.ts';
 import { configureNunjucks } from '../../../nunjucks.ts';
-import { buildBoundaryStaticMap, buildBoundarySubmit, buildConsulteeProjectPage } from './controller.ts';
+import type { BoundaryFileOption } from './boundary-files.ts';
+import {
+	buildBoundaryOptionFromStyles,
+	buildBoundaryStaticMap,
+	buildBoundarySubmit,
+	buildConsulteeProjectPage
+} from './controller.ts';
 
 const realProjectId = '44444444-4444-4444-4444-444444444444';
 const siblingProjectId = '55555555-5555-5555-5555-555555555555';
@@ -77,6 +84,13 @@ describe('consultee project boundary page', () => {
 		assert.strictEqual(viewModel.files.length, 1);
 		assert.strictEqual(viewModel.files[0].value, realProjectId);
 		assert.strictEqual(viewModel.files[0].text, 'EN010099.geojson');
+		assert.deepStrictEqual(viewModel.files[0].style, {
+			colour: '#ff0000',
+			fillOpacity: 0.2,
+			strokeWidth: 1.5,
+			description: 'red, solid fill'
+		});
+		console.log(viewModel.files[0]);
 		assert.strictEqual('checked' in viewModel.files[0], false);
 		assert.match(viewModel.files[0].hint.text, /Uploaded: /);
 
@@ -435,5 +449,27 @@ describe('project boundary static map', () => {
 		assert.strictEqual(mockRes.status.mock.calls[0].arguments[0], 404);
 		await handler({ params: { caseId: 'not-a-uuid' }, query: {}, headers: {} }, mockRes);
 		assert.strictEqual(mockRes.status.mock.calls[1].arguments[0], 404);
+	});
+});
+
+describe('buildBoundaryOptionFromStyles', () => {
+	const baseOption: BoundaryFileOption = {
+		id: 'boundary-1',
+		label: 'Site boundary',
+		receivedDate: new Date('2026-01-15'),
+		current: true
+	};
+
+	const baseStyle: BoundaryFileStyle = {
+		colour: '#d4351c',
+		fillOpacity: 0.2,
+		strokeWidth: 2,
+		description: 'Red dashed outline'
+	};
+
+	it('returns a span containing the option label and style colour', () => {
+		const result = buildBoundaryOptionFromStyles(baseOption, baseStyle);
+
+		assert.strictEqual(result, '<span>Site boundary #d4351c</span>');
 	});
 });

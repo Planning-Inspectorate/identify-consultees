@@ -1,8 +1,12 @@
+import type { BoundaryFileStyle } from '../../../maps/boundary-map-styles.ts';
+
 export interface BoundaryFileRadio {
 	/** The file option's id - the boundary's own id for real files. */
 	value: string;
 	/** The file's name. */
 	text: string;
+	/** The corresponding colour of this file in the map */
+	style: BoundaryFileStyle;
 	/** "Uploaded: ..." when the file has a received date. */
 	hint?: { text: string };
 	/** The file the check page has - checked only when changing it there. */
