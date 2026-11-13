@@ -46,30 +46,57 @@
 		{% if rows.length == 0 %}
 			<p class="govuk-body">No consultees identified in this category.</p>
 		{% else %}
-			{% set tableRows = [] %}
-			{% for row in rows %}
-				{% set removeLink %}
-					<a class="govuk-link" href="{{ row.removeUrl }}">Remove<span class="govuk-visually-hidden"> {{ row.name }}</span></a>
+			<form method="get" action="{{ bulkRemove.formAction }}">
+				{% for param in bulkRemove.hiddenParams %}
+					<input type="hidden" name="{{ param.name }}" value="{{ param.value }}">
+				{% endfor %}
+				{% set tableRows = [] %}
+				{# MoJ multi-select pattern: a checkbox-only first column, its header holding the
+				   Select all box. It submits `select-all` when JS never ran - the remove page
+				   reads that as every listed consultee; consultee-select.js strips the name and
+				   wires the toggling instead #}
+				{% set selectAllHtml %}
+					<div class="govuk-checkboxes__item govuk-checkboxes--small moj-multi-select__checkbox">
+						<input class="govuk-checkboxes__input" id="consultees-checkboxes-all" name="select-all" type="checkbox" value="true">
+						<label class="govuk-label govuk-checkboxes__label moj-multi-select__toggle-label" for="consultees-checkboxes-all"><span class="govuk-visually-hidden">Select all</span></label>
+					</div>
 				{% endset %}
-				{# one reason per line - each item is autoescaped #}
-				{% set identifiedHtml %}{% for reason in row.identified %}{{ reason }}{% if not loop.last %}<br>{% endif %}{% endfor %}{% endset %}
-				{% set tableRows = (tableRows.push([
-					{ text: row.name, classes: "govuk-table__cell--no-wrap" },
-					{ html: identifiedHtml },
-					{ html: removeLink }
-				]), tableRows) %}
-			{% endfor %}
-			{{ govukTable({
-				caption: "Included consultees",
-				captionClasses: "govuk-visually-hidden",
-				firstCellIsHeader: true,
-				head: [
-					{ text: "Name" },
-					{ text: "Identified" },
-					{ text: "Actions" }
-				],
-				rows: tableRows
-			}) }}
+				{% for row in rows %}
+					{% set removeLink %}
+						<a class="govuk-link" href="{{ row.removeUrl }}">Remove<span class="govuk-visually-hidden"> {{ row.name }}</span></a>
+					{% endset %}
+					{% set selectHtml %}
+						<div class="govuk-checkboxes__item govuk-checkboxes--small moj-multi-select__checkbox">
+							<input class="govuk-checkboxes__input" id="{{ row.select.domId }}" name="{{ row.select.param }}" type="checkbox" value="{{ row.select.value }}">
+							<label class="govuk-label govuk-checkboxes__label" for="{{ row.select.domId }}"><span class="govuk-visually-hidden">Select {{ row.name }}</span></label>
+						</div>
+					{% endset %}
+					{# one reason per line - each item is autoescaped #}
+					{% set identifiedHtml %}{% for reason in row.identified %}{{ reason }}{% if not loop.last %}<br>{% endif %}{% endfor %}{% endset %}
+					{% set tableRows = (tableRows.push([
+						{ html: selectHtml },
+						{ text: row.name, classes: "govuk-table__cell--no-wrap" },
+						{ html: identifiedHtml },
+						{ html: removeLink }
+					]), tableRows) %}
+				{% endfor %}
+				{{ govukTable({
+					caption: "Included consultees",
+					captionClasses: "govuk-visually-hidden",
+					attributes: { "data-module": "consultee-select", "data-id-prefix": "consultees-" },
+					head: [
+						{ html: selectAllHtml, attributes: { id: "consultees-select-all" } },
+						{ text: "Name" },
+						{ text: "Identified" },
+						{ text: "Actions" }
+					],
+					rows: tableRows
+				}) }}
+				{{ govukButton({
+					text: "Remove selected",
+					classes: "govuk-button--warning"
+				}) }}
+			</form>
 		{% endif %}
 	{% endif %}
 
@@ -116,4 +143,5 @@
 	<script defer src="/{{ config.vendorDatasetsPluginJs }}"></script>
 	<script defer src="/{{ config.vendorInteractPluginJs }}"></script>
 	<script type="module" src="/{{ config.consulteesMapJs }}"></script>
+	<script type="module" src="/{{ config.consulteeSelectJs }}"></script>
 {% endblock %}

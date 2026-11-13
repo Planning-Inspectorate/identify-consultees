@@ -21,12 +21,14 @@ import type { ConsulteeSelection } from '../urls.ts';
 import {
 	addConsulteeUrl,
 	addedMatchIds,
+	bulkRemoveConsulteeUrl,
 	categoryStaticMapUrl,
 	consulteeSelection,
 	consulteesUrl,
 	excludedMatchIds,
 	removeConsulteeUrl,
-	reportUrl
+	reportUrl,
+	selectionParams
 } from '../urls.ts';
 import type { ConsulteeRow, ReportConsulteesViewModel } from './view-model.ts';
 
@@ -171,7 +173,8 @@ async function renderCategoryPage(
 			name: consulteeName(match),
 			distanceMetres: match.distanceMetres,
 			identified: describeReasons(match, ruleset, { nearby: false }),
-			removeUrl: removeConsulteeUrl(project.id, ruleset.id, category, { matchId: match.feature.id }, selection)
+			removeUrl: removeConsulteeUrl(project.id, ruleset.id, category, { matchId: match.feature.id }, selection),
+			select: { param: 'match', value: match.feature.id, domId: `select-match-${match.feature.id}` }
 		})),
 		...selection.adds.flatMap((add, index) => {
 			if (add.category !== category) {
@@ -185,7 +188,8 @@ async function renderCategoryPage(
 					name: add.name,
 					...(found ? { distanceMetres: found.distanceMetres } : {}),
 					identified: [addedConsulteeReason(add)],
-					removeUrl: removeConsulteeUrl(project.id, ruleset.id, category, { addedIndex: index }, selection)
+					removeUrl: removeConsulteeUrl(project.id, ruleset.id, category, { addedIndex: index }, selection),
+					select: { param: 'added', value: String(index), domId: `select-added-${index}` }
 				}
 			];
 		})
@@ -210,7 +214,12 @@ async function renderCategoryPage(
 		...(buffers.length > 0 ? { bufferGeojson: siteBufferGeojson(buffers) } : {})
 	};
 	const rows: ConsulteeRow[] = listedRows
-		.map(({ id, identified: reasons, removeUrl }) => ({ name: labels.get(id)!, identified: reasons, removeUrl }))
+		.map(({ id, identified: reasons, removeUrl, select }) => ({
+			name: labels.get(id)!,
+			identified: reasons,
+			removeUrl,
+			select
+		}))
 		.sort((a, b) => a.name.localeCompare(b.name, 'en-GB'));
 
 	const viewModel: ReportConsulteesViewModel = {
@@ -219,6 +228,16 @@ async function renderCategoryPage(
 		backLinkUrl: reportUrl(project.id, ruleset.id, selection),
 		backLinkText: 'Back to draft report',
 		rows,
+		// the bulk form's state rides in its hidden inputs - the GET action itself is the bare
+		// remove path, so the checked rows land as repeated match/added params
+		bulkRemove: {
+			formAction: bulkRemoveConsulteeUrl(project.id),
+			hiddenParams: [
+				{ name: 'ruleset', value: ruleset.id },
+				{ name: 'category', value: category },
+				...selectionParams(selection)
+			]
+		},
 		addConsulteeUrl: addConsulteeUrl(project.id, ruleset.id, category, selection),
 		mapId: 'case-map',
 		mapRegionLabel: `Map showing ${categoryName} consultees for ${project.properties.caseName}`,

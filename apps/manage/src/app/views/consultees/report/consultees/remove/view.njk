@@ -33,22 +33,24 @@
 				{% endset %}
 				{{ govukNotificationBanner({ html: failureHtml }) }}
 			{% else %}
-				{# one reason per line - each item is autoescaped #}
-				{% set identifiedHtml %}{% for reason in identified %}{{ reason }}{% if not loop.last %}<br>{% endif %}{% endfor %}{% endset %}
+				{% set summaryRows = [] %}
+				{% for consultee in consultees %}
+					{# one reason per line - each item is autoescaped #}
+					{% set identifiedHtml %}{% for reason in consultee.identified %}{{ reason }}{% if not loop.last %}<br>{% endif %}{% endfor %}{% endset %}
+					{% set summaryRows = (summaryRows.push([
+						{ text: consultee.name, classes: "govuk-table__cell--no-wrap" },
+						{ html: identifiedHtml }
+					]), summaryRows) %}
+				{% endfor %}
 				{{ govukTable({
-					caption: "Consultee being removed",
+					caption: "Consultees being removed" if consultees.length > 1 else "Consultee being removed",
 					captionClasses: "govuk-visually-hidden",
 					firstCellIsHeader: true,
 					head: [
 						{ text: "Name" },
 						{ text: "Identified" }
 					],
-					rows: [
-						[
-							{ text: name, classes: "govuk-table__cell--no-wrap" },
-							{ html: identifiedHtml }
-						]
-					]
+					rows: summaryRows
 				}) }}
 
 				<form method="post" action="{{ formAction }}" novalidate>

@@ -160,6 +160,7 @@ export async function applyAssetManifestToLocalsFile(localsFile: string, manifes
 		{ logical: 'assets/js/govuk-frontend.min.js', property: 'govukFrontendJs' },
 		{ logical: 'javascripts/consultees-map.js', property: 'consulteesMapJs' },
 		{ logical: 'javascripts/consultee-autocomplete.js', property: 'consulteeAutocompleteJs' },
+		{ logical: 'javascripts/consultee-select.js', property: 'consulteeSelectJs' },
 		{ logical: 'javascripts/blob-upload.js', property: 'blobUploadJs' },
 		{ logical: 'assets/js/accessible-autocomplete.min.js', property: 'accessibleAutocompleteJs' },
 		{ logical: 'assets/css/accessible-autocomplete.min.css', property: 'accessibleAutocompleteCss' },

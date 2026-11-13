@@ -1,5 +1,5 @@
 export interface RemoveConsulteeViewModel {
-	/** "Remove consultee" - the heading above the consultee's details and reason form. */
+	/** "Remove consultee" - the heading above the table and reason form, one consultee or many. */
 	pageHeading: string;
 	/** The category it's being removed from - the caption above the heading, as on the add page (Nearby NSIPs spelled out). */
 	pageCaption: string;
@@ -7,10 +7,12 @@ export interface RemoveConsulteeViewModel {
 	backLinkUrl: string;
 	/** The form's POST target - this same URL, so the selection and target params ride along. */
 	formAction: string;
-	/** The consultee being removed - the single row of the summary table. */
-	name: string;
-	/** Every reason it was identified, one per line - same as the category page's Identified column. */
-	identified: string[];
+	/** The consultees being removed - a row of the summary table each. */
+	consultees: {
+		name: string;
+		/** Every reason it was identified, one per line - same as the category page's Identified column. */
+		identified: string[];
+	}[];
 	/** Entered value, re-rendered when the form fails validation. */
 	reasonValue: string;
 	/** govukTextarea's errorMessage param - present only when the reason was missing. */
