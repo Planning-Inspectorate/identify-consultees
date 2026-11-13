@@ -1,12 +1,11 @@
 import { mockLogger } from '@planning-inspectorate/core/testing';
 import assert from 'node:assert';
 import { describe, it, mock } from 'node:test';
-import type { BoundaryFileStyle } from '../../../maps/boundary-map-styles.ts';
 import { BOUNDARY_MAP_STYLES } from '../../../maps/boundary-map-styles.ts';
 import { configureNunjucks } from '../../../nunjucks.ts';
 import type { BoundaryFileOption } from './boundary-files.ts';
 import {
-	buildBoundaryOptionFromStyles,
+	buildBoundaryFileStyles,
 	buildBoundaryStaticMap,
 	buildBoundarySubmit,
 	buildConsulteeProjectPage
@@ -452,24 +451,24 @@ describe('project boundary static map', () => {
 	});
 });
 
-describe('buildBoundaryOptionFromStyles', () => {
-	const baseOption: BoundaryFileOption = {
-		id: 'boundary-1',
-		label: 'Site boundary',
-		receivedDate: new Date('2026-01-15'),
-		current: true
-	};
+describe('buildBoundaryFileStyles', () => {
+	const option = (id: string, receivedDate: Date | null): BoundaryFileOption => ({
+		id,
+		label: id,
+		receivedDate,
+		current: false
+	});
 
-	const baseStyle: BoundaryFileStyle = {
-		colour: '#d4351c',
-		fillOpacity: 0.2,
-		strokeWidth: 2,
-		description: 'Red dashed outline'
-	};
-
-	it('returns a span containing the option label and style colour', () => {
-		const result = buildBoundaryOptionFromStyles(baseOption, baseStyle);
-
-		assert.strictEqual(result, '<span>Site boundary #d4351c</span>');
+	it("gives each file its map style by how recent it is - the radios' colours match the map's", () => {
+		const styles = buildBoundaryFileStyles([
+			option('older', new Date('2026-01-15')),
+			option('newest', new Date('2026-06-01')),
+			option('undated', null)
+		]);
+		assert.deepStrictEqual(styles, [
+			BOUNDARY_MAP_STYLES.earlier[0],
+			BOUNDARY_MAP_STYLES.mostRecent,
+			BOUNDARY_MAP_STYLES.earlier[1 % BOUNDARY_MAP_STYLES.earlier.length]
+		]);
 	});
 });
