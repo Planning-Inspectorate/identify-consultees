@@ -7,6 +7,7 @@ import {
 } from '@pins/identify-consultees-database/src/geospatial/case-boundaries.ts';
 import { getRuleset } from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
 import type { AsyncRequestHandler, AsyncRequestHandlerWithBody } from '@planning-inspectorate/core/util';
+import type { BoundaryFileStyle } from '../../../maps/boundary-map-styles.ts';
 import { recencyRanks, styleForRank } from '../../../maps/boundary-map-styles.ts';
 import type { BoundaryMapFile } from '../../../maps/boundary-map.ts';
 import { buildBoundaryMapConfig } from '../../../maps/boundary-map.ts';
@@ -76,6 +77,12 @@ function boundaryChange(
 	};
 }
 
+export function buildBoundaryFileStyles(files: BoundaryFileOption[]): BoundaryFileStyle[] {
+	const ranks = recencyRanks(files.map((file) => file.receivedDate));
+
+	return files.map((file, index) => styleForRank(ranks[index]));
+}
+
 /**
  * The boundary page's view model: the map draws every shapefile the case holds (the page's own
  * file visible first), and the radios below ask the user to confirm which single file is carried
@@ -97,10 +104,19 @@ async function boundaryPageViewModel(
 		src: `/consultees/${encodeURIComponent(project.id)}/boundary-map`,
 		alt: `Static map showing the project boundary for ${project.properties.caseName}`
 	};
+
+	const styles = buildBoundaryFileStyles(options);
+
 	const map = await mapFiles(db, project, options)
-		.then((files) =>
-			buildBoundaryMapConfig(project.properties.caseName, project.properties.caseReference, files, fallback)
-		)
+		.then((files) => {
+			return buildBoundaryMapConfig(
+				project.properties.caseName,
+				project.properties.caseReference,
+				files,
+				styles,
+				fallback
+			);
+		})
 		.catch((error: unknown) => {
 			logger.error({ error, caseId: project.id }, 'Failed to load the boundary page map');
 			return undefined;
@@ -118,9 +134,10 @@ async function boundaryPageViewModel(
 			: { backLinkUrl: change ? changeProjectUrl(change.rulesetId) : '/' }),
 		backLinkText: 'Back',
 		formAction: boundaryUrl(project.id, change, change?.selection),
-		files: options.map((option): BoundaryFileRadio => ({
+		files: options.map((option, index): BoundaryFileRadio => ({
 			value: option.id,
 			text: option.label,
+			style: styles[index],
 			...(option.receivedDate ? { hint: { text: `Uploaded: ${formatUploadedAt(option.receivedDate)}` } } : {}),
 			...(change?.step === 'shapefile' && !shapefileError && option.id === project.id ? { checked: true } : {})
 		})),

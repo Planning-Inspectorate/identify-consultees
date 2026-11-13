@@ -1,7 +1,13 @@
 import type { ConsulteeAreaDetail } from '@pins/identify-consultees-database/src/geospatial/consultee-areas.ts';
 import assert from 'node:assert';
 import { describe, it } from 'node:test';
-import { distinguishedLabels, distinguishingDetail, labelVariants, nameBeforeLabel } from './consultee-labels.ts';
+import {
+	distinguishedLabels,
+	distinguishingDetail,
+	kilometresFromSite,
+	labelVariants,
+	nameBeforeLabel
+} from './consultee-labels.ts';
 
 const detail = (overrides: Partial<ConsulteeAreaDetail> = {}): ConsulteeAreaDetail => ({
 	region: null,
@@ -12,6 +18,24 @@ const detail = (overrides: Partial<ConsulteeAreaDetail> = {}): ConsulteeAreaDeta
 });
 
 describe('consultee labels', () => {
+	it('gives a distance to a tenth of a kilometre, and an approximate one as "about", to the kilometre from 10km', () => {
+		assert.strictEqual(kilometresFromSite(3_249), '3.2 km from the site');
+		assert.strictEqual(kilometresFromSite(3_249, true), 'about 3.2 km from the site');
+		assert.strictEqual(kilometresFromSite(40_400, true), 'about 40 km from the site');
+		assert.strictEqual(kilometresFromSite(40_400), '40.4 km from the site');
+	});
+
+	it('offers an approximate distance back as the label gave it', () => {
+		assert.deepStrictEqual(
+			labelVariants({ id: 'a', name: 'Middleton', distanceMetres: 40_400, approximate: true }, 'North Yorkshire'),
+			[
+				'Middleton (North Yorkshire)',
+				'Middleton (North Yorkshire, about 40 km from the site)',
+				'Middleton (about 40 km from the site)'
+			]
+		);
+	});
+
 	it("tells a consultee apart by its category's detail: council area, operator and technology, else region", () => {
 		assert.strictEqual(
 			distinguishingDetail(

@@ -227,7 +227,14 @@ export async function loadConsulteeAreas(
 		await dbClient.$executeRaw`
 			MERGE INTO ${target} AS target
 			USING (
-				SELECT parsed.*, parsed.geometry.Reduce(${SIMPLIFY_TOLERANCE_METRES}).MakeValid() AS geometrySimplified
+				SELECT parsed.*, simplified.geometrySimplified,
+					-- a point on the area, as the 20261112090000 migration backfilled: PointOnSurface
+					-- is geometry-only, so to geometry and back
+					geography::STGeomFromWKB(
+						geometry::STGeomFromWKB(simplified.geometrySimplified.STAsBinary(), 4326)
+							.MakeValid().STPointOnSurface().STAsBinary(),
+						4326
+					) AS representativePoint
 				FROM (
 					SELECT
 						id,
@@ -266,12 +273,16 @@ export async function loadConsulteeAreas(
 						metadata NVARCHAR(MAX) '$.metadata'
 					)
 				) AS parsed
+				CROSS APPLY (
+					SELECT parsed.geometry.Reduce(${SIMPLIFY_TOLERANCE_METRES}).MakeValid() AS geometrySimplified
+				) AS simplified
 			) AS source
 			ON target.id = source.id
 			WHEN MATCHED THEN UPDATE SET
 				geometryType = source.geometryType,
 				geometry = source.geometry,
 				geometrySimplified = source.geometrySimplified,
+				representativePoint = source.representativePoint,
 				consulteeCategory = source.consulteeCategory,
 				consultee = source.consultee,
 				region = source.region,
@@ -285,11 +296,12 @@ export async function loadConsulteeAreas(
 				metadata = source.metadata,
 				lastUpdated = SYSUTCDATETIME()
 			WHEN NOT MATCHED THEN INSERT (
-				id, geometryType, geometry, geometrySimplified, sourceId, consulteeCategory, consulteeGroup,
-				consulteeSubcategory, consulteeSubcategoryDescription, currentVersion, validFrom, validTo, consultee,
-				region, metadata
+				id, geometryType, geometry, geometrySimplified, representativePoint, sourceId, consulteeCategory,
+				consulteeGroup, consulteeSubcategory, consulteeSubcategoryDescription, currentVersion, validFrom, validTo,
+				consultee, region, metadata
 			) VALUES (
-				source.id, source.geometryType, source.geometry, source.geometrySimplified, source.sourceId,
+				source.id, source.geometryType, source.geometry, source.geometrySimplified, source.representativePoint,
+				source.sourceId,
 				source.consulteeCategory, source.consulteeGroup, source.consulteeSubcategory,
 				source.consulteeSubcategoryDescription, source.currentVersion, source.validFrom, source.validTo,
 				source.consultee, source.region, source.metadata
@@ -434,10 +446,20 @@ export interface NamedConsulteeArea {
 	id: string;
 	/** As the reference data spells it. */
 	consultee: string;
+	/**
+	 * Approximate: from the site to the area's representativePoint (its envelope centre if it has
+	 * none), not to its nearest edge - quick, but off by up to the area's own size. A list of names
+	 * is ordered by it and shows it as "about"; nothing is decided by it.
+	 */
 	distanceMetres: number;
 	/** Its region, to tell apart areas that share a name. */
 	region: string | null;
 }
+
+/** The SQL for an area's approximate distance from `@site` - see NamedConsulteeArea.distanceMetres. */
+const APPROXIMATE_DISTANCE = Prisma.raw(
+	'ISNULL(representativePoint, geometrySimplified.EnvelopeCenter()).STDistance(@site)'
+);
 
 // a name more areas share than this is listed only this far - Middleton, the most shared parish
 // name, has 12
@@ -457,8 +479,8 @@ export async function findConsulteeAreasByName(
 ): Promise<NamedConsulteeArea[]> {
 	const rows = await withDeadlockRetry(
 		() => dbClient.$queryRaw<{ id: string; consultee: string; distanceMetres: number; region: string | null }[]>`
-			SELECT TOP (${MAX_NAMED_AREAS}) id, consultee, region,
-				geometrySimplified.STDistance(geography::STGeomFromText(${geometryToWkt(site)}, 4326)) AS distanceMetres
+			DECLARE @site geography = geography::STGeomFromText(${geometryToWkt(site)}, 4326);
+			SELECT TOP (${MAX_NAMED_AREAS}) id, consultee, region, ${APPROXIMATE_DISTANCE} AS distanceMetres
 			FROM consultee_area
 			WHERE consulteeCategory = ${category}
 				AND LOWER(consultee) = LOWER(${name})
@@ -486,6 +508,9 @@ function likeLiteral(text: string): string {
  * The consultee_area rows in `category` whose names start with `typed` - case aside - for the Add a
  * consultee page to suggest as a name is typed, anywhere in the reference data: those called exactly
  * that first (every Newton, for "Newton"), then the rest, each nearest `site` first.
+ *
+ * Their distances are approximate (NamedConsulteeArea.distanceMetres), so none is measured exactly:
+ * measuring every match exactly took 1.5s for "New" (128 parishes) on the largest site.
  */
 export async function findConsulteeAreasByNameStart(
 	dbClient: PrismaClient,
@@ -495,8 +520,8 @@ export async function findConsulteeAreasByNameStart(
 ): Promise<NamedConsulteeArea[]> {
 	const rows = await withDeadlockRetry(
 		() => dbClient.$queryRaw<{ id: string; consultee: string; distanceMetres: number; region: string | null }[]>`
-			SELECT TOP (${MAX_SUGGESTED_AREAS}) id, consultee, region,
-				geometrySimplified.STDistance(geography::STGeomFromText(${geometryToWkt(site)}, 4326)) AS distanceMetres
+			DECLARE @site geography = geography::STGeomFromText(${geometryToWkt(site)}, 4326);
+			SELECT TOP (${MAX_SUGGESTED_AREAS}) id, consultee, region, ${APPROXIMATE_DISTANCE} AS distanceMetres
 			FROM consultee_area
 			WHERE consulteeCategory = ${category}
 				AND LOWER(consultee) LIKE LOWER(${`${likeLiteral(typed)}%`}) ESCAPE '!'

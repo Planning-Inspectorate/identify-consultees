@@ -21,11 +21,20 @@ export interface Labelled {
 	name: string;
 	/** From the site, when known - the last thing to tell two apart by. */
 	distanceMetres?: number;
+	/** Whether that's approximate - to a point on it, not its nearest edge - so reads "about". */
+	approximate?: boolean;
 }
 
-/** A distance as the add page and its labels give it - "3.2 km from the site". */
-export function kilometresFromSite(metres: number): string {
-	return `${(metres / 1000).toFixed(1)} km from the site`;
+/**
+ * A distance as the add page and its labels give it - "3.2 km from the site", or for an approximate
+ * one "about 3.2 km from the site", to the nearest kilometre from 10km ("about 40 km").
+ */
+export function kilometresFromSite(metres: number, approximate = false): string {
+	const kilometres = metres / 1000;
+	if (!approximate) {
+		return `${kilometres.toFixed(1)} km from the site`;
+	}
+	return `about ${kilometres < 10 ? kilometres.toFixed(1) : Math.round(kilometres)} km from the site`;
 }
 
 /** A name as names are compared: case, and runs of spaces, ignored. */
@@ -93,7 +102,7 @@ export function distinguishedLabels(
 		labels.set(
 			item.id,
 			tellApart
-				? `${item.name} (${[detail, kilometresFromSite(item.distanceMetres!)].filter(Boolean).join(', ')})`
+				? `${item.name} (${[detail, kilometresFromSite(item.distanceMetres!, item.approximate)].filter(Boolean).join(', ')})`
 				: label
 		);
 	}
@@ -105,7 +114,8 @@ export function distinguishedLabels(
  * apart, with that and its distance, or with its distance alone.
  */
 export function labelVariants(item: Labelled, detail: string | undefined): string[] {
-	const distance = item.distanceMetres === undefined ? undefined : kilometresFromSite(item.distanceMetres);
+	const distance =
+		item.distanceMetres === undefined ? undefined : kilometresFromSite(item.distanceMetres, item.approximate);
 	return [
 		...(detail ? [`${item.name} (${detail})`] : []),
 		...(detail && distance ? [`${item.name} (${detail}, ${distance})`] : []),

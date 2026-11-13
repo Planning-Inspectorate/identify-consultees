@@ -32,6 +32,11 @@ interface NameCandidate {
 	/** Every name it answers to - for a case, "Name (REF)" and each part alone. */
 	aliases: string[];
 	distanceMetres: number;
+	/**
+	 * Whether that's approximate: a consultee looked up in the reference data by name is measured to
+	 * a point on it (NamedConsulteeArea.distanceMetres); one the run found has its exact distance.
+	 */
+	approximate?: boolean;
 	/** Its region - shown to tell apart consultees that share a name. */
 	region?: string | null;
 	/** One the category page removed - adding it back undoes the removal. */
@@ -68,7 +73,9 @@ async function labelCandidates(
 		const label = labels.get(candidate.id)!;
 		const isShared = sharing.has(candidate.id);
 		const hint = [
-			label.includes(' km from the site') ? undefined : kilometresFromSite(candidate.distanceMetres),
+			label.includes(' km from the site')
+				? undefined
+				: kilometresFromSite(candidate.distanceMetres, candidate.approximate),
 			isShared && candidate.region && !label.includes(candidate.region) ? candidate.region : undefined,
 			candidate.removed ? 'removed' : undefined
 		]
@@ -280,6 +287,8 @@ export function buildReportConsulteeAddSuggestions(service: ManageService): Asyn
 		}
 		const inList = listedIds(context);
 		const removed = excludedMatchIds(context.selection.removed);
+		// one the run found keeps its exact distance, as the page's own suggestions give it
+		const found = new Map((await nameCandidates(service, context)).map((candidate) => [candidate.id, candidate]));
 		const candidates: NameCandidate[] = (
 			await findConsulteeAreasByNameStart(service.db, context.category, typed, screenedGeometry(context.project))
 		)
@@ -288,7 +297,9 @@ export function buildReportConsulteeAddSuggestions(service: ManageService): Asyn
 				id: area.id,
 				name: area.consultee,
 				aliases: [area.consultee],
-				distanceMetres: area.distanceMetres,
+				...(found.has(area.id)
+					? { distanceMetres: found.get(area.id)!.distanceMetres }
+					: { distanceMetres: area.distanceMetres, approximate: true }),
 				region: area.region,
 				removed: removed.has(area.id)
 			}));
@@ -320,6 +331,7 @@ async function consulteesNamed(
 				name: area.consultee,
 				aliases: [area.consultee],
 				distanceMetres: area.distanceMetres,
+				approximate: true,
 				region: area.region,
 				removed: removed.has(area.id)
 			});

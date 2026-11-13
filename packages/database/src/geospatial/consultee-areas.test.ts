@@ -342,7 +342,8 @@ describe('consultee areas (requires a local SQL Server - see docker-compose.yml)
 					{ id: testAreaId, consultee: testName, region: 'Far' }
 				]
 			);
-			assert.equal(found[0].distanceMetres, 0);
+			// approximate - to a point on each, so the near one, on the site's edge, is under a kilometre
+			assert.ok(found[0].distanceMetres < 1_000);
 			assert.ok(found[1].distanceMetres > 100_000);
 
 			// another category, or a name that isn't a consultee - none
@@ -397,6 +398,93 @@ describe('consultee areas (requires a local SQL Server - see docker-compose.yml)
 				new Set([testName.toLowerCase()])
 			);
 			assert.deepEqual(await sharedConsulteeNames(dbClient, 'Parish, town and community councils', []), new Set());
+		} finally {
+			await cleanup();
+		}
+	});
+
+	test('keeps a representative point on each area, which name lookups measure an approximate distance to', async (t) => {
+		if (!dbAvailable) return t.skip('SQL Server database not available');
+
+		await cleanup();
+		try {
+			// out in the Atlantic: a U whose envelope centre falls in its notch, off the area
+			const u = {
+				type: 'Polygon' as const,
+				coordinates: [
+					[
+						[-30, 50],
+						[-29.9, 50],
+						[-29.9, 50.1],
+						[-29.93, 50.1],
+						[-29.93, 50.03],
+						[-29.97, 50.03],
+						[-29.97, 50.1],
+						[-30, 50.1],
+						[-30, 50]
+					]
+				]
+			};
+			const square = {
+				...u,
+				coordinates: [
+					[
+						[-31, 50],
+						[-30.99, 50],
+						[-30.99, 50.01],
+						[-31, 50.01],
+						[-31, 50]
+					]
+				]
+			};
+			const category = 'Parish, town and community councils';
+			await loadConsulteeAreas(dbClient, {
+				type: 'FeatureCollection',
+				features: [
+					{
+						id: testAreaId,
+						type: 'Feature',
+						geometry: u,
+						properties: { consulteeCategory: category, consultee: 'Pointtest Bay' }
+					},
+					{
+						id: secondAreaId,
+						type: 'Feature',
+						geometry: square,
+						properties: { consulteeCategory: category, consultee: 'Pointtest Square' }
+					}
+				]
+			});
+
+			const [onArea] = await dbClient.$queryRaw<{ pointOnArea: boolean; centreOnArea: boolean }[]>`
+				SELECT CAST(representativePoint.STIntersects(geometrySimplified) AS BIT) AS pointOnArea,
+					CAST(geometrySimplified.STIntersects(geometrySimplified.EnvelopeCenter()) AS BIT) AS centreOnArea
+				FROM consultee_area WHERE id = ${testAreaId}`;
+			assert.deepEqual(onArea, { pointOnArea: true, centreOnArea: false });
+
+			// an area without one is measured to its envelope centre instead
+			await dbClient.$executeRaw`UPDATE consultee_area SET representativePoint = NULL WHERE id = ${secondAreaId}`;
+
+			// a site in the U's notch: 0.02° of longitude from either arm
+			const site = { type: 'Point' as const, coordinates: [-29.95, 50.06] };
+			const [expected] = await dbClient.$queryRaw<{ bay: number; bayEdge: number; square: number }[]>`
+				SELECT
+					(SELECT representativePoint.STDistance(geography::Point(50.06, -29.95, 4326)) FROM consultee_area WHERE id = ${testAreaId}) AS bay,
+					(SELECT geometrySimplified.STDistance(geography::Point(50.06, -29.95, 4326)) FROM consultee_area WHERE id = ${testAreaId}) AS bayEdge,
+					(SELECT geometrySimplified.EnvelopeCenter().STDistance(geography::Point(50.06, -29.95, 4326)) FROM consultee_area WHERE id = ${secondAreaId}) AS square`;
+			const found = await findConsulteeAreasByNameStart(dbClient, category, 'pointtest', site);
+			assert.deepEqual(
+				found.map(({ id }) => id),
+				[testAreaId, secondAreaId]
+			);
+			assert.ok(Math.abs(found[0].distanceMetres - expected.bay) < 1);
+			assert.ok(Math.abs(found[1].distanceMetres - expected.square) < 1);
+			// not its nearest edge, 1.4km away
+			assert.ok(expected.bayEdge > 1_000 && expected.bayEdge < 2_000);
+			assert.ok(Math.abs(found[0].distanceMetres - expected.bayEdge) > 100);
+			// and the same distance when it's looked up by its whole name
+			const [named] = await findConsulteeAreasByName(dbClient, category, 'Pointtest Bay', site);
+			assert.ok(Math.abs(named.distanceMetres - expected.bay) < 1);
 		} finally {
 			await cleanup();
 		}
