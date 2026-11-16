@@ -4,7 +4,7 @@ Start with the [README](../README.md): `nvm use`, `npm ci`, `npm start`. This pa
 
 ## What `npm start` runs
 
-`scripts/start-local.mjs`:
+`scripts/start-local.ts`:
 
 1. Creates `packages/database/.env` and `apps/manage/.env` from their `.env.example` files if missing (auth disabled, SQL pointed at Docker)
 2. Starts SQL Server in Docker (`docker compose up -d`) on **localhost:1434** and waits for it

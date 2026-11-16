@@ -157,7 +157,7 @@ No application code imports React or Preact — the manage UI is GOV.UK Frontend
 | `overrides.preact` → `^10.29.8`                            | `@defra/interactive-map` ships Preact-compiled code (`preact` is a real dependency of the map). `accessible-autocomplete` declares an optional `preact@^8` peer; the override keeps resolution on the Defra v10 line.                                                                                                                        |
 | `node_modules/preact` in the lockfile                      | Satisfies `@defra/interactive-map` at runtime — the interactive map component genuinely runs on Preact.                                                                                                                                                                                                                                      |
 
-Do not remove these entries as a “cleanup” — they are enforced by `scripts/check-toolchain.mjs` and removing them breaks Azure `npm ci`. They can only go if the underlying dependencies (`prisma` CLI, `@defra/interactive-map`, `accessible-autocomplete`) are removed, which is an architecture decision, not a tidy-up.
+Do not remove these entries as a “cleanup” — they are enforced by `scripts/check-toolchain.ts` and removing them breaks Azure `npm ci`. They can only go if the underlying dependencies (`prisma` CLI, `@defra/interactive-map`, `accessible-autocomplete`) are removed, which is an architecture decision, not a tidy-up.
 
 ### Switching locally
 
