@@ -419,6 +419,61 @@ describe('report consultees change page', () => {
 		);
 	});
 
+	it('should give each mapped consultee its details-panel action: a remove target, or the add page for a nearby one', async () => {
+		const mockRes = { status: mock.fn(() => mockRes), render: mock.fn() };
+		const nearbyParish = parishMatchRow('88888888-8888-8888-8888-888888888888', 'Nearby Parish Council', 9_000);
+		nearbyParish.reasons = [{ type: 'nearby' as const, radiusMetres: 20_000 }];
+		// a nearby-only parish added by hand - drawn as identified, removed by its add param's index
+		const addedParish = parishMatchRow('99999999-9999-9999-9999-999999999999', 'Added Parish Council', 5_000);
+		addedParish.reasons = [{ type: 'nearby' as const, radiusMetres: 20_000 }];
+		const add = urlParam(
+			JSON.stringify({
+				i: '99999999-9999-9999-9999-999999999999',
+				c: 'Parish, town and community councils',
+				n: 'Added Parish Council',
+				r: 'Bordering'
+			})
+		);
+		const db = dbReturning([[realProjectRow()], [parishMatchRow(), nearbyParish, addedParish]]);
+		await handlerFor(db)(
+			{
+				params: { caseId: realProjectId },
+				query: {
+					ruleset: 'england-wales-post-20240430',
+					category: 'Parish, town and community councils',
+					add
+				}
+			},
+			mockRes
+		);
+
+		const map = JSON.parse(mockRes.render.mock.calls[0].arguments[1].mapConfigJson);
+		assert.strictEqual(
+			map.consulteeActions.addUrl,
+			`/consultees/${realProjectId}/report/consultees/add?ruleset=england-wales-post-20240430&category=Parish%2C%20town%20and%20community%20councils&add=${add}`
+		);
+		assert.strictEqual(
+			map.consulteeActions.removeUrl,
+			`/consultees/${realProjectId}/report/consultees/remove?ruleset=england-wales-post-20240430&category=Parish%2C%20town%20and%20community%20councils&add=${add}`
+		);
+		// nearby context has no removeTarget - its panel link is Add; a ruleset match removes by id,
+		// a hand-added one by its add param's index, as the table's Remove links do
+		assert.deepStrictEqual(
+			map.consulteeGeojson.features.map(
+				(feature: { properties: { name: string; identified: string; removeTarget?: string } }) => [
+					feature.properties.name,
+					feature.properties.identified,
+					feature.properties.removeTarget
+				]
+			),
+			[
+				['Nearby Parish Council', 'false', undefined],
+				['Little Snoring Parish Council', 'true', `match=${matchId}`],
+				['Added Parish Council', 'true', 'added=0']
+			]
+		);
+	});
+
 	it('should fall back to a condition id the ruleset does not have, rather than drop the reason', async () => {
 		const mockRes = { status: mock.fn(() => mockRes), render: mock.fn() };
 		const row = { ...parishMatchRow(), reasons: [{ type: 'condition' as const, conditionId: 'retired_condition' }] };
