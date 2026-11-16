@@ -146,12 +146,16 @@ resource "azurerm_cdn_frontdoor_firewall_policy" "web" {
     # and not the interactive maps' OS tiles (apps/manage/src/app/maps/os-maps.ts): every pan or
     # zoom of a map is dozens of them, through this app so the OS key stays server-side, and
     # several people at one office or VPN address share this limit - they'd be blocked for the
-    # rest of the window together. Tiles are behind sign-in, and browsers keep each for a day
-    match_condition {
-      match_variable     = "RequestUri"
-      operator           = "Contains"
-      negation_condition = true
-      match_values       = ["/maps/os/tiles/"]
+    # rest of the window together. Tiles are behind sign-in, and browsers keep each for a day.
+    # Only where waf_rate_limits.skip_map_tiles is on - see variables.tf
+    dynamic "match_condition" {
+      for_each = var.waf_rate_limits.skip_map_tiles ? [1] : []
+      content {
+        match_variable     = "RequestUri"
+        operator           = "Contains"
+        negation_condition = true
+        match_values       = ["/maps/os/tiles/"]
+      }
     }
   }
 
