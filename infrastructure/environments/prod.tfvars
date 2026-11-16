@@ -86,6 +86,9 @@ waf_rate_limits = {
   enabled             = true
   duration_in_minutes = 5
   threshold           = 1500
+  # off until the pipeline's identity can write the firewall policy in pins-rg-common-prod - the
+  # apply fails with AuthorizationFailed otherwise. Remove this line once it can
+  skip_map_tiles = false
 }
 
 web_domains = {

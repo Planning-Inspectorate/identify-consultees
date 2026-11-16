@@ -189,6 +189,9 @@ variable "waf_rate_limits" {
     enabled             = bool
     duration_in_minutes = number
     threshold           = number
+    # leave the interactive maps' OS tiles out of the limit (front-door.tf). Off where the
+    # pipeline can't yet change the firewall policy - Prod's, in the shared pins-rg-common-prod
+    skip_map_tiles = optional(bool, true)
   })
 }
 
