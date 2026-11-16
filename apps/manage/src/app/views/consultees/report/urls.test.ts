@@ -15,6 +15,7 @@ import {
 	fitsInReportUrl,
 	MAX_REPORT_URL_LENGTH,
 	queryValues,
+	removeConsulteePageUrl,
 	removeConsulteeUrl,
 	removedConsultees,
 	reportCreatedUrl,
@@ -41,6 +42,11 @@ describe('report url helpers', () => {
 		assert.strictEqual(
 			removeConsulteeUrl('case-1', 'rs-1', 'Parish, town and community councils', { matchId: 'm-1' }),
 			'/consultees/case-1/report/consultees/remove?ruleset=rs-1&category=Parish%2C%20town%20and%20community%20councils&match=m-1'
+		);
+		// the map's feature Remove links add their own match=/added= to the targetless page URL
+		assert.strictEqual(
+			removeConsulteePageUrl('case-1', 'rs-1', 'Parish, town and community councils'),
+			'/consultees/case-1/report/consultees/remove?ruleset=rs-1&category=Parish%2C%20town%20and%20community%20councils'
 		);
 		assert.strictEqual(
 			removeConsulteeUrl('case-1', 'rs-1', 'Parish, town and community councils', { addedIndex: 2 }),

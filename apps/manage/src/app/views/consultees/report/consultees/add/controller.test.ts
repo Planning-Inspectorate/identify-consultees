@@ -278,6 +278,20 @@ describe('add a consultee page', () => {
 		assert.match(html, /govuk-label--m/);
 	});
 
+	it('starts the name filled when a map Add link passes ?name=', async () => {
+		const res = rendering();
+		await buildReportConsulteeAddPage(service() as never)(
+			{
+				params: { caseId: realProjectId },
+				query: { ...parishQuery, name: 'West Bergholt' }
+			} as never,
+			res as never
+		);
+
+		assert.strictEqual(viewModelOf(res).addForm.nameValue, 'West Bergholt');
+		assert.match(res.render.mock.calls[0].result as string, /value="West Bergholt"/);
+	});
+
 	it("suggests each of the category's nearby consultees, nearest first - those sharing a name by distance", async () => {
 		const res = rendering();
 		await buildReportConsulteeAddPage(service() as never)(

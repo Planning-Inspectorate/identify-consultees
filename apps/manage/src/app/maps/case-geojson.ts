@@ -225,6 +225,12 @@ export interface CaseMapConfig {
 	 */
 	bufferGeojson?: GeoJsonFeatureCollection;
 	/**
+	 * The add/remove consultee pages' URLs, for a selected consultee's map panel link - an
+	 * identified feature's `removeTarget` (`match=` or `added=`) completes `removeUrl`; a
+	 * nearby-only one's `&name=` completes `addUrl`. Category pages only.
+	 */
+	consulteeActions?: { addUrl: string; removeUrl: string };
+	/**
 	 * The JS init-failure fallback's static-map image - carried in the page config because
 	 * data-* attributes on the map container are JSON.parsed by the InteractiveMap constructor.
 	 */

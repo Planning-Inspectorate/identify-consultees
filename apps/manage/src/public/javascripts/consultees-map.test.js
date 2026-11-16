@@ -7,7 +7,6 @@ import {
 	buildCategorySublayers,
 	buildDatasets,
 	buildSelectableLayers,
-	featureDetailsHtml,
 	initAllConsulteeMaps,
 	initConsulteeMap,
 	interactiveZoom,
@@ -408,6 +407,7 @@ describe('consultees-map client helpers', () => {
 		assert.ok(staticMap);
 		assert.equal(typeof staticMap.load, 'function');
 		assert.ok(plugins.some((plugin) => plugin.id === 'layersKey'));
+		assert.ok(plugins.some((plugin) => plugin.id === 'featureDetails'));
 	});
 
 	test('buildSelectableLayers lists the MapLibre layers of each consultee sublayer and the project site', () => {
@@ -432,34 +432,6 @@ describe('consultees-map client helpers', () => {
 			]
 		);
 		assert.ok(layers.every((layer) => layer.labelProperty === 'name'));
-	});
-
-	test('featureDetailsHtml describes a consultee or the project site, escaping their text', () => {
-		assert.equal(
-			featureDetailsHtml({
-				consulteeId: 'x',
-				name: 'A & <B>',
-				consulteeCategory: 'Police and crime commissioners',
-				region: 'East'
-			}),
-			'<p class="govuk-body govuk-!-font-weight-bold govuk-!-margin-bottom-2">A &amp; &lt;B&gt;</p>' +
-				'<p class="govuk-body-s govuk-!-margin-bottom-1">Category: Police and crime commissioners</p>' +
-				'<p class="govuk-body-s govuk-!-margin-bottom-1">Region: East</p>'
-		);
-		assert.match(
-			featureDetailsHtml({
-				consulteeId: 'x',
-				name: '',
-				consulteeCategory: 'Hospitals operated by NHS trusts and NHS foundation trusts (England)',
-				region: ''
-			}),
-			/Unnamed.*Category: Hospitals operated by NHS trusts and NHS foundation trusts \(England\)<\/p>$/
-		);
-		assert.match(featureDetailsHtml({ name: 'Luton', reference: 'TR020001' }), /Luton.*Reference: TR020001/);
-		assert.match(
-			featureDetailsHtml({ name: `O'Brien & "Sons"`, reference: 'x' }),
-			/O&#39;Brien &amp; &quot;Sons&quot;/
-		);
 	});
 
 	test('initConsulteeMap shows a selected feature in a panel, and clears the selection when it closes', () => {

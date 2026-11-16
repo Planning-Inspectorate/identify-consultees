@@ -5,7 +5,7 @@ import type { ConsulteeMatch, Ruleset } from '@pins/identify-consultees-database
 import { isIdentified } from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
 import type { AsyncRequestHandler } from '@planning-inspectorate/core/util';
 import type { Request, Response } from 'express';
-import type { MapMatch } from '../../../../maps/case-geojson.ts';
+import type { CaseMapConfig, MapMatch } from '../../../../maps/case-geojson.ts';
 import { addedBeyondRun, buildCaseMapConfig, markAddedByHand } from '../../../../maps/case-geojson.ts';
 import { MAP_VIEWPORT } from '../../../../maps/sample-geojson.ts';
 import { categorySettings } from '../../../../report-config.ts';
@@ -25,6 +25,7 @@ import {
 	consulteeSelection,
 	consulteesUrl,
 	excludedMatchIds,
+	removeConsulteePageUrl,
 	removeConsulteeUrl,
 	reportUrl
 } from '../urls.ts';
@@ -122,6 +123,52 @@ function labelledMatches(matches: MapMatch[], labels: ReadonlyMap<string, string
 	});
 }
 
+/**
+ * The map's add/remove shortcuts: a selected identified consultee's details panel links to the
+ * "Remove consultee" page targeting it as its table row's Remove link does - `added=<index>` for
+ * one added by hand (dropping the add), `match=<id>` for a ruleset match (excluding it) - carried
+ * on the feature as `removeTarget` for the map to append to `consulteeActions.removeUrl`. A
+ * nearby-only feature (identified 'false') has none: its link is Add, to `consulteeActions.addUrl`
+ * with its name.
+ */
+function withConsulteeActions(
+	map: CaseMapConfig,
+	caseId: string,
+	rulesetId: string,
+	category: string,
+	selection: ConsulteeSelection
+): CaseMapConfig {
+	const addedIndexById = new Map(
+		selection.adds.flatMap((add, index) =>
+			add.category === category && add.id ? [[add.id.toLowerCase(), index] as const] : []
+		)
+	);
+	return {
+		...map,
+		consulteeGeojson: {
+			...map.consulteeGeojson,
+			features: map.consulteeGeojson.features.map((feature) => {
+				const { consulteeId, identified } = feature.properties;
+				if (identified === 'false') {
+					return feature;
+				}
+				const addedIndex = addedIndexById.get(consulteeId.toLowerCase());
+				return {
+					...feature,
+					properties: {
+						...feature.properties,
+						removeTarget: addedIndex !== undefined ? `added=${addedIndex}` : `match=${encodeURIComponent(consulteeId)}`
+					}
+				};
+			})
+		},
+		consulteeActions: {
+			addUrl: addConsulteeUrl(caseId, rulesetId, category, selection),
+			removeUrl: removeConsulteePageUrl(caseId, rulesetId, category, selection)
+		}
+	};
+}
+
 /** The page: map, the category's identified consultees, and the removed-consultees section. */
 async function renderCategoryPage(
 	service: ManageService,
@@ -195,17 +242,23 @@ async function renderCategoryPage(
 		),
 		listLabels(service, category, [...listedRows, ...mappedOnly])
 	]);
-	const map = {
-		...buildCaseMapConfig(
-			project,
-			labelledMatches(drawn, labels),
-			category,
-			searchArea,
-			{ src: staticMapSrc, alt: staticMapAlt },
-			categorySettings(category).mapMarginMetres
-		),
-		...(buffers.length > 0 ? { bufferGeojson: siteBufferGeojson(buffers) } : {})
-	};
+	const map = withConsulteeActions(
+		{
+			...buildCaseMapConfig(
+				project,
+				labelledMatches(drawn, labels),
+				category,
+				searchArea,
+				{ src: staticMapSrc, alt: staticMapAlt },
+				categorySettings(category).mapMarginMetres
+			),
+			...(buffers.length > 0 ? { bufferGeojson: siteBufferGeojson(buffers) } : {})
+		},
+		project.id,
+		ruleset.id,
+		category,
+		selection
+	);
 	const rows: ConsulteeRow[] = listedRows
 		.map(({ id, identified: reasons, removeUrl }) => ({ name: labels.get(id)!, identified: reasons, removeUrl }))
 		.sort((a, b) => a.name.localeCompare(b.name, 'en-GB'));
