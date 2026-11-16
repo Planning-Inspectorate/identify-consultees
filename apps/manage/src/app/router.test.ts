@@ -192,7 +192,7 @@ describe('manage router wiring', () => {
 		assert.match(response.text, /Project boundary/);
 		assert.match(response.text, /Router Test Fixture Wind Farm/);
 		assert.match(response.text, />Back</);
-		assert.match(response.text, /Confirm shapefile for report/);
+		assert.match(response.text, /Confirm geometry for report/);
 		assert.match(response.text, /Continue/);
 		assert.match(response.text, /app-consultee-map/);
 		// the single stored file, and nothing else - and no radio pre-selected
@@ -281,7 +281,7 @@ describe('manage router wiring', () => {
 			.send({ _csrf: csrf, shapefile: '99999999-9999-9999-9999-999999999999' });
 		assert.equal(response.status, 200);
 		assert.match(response.text, /There is a problem/);
-		assert.match(response.text, /Select a shapefile/);
+		assert.match(response.text, /Select a geometry/);
 	});
 
 	test('POST /consultees/:id/ruleset re-renders with an error when no ruleset is chosen', async () => {
