@@ -112,6 +112,7 @@ When opening a PR with `gh pr create` (user-requested), the body must include co
 - **Disadvantages / trade-offs** — costs, complexity, or anything intentionally deferred.
 - **Risks** — what could go wrong, rollout/rollback notes, and any Service Standard / TCoP impact when material.
 - **Test plan** — concrete steps a reviewer can run or verify.
+- **Screenshots** — for any PR that changes what a page looks like, a `## Screenshots` section with clearly headed `**Before**` and `**After**` images (see "Screenshots on UI-change PRs" below).
 
 And mechanically:
 
@@ -122,6 +123,26 @@ And mechanically:
 - [ ] No secrets, `.env`, or production data dumps in the diff.
 - [ ] No AI self-identification in the PR description, commits, or diff.
 - [ ] All tests and the CI checks (lint, typecheck, format, coverage) pass locally — see "Verifying changes before opening a PR".
+
+### Screenshots on UI-change PRs
+
+A PR that changes what a page looks like must show the change, not just describe it: a `## Screenshots` section in the body with clearly headed before and after images.
+
+```markdown
+## Screenshots
+
+**Before**
+
+<img width="760" alt="..." src="..." />
+
+**After**
+
+<img width="760" alt="..." src="..." />
+```
+
+- Capture the **before** shot from `main` and the **after** shot from the PR branch, at the same viewport and page state so the pair compares cleanly. For a brand-new element that did not exist before, say so under `**Before**` instead of forcing a shot.
+- Images must render inline in the body. Working hosts: drag the file into the GitHub editor (`user-attachments` URLs — needs a browser session), or push the files to a dedicated assets branch (`chore/pr-<n>-screenshots`) and embed `raw.githubusercontent.com` URLs **pinned to the commit SHA** — branch-name URLs can serve stale content through GitHub's image cache.
+- Gists cannot host binary files (`binary file not supported`), so they are not an option for screenshots — use one of the two hosts above.
 
 ## Node and npm toolchain (match Azure Pipelines)
 
