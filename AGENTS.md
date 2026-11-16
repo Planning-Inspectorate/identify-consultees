@@ -141,7 +141,20 @@ A PR that changes what a page looks like must show the change, not just describe
 ```
 
 - Capture the **before** shot from `main` and the **after** shot from the PR branch, at the same viewport and page state so the pair compares cleanly. For a brand-new element that did not exist before, say so under `**Before**` instead of forcing a shot.
-- Images must render inline in the body. Working hosts: drag the file into the GitHub editor (`user-attachments` URLs — needs a browser session), or push the files to a dedicated assets branch (`chore/pr-<n>-screenshots`) and embed `raw.githubusercontent.com` URLs **pinned to the commit SHA** — branch-name URLs can serve stale content through GitHub's image cache.
+- Images must render inline in the body. Working hosts: drag the file into the GitHub editor (`user-attachments` URLs — needs a browser session), or push them on a **tag** (`pr-<n>-screenshots`) and embed `raw.githubusercontent.com` URLs **pinned to the tag's commit SHA** — ref-name URLs can serve stale content through GitHub's image cache. **Never push screenshot-only branches**: every branch push earns a "recent pushes — Compare & pull request" banner that invites a stray screenshot PR, while a tag carries the same commit without the prompt. A scratch worktree keeps the working tree undisturbed:
+
+  ```bash
+  git worktree add --detach /tmp/pr-<n>-shots
+  cp shots/*.png /tmp/pr-<n>-shots
+  git -C /tmp/pr-<n>-shots add '*.png'
+  git -C /tmp/pr-<n>-shots commit -m "chore: pr <n> screenshots"
+  git -C /tmp/pr-<n>-shots tag pr-<n>-screenshots
+  git push origin refs/tags/pr-<n>-screenshots
+  git worktree remove /tmp/pr-<n>-shots
+  ```
+
+  Then embed `https://raw.githubusercontent.com/<owner>/<repo>/<commit-sha>/<file>.png`.
+
 - Gists cannot host binary files (`binary file not supported`), so they are not an option for screenshots — use one of the two hosts above.
 
 ## Node and npm toolchain (match Azure Pipelines)
