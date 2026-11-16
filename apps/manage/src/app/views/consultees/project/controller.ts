@@ -224,7 +224,7 @@ export function buildBoundarySubmit(service: ManageService): AsyncRequestHandler
 		if (!chosen) {
 			res.render(
 				'views/consultees/project/view.njk',
-				await boundaryPageViewModel(db, logger, project, options, req.query ?? {}, 'Select a shapefile')
+				await boundaryPageViewModel(db, logger, project, options, req.query ?? {}, 'Select a geometry')
 			);
 			return;
 		}

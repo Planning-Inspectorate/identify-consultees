@@ -100,7 +100,7 @@ describe('consultee project boundary page', () => {
 
 		const html = mockRes.render.mock.calls[0].result;
 		assert.match(html, />Back</);
-		assert.match(html, /Confirm shapefile for report/);
+		assert.match(html, /Confirm geometry for report/);
 		assert.match(html, /Continue/);
 		assert.match(html, /app-consultee-map/);
 	});
@@ -339,8 +339,8 @@ describe('project boundary submit', () => {
 		assert.strictEqual(mockRes.render.mock.callCount(), 3);
 		for (const call of mockRes.render.mock.calls) {
 			assert.strictEqual(call.arguments[0], 'views/consultees/project/view.njk');
-			assert.deepStrictEqual(call.arguments[1].errorSummary, [{ text: 'Select a shapefile', href: '#shapefile' }]);
-			assert.deepStrictEqual(call.arguments[1].shapefileError, { text: 'Select a shapefile' });
+			assert.deepStrictEqual(call.arguments[1].errorSummary, [{ text: 'Select a geometry', href: '#shapefile' }]);
+			assert.deepStrictEqual(call.arguments[1].shapefileError, { text: 'Select a geometry' });
 		}
 	});
 

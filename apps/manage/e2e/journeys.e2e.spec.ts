@@ -418,7 +418,7 @@ test.describe('manage journeys', () => {
 	test('the boundary page offers the project’s shapefiles and continues with one', async ({ page }) => {
 		await page.goto(`/consultees/${SAMPLE_CASE_ID}`);
 		await expect(page.getByRole('heading', { level: 1 })).toContainText('Project boundary');
-		await expect(page.getByText('Confirm shapefile for report')).toBeVisible();
+		await expect(page.getByText('Confirm geometry for report')).toBeVisible();
 
 		const radios = page.getByRole('radio');
 		// one radio per stored boundary file
@@ -433,12 +433,12 @@ test.describe('manage journeys', () => {
 		await page.goto(`/consultees/${SAMPLE_CASE_ID}/report?ruleset=${SAMPLE_RULESET_ID}`);
 
 		// the shapefile: its own file checked, back to the check page, and Continue back to it too
-		await page.getByRole('link', { name: 'Change shapefile' }).click();
+		await page.getByRole('link', { name: 'Change geometry' }).click();
 		await expect(page.getByRole('heading', { level: 1 })).toContainText('Project boundary');
 		await expect(page.locator(`input[name="shapefile"][value="${SAMPLE_CASE_ID}"]`)).toBeChecked();
 		await page.getByRole('link', { name: 'Back', exact: true }).click();
 		await expect(page).toHaveURL(checkPage);
-		await page.getByRole('link', { name: 'Change shapefile' }).click();
+		await page.getByRole('link', { name: 'Change geometry' }).click();
 		await page.getByRole('button', { name: 'Continue' }).click();
 		await expect(page).toHaveURL(checkPage);
 		await expect(page.getByRole('heading', { level: 1 })).toContainText('Check consultees before creating the report');
