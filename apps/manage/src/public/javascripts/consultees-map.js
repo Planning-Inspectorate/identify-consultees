@@ -12,6 +12,7 @@
  *   every data-* attribute on its container.
  */
 
+import { createFeatureDetailsPlugin } from './feature-details-plugin.mjs';
 import { createLayersKeyPlugin } from './layers-key-plugin.mjs';
 import { createMapLoadingPlugin } from './map-loading-plugin.mjs';
 import { createStaticMapPlugin } from './static-map-plugin.mjs';
@@ -253,8 +254,6 @@ export function buildDatasets(config) {
 	return datasets;
 }
 
-const DETAILS_PANEL_ID = 'consultee-details';
-
 /**
  * The map layers a click can select: each consultee sublayer, and the project site. These are
  * MapLibre layer ids as the datasets plugin names them - `<dataset>-<sublayer>` for a sublayer,
@@ -279,79 +278,6 @@ export function buildSelectableLayers(datasets) {
 		}
 	}
 	return layers;
-}
-
-/**
- * @param {unknown} value
- * @returns {string}
- */
-function escapeHtml(value) {
-	return String(value)
-		.replaceAll('&', '&amp;')
-		.replaceAll('<', '&lt;')
-		.replaceAll('>', '&gt;')
-		.replaceAll('"', '&quot;')
-		.replaceAll("'", '&#39;');
-}
-
-/**
- * The details panel's HTML for a selected feature: a consultee's name, category and region, or the
- * project site's name and reference.
- *
- * @param {object} properties
- * @returns {string}
- */
-export function featureDetailsHtml(properties) {
-	const rows = properties.consulteeId
-		? [
-				['Category', properties.consulteeCategory],
-				['Region', properties.region]
-			]
-		: [['Reference', properties.reference]];
-	return (
-		`<p class="govuk-body govuk-!-font-weight-bold govuk-!-margin-bottom-2">${escapeHtml(properties.name || 'Unnamed')}</p>` +
-		rows
-			.filter(([, value]) => value)
-			.map(([label, value]) => `<p class="govuk-body-s govuk-!-margin-bottom-1">${label}: ${escapeHtml(value)}</p>`)
-			.join('')
-	);
-}
-
-/**
- * Click an area or point to see what it is in a panel; clicking away closes it.
- *
- * @param {object} map - InteractiveMap instance
- * @param {object} interactPlugin
- */
-function wireFeatureDetails(map, interactPlugin) {
-	map.on('map:ready', () => {
-		// the core attaches enable etc. to the plugin when it mounts, so not before map:ready
-		interactPlugin.enable();
-		map.addPanel(DETAILS_PANEL_ID, {
-			focus: false,
-			label: 'Selected on the map',
-			html: `<div id="${DETAILS_PANEL_ID}-content"></div>`,
-			mobile: { slot: 'drawer', dismissible: true },
-			tablet: { slot: 'left-top', dismissible: true, width: '300px' },
-			desktop: { slot: 'left-top', dismissible: true, width: '300px' }
-		});
-		map.hidePanel(DETAILS_PANEL_ID);
-	});
-	map.on('interact:selectionchange', ({ selectedFeatures }) => {
-		if (selectedFeatures.length > 0) {
-			document.getElementById(`${DETAILS_PANEL_ID}-content`).innerHTML = featureDetailsHtml(
-				selectedFeatures[0].properties
-			);
-			map.showPanel(DETAILS_PANEL_ID);
-		} else {
-			map.hidePanel(DETAILS_PANEL_ID);
-		}
-	});
-	map.on('app:panelclosed', ({ panelId }) => {
-		if (panelId === DETAILS_PANEL_ID) {
-			interactPlugin.clear();
-		}
-	});
 }
 
 /**
@@ -397,6 +323,9 @@ export function initConsulteeMap(mapId) {
 			deselectOnClickOutside: true,
 			layers: buildSelectableLayers(datasets)
 		});
+		// the category pages carry their add/remove page URLs - a selected consultee's details
+		// panel links to them; other maps have none and show the details alone
+		const featureDetailsPlugin = createFeatureDetailsPlugin(config.consulteeActions);
 
 		const map = new defra.InteractiveMap(mapId, {
 			behaviour: 'inline',
@@ -411,12 +340,13 @@ export function initConsulteeMap(mapId) {
 				layersKeyPlugin,
 				staticMapPlugin,
 				loadingPlugin,
+				featureDetailsPlugin,
 				...(interactPlugin ? [interactPlugin] : [])
 			]
 		});
 		map.on('map:firstidle', () => loadingPlugin.dismiss());
 		if (interactPlugin) {
-			wireFeatureDetails(map, interactPlugin);
+			featureDetailsPlugin.wire(map, interactPlugin);
 		}
 	} catch {
 		loadingPlugin.dismiss();

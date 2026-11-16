@@ -398,6 +398,19 @@ export function addConsulteeSuggestionsUrl(
 export type RemovalTarget = { matchId: string } | { addedIndex: number };
 
 /**
+ * The "Remove consultee" page with no target yet - the category map's feature Remove links add
+ * `&match=` or `&added=` to it, as the table rows' Remove links do.
+ */
+export function removeConsulteePageUrl(
+	caseId: string,
+	rulesetId: string,
+	category: string,
+	selection: ConsulteeSelection = NO_SELECTION
+): string {
+	return reportPageUrl(caseId, 'report/consultees/remove', rulesetId, selection, categoryParam(category));
+}
+
+/**
  * The "Remove consultee" form on a category page - posts back to the same URL with the reason.
  * Several targets (a bulk removal) ride along as repeated `match`/`added` params.
  */

@@ -275,14 +275,18 @@ async function renderAddPage(
  * The "Add a consultee" page a category page's Add consultee link opens: a name - matched to the
  * category's consultees only the nearby search found (the faint ones on its map) as it's typed,
  * via the datalist consultee-autocomplete.js enhances; for Nearby NSIPs, to the other cases -
- * and a reason. It shares the category page's ruleset semantics, so a case, ruleset or category
- * it would 404 is a 404 here too.
+ * and a reason. A `?name=` starts the name filled - the map's Add link for a nearby consultee
+ * opens it that way, the area already chosen. It shares the category page's ruleset semantics,
+ * so a case, ruleset or category it would 404 is a 404 here too.
  */
 export function buildReportConsulteeAddPage(service: ManageService): AsyncRequestHandler {
 	return async (req, res) => {
 		const context = await categoryContext(service, req, res);
 		if (context) {
-			await renderAddPage(res, service, context);
+			await renderAddPage(res, service, context, {
+				nameValue: firstQueryValue(req.query.name),
+				reasonValue: ''
+			});
 		}
 	};
 }
