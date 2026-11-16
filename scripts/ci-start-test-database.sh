@@ -70,7 +70,7 @@ docker exec "$container" /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "$p
 # throwaway database, proving the schema sets up correctly - not just that it compiles
 SQL_CONNECTION_STRING_ADMIN="$conn" npm run db-migrate-prod
 
-# matches local dev (scripts/start-local.mjs seeds automatically) - without this,
+# matches local dev (scripts/start-local.ts seeds automatically) - without this,
 # e2e/integration tests that expect real project/consultee data to actually be there
 # would see an empty database, unlike every local run. The seed needs the generated
 # Prisma client, which is why the launcher runs after db-generate.

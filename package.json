@@ -15,7 +15,7 @@
   },
   "scripts": {
     "check-config": "node apps/manage/scripts/check-config.mjs",
-    "check-toolchain": "node scripts/check-toolchain.mjs",
+    "check-toolchain": "node scripts/check-toolchain.ts",
     "check-types": "npx tsc -p tsconfig.check.json",
     "commitlint": "node scripts/run-commitlint.mjs",
     "db-migrate-dev": "npm run migrate-dev --workspace @pins/identify-consultees-database",
@@ -36,7 +36,7 @@
     "lint-ts": "npx eslint .",
     "prepare": "node .husky/install.mjs",
     "postinstall": "npm run deps:patch-maplibre && npm run deps:patch-im-aria-controls && npm run deps:patch-core-msal-nonce && npm run check-toolchain",
-    "start": "node scripts/start-local.mjs",
+    "start": "node scripts/start-local.ts",
     "test": "node --test \"packages/**/*.test.*\" \"scripts/**/*.test.*\" && npm run test:frontend-coverage && npm run test:e2e --workspace identify-consultees-manage",
     "test:e2e": "npm run test:e2e --workspace identify-consultees-manage",
     "test:visual": "npm run test:visual --workspace identify-consultees-manage",

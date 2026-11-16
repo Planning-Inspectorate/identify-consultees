@@ -22,7 +22,7 @@ export NVM_DIR="${NVM_DIR:-/usr/local/nvm}"
 [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
 
 toolchain_ok() {
-	node "$(dirname "${BASH_SOURCE[0]}")/check-toolchain.mjs" >/dev/null 2>&1
+	node "$(dirname "${BASH_SOURCE[0]}")/check-toolchain.ts" >/dev/null 2>&1
 }
 
 nvm use "$MAJOR" >/dev/null 2>&1 || true
