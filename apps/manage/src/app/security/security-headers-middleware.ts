@@ -1,5 +1,6 @@
 import type { Handler } from 'express';
 import {
+	CROSS_ORIGIN_EMBEDDER_POLICY,
 	CROSS_ORIGIN_OPENER_POLICY,
 	CROSS_ORIGIN_RESOURCE_POLICY,
 	PERMISSIONS_POLICY,
@@ -23,6 +24,7 @@ export function buildOwaspSecurityHeadersMiddleware(options: SecurityHeadersOpti
 		res.setHeader('Permissions-Policy', PERMISSIONS_POLICY);
 		res.setHeader('Cross-Origin-Opener-Policy', CROSS_ORIGIN_OPENER_POLICY);
 		res.setHeader('Cross-Origin-Resource-Policy', CROSS_ORIGIN_RESOURCE_POLICY);
+		res.setHeader('Cross-Origin-Embedder-Policy', CROSS_ORIGIN_EMBEDDER_POLICY);
 		res.setHeader('X-Permitted-Cross-Domain-Policies', 'none');
 		res.setHeader('X-DNS-Prefetch-Control', 'off');
 

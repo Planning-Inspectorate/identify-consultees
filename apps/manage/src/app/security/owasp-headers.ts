@@ -58,3 +58,7 @@ export const X_CONTENT_TYPE_OPTIONS = 'nosniff';
 export const X_FRAME_OPTIONS = 'SAMEORIGIN';
 export const CROSS_ORIGIN_OPENER_POLICY = 'same-origin';
 export const CROSS_ORIGIN_RESOURCE_POLICY = 'same-origin';
+// 'require-corp' would block the OpenFreeMap tiles/fonts - a public CDN sends no
+// Cross-Origin-Resource-Policy header. 'credentialless' loads no-credential cross-origin
+// resources like those without it, and still opts the page out of cross-origin process sharing
+export const CROSS_ORIGIN_EMBEDDER_POLICY = 'credentialless';
