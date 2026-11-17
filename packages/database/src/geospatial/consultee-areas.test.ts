@@ -4,12 +4,14 @@ import type { PrismaClient } from '../client/client.ts';
 import { loadConfig } from '../configuration/config.ts';
 import { acquireDbTestLock, releaseDbTestLock } from '../db-test-lock.ts';
 import { newDatabaseClient } from '../index.ts';
+import { loadCaseBoundaries } from './case-boundaries.ts';
 import type { ConsulteeAreaFeatureCollection } from './consultee-areas.ts';
 import {
 	bufferGeometryForDisplay,
 	consulteeAreaDetails,
 	consulteeAreaTable,
 	datasetInUse,
+	dataWatermark,
 	findConsulteeAreasByName,
 	findConsulteeAreasByNameStart,
 	getConsulteeAreaById,
@@ -611,5 +613,48 @@ describe('datasetInUse', () => {
 			$queryRaw: async () => [{ baseObjectName: '[dbo].[consultee_area_archive]' }]
 		} as unknown as PrismaClient;
 		await assert.rejects(() => datasetInUse(client), /doesn't point at a quarter's table/);
+	});
+});
+
+describe('dataWatermark', () => {
+	test('fingerprints the data a case map is drawn from, and says when the case is missing', async (t) => {
+		if (!dbAvailable) return t.skip('SQL Server database not available');
+
+		const caseId = '22222222-2222-2222-2222-222222222222';
+		const missing = await dataWatermark(dbClient, caseId);
+		assert.equal(missing.caseUpdated, null);
+		assert.match(missing.watermark, /\|/);
+
+		try {
+			await loadCaseBoundaries(dbClient, {
+				type: 'FeatureCollection',
+				features: [
+					{
+						id: caseId,
+						type: 'Feature',
+						geometry: { type: 'Point', coordinates: [-1.5, 52.5] },
+						properties: { caseReference: 'EN010001', caseName: 'Watermark case' }
+					}
+				]
+			});
+
+			const found = await dataWatermark(dbClient, caseId);
+			assert.ok(found.caseUpdated instanceof Date);
+			// a boundary arriving moves the watermark even when MAX(lastUpdated) doesn't - the count
+			assert.notEqual(found.watermark, missing.watermark);
+			// the dataset half of the watermark: the loads, cases and synonym, stably
+			assert.equal((await dataWatermark(dbClient, caseId)).watermark, found.watermark);
+		} finally {
+			await dbClient.$executeRaw`DELETE FROM case_boundary WHERE id = CAST(${caseId} AS UNIQUEIDENTIFIER)`;
+			// and a boundary going moves it back - CBOS imports delete unlisted rows
+			assert.equal((await dataWatermark(dbClient, caseId)).watermark, missing.watermark);
+		}
+	});
+
+	test('reports no watermark when the database gives no row', async () => {
+		const client = { $queryRaw: async () => [] } as unknown as PrismaClient;
+		const result = await dataWatermark(client, '22222222-2222-2222-2222-222222222222');
+		assert.equal(result.caseUpdated, null);
+		assert.equal(result.watermark, 'none|none|none');
 	});
 });

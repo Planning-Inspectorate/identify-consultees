@@ -120,6 +120,24 @@ async function storedRun(
 	return undefined;
 }
 
+/**
+ * The pointer the session field holds for this case and ruleset's last run, if it's still fresh -
+ * whether the field is a pointer into Redis or a whole kept run (both name it the same way).
+ * Reads neither geometry nor Redis, so a page can name the remembered run - a `ranAt` - before
+ * paying for either; runRulesetSafely's storedRun resolves it when the run itself is needed.
+ */
+export function storedRunReference(
+	store: RulesetRunStore,
+	caseId: string,
+	rulesetId: string
+): StoredRunReference | undefined {
+	const kept = store?.[RULESET_RUN_SESSION_FIELD] as StoredRulesetRun | StoredRunReference | undefined;
+	if (kept?.caseId === caseId && kept.rulesetId === rulesetId && Date.now() - kept.ranAt < RULESET_RUN_MAX_AGE_MS) {
+		return { caseId: kept.caseId, rulesetId: kept.rulesetId, ranAt: kept.ranAt };
+	}
+	return undefined;
+}
+
 /** What a ruleset run needs from the service. No Nearby NSIPs distance means none are looked for. */
 export type RulesetRunService = Pick<
 	ManageService,
