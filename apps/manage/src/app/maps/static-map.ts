@@ -9,12 +9,12 @@
  * Tile and static-image upstreams must be used sparingly — see AGENTS.md.
  */
 
-import { BoundedCache } from '#util/bounded-cache.ts';
 import type { Geometry, Position } from '@pins/identify-consultees-database/src/geospatial/wkt.ts';
 import { fetchWithTimeout } from '@planning-inspectorate/core/util';
 import { fetchOsTile, osCoversView, osMapsApiKeyFromEnv } from './os-maps.ts';
 import type { GeoJsonFeature, GeoJsonFeatureCollection } from './sample-geojson.ts';
 import { MAP_VIEWPORT } from './sample-geojson.ts';
+import { cachedTile } from './tile-cache.ts';
 
 export type LngLat = readonly [number, number];
 
@@ -150,31 +150,9 @@ export function projectColours(feature: GeoJsonFeature): FeatureColours {
 	return featureColours(feature, PROJECT_COLOUR);
 }
 
-// tiles keep for a day, as OS's and OSM's own cache headers allow
-const TILE_TTL_MS = 24 * 60 * 60 * 1000;
-// the most tiles kept, OS's and OSM's together - each is 10-30KB, so tens of MB at most. A report's
-// maps share a view, so a few hundred tiles cover several reports
-const MAX_CACHED_TILES = 2_000;
-// added to the cache's clock - only ageOsmTileCacheForTests moves it
-let tileClockOffsetMs = 0;
-const osmTileCache = new BoundedCache<Buffer>({
-	maxEntries: MAX_CACHED_TILES,
-	ttlMs: TILE_TTL_MS,
-	now: () => Date.now() + tileClockOffsetMs
-});
-
-export function clearOsmTileCacheForTests(): void {
-	osmTileCache.clear();
-}
-
-export function osmTileCacheSizeForTests(): number {
-	return osmTileCache.size;
-}
-
-/** Make every tile cached so far older than a day. */
-export function ageOsmTileCacheForTests(): void {
-	tileClockOffsetMs += TILE_TTL_MS + 1;
-}
+// the basemap tile cache, shared with the interactive maps' tile route, lives in tile-cache.ts;
+// these are re-exported so the existing test imports keep working
+export { ageOsmTileCacheForTests, clearOsmTileCacheForTests, osmTileCacheSizeForTests } from './tile-cache.ts';
 
 export function googleMapsApiKeyFromEnv(env: NodeJS.ProcessEnv = process.env): string | undefined {
 	const key = env.GOOGLE_MAPS_API_KEY?.trim();
@@ -260,14 +238,7 @@ async function fetchTiles(
 		const results = await Promise.all(
 			batch.map(async (tile) => {
 				const key = `${cachePrefix}${tileCacheKey(zoom, tile.tileX, tile.tileY)}`;
-				const cached = osmTileCache.get(key);
-				if (cached) {
-					return { ...tile, png: cached } satisfies OsmBasemapTile;
-				}
-				const png = await source(zoom, tile.tileX, tile.tileY);
-				if (png) {
-					osmTileCache.set(key, png);
-				}
+				const png = await cachedTile(key, () => source(zoom, tile.tileX, tile.tileY));
 				return png && ({ ...tile, png } satisfies OsmBasemapTile);
 			})
 		);

@@ -12,6 +12,7 @@
 import { fetchWithTimeout } from '@planning-inspectorate/core/util';
 import type { IRouter, Request, Response } from 'express';
 import { Router as createRouter } from 'express';
+import { cachedTile } from './tile-cache.ts';
 
 const OS_TILE_URL = 'https://api.os.uk/maps/raster/v1/zxy/Light_3857';
 
@@ -175,7 +176,10 @@ export function createOsMapRoutes(key: string, fetchTile: TileFetcher = fetchOsT
 			res.status(404).end();
 			return;
 		}
-		const png = await fetchTile(key, zoom, x, y);
+		// the shared tile cache (the static maps keep their OS tiles under the same 'os/' prefix)
+		// answers most requests without asking OS, and shares one upstream call among the tiles a
+		// map pan asks for at the same time
+		const png = await cachedTile(`os/${zoom}/${x}/${y}`, () => fetchTile(key, zoom, x, y));
 		if (!png) {
 			res.status(502).end();
 			return;
