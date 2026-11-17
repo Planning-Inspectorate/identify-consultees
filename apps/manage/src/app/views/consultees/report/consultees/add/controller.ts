@@ -159,6 +159,12 @@ function removedCandidates({ consultees, category, selection }: CategoryContext)
 		});
 }
 
+// a request asks for its candidates more than once - a submit checks the typed name, then renders
+// the page's suggestions from them - and the Nearby NSIPs ones are a distance check against every
+// other case. They're stable for the request, so each context's are computed once, the WeakMap
+// letting the entry go with the request
+const nameCandidatesFor = new WeakMap<CategoryContext, Promise<NameCandidate[]>>();
+
 /**
  * What a typed name is matched against: for a consultee category, the ones the category page
  * removed - so one can be added back - then its consultees only the nearby search found, nearest
@@ -166,7 +172,17 @@ function removedCandidates({ consultees, category, selection }: CategoryContext)
  * the candidates are every other case instead (a removed one among them), named for its project and
  * case reference and answering to either alone.
  */
+
 async function nameCandidates(service: ManageService, context: CategoryContext): Promise<NameCandidate[]> {
+	let candidates = nameCandidatesFor.get(context);
+	if (!candidates) {
+		candidates = computeNameCandidates(service, context);
+		nameCandidatesFor.set(context, candidates);
+	}
+	return candidates;
+}
+
+async function computeNameCandidates(service: ManageService, context: CategoryContext): Promise<NameCandidate[]> {
 	if (context.category === NEARBY_NSIPS) {
 		const excluded = excludedMatchIds(context.selection.removed);
 		return (await findOtherCases(service.db, context.project.id)).map((other) => {

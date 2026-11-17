@@ -713,6 +713,33 @@ describe('add a consultee page', () => {
 		assert.strictEqual(res.redirect.mock.callCount(), 0);
 		assert.strictEqual(viewModelOf(res).addForm.nameError.text, 'Consultee not found');
 	});
+
+	it('looks the other cases up once across a submit that names one and re-renders', async () => {
+		const db = dbReturning([[realProjectRow()], []]);
+		const svc = {
+			db,
+			logger: mockLogger(),
+			nearbyConsulteeRadiusMetres: 20_000,
+			nearbyNsipRadiusMetres: 35_000,
+			rulesetRunner: rulesetRunnerReturning([])
+		};
+		await buildReportConsulteeAddSubmit(svc as never)(
+			{
+				params: { caseId: realProjectId },
+				query: nsipQuery,
+				body: { name: 'Neighbouring Solar Farm', reason: 'r' }
+			} as never,
+			rendering() as never
+		);
+
+		// the typed name is checked against the other cases, and the re-rendered page's
+		// suggestions come from them - one findOtherCases serves both
+		const otherCaseQueries = db.$queryRaw.mock.calls.filter((call) => {
+			const text = String(call.arguments[0].join(''));
+			return text.includes('PARTITION BY caseReference') && !text.includes('EnvelopeCenter');
+		});
+		assert.strictEqual(otherCaseQueries.length, 1);
+	});
 });
 
 describe('add a consultee suggestions, as a name is typed', () => {
