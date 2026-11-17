@@ -1,42 +1,30 @@
 import type { ManageService } from '#service';
-import { clientAddressKey } from '#util/client-address.ts';
 import { createRoutesAndGuards as createAuthRoutesAndGuards } from '@planning-inspectorate/core/auth';
 import { createMonitoringRoutes } from '@planning-inspectorate/core/controllers';
 import { cacheNoCacheMiddleware } from '@planning-inspectorate/core/middleware';
 import compression from 'compression';
 import type { IRouter, RequestHandler } from 'express';
 import { Router as createRouter } from 'express';
-import rateLimit from 'express-rate-limit';
 import { createAdminRoutes } from './admin/index.ts';
 import { buildSanitisingErrorHandler } from './error-handler.ts';
 import { createOsMapRoutes, osMapsApiKeyFromEnv } from './maps/os-maps.ts';
 import { createDefraVendorRouter } from './maps/vendor.ts';
+import type { EndpointRateLimiterOptions } from './rate-limit.ts';
+import { buildEndpointRateLimiter } from './rate-limit.ts';
 import { createRoutes as createConsulteeRoutes } from './views/consultees/index.ts';
 import { createFooterRoutes } from './views/footer/index.ts';
 import { createRoutes as createHelpRoutes } from './views/help/index.ts';
 import { createRoutes as createHomeRoutes } from './views/home/index.ts';
 import { createErrorRoutes } from './views/static/error/index.ts';
 
-export type AuthRateLimiterOptions = {
-	windowMs?: number;
-	limit?: number;
-};
+export type AuthRateLimiterOptions = EndpointRateLimiterOptions;
 
 /**
  * Limit auth endpoints to reduce abuse of MSAL sign-in and redirect handlers.
  * @see https://codeql.github.com/codeql-query-help/javascript/js-missing-rate-limiting/
  */
 export function buildAuthRateLimiter(options: AuthRateLimiterOptions = {}): RequestHandler {
-	return rateLimit({
-		windowMs: options.windowMs ?? 15 * 60 * 1000,
-		limit: options.limit ?? 100,
-		standardHeaders: 'draft-8',
-		legacyHeaders: false,
-		// each client its own limit, not each Front Door edge's (see clientAddressKey)
-		keyGenerator: clientAddressKey,
-		// Tests and local setups often omit X-Forwarded-For
-		validate: { xForwardedForHeader: false }
-	});
+	return buildEndpointRateLimiter({ windowMs: 15 * 60 * 1000, limit: 100, ...options });
 }
 
 export type BuildRouterOptions = {
@@ -111,10 +99,11 @@ export function buildRouter(service: ManageService, options: BuildRouterOptions 
 		});
 	}
 
-	// the interactive maps' OS basemap, through this app so the key stays here - only with a key
+	// the interactive maps' OS basemap, through this app so the key stays here - only with a key.
+	// every tile is an upstream call on our quota, so cap each client at a sustained 20 a second
 	const osMapsApiKey = osMapsApiKeyFromEnv();
 	if (osMapsApiKey) {
-		router.use('/maps/os', createOsMapRoutes(osMapsApiKey));
+		router.use('/maps/os', buildEndpointRateLimiter({ limit: 1200 }), createOsMapRoutes(osMapsApiKey));
 	}
 	router.use('/', homeRoutes);
 	router.use('/consultees', consulteeRoutes);
