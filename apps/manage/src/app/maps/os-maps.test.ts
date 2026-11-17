@@ -12,6 +12,7 @@ import {
 	osMapsApiKeyFromEnv,
 	osStyle
 } from './os-maps.ts';
+import { clearOsmTileCacheForTests } from './tile-cache.ts';
 
 const KEY = 'test-os-key';
 const PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47]);
@@ -21,6 +22,7 @@ const LONDON_VIEW = { center: LONDON, zoom: 12, width: 960, height: 516 };
 const realFetch = globalThis.fetch;
 afterEach(() => {
 	globalThis.fetch = realFetch;
+	clearOsmTileCacheForTests();
 });
 
 describe('osMapsApiKeyFromEnv', () => {
@@ -179,5 +181,68 @@ describe('createOsMapRoutes', () => {
 	test("is a 502 when OS can't send the tile", async () => {
 		const response = await request(appWith(async () => undefined)).get('/maps/os/tiles/14/8186/5448.png');
 		assert.equal(response.status, 502);
+	});
+
+	test('serves a tile asked for again from the cache, without asking OS again', async () => {
+		let asked = 0;
+		const app = appWith(async () => {
+			asked++;
+			return PNG;
+		});
+		for (let i = 0; i < 3; i++) {
+			const response = await request(app).get('/maps/os/tiles/14/8186/5448.png');
+			assert.equal(response.status, 200);
+			assert.deepEqual(response.body, PNG);
+		}
+		assert.equal(asked, 1);
+	});
+
+	test('shares one upstream call among requests for the same tile at the same time', async () => {
+		let asked = 0;
+		const app = appWith(async () => {
+			asked++;
+			await new Promise((resolve) => setTimeout(resolve, 10));
+			return PNG;
+		});
+		const responses = await Promise.all(
+			Array.from({ length: 4 }, () => request(app).get('/maps/os/tiles/14/8186/5448.png'))
+		);
+		for (const response of responses) {
+			assert.equal(response.status, 200);
+			assert.deepEqual(response.body, PNG);
+		}
+		assert.equal(asked, 1);
+	});
+
+	test("doesn't remember a tile OS couldn't send, so the next request tries OS again", async () => {
+		let asked = 0;
+		const app = appWith(async () => {
+			asked++;
+			return asked === 1 ? undefined : PNG;
+		});
+		assert.equal((await request(app).get('/maps/os/tiles/14/8186/5448.png')).status, 502);
+		assert.equal((await request(app).get('/maps/os/tiles/14/8186/5448.png')).status, 200);
+		assert.equal(asked, 2);
+	});
+
+	test('propagates a fetch that fails outright, as before', async () => {
+		const app = appWith(async () => {
+			throw new Error('upstream blew up');
+		});
+		assert.equal((await request(app).get('/maps/os/tiles/14/8186/5448.png')).status, 500);
+		// and the failed fetch is let go, so the next request tries again
+		assert.equal((await request(app).get('/maps/os/tiles/14/8186/5448.png')).status, 500);
+	});
+
+	test('keeps different tiles apart in the cache', async () => {
+		let asked = 0;
+		const app = appWith(async () => {
+			asked++;
+			return PNG;
+		});
+		await request(app).get('/maps/os/tiles/14/8186/5448.png');
+		await request(app).get('/maps/os/tiles/14/8186/5449.png');
+		await request(app).get('/maps/os/tiles/14/8186/5448.png');
+		assert.equal(asked, 2);
 	});
 });
