@@ -8,7 +8,7 @@ import type {
 	RunRulesetResult,
 	SiteScreenedAs
 } from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
-import { getRuleset, RULESETS } from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
+import { getRuleset, isIdentified, RULESETS } from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
 import type { Geometry } from '@pins/identify-consultees-database/src/geospatial/wkt.ts';
 import type { MapMatch, SearchAreaDisplay } from '../../maps/case-geojson.ts';
 import { grownSite } from './grown-site.ts';
@@ -148,11 +148,13 @@ export type SearchAreaCache = Map<number, Promise<Geometry>>;
 
 /**
  * The interactive map's search area - the site grown by the nearby radius - and the display
- * geometry of every consultee touching it: consultee areas', and Nearby NSIPs' boundaries. A
- * consultee added by hand is drawn wherever it is - it may be one the run never found, further
- * away (see addedBeyondRun). The map is an extra: if this fails, the page still lists every
- * consultee in its tables. A report's maps share `cache`: growing a large site by 35km takes
- * seconds, and a report has a map for each of its categories.
+ * geometry of the consultees to draw: consultee areas', and Nearby NSIPs' boundaries. A consultee
+ * the run identified, or one added by hand, is drawn wherever it is: a district bordering the host
+ * authority can lie further from the site than the search reaches (Torridge, from a site in mid
+ * Cornwall), and one added by hand may be one the run never found (see addedBeyondRun). Only the
+ * nearby consultees drawn as context are limited to the search area. The map is an extra: if this
+ * fails, the page still lists every consultee in its tables. A report's maps share `cache`:
+ * growing a large site by 35km takes seconds, and a report has a map for each of its categories.
  */
 export async function buildSearchAreaSafely(
 	db: ManageService['db'],
@@ -172,18 +174,20 @@ export async function buildSearchAreaSafely(
 			cache.set(nearbyRadiusMetres, grown);
 		}
 		const area = await grown;
-		const ids = (nearbyNsips: boolean, addedByHand: boolean) => [
+		// only the nearby consultees drawn as context are limited to the search area
+		const asContext = (match: MapMatch) => match.addedByHand !== true && !isIdentified(match);
+		const ids = (nearbyNsips: boolean, context: boolean) => [
 			...new Set(
 				matches
-					.filter((match) => isNearbyNsip(match) === nearbyNsips && (match.addedByHand === true) === addedByHand)
+					.filter((match) => isNearbyNsip(match) === nearbyNsips && asContext(match) === context)
 					.map((match) => match.feature.id)
 			)
 		];
 		const found = await Promise.all([
-			getConsulteeAreaDisplayGeometries(db, ids(false, false), area),
-			getCaseBoundaryDisplayGeometries(db, ids(true, false), area),
-			getConsulteeAreaDisplayGeometries(db, ids(false, true)),
-			getCaseBoundaryDisplayGeometries(db, ids(true, true))
+			getConsulteeAreaDisplayGeometries(db, ids(false, true), area),
+			getCaseBoundaryDisplayGeometries(db, ids(true, true), area),
+			getConsulteeAreaDisplayGeometries(db, ids(false, false)),
+			getCaseBoundaryDisplayGeometries(db, ids(true, false))
 		]);
 		return { area, geometries: new Map(found.flatMap((geometries) => [...geometries])) };
 	} catch (error) {

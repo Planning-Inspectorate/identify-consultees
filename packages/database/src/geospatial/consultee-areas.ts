@@ -404,8 +404,8 @@ export async function bufferGeometryForDisplay(
  * areas - counties, police forces, health boards - are detailed, coastline and all: at a flat 25m,
  * the areas within 20km of Norwich to Tilbury come to ~3.8MB; simplified by size, ~1.5MB.
  * Display only - never measure distances on these. Ids with no matching row, or not touching
- * `window`, are absent. With no `window`, every one found is - as for consultees added by hand from
- * anywhere in the reference data.
+ * `window`, are absent. With no `window`, every one found is - as for identified consultees, which a
+ * bordering authority rule can find beyond the search area, and ones added by hand from anywhere.
  */
 export async function getConsulteeAreaDisplayGeometries(
 	dbClient: PrismaClient,
