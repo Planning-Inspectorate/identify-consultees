@@ -3,13 +3,13 @@
 # change is checked by `npm run check-config` and takes effect on the next deploy.
 #
 # The map draws one layer per boundary file the case holds, under "GIS shapefiles" in the Layers
-# menu: the most recent in one style, every earlier file in the other. "Most recent" is the file
+# menu: the most recent in one style, every earlier file in the other colours. "Most recent" is the file
 # with the latest received date; files with no date count as oldest.
 #
 # The styles are the geometry selection map's from the GIS Styling default values (AGENTS.md): the
-# selected geometry red, every other geometry blue - solid fill, 0.2 fill opacity, a full-opacity
-# 1.5px border. The most recent file stands in for the selected one: the radios below the map are
-# never pre-selected, so the newest submission is the drawn candidate.
+# selected geometry red, every other cycles through other colours - solid fill, 0.2 fill opacity,
+# a full-opacity, 1.5px border. The most recent file stands in for the selected one: the radios
+# below the map are never pre-selected on the first shapefile, so the newest submission is the drawn candidate.
 #
 # Each style:
 #   colour        - a 6-digit hex colour, e.g. '#ff0000'. Quote it: YAML treats # as a comment.
@@ -39,3 +39,47 @@ earlier:
     fillOpacity: 0.2
     strokeWidth: 1.5
     description: blue, solid fill
+  - colour: '#f47738'
+    fillOpacity: 0.2
+    strokeWidth: 1.5
+    description: orange, solid fill
+  - colour: '#912b88'
+    fillOpacity: 0.2
+    strokeWidth: 1.5
+    description: purple, solid fill
+  - colour: '#28a197'
+    fillOpacity: 0.2
+    strokeWidth: 1.5
+    description: green, solid fill
+  - colour: '#b58840'
+    fillOpacity: 0.2
+    strokeWidth: 1.5
+    description: brown, solid fill
+  - colour: '#d53880'
+    fillOpacity: 0.2
+    strokeWidth: 1.5
+    description: pink, solid fill
+  - colour: '#5694ca'
+    fillOpacity: 0.2
+    strokeWidth: 1.5
+    description: light blue, solid fill
+  - colour: '#85994b'
+    fillOpacity: 0.2
+    strokeWidth: 1.5
+    description: light green, solid fill
+  - colour: '#6f72af'
+    fillOpacity: 0.2
+    strokeWidth: 1.5
+    description: lavender, solid fill
+  - colour: '#003078'
+    fillOpacity: 0.2
+    strokeWidth: 1.5
+    description: navy blue, solid fill
+  - colour: '#ffdd00'
+    fillOpacity: 0.2
+    strokeWidth: 1.5
+    description: yellow, solid fill
+  - colour: '#f499be'
+    fillOpacity: 0.2
+    strokeWidth: 1.5
+    description: pale pink, solid fill

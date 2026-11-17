@@ -197,7 +197,7 @@ describe('boundaryFileStyle', () => {
 	});
 
 	it('should cycle through the earlier styles when there are more files than earlier entries', () => {
-		const fileCount = BOUNDARY_MAP_STYLES.earlier.length + 1;
+		const fileCount = BOUNDARY_MAP_STYLES.earlier.length + 2;
 		const files = Array.from({ length: fileCount }, (_, index) =>
 			boundaryFileOption(`file-${index}`, new Date(Date.UTC(2026, 3, fileCount - index)))
 		);
