@@ -285,7 +285,7 @@ function withFillOpacity(
 	};
 }
 
-/** `matches` with their display geometry from `geometries`; any with none (not touching the area) are left out. */
+/** `matches` with their display geometry from `geometries`; any with none (nearby context not touching the area) are left out. */
 function withDisplayGeometry(matches: MapMatch[], geometries: Map<string, Geometry>): MapMatch[] {
 	return matches.flatMap((match) => {
 		const geometry = geometries.get(match.feature.id);

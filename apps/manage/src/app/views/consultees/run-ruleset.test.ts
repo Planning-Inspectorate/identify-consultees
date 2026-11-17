@@ -256,34 +256,64 @@ describe('buildSearchAreaSafely', () => {
 		assert.equal($queryRaw.mock.callCount(), 3);
 	});
 
-	it('draws a consultee added by hand wherever it is, not only where it touches the search area', async () => {
-		// whether each query was limited to the search area - its window is a nested SQL fragment
-		const windowed: { table: string; windowed: boolean }[] = [];
+	/** Each display-geometry query's table, and whether it was limited to the search area (a nested SQL fragment), with its ids. */
+	async function displayQueries(matches: Parameters<typeof buildSearchAreaSafely>[2]) {
+		const queries: { table: string; windowed: boolean; ids: string[] }[] = [];
 		const $queryRaw = mock.fn(async (sql: TemplateStringsArray, ...values: unknown[]) => {
 			const text = sql.join('');
 			if (!/\bFROM\b/.test(text)) return [{ wkt: 'POINT(-1.5 52.5)' }];
-			windowed.push({
+			queries.push({
 				table: text.includes('FROM consultee_area') ? 'consultee_area' : 'case_boundary',
-				windowed: values.some((value) => String((value as { sql?: string })?.sql).includes('STIntersects'))
+				windowed: values.some((value) => String((value as { sql?: string })?.sql).includes('STIntersects')),
+				ids: values
+					.flatMap((value) => (value as { values?: unknown[] })?.values ?? [])
+					.map(String)
+					.filter((v) => /^[0-9a-f-]{36}$/.test(v))
+					.sort()
 			});
 			return [];
 		});
-		const added = { ...parish, feature: { ...parish.feature, id: 'cccccccc-0000-0000-0000-000000000003' } };
 		await buildSearchAreaSafely(
 			{ $queryRaw } as unknown as RulesetRunService['db'],
 			project(),
-			[parish, { ...added, addedByHand: true }, { ...nsip, addedByHand: true }],
+			matches,
 			20_000,
 			mockLogger()
 		);
+		return queries.toSorted((a, b) => a.table.localeCompare(b.table) || Number(b.windowed) - Number(a.windowed));
+	}
+
+	const nearbyParish = {
+		feature: {
+			id: 'dddddddd-0000-0000-0000-000000000004',
+			properties: { consulteeCategory: 'Parish, town and community councils' }
+		},
+		distanceMetres: 5_000,
+		reasons: [{ type: 'nearby' as const, radiusMetres: 20_000 }]
+	};
+
+	it('draws a consultee added by hand wherever it is, not only where it touches the search area', async () => {
+		const added = { ...nearbyParish, feature: { ...nearbyParish.feature, id: 'cccccccc-0000-0000-0000-000000000003' } };
 		assert.deepStrictEqual(
-			windowed.toSorted((a, b) => a.table.localeCompare(b.table) || Number(b.windowed) - Number(a.windowed)),
+			(await displayQueries([nearbyParish, { ...added, addedByHand: true }, { ...nsip, addedByHand: true }])).map(
+				({ table, windowed }) => ({ table, windowed })
+			),
 			[
 				{ table: 'case_boundary', windowed: false },
 				{ table: 'consultee_area', windowed: true },
 				{ table: 'consultee_area', windowed: false }
 			]
 		);
+	});
+
+	it('draws an identified consultee wherever it is - a district bordering the host authority can be beyond the search', async () => {
+		// the parish is identified by a condition, and a Nearby NSIP is listed as identified too;
+		// only the consultees drawn as nearby context are limited to the search area
+		assert.deepStrictEqual(await displayQueries([parish, nearbyParish, nsip]), [
+			{ table: 'case_boundary', windowed: false, ids: [nsip.feature.id] },
+			{ table: 'consultee_area', windowed: true, ids: [nearbyParish.feature.id] },
+			{ table: 'consultee_area', windowed: false, ids: [parish.feature.id] }
+		]);
 	});
 
 	it('looks up no case boundaries when there are no Nearby NSIPs', async () => {
