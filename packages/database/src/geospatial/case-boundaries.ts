@@ -75,10 +75,32 @@ function rowToFeature(row: CaseBoundaryRow): CaseBoundaryFeature {
 export interface LoadOptions {
 	/** Rows per round trip - see the equivalent option on loadConsulteeAreas for why this exists. */
 	batchSize?: number;
+	/** The most points one boundary may carry before it is refused - MAX_CASE_BOUNDARY_POINTS. */
+	boundaryPointLimit?: number;
 	onProgress?: (loaded: number, total: number) => void;
 }
 
 const DEFAULT_LOAD_BATCH_SIZE = 200;
+
+/**
+ * The most points one boundary may carry - several times the largest real case (over 100,000).
+ * Past it the WKT SQL Server must parse and simplify for one MERGE is an unreasonable amount of
+ * work, and no display path could draw it anyway; the file is refused, which a caller like the
+ * CBOS import reports and skips like any other unreadable file.
+ */
+export const MAX_CASE_BOUNDARY_POINTS = 500_000;
+
+function boundaryPointCount(geometry: Geometry): number {
+	if (geometry.type === 'GeometryCollection') {
+		return geometry.geometries.reduce((total, part) => total + boundaryPointCount(part), 0);
+	}
+	// a position is an array of numbers; anything else, an array of positions or of their arrays
+	const count = (value: unknown): number =>
+		Array.isArray(value) && typeof value[0] !== 'number'
+			? value.reduce<number>((total, part) => total + count(part), 0)
+			: 1;
+	return count((geometry as { coordinates: unknown }).coordinates);
+}
 
 /**
  * Upsert (by id) every feature in `featureCollection` into case_boundary, `batchSize` rows per
@@ -91,8 +113,14 @@ export async function loadCaseBoundaries(
 	featureCollection: CaseBoundaryFeatureCollection,
 	options: LoadOptions = {}
 ): Promise<number> {
-	const { batchSize = DEFAULT_LOAD_BATCH_SIZE, onProgress } = options;
+	const { batchSize = DEFAULT_LOAD_BATCH_SIZE, boundaryPointLimit = MAX_CASE_BOUNDARY_POINTS, onProgress } = options;
 	const features = featureCollection.features;
+
+	for (const feature of features) {
+		if (boundaryPointCount(feature.geometry) > boundaryPointLimit) {
+			throw new Error(`case boundary ${feature.id} carries more than ${boundaryPointLimit} points`);
+		}
+	}
 
 	for (let i = 0; i < features.length; i += batchSize) {
 		// MERGE can't join against a source with duplicate keys within one statement - real source
