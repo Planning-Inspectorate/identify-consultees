@@ -150,6 +150,40 @@ describe('case boundaries (requires a local SQL Server - see docker-compose.yml)
 		}
 	});
 
+	test('getCaseBoundaryById reads the simplified geometry for a boundary too detailed to draw whole', async (t) => {
+		if (!dbAvailable) return t.skip('SQL Server database not available');
+
+		// a ring with more points than the read's 50,000-point cap - a 60,000-vertex circle
+		const vertices = 60_000;
+		const ring = Array.from({ length: vertices }, (_, i) => {
+			const angle = (i / vertices) * 2 * Math.PI;
+			return [0.5 + 0.4 * Math.cos(angle), 0.5 + 0.4 * Math.sin(angle)];
+		});
+		ring.push(ring[0]);
+
+		await cleanup();
+		try {
+			await loadCaseBoundaries(dbClient, {
+				type: 'FeatureCollection',
+				features: [
+					{
+						id: testBoundaryId,
+						type: 'Feature',
+						geometry: { type: 'Polygon', coordinates: [ring] },
+						properties: { caseReference: 'EN010001', caseName: 'Huge boundary' }
+					}
+				]
+			});
+
+			const found = await getCaseBoundaryById(dbClient, testBoundaryId);
+			// the original's WKT (several MB) is never read: geometry is the simplified copy, which
+			// is what the maps and the ruleset run use anyway
+			assert.deepStrictEqual(found?.geometry, found?.simplifiedGeometry);
+		} finally {
+			await cleanup();
+		}
+	});
+
 	test('getCaseBoundarySummaryById finds a stored boundary without its geometry, and returns null otherwise', async (t) => {
 		if (!dbAvailable) return t.skip('SQL Server database not available');
 
