@@ -97,6 +97,7 @@ async function nearbyNsipRecords(
 export interface ReportZipContext {
 	service: ManageService;
 	project: CaseBoundaryFeature;
+	accountInfo?: { name: string };
 	ruleset: Ruleset;
 	consultees: ConsulteeMatch[];
 	selection: ConsulteeSelection;
@@ -268,6 +269,7 @@ export interface ReportZip {
 export async function buildReportZip({
 	service,
 	project,
+	accountInfo,
 	ruleset,
 	consultees,
 	selection,
@@ -306,7 +308,8 @@ export async function buildReportZip({
 			const found = add.id ? consultees.find((match) => match.feature.id === add.id) : undefined;
 			return found ? { ...add, distanceMetres: found.distanceMetres } : add;
 		}),
-		removed: selection.removed
+		removed: selection.removed,
+		accountInfo
 	};
 	const files: Record<string, Uint8Array> = {
 		[reportFileName(report)]: new Uint8Array(await writeExcelFile(buildReportSheets(report)).toBuffer())

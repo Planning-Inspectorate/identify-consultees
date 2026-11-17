@@ -476,7 +476,10 @@ describe('report created page', () => {
 
 	it("should render the confirmation panel and the download link with the built report's size", async () => {
 		const { handler, mockRes } = createdPage([parishRow(), hospitalRow()]);
-		await handler({ params: { caseId: realProjectId }, query: {} }, mockRes);
+		await handler(
+			{ params: { caseId: realProjectId }, query: {}, session: { account: { name: 'Test Name' } } },
+			mockRes
+		);
 
 		assert.strictEqual(mockRes.render.mock.calls[0].arguments[0], 'views/consultees/report/created.njk');
 		const viewModel = mockRes.render.mock.calls[0].arguments[1];
