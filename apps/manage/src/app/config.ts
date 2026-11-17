@@ -96,6 +96,26 @@ export function cbosSubscriberSettings(env: NodeJS.ProcessEnv): CbosSubscriberSe
 	return { namespace, topic: env.CBOS_SERVICE_BUS_TOPIC?.trim() || 'nsip-document', subscription };
 }
 
+/** Connection-string hosts on the machine itself - no network hop for a man in the middle to sit on. */
+const LOOPBACK_DATABASE_HOSTS = new Set(['localhost', '127.0.0.1', '::1', '[::1]']);
+
+/**
+ * The one way a production boot may keep a TLS-skipping SQL_CONNECTION_STRING. It exists for the
+ * CI image smoke test (.azure/pipelines/pr.yml, 'Smoke-test the built Docker image'), which runs
+ * the built image with NODE_ENV=production against the same throwaway Docker SQL Server local
+ * development uses - a connection string that needs trustServerCertificate=true. The flag only
+ * counts alongside a loopback host, so a deployed environment can't set ALLOW_INSECURE_DB_TLS to
+ * reach a remote database insecurely.
+ */
+export function insecureDbTlsAllowed(env: NodeJS.ProcessEnv): boolean {
+	if (env.ALLOW_INSECURE_DB_TLS !== 'true') {
+		return false;
+	}
+	// String() as in the guard itself: keeps this total when the variable is unset
+	const match = /^sqlserver:\/\/([^;:]+)/i.exec(String(env.SQL_CONNECTION_STRING));
+	return LOOPBACK_DATABASE_HOSTS.has(match ? match[1].toLowerCase() : '');
+}
+
 // cache the config
 let config: Config | undefined;
 
@@ -162,6 +182,19 @@ export function loadConfig(): Config {
 	const screening = loadScreeningConfig();
 
 	const isProduction = NODE_ENV === 'production';
+
+	// a production database connection must validate SQL Server's TLS certificate; skipping
+	// validation or dropping encryption leaves the channel open to a man in the middle. The
+	// local Docker SQL Server is the reason trustServerCertificate exists at all - it must
+	// never appear in a deployed connection string
+	// String() rather than ?? '' keeps the check total when the variable is unset
+	if (
+		isProduction &&
+		/(trustservercertificate\s*=\s*true|encrypt\s*=\s*false)/i.test(String(SQL_CONNECTION_STRING)) &&
+		!insecureDbTlsAllowed(process.env)
+	) {
+		throw new Error('SQL_CONNECTION_STRING must not set trustServerCertificate=true or encrypt=false in production');
+	}
 
 	const authDisabled = AUTH_DISABLED === 'true' && !isProduction;
 	if (!authDisabled) {
