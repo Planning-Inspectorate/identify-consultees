@@ -71,7 +71,7 @@ def run_ruleset(
     A site whose outline - simplified as the reference data is - has more than
     `bounding_box_above_points` points is too detailed to screen in time on a small database (the
     most detailed real sites took minutes). It's searched around a simpler outline covering it
-    (queries.covering_outline) instead, and what that finds is measured from the outline itself
+    (queries.simplified_site_and_cover) instead, and what that finds is measured from the outline itself
     wherever a condition depends on it - so the consultees a condition identifies, and their
     distances, are exactly the outline's. Only the nearby-only ones keep the covering outline's
     distance, which can be up to ~875m short: there may be a few more of them. If no covering
@@ -101,9 +101,11 @@ def run_ruleset(
             site_screened_as = "boundingBox"
             site = queries.bounding_box(site_wkt)
         else:
-            site = queries.simplify(db, site_wkt)
+            # the cover is for a site too detailed to measure against - under the point limit
+            # the query builds none
+            site, covering = queries.simplified_site_and_cover(db, site_wkt, bounding_box_above_points)
             if too_detailed(site):
-                cover = queries.covering_outline(db, site)
+                cover = covering
                 site_screened_as = "simplifiedOutline" if cover else "boundingBox"
                 if not cover:
                     site = queries.bounding_box(site)

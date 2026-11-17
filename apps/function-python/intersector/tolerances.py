@@ -17,7 +17,7 @@ DISTANCE_MARGIN_METRES = 2 * SIMPLIFY_TOLERANCE_METRES + 10
 the tolerance, so simplification can only add a borderline consultee, never drop one."""
 
 COVER_TOLERANCE_METRES = 500
-"""How much simpler a site too detailed to screen in time is made - see queries.covering_outline.
+"""How much simpler a site too detailed to screen in time is made - see queries.simplified_site_and_cover.
 Its outline is grown by this and simplified by half of it, which takes the most detailed real sites
 from 1,300-4,800 points to 100-450, and the runs of those past 1,000 points 1.8 times faster."""
 
