@@ -303,7 +303,7 @@ def test_includes_an_area_just_past_a_cut_off_but_not_one_well_past_it(connectio
 
 def test_drops_an_area_within_the_sites_convex_hull_reach_but_past_the_radius(connection_params, areas):
     # two points ~44km apart: the area between them is ~17km from the line joining them - which the
-    # search's convex hull reaches (see queries._reach) - but ~28km from either point
+    # search's convex hull reaches (see find_areas_near) - but ~28km from either point
     site = "MULTIPOINT((0 0), (0.4 0))"
     areas(
         (TEST_AREA_ID, "POINT(0 0.1)", "Hospitals operated by NHS trusts and NHS foundation trusts (England)", "11km From One Point"),
@@ -527,23 +527,34 @@ def test_a_detailed_site_with_no_covering_outline_or_when_asked_is_screened_agai
     assert TEST_AREA_ID not in _ids(_matched(covered.consultees))
     assert screen(connection_params, site, rules, 1_000, bounding_box_above_points=2).site_screened_as == "outline"
 
-    monkeypatch.setattr(queries, "covering_outline", lambda *_args: None)
+    monkeypatch.setattr(queries, "simplified_site_and_cover", lambda _db, wkt, _above_points=None: (wkt, None))
     boxed = screen(connection_params, site, rules, 1_000, bounding_box_above_points=1)
     assert boxed.site_screened_as == "boundingBox"
     assert TEST_AREA_ID in _ids(_matched(boxed.consultees))
 
 
 def test_covering_outline_contains_the_site_and_is_simpler(connection_params):
-    # a detailed zigzag, 2km long
+    # a detailed zigzag, 2km long - past a low point limit the cover is built
     zigzag = "LINESTRING(" + ", ".join(f"{i * 0.0001} {0.00005 * (i % 2)}" for i in range(181)) + ")"
     with open_database(connection_params) as db:
-        cover = queries.covering_outline(db, zigzag)
+        _site, cover = queries.simplified_site_and_cover(db, zigzag, 1)
         [row] = db.query(
             "SELECT geography::STGeomFromText(%s, 4326).STContains(geography::STGeomFromText(%s, 4326)) AS covers",
             (cover, zigzag),
         )
     assert row["covers"] is True or row["covers"] == 1
     assert point_count(cover) < point_count(zigzag)
+
+
+def test_under_the_point_limit_no_cover_is_built(connection_params):
+    # a mid-sized site's buffer can cost more than the round trip it saves, so the cover is only
+    # computed past the limit: under it (or with none, `> NULL` never true) the query returns none
+    zigzag = "LINESTRING(" + ", ".join(f"{i * 0.0001} {0.00005 * (i % 2)}" for i in range(181)) + ")"
+    with open_database(connection_params) as db:
+        _site, no_cover = queries.simplified_site_and_cover(db, zigzag, 1_000)
+        assert no_cover is None
+        _site, no_cover = queries.simplified_site_and_cover(db, zigzag, None)
+        assert no_cover is None
 
 
 def test_a_run_past_its_time_limit_is_stopped_on_the_database_too(connection_params):

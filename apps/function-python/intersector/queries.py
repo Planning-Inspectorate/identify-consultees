@@ -75,14 +75,35 @@ def table_exists(db: Database, table: str) -> bool:
     return row["id"] is not None
 
 
-def simplify(db: Database, wkt: str) -> str:
-    """`wkt` simplified the way `geometrySimplified` is. Done to the site once per run: detailed
-    site boundaries were most of a run's time (one 0.3km² site had 2,536 points)."""
+def simplified_site_and_cover(db: Database, wkt: str, above_points: int | None) -> tuple[str, str | None]:
+    """`wkt` simplified the way `geometrySimplified` is, and a covering outline for it (see below),
+    in one round trip: the site query a run starts with. Detailed site boundaries were most of a
+    run's time (one 0.3km² site had 2,536 points); a covering outline is what makes measuring
+    distances from one affordable. But buffering a mid-sized site whose cover goes unused can cost
+    more than the round trip it saves, so the CASE builds it only when the simplified site has
+    more than `above_points` points - None asks for none, `> NULL` being neither true nor false."""
     [row] = db.query(
-        f"SELECT {_geography()}.Reduce(%s).MakeValid().STAsText() AS wkt",
-        (wkt, SIMPLIFY_TOLERANCE_METRES),
+        f"""
+        DECLARE @site geography = {_geography()}.Reduce(%s).MakeValid();
+        SELECT @site.STAsText() AS site,
+            cover.geometry.STAsText() AS cover,
+            cover.geometry.STContains(@site) AS covers
+        FROM (
+            SELECT CASE WHEN @site.STNumPoints() > %s
+                THEN @site.BufferWithTolerance(%s, %s, 0).Reduce(%s).MakeValid()
+            END AS geometry
+        ) AS cover
+        """,
+        (
+            wkt,
+            SIMPLIFY_TOLERANCE_METRES,
+            above_points,
+            COVER_TOLERANCE_METRES,
+            COVER_TOLERANCE_METRES / 4,
+            COVER_TOLERANCE_METRES / 2,
+        ),
     )
-    return row["wkt"]
+    return row["site"], row["cover"] if row["covers"] else None
 
 
 _NUMBER = re.compile(r"-?\d+(?:\.\d+)?(?:[eE][-+]?\d+)?")
@@ -132,39 +153,6 @@ def grow(db: Database, wkt: str, metres: float) -> str:
     return row["wkt"]
 
 
-def _reach(db: Database, wkt: str, metres: float) -> str:
-    """Somewhere covering everything within `metres` of `wkt`: its convex hull, grown by `metres`
-    (and the growing's tolerance, so it can't fall short). The hull has a handful of points, so
-    it's quick to grow - but it covers more than the site does, so what it finds must be measured.
-    Simplifying the site to grow it instead is quicker still, but can drop a small part of it
-    altogether: that lost 36 of an airport's 273 consultees."""
-    [row] = db.query(
-        f"""SELECT {_geography()}.STConvexHull()
-            .BufferWithTolerance(%s, {GROW_TOLERANCE_METRES}, 0).STAsText() AS wkt""",
-        (wkt, metres + GROW_TOLERANCE_METRES),
-    )
-    return row["wkt"]
-
-
-def covering_outline(db: Database, wkt: str) -> str | None:
-    """A simpler outline that covers all of `wkt`, or None if one can't be made: `wkt` grown by
-    COVER_TOLERANCE_METRES (to within a quarter of it), then simplified by half of it - so its edge
-    is never inside the site, and at most ~1.75 x the tolerance outside it. Distances from it are
-    never further than from the site, so a search around it misses nothing a search around the site
-    would find. Simplifying alone could cut a corner off the site, or drop a small part of it
-    altogether, so the result is checked to contain the site."""
-    [row] = db.query(
-        f"""
-        SELECT cover.geometry.STAsText() AS wkt, cover.geometry.STContains({_geography()}) AS covers
-        FROM (
-            SELECT {_geography()}.BufferWithTolerance(%s, %s, 0).Reduce(%s).MakeValid() AS geometry
-        ) AS cover
-        """,
-        (wkt, wkt, COVER_TOLERANCE_METRES, COVER_TOLERANCE_METRES / 4, COVER_TOLERANCE_METRES / 2),
-    )
-    return row["wkt"] if row["covers"] else None
-
-
 def find_areas_near(
     db: Database,
     wkt: str,
@@ -175,10 +163,18 @@ def find_areas_near(
     """Areas within `radius_metres` (+ DISTANCE_MARGIN_METRES) of `wkt`, nearest first, optionally
     limited to `categories` or leaving out `excluded_categories`.
 
-    Found by intersecting somewhere that covers the radius (see _reach), then measured - only
-    those - and any past the radius dropped. Filtering on the distance itself measures every area
-    the spatial index can't rule out: for a detailed site among detailed areas, that took 2-5 times
-    as long (a 0.8km² site's 20km search: 3.9s, against 0.8s)."""
+    Found by intersecting somewhere that covers the radius, then measured - only those - and any
+    past the radius dropped. The covering shape is the site's convex hull grown by the radius (and
+    the growing's tolerance, so it can't fall short): the hull has a handful of points, so it's
+    quick to grow - but it covers more than the site does, so what it finds must be measured.
+    Simplifying the site to grow it instead is quicker still, but can drop a small part of it
+    altogether: that lost 36 of an airport's 273 consultees. It's computed inside the query - a
+    parameter-derived shape is constant to the planner and still seeks the index - saving the
+    round trip fetching it used to take, once per call.
+
+    Filtering on the distance itself measures every area the spatial index can't rule out: for a
+    detailed site among detailed areas, that took 2-5 times as long (a 0.8km² site's 20km search:
+    3.9s, against 0.8s)."""
     categories = list(categories)
     excluded_categories = list(excluded_categories)
     category_filter = f"AND consulteeCategory IN ({_placeholders(categories)})" if categories else ""
@@ -189,17 +185,18 @@ def find_areas_near(
         else ""
     )
     limit = radius_metres + DISTANCE_MARGIN_METRES
-    within_reach = _reach(db, wkt, limit)
     rows = db.query(
         f"""
         SELECT {AREA_COLUMNS}, geometrySimplified.STDistance({_geography()}) AS distanceMetres
         FROM {db.table} {USE_SPATIAL_INDEX}
-        WHERE geometrySimplified.STIntersects({_geography()}) = 1
+        WHERE geometrySimplified.STIntersects(
+            {_geography()}.STConvexHull().BufferWithTolerance(%s, {GROW_TOLERANCE_METRES}, 0)
+        ) = 1
             {category_filter}
             {excluded_filter}
         ORDER BY distanceMetres
         """,
-        (wkt, within_reach, *categories, *excluded_categories),
+        (wkt, wkt, limit + GROW_TOLERANCE_METRES, *categories, *excluded_categories),
     )
     return [AreaMatch(_area_from_row(row), row["distanceMetres"]) for row in rows if row["distanceMetres"] <= limit]
 
