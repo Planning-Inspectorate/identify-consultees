@@ -16,6 +16,7 @@ const requiredAuthEnv = {
 
 /** Keys this suite mutates — restored after each test. */
 const managedKeys = [
+	'ALLOW_INSECURE_DB_TLS',
 	'APP_HOSTNAME',
 	'AUTH_CLIENT_ID',
 	'AUTH_CLIENT_SECRET',
@@ -127,6 +128,60 @@ describe('manage loadConfig', () => {
 		assert.equal(config.auth.clientId, '');
 		assert.equal(config.auth.clientSecret, '');
 		assert.equal(config.auth.groups.applicationAccess, '');
+	});
+
+	test('refuses a production database connection that trusts any certificate', () => {
+		setBaseEnv({
+			NODE_ENV: 'production',
+			SQL_CONNECTION_STRING: 'sqlserver://db.example.net;database=app;trustServerCertificate=true'
+		});
+		assert.throws(() => loadConfig(), /trustServerCertificate=true or encrypt=false/);
+	});
+
+	test('refuses a production database connection that drops encryption', () => {
+		setBaseEnv({
+			NODE_ENV: 'production',
+			SQL_CONNECTION_STRING: 'sqlserver://db.example.net;database=app;encrypt=false'
+		});
+		assert.throws(() => loadConfig(), /trustServerCertificate=true or encrypt=false/);
+	});
+
+	test('leaves the local Docker connection string alone outside production', () => {
+		setBaseEnv({
+			NODE_ENV: 'development',
+			SQL_CONNECTION_STRING: 'sqlserver://localhost:1434;database=app;trustServerCertificate=true'
+		});
+		const config = loadConfig();
+		assert.match(config.database.connectionString, /trustServerCertificate=true/);
+	});
+
+	test('allows ALLOW_INSECURE_DB_TLS on a loopback production connection', () => {
+		// the CI image smoke test boots NODE_ENV=production against the Docker SQL Server
+		setBaseEnv({
+			NODE_ENV: 'production',
+			ALLOW_INSECURE_DB_TLS: 'true',
+			SQL_CONNECTION_STRING: 'sqlserver://localhost:1434;database=app;trustServerCertificate=true'
+		});
+		const config = loadConfig();
+		assert.match(config.database.connectionString, /trustServerCertificate=true/);
+	});
+
+	test('keeps refusing a remote production connection even with ALLOW_INSECURE_DB_TLS', () => {
+		setBaseEnv({
+			NODE_ENV: 'production',
+			ALLOW_INSECURE_DB_TLS: 'true',
+			SQL_CONNECTION_STRING: 'sqlserver://db.example.net;database=app;trustServerCertificate=true'
+		});
+		assert.throws(() => loadConfig(), /trustServerCertificate=true or encrypt=false/);
+	});
+
+	test('keeps refusing a connection without the sqlserver:// scheme even with ALLOW_INSECURE_DB_TLS', () => {
+		setBaseEnv({
+			NODE_ENV: 'production',
+			ALLOW_INSECURE_DB_TLS: 'true',
+			SQL_CONNECTION_STRING: 'localhost:1434;database=app;trustServerCertificate=true'
+		});
+		assert.throws(() => loadConfig(), /trustServerCertificate=true or encrypt=false/);
 	});
 
 	test('does not allow AUTH_DISABLED in production', () => {
