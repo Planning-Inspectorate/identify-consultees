@@ -196,7 +196,7 @@ function dbReturning(rows: unknown[][], otherCases: unknown[] = OTHER_CASES) {
 					)
 					.map(({ id, consultee, distanceMetres, region }) => ({ id, consultee, distanceMetres, region }));
 			}
-			if (text.includes('LOWER(consultee)')) {
+			if (text.includes('AND consultee = ')) {
 				const [category, name] = (values as string[]).slice(-2);
 				return STORED.filter(
 					(row) => row.consulteeCategory === category && row.consultee.toLowerCase() === name.toLowerCase()
@@ -801,7 +801,7 @@ describe('add a consultee suggestions, as a name is typed', () => {
 		);
 
 		const sites = svc.db.$queryRaw.mock.calls
-			.filter((call) => /LIKE|LOWER\(consultee\) =/.test(call.arguments[0].join('')))
+			.filter((call) => /consultee (?:=|LIKE) /.test(call.arguments[0].join('')))
 			.map((call) => call.arguments.slice(1).find((value) => String(value).startsWith('POINT')));
 		// the prefix search as it's typed, and the name lookup on submit
 		assert.ok(sites.length >= 2);

@@ -465,6 +465,11 @@ const APPROXIMATE_DISTANCE = Prisma.raw(
 // name, has 12
 const MAX_NAMED_AREAS = 50;
 
+// the name lookups below compare consultee bare - no LOWER() on either side. Every environment's
+// database runs the case-insensitive SQL_Latin1_General_CP1_CI_AS collation (infrastructure/
+// database.tf), so =, LIKE and IN match regardless of case already, and a bare column can seek
+// the (consulteeCategory, consultee) index an expression never could
+
 /**
  * The consultee_area rows in `category` called `name` - case aside, as names are compared when
  * consultees are added by hand - nearest `site` first: the check that a name typed on the Add a
@@ -483,7 +488,7 @@ export async function findConsulteeAreasByName(
 			SELECT TOP (${MAX_NAMED_AREAS}) id, consultee, region, ${APPROXIMATE_DISTANCE} AS distanceMetres
 			FROM consultee_area
 			WHERE consulteeCategory = ${category}
-				AND LOWER(consultee) = LOWER(${name})
+				AND consultee = ${name}
 			ORDER BY distanceMetres, id
 		`
 	);
@@ -524,8 +529,8 @@ export async function findConsulteeAreasByNameStart(
 			SELECT TOP (${MAX_SUGGESTED_AREAS}) id, consultee, region, ${APPROXIMATE_DISTANCE} AS distanceMetres
 			FROM consultee_area
 			WHERE consulteeCategory = ${category}
-				AND LOWER(consultee) LIKE LOWER(${`${likeLiteral(typed)}%`}) ESCAPE '!'
-			ORDER BY CASE WHEN LOWER(consultee) = LOWER(${typed}) THEN 0 ELSE 1 END, distanceMetres, id
+				AND consultee LIKE ${`${likeLiteral(typed)}%`} ESCAPE '!'
+			ORDER BY CASE WHEN consultee = ${typed} THEN 0 ELSE 1 END, distanceMetres, id
 		`
 	);
 	return rows.map((row) => ({
@@ -557,8 +562,8 @@ export async function sharedConsulteeNames(
 				SELECT LOWER(consultee) AS name
 				FROM consultee_area
 				WHERE consulteeCategory = ${category}
-					AND LOWER(consultee) IN (${Prisma.join(batch)})
-				GROUP BY LOWER(consultee)
+					AND consultee IN (${Prisma.join(batch)})
+				GROUP BY consultee
 				HAVING COUNT(*) > 1
 			`
 		);
