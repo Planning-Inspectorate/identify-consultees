@@ -249,6 +249,32 @@ export async function getCaseBoundaryById(dbClient: PrismaClient, id: string): P
 }
 
 /**
+ * The case boundaries `ids` names, keyed by their (lowercased) id - one round trip rather than a
+ * getCaseBoundaryById per file, for the boundary page drawing every file the case holds. Each row
+ * reads as getCaseBoundaryById reads it (the original's WKT only where a map could draw it whole).
+ * Ids with no matching row are absent.
+ */
+export async function getCaseBoundariesByIds(
+	dbClient: PrismaClient,
+	ids: string[]
+): Promise<Map<string, CaseBoundaryFeature>> {
+	const features = new Map<string, CaseBoundaryFeature>();
+	if (ids.length === 0) {
+		return features;
+	}
+	const rows = await withDeadlockRetry(
+		() => dbClient.$queryRaw<CaseBoundaryRow[]>`
+			SELECT ${boundaryColumns}, geometrySimplified.STAsText() AS simplifiedGeometryWkt
+			FROM case_boundary WHERE id IN (${Prisma.join(ids)})
+		`
+	);
+	for (const row of rows) {
+		features.set(row.id.toLowerCase(), rowToFeature(row));
+	}
+	return features;
+}
+
+/**
  * A case boundary without its geometry - for the (common) pages that only ever show a
  * reference/name/date and would otherwise pay for fetching and WKT-parsing a geometry that's
  * never used. Some real boundaries are large (complex multi-part polygons), so this isn't just a

@@ -9,6 +9,7 @@ import type { CaseBoundaryFeatureCollection } from './case-boundaries.ts';
 import {
 	findNearbyCases,
 	findOtherCases,
+	getCaseBoundariesByIds,
 	getCaseBoundaryById,
 	getCaseBoundaryDisplayGeometries,
 	getCaseBoundarySummaryById,
@@ -181,6 +182,45 @@ describe('case boundaries (requires a local SQL Server - see docker-compose.yml)
 			assert.deepStrictEqual(found?.geometry, found?.simplifiedGeometry);
 		} finally {
 			await cleanup();
+		}
+	});
+
+	test('getCaseBoundariesByIds reads every named boundary in one round trip, missing ones absent', async (t) => {
+		if (!dbAvailable) return t.skip('SQL Server database not available');
+
+		const secondBoundaryId = '33333333-3333-3333-3333-333333333333';
+		const missingId = '99999999-9999-9999-9999-999999999999';
+
+		await cleanup();
+		try {
+			await loadCaseBoundaries(dbClient, {
+				type: 'FeatureCollection',
+				features: [
+					{
+						id: testBoundaryId,
+						type: 'Feature',
+						geometry: { type: 'Point', coordinates: [0, 0] },
+						properties: { caseReference: 'EN010001', caseName: 'First' }
+					},
+					{
+						id: secondBoundaryId,
+						type: 'Feature',
+						geometry: { type: 'Point', coordinates: [1, 1] },
+						properties: { caseReference: 'EN010002', caseName: 'Second' }
+					}
+				]
+			});
+
+			const found = await getCaseBoundariesByIds(dbClient, [testBoundaryId, missingId, secondBoundaryId]);
+			assert.equal(found.size, 2);
+			assert.equal(found.get(testBoundaryId)?.properties.caseName, 'First');
+			assert.equal(found.get(secondBoundaryId)?.properties.caseName, 'Second');
+			assert.equal(found.get(missingId), undefined);
+			// nothing is queried when nothing is asked for
+			assert.equal((await getCaseBoundariesByIds(dbClient, [])).size, 0);
+		} finally {
+			await cleanup();
+			await dbClient.$executeRaw`DELETE FROM case_boundary WHERE id = CAST(${secondBoundaryId} AS UNIQUEIDENTIFIER)`;
 		}
 	});
 
