@@ -3,6 +3,7 @@ import { clientAddressKey } from '#util/client-address.ts';
 import { createRoutesAndGuards as createAuthRoutesAndGuards } from '@planning-inspectorate/core/auth';
 import { createMonitoringRoutes } from '@planning-inspectorate/core/controllers';
 import { cacheNoCacheMiddleware } from '@planning-inspectorate/core/middleware';
+import compression from 'compression';
 import type { IRouter, RequestHandler } from 'express';
 import { Router as createRouter } from 'express';
 import rateLimit from 'express-rate-limit';
@@ -64,6 +65,12 @@ export function buildRouter(service: ManageService, options: BuildRouterOptions 
 	// don't cache responses, note no-cache allows some caching, but with revalidation
 	// see https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Cache-Control#no-cache
 	router.use(cacheNoCacheMiddleware);
+
+	// Front Door's compression is part of its caching, so it doesn't compress these no-cache
+	// pages - the category page embeds its consultees' GeoJSON, ~1.5MB of very compressible
+	// text. Compress them here instead; the maps' tiles and vendor assets need no help (PNG is
+	// compressed already, and the assets are served pre-compressed)
+	router.use(compression());
 
 	router.get('/unauthenticated', (req, res) => res.status(401).render('views/errors/401.njk'));
 
