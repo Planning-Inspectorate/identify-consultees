@@ -9,6 +9,7 @@ import { createApp } from '../app.ts';
 import type { Config } from '../config.ts';
 import { loadBuildConfig } from '../config.ts';
 import {
+	CROSS_ORIGIN_EMBEDDER_POLICY,
 	CROSS_ORIGIN_OPENER_POLICY,
 	CROSS_ORIGIN_RESOURCE_POLICY,
 	OPENFREEMAP_ORIGIN,
@@ -148,6 +149,7 @@ describe('HTML security response headers', () => {
 		assert.equal(response.headers['permissions-policy'], PERMISSIONS_POLICY);
 		assert.equal(response.headers['cross-origin-opener-policy'], CROSS_ORIGIN_OPENER_POLICY);
 		assert.equal(response.headers['cross-origin-resource-policy'], CROSS_ORIGIN_RESOURCE_POLICY);
+		assert.equal(response.headers['cross-origin-embedder-policy'], CROSS_ORIGIN_EMBEDDER_POLICY);
 		assert.equal(response.headers['strict-transport-security'], undefined);
 
 		const csp = response.headers['content-security-policy'];
