@@ -122,6 +122,89 @@ describe('case boundaries (requires a local SQL Server - see docker-compose.yml)
 		}
 	});
 
+	test('refuses a boundary carrying more points than the limit, before any write', async (t) => {
+		if (!dbAvailable) return t.skip('SQL Server database not available');
+
+		await cleanup();
+		try {
+			// a six-point ring against a five-point cap
+			const tooBig = {
+				id: testBoundaryId,
+				type: 'Feature' as const,
+				geometry: {
+					type: 'Polygon' as const,
+					coordinates: [
+						[
+							[-0.15, 51.5],
+							[-0.1, 51.5],
+							[-0.1, 51.52],
+							[-0.05, 51.52],
+							[-0.15, 51.52],
+							[-0.15, 51.5]
+						]
+					]
+				},
+				properties: { caseReference: 'EN010001', caseName: 'Over the limit' }
+			};
+
+			await assert.rejects(
+				loadCaseBoundaries(dbClient, { type: 'FeatureCollection', features: [tooBig] }, { boundaryPointLimit: 5 }),
+				/more than 5 points/
+			);
+
+			// nothing reached the table - the whole load refused, not a partial write
+			const listed = await listCaseBoundaries(dbClient);
+			assert.equal(
+				listed.features.some((feature) => feature.id === testBoundaryId),
+				false
+			);
+
+			// at the limit exactly, the same feature loads
+			await loadCaseBoundaries(dbClient, { type: 'FeatureCollection', features: [tooBig] }, { boundaryPointLimit: 6 });
+			const reloaded = await listCaseBoundaries(dbClient);
+			assert.equal(
+				reloaded.features.some((feature) => feature.id === testBoundaryId),
+				true
+			);
+		} finally {
+			await cleanup();
+		}
+	});
+
+	test('counts a GeometryCollection boundary across its parts for the limit', async (t) => {
+		if (!dbAvailable) return t.skip('SQL Server database not available');
+
+		await cleanup();
+		try {
+			const ring = (dx: number) => [
+				[dx - 0.15, 51.5],
+				[dx - 0.1, 51.5],
+				[dx - 0.1, 51.52],
+				[dx - 0.15, 51.5]
+			];
+			const collection = {
+				id: testBoundaryId,
+				type: 'Feature' as const,
+				geometry: {
+					type: 'GeometryCollection' as const,
+					geometries: [
+						{ type: 'Polygon' as const, coordinates: [ring(-0.1)] },
+						{ type: 'Polygon' as const, coordinates: [ring(0.1)] }
+					]
+				},
+				properties: { caseReference: 'EN010001', caseName: 'Two-part boundary' }
+			};
+
+			// eight points across the parts - under a five-each, over an eight-total reading
+			await assert.rejects(
+				loadCaseBoundaries(dbClient, { type: 'FeatureCollection', features: [collection] }, { boundaryPointLimit: 5 }),
+				/more than 5 points/
+			);
+		} finally {
+			await cleanup();
+		}
+	});
+
 	test('getCaseBoundaryById finds a stored boundary and returns null otherwise', async (t) => {
 		if (!dbAvailable) return t.skip('SQL Server database not available');
 
