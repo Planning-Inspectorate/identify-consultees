@@ -47,6 +47,12 @@ export type StaticMapResponseBody = {
 	vary?: string;
 	/** Whose basemap the image was drawn on - absent for a 304, which sends no image. */
 	basemap?: BasemapProvider | 'google';
+	/**
+	 * Every basemap tile arrived - false when the image was drawn over gaps (OSM tiles that
+	 * couldn't be fetched). Absent for a 304; a cache uses it to keep a degraded body to the
+	 * client that got it rather than serve it to everyone.
+	 */
+	basemapComplete?: boolean;
 };
 
 /** Write a built static-map response onto an Express response - shared by every static-map route. */
@@ -55,7 +61,8 @@ export function sendStaticMapResponse(res: Response, image: StaticMapResponseBod
 		.status(image.status)
 		.set({
 			'Cache-Control': image.cacheControl,
-			ETag: image.etag,
+			// error responses built outside the fingerprint path carry no validator
+			...(image.etag ? { ETag: image.etag } : {}),
 			...(image.vary ? { Vary: image.vary } : {})
 		})
 		.type(image.contentType);
@@ -161,7 +168,8 @@ export async function buildConsulteeStaticMapResponse(
 			contentType: SVG_CONTENT_TYPE,
 			cacheControl,
 			etag,
-			basemap: basemap.provider
+			basemap: basemap.provider,
+			basemapComplete: basemap.complete
 		};
 	}
 
@@ -177,6 +185,9 @@ export async function buildConsulteeStaticMapResponse(
 		cacheControl,
 		etag,
 		vary,
-		basemap: basemap?.provider ?? 'google'
+		basemap: basemap?.provider ?? 'google',
+		// Google's fetched image is whole by definition, and the OS tile path only reports 'os'
+		// when complete - a degraded basemap is an incomplete OSM one
+		basemapComplete: basemap?.complete ?? true
 	};
 }

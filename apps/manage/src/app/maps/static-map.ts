@@ -284,19 +284,22 @@ export type BasemapProvider = 'os' | 'osm';
 /**
  * A viewport's basemap tiles: OS's when there's a key, OS covers the whole map (Great Britain, zooms
  * 7 to 20 - see osCoversView) and every tile came - else OpenStreetMap's, so a map is never drawn
- * half on each.
+ * half on each. `complete` says every tile arrived - always true of the OS half (an incomplete OS
+ * fetch falls to OSM), false when some OSM tiles couldn't be had, so a caller can tell a degraded
+ * basemap from a full one.
  */
 export async function fetchBasemapTiles(
 	options: Pick<StaticMapBuildOptions, 'center' | 'zoom' | 'width' | 'height' | 'pixelRatio'>,
 	osKey: string | undefined = osMapsApiKeyFromEnv()
-): Promise<{ provider: BasemapProvider; tiles: OsmBasemapTile[] }> {
+): Promise<{ provider: BasemapProvider; tiles: OsmBasemapTile[]; complete: boolean }> {
 	if (osKey && osCoversView({ center: options.center, ...basemapFrame(options) })) {
 		const os = await fetchTiles(options, (zoom, x, y) => fetchOsTile(osKey, zoom, x, y), 'os/', true);
 		if (os.complete) {
-			return { provider: 'os', tiles: os.tiles };
+			return { provider: 'os', tiles: os.tiles, complete: true };
 		}
 	}
-	return { provider: 'osm', tiles: await fetchOsmBasemapTiles(options) };
+	const osm = await fetchTiles(options, fetchOsmTile, '', false);
+	return { provider: 'osm', tiles: osm.tiles, complete: osm.complete };
 }
 
 function encodeGooglePolyline(ring: number[][]): string {

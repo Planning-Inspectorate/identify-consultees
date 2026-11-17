@@ -1,7 +1,8 @@
 import { mockLogger } from '@planning-inspectorate/core/testing';
 import assert from 'node:assert';
-import { describe, it, mock } from 'node:test';
+import { afterEach, describe, it, mock } from 'node:test';
 import { NEARBY_REGIONAL_FILL_OPACITY, REGIONAL_FILL_OPACITY } from '../../../maps/case-geojson.ts';
+import { clearStaticMapResponseCacheForTests } from '../../../maps/static-map-response-cache.ts';
 import type { ConsulteeAreaMatchRow } from '../../../testing/ruleset-runner-stub.ts';
 import { failingRulesetRunner, rulesetRunnerReturning } from '../../../testing/ruleset-runner-stub.ts';
 import { buildResultsStaticMap } from './controller.ts';
@@ -37,15 +38,23 @@ function railwayMatchRow(
 	};
 }
 
+// the data-watermark lookup every request starts with: `caseUpdated` null means no such case
+function watermarkRow(caseUpdated: Date | null = new Date(Date.UTC(2026, 0, 1))) {
+	return { caseUpdated, watermark: `loads|cases|${caseUpdated === null ? 'none' : 'table'}` };
+}
+
 // rows[0] answers the project lookup; rows[1], if given, is what the ruleset matched - returned by
 // the stand-in Python function (see rulesetRunnerFor), and by the database as the map's display geometry
-function dbReturning(rows: unknown[][]) {
+function dbReturning(rows: unknown[][], watermark = watermarkRow()) {
 	let call = 0;
 	return {
 		matchRows: (rows[1] ?? []) as ConsulteeAreaMatchRow[],
 		$queryRaw: mock.fn(async (sql: TemplateStringsArray) => {
+			const text = sql.join('');
+			// the data-watermark lookup, answered before any geometry work
+			if (text.includes('sys.synonyms') || text.includes('reference_data_load')) return [watermark];
 			// the map's search area is a query on the site alone (no table) - answer it with the site
-			if (!/\bFROM\b/.test(sql.join(''))) return [{ wkt: realProjectRow().geometryWkt }];
+			if (!/\bFROM\b/.test(text)) return [{ wkt: realProjectRow().geometryWkt }];
 			return rows[Math.min(call++, rows.length - 1)] ?? [];
 		})
 	};
@@ -54,6 +63,10 @@ function dbReturning(rows: unknown[][]) {
 function rulesetRunnerFor(db: unknown) {
 	return rulesetRunnerReturning((db as { matchRows?: ConsulteeAreaMatchRow[] }).matchRows ?? []);
 }
+
+afterEach(() => {
+	clearStaticMapResponseCacheForTests();
+});
 
 describe('consultees results static map', () => {
 	it('should serve a static map with cache headers', async () => {
@@ -306,12 +319,14 @@ describe('consultees results static map', () => {
 			set: mock.fn(() => mockRes),
 			send: mock.fn()
 		};
-		let call = 0;
 		const db = {
-			$queryRaw: mock.fn(async () => {
-				call += 1;
-				if (call === 1) return [realProjectRow()];
-				throw new Error('query failed');
+			$queryRaw: mock.fn(async (sql: TemplateStringsArray) => {
+				const text = sql.join('');
+				if (text.includes('sys.synonyms') || text.includes('reference_data_load')) return [watermarkRow()];
+				// the project lookup succeeds; the run's nearby-cases query is what fails
+				if (/FROM case_boundary\s+WHERE id/.test(text)) return [realProjectRow()];
+				if (/\bFROM\b/.test(text)) throw new Error('query failed');
+				return [{ wkt: realProjectRow().geometryWkt }];
 			})
 		};
 		const handler = buildResultsStaticMap(
@@ -324,7 +339,9 @@ describe('consultees results static map', () => {
 		);
 
 		assert.strictEqual(mockRes.status.mock.calls[0].arguments[0], 503);
-		assert.strictEqual(mockRes.set.mock.callCount(), 0);
+		// no validator on an error - a browser mustn't keep it
+		assert.strictEqual(mockRes.set.mock.calls[0].arguments[0]['Cache-Control'], 'no-cache');
+		assert.equal(mockRes.set.mock.calls[0].arguments[0].ETag, undefined);
 	});
 
 	it('should 404 when caseId is missing', async () => {
@@ -368,7 +385,7 @@ describe('consultees results static map', () => {
 			send: mock.fn()
 		};
 		const handler = buildResultsStaticMap({
-			db: dbReturning([[]]),
+			db: dbReturning([[]], watermarkRow(null)),
 			logger: mockLogger(),
 			nearbyConsulteeRadiusMetres: 20_000
 		});
@@ -445,5 +462,120 @@ describe('consultees results static map', () => {
 		} finally {
 			globalThis.fetch = originalFetch;
 		}
+	});
+
+	it('serves a repeated request from the rendered-map cache - only the watermark is queried', async () => {
+		const res = () => ({
+			status: mock.fn(() => resObj),
+			type: mock.fn(() => resObj),
+			set: mock.fn(() => resObj),
+			send: mock.fn(),
+			end: mock.fn()
+		});
+		let resObj = res();
+
+		const db = dbReturning([[realProjectRow()], []]);
+		const handler = buildResultsStaticMap(
+			{ db, logger: mockLogger(), nearbyConsulteeRadiusMetres: 20_000, rulesetRunner: rulesetRunnerFor(db) },
+			true
+		);
+		const request = {
+			params: { caseId: realProjectId },
+			query: { ruleset: 'england-wales-post-20240430' },
+			headers: {}
+		};
+		await handler(request, resObj);
+		assert.strictEqual(resObj.status.mock.calls[0].arguments[0], 200);
+
+		const callsAfterFirst = db.$queryRaw.mock.callCount();
+		resObj = res();
+		await handler(request, resObj);
+
+		// the only database work the second request did was the watermark lookup
+		const laterCalls = db.$queryRaw.mock.calls.slice(callsAfterFirst).map((call) => String(call.arguments[0].join('')));
+		assert.strictEqual(laterCalls.length, 1);
+		assert.ok(laterCalls[0].includes('sys.synonyms'));
+		assert.strictEqual(resObj.status.mock.calls[0].arguments[0], 200);
+	});
+
+	it('keys the session-remembered run into the cache, so a changed run misses', async () => {
+		const res = () => {
+			const r = {
+				status: mock.fn(() => r),
+				type: mock.fn(() => r),
+				set: mock.fn(() => r),
+				send: mock.fn(),
+				end: mock.fn()
+			};
+			return r;
+		};
+
+		const db = dbReturning([[realProjectRow()], []]);
+		const handler = buildResultsStaticMap(
+			{
+				db,
+				logger: mockLogger(),
+				nearbyConsulteeRadiusMetres: 20_000,
+				nearbyNsipRadiusMetres: 5_000,
+				rulesetRunner: rulesetRunnerFor(db)
+			},
+			true
+		);
+		const session = (ranAt: number) => ({
+			rulesetRun2: {
+				caseId: realProjectId,
+				rulesetId: 'england-wales-post-20240430',
+				ranAt,
+				siteScreenedAs: 'outline',
+				consultees: []
+			}
+		});
+		const request = (ranAt: number) => ({
+			params: { caseId: realProjectId },
+			query: { ruleset: 'england-wales-post-20240430' },
+			headers: {},
+			session: session(ranAt)
+		});
+
+		// the run's ranAt names it - whichever shape the session field holds it in
+		const ranAt = Date.now();
+		const first = res();
+		await handler(request(ranAt), first);
+		assert.strictEqual(first.status.mock.calls[0].arguments[0], 200);
+		const callsAfterFirst = db.$queryRaw.mock.callCount();
+
+		// the same remembered run hits the cache: only the watermark is queried
+		await handler(request(ranAt), res());
+		const secondCalls = db.$queryRaw.mock.calls
+			.slice(callsAfterFirst)
+			.map((call) => String(call.arguments[0].join('')));
+		assert.strictEqual(secondCalls.length, 1);
+		assert.ok(secondCalls[0].includes('sys.synonyms'));
+
+		// a different remembered run - another ranAt - is a different map, so it builds again
+		const callsAfterSecond = db.$queryRaw.mock.callCount();
+		await handler(request(ranAt - 1000), res());
+		assert.ok(db.$queryRaw.mock.callCount() > callsAfterSecond);
+	});
+
+	it('should 404 if the case goes between the watermark check and the build', async () => {
+		const mockRes = {
+			status: mock.fn(() => mockRes),
+			type: mock.fn(() => mockRes),
+			set: mock.fn(() => mockRes),
+			send: mock.fn()
+		};
+		const handler = buildResultsStaticMap({
+			// the watermark says the case exists, but its row is gone when the build reads it
+			db: dbReturning([[]]),
+			logger: mockLogger(),
+			nearbyConsulteeRadiusMetres: 20_000,
+			rulesetRunner: failingRulesetRunner()
+		});
+		await handler(
+			{ params: { caseId: realProjectId }, query: { ruleset: 'england-wales-post-20240430' }, headers: {} },
+			mockRes
+		);
+		assert.strictEqual(mockRes.status.mock.calls[0].arguments[0], 404);
 	});
 });

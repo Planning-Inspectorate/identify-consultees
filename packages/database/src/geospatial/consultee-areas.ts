@@ -159,6 +159,34 @@ export async function datasetInUse(dbClient: PrismaClient): Promise<string> {
 	return quarter;
 }
 
+/**
+ * A cheap fingerprint of everything a case's maps are drawn from, in one small round trip: when
+ * the case was last changed, the newest reference-data load, the newest case boundary change and
+ * how many boundaries there are - a delete moves no max - and which quarterly table the
+ * consultee_area synonym points at. `caseUpdated` is null when no such case exists - it doubles
+ * as an existence check. Repeat reads of the same watermark mean the data a map is drawn from
+ * hasn't changed, so work whose output depends only on it can be reused.
+ */
+export interface DataWatermark {
+	caseUpdated: Date | null;
+	watermark: string;
+}
+
+export async function dataWatermark(dbClient: PrismaClient, caseId: string): Promise<DataWatermark> {
+	const [row] = await withDeadlockRetry(
+		() => dbClient.$queryRaw<{ caseUpdated: Date | null; watermark: string }[]>`
+			SELECT
+				(SELECT lastUpdated FROM case_boundary WHERE id = CAST(${caseId} AS UNIQUEIDENTIFIER)) AS caseUpdated,
+				COALESCE(CONVERT(nvarchar(33), (SELECT MAX(loadedAt) FROM reference_data_load), 126), 'none')
+					+ '|' + COALESCE(CONVERT(nvarchar(33), (SELECT MAX(lastUpdated) FROM case_boundary), 126), 'none')
+					+ ':' + CONVERT(nvarchar, (SELECT COUNT(*) FROM case_boundary))
+					+ '|' + COALESCE((SELECT base_object_name FROM sys.synonyms WHERE name = ${CONSULTEE_AREA}), 'none')
+					AS watermark
+		`
+	);
+	return { caseUpdated: row?.caseUpdated ?? null, watermark: row?.watermark ?? 'none|none|none' };
+}
+
 /** A quarter's consultee areas, as listDatasets gives them. */
 export interface ConsulteeAreaDataset {
 	quarter: string;
