@@ -77,6 +77,15 @@ export class ManageService extends BaseService<PrismaClient> {
 		return this.#rulesetRunner;
 	}
 
+	/**
+	 * The prefix this app's Redis keys live under ('manage:', config.ts) - core stores the
+	 * sessions at `${prefix}sess:`, and keys of our own (a session's ruleset run,
+	 * run-ruleset.ts) take the same prefix so they sit alongside them in a shared Redis.
+	 */
+	get redisPrefix(): string {
+		return this.#config.session.redisPrefix;
+	}
+
 	/** Whether the admin pages can change the reference data, or only report it - see config.ts. */
 	get referenceDataChanges(): boolean {
 		return this.#config.referenceDataChanges;

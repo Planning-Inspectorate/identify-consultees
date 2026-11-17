@@ -61,23 +61,70 @@ export interface StoredRulesetRun {
 	siteScreenedAs?: SiteScreenedAs;
 }
 
+/** The session field's pointer to a run kept in Redis: enough to name it, none of its consultees. */
+export interface StoredRunReference {
+	caseId: string;
+	rulesetId: string;
+	ranAt: number;
+}
+
 /** Where a run is kept between requests: the request's session, if it has one. */
 export type RulesetRunStore = Record<string, unknown> | undefined;
 
-function storedRun(
+/**
+ * The Redis key a session's run is kept under. A run's consultees - hundreds, each with its
+ * reasons - are most of a session record's size, and the record is read and parsed on every
+ * request, each tile of a map's pan included. Given Redis and a session id, the consultees are
+ * kept here instead and only read by the pages that need them; the session field holds just the
+ * pointer. Sessions without Redis or an id (a test's plain store) keep the run as they did.
+ * The key takes the app's prefix - `manage:rulesetRun:` - so it sits alongside this app's
+ * `manage:sess:` session records in a shared Redis rather than at the root.
+ */
+function runKey(service: RulesetRunService, store: RulesetRunStore): string | undefined {
+	return typeof store?.id === 'string' ? `${service.redisPrefix}rulesetRun:${store.id}` : undefined;
+}
+
+async function storedRun(
+	service: RulesetRunService,
 	store: RulesetRunStore,
 	project: CaseBoundaryFeature,
 	ruleset: Ruleset
-): StoredRulesetRun | undefined {
-	const run = store?.[RULESET_RUN_SESSION_FIELD] as StoredRulesetRun | undefined;
-	if (run?.caseId === project.id && run.rulesetId === ruleset.id && Date.now() - run.ranAt < RULESET_RUN_MAX_AGE_MS) {
-		return run;
+): Promise<StoredRulesetRun | undefined> {
+	const kept = store?.[RULESET_RUN_SESSION_FIELD] as StoredRulesetRun | StoredRunReference | undefined;
+	const fresh =
+		kept?.caseId === project.id && kept.rulesetId === ruleset.id && Date.now() - kept.ranAt < RULESET_RUN_MAX_AGE_MS;
+	if (!kept || !fresh) {
+		return undefined;
+	}
+	// a session keeping the run itself - no Redis, or an id-less store - gives it as stored
+	if ('consultees' in kept) {
+		return kept;
+	}
+	const key = runKey(service, store);
+	if (!key || !service.redisClient) {
+		return undefined;
+	}
+	try {
+		// through fullClient, like the write: core copies the client's get/set unbound onto the
+		// wrapper, and calling one there throws against a real cluster
+		const raw = await service.redisClient.fullClient.get(key);
+		const run = raw ? (JSON.parse(raw) as StoredRulesetRun) : undefined;
+		// the key is only trusted as the session's run if it's the run the pointer names - a key a
+		// session left behind when its id was reissued is no one's to read
+		if (run?.caseId === kept.caseId && run.rulesetId === kept.rulesetId && run.ranAt === kept.ranAt) {
+			return run;
+		}
+	} catch (error) {
+		service.logger.warn({ error }, "Failed to read the session's ruleset run from Redis");
 	}
 	return undefined;
 }
 
 /** What a ruleset run needs from the service. No Nearby NSIPs distance means none are looked for. */
-export type RulesetRunService = Pick<ManageService, 'db' | 'logger' | 'rulesetRunner' | 'nearbyConsulteeRadiusMetres'> &
+export type RulesetRunService = Pick<
+	ManageService,
+	'db' | 'logger' | 'rulesetRunner' | 'nearbyConsulteeRadiusMetres' | 'redisClient' | 'redisPrefix'
+> &
 	Partial<Pick<ManageService, 'nearbyNsipRadiusMetres'>>;
 
 /**
@@ -89,9 +136,13 @@ export type RulesetRunService = Pick<ManageService, 'db' | 'logger' | 'rulesetRu
  * again on the site's bounding box: the function decides that up front, and a retry would only add
  * a second run's queries to a database already struggling with the first's.
  *
- * Given the session, the run is kept there - only the last one, for an hour - so the report pages,
- * their maps and the download use one run rather than each running the ruleset again. Nothing is
- * kept beyond the session. A kept run has no geometry, so a page using one draws its map from
+ * Given the session, the run is kept for it - only the last one, for an hour - so the report
+ * pages, their maps and the download use one run rather than each running the ruleset again.
+ * Where the session has an id and the service has Redis, the run's consultees are kept under the
+ * session's own Redis key and the session field holds only the pointer to it: the run is most of
+ * a session record's size, and every request - the tiles of a map's pan too - reads and parses
+ * the record. Otherwise the whole run is kept in the session, as before. Nothing is kept beyond
+ * the session and its key. A kept run has no geometry, so a page using one draws its map from
  * display geometry alone (as it does whenever the search area can be built).
  */
 export async function runRulesetSafely(
@@ -100,7 +151,7 @@ export async function runRulesetSafely(
 	ruleset: Ruleset,
 	store?: RulesetRunStore
 ): Promise<RulesetRun> {
-	const stored = storedRun(store, project, ruleset);
+	const stored = await storedRun(service, store, project, ruleset);
 	if (stored) {
 		return { consultees: stored.consultees, failed: false, siteScreenedAs: stored.siteScreenedAs ?? 'outline' };
 	}
@@ -121,7 +172,28 @@ export async function runRulesetSafely(
 				consultees,
 				siteScreenedAs
 			};
-			store[RULESET_RUN_SESSION_FIELD] = run;
+			const key = runKey(service, store);
+			if (key && service.redisClient) {
+				try {
+					// the key outlives the session field by design: it names the run it holds, so a key a
+					// reissued session left behind is never mistaken for that session's own
+					await service.redisClient.fullClient.setEx(
+						key,
+						Math.ceil(RULESET_RUN_MAX_AGE_MS / 1000),
+						JSON.stringify(run)
+					);
+					store[RULESET_RUN_SESSION_FIELD] = {
+						caseId: run.caseId,
+						rulesetId: run.rulesetId,
+						ranAt: run.ranAt
+					} satisfies StoredRunReference;
+				} catch (error) {
+					service.logger.warn({ error }, 'Failed to keep the ruleset run in Redis - keeping it in the session');
+					store[RULESET_RUN_SESSION_FIELD] = run;
+				}
+			} else {
+				store[RULESET_RUN_SESSION_FIELD] = run;
+			}
 		}
 		return { consultees, failed: false, siteScreenedAs };
 	} catch (error) {

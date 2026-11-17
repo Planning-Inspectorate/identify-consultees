@@ -14,6 +14,7 @@ describe('ManageService', () => {
 			assert.equal(service.pythonFunctionApiKey, config.pythonFunctionApiKey);
 			assert.deepEqual(service.cbosImportHours, config.cbosImportHours);
 			assert.equal(service.blobStoreConfig, config.blobStore);
+			assert.equal(service.redisPrefix, config.session.redisPrefix);
 			assert.equal(service.nearbyConsulteeRadiusMetres, config.nearbyConsulteeRadiusMetres);
 			assert.equal(service.nearbyNsipRadiusMetres, config.nearbyNsipRadiusMetres);
 			// with no per-category distances, the search reaches the default
