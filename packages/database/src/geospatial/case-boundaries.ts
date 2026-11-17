@@ -22,6 +22,11 @@ export interface CaseBoundaryProperties {
 export interface CaseBoundaryFeature {
 	id: string;
 	type: 'Feature';
+	/**
+	 * The boundary's own geometry - or, past the point count a map would draw it whole with, its
+	 * simplified one (see getCaseBoundaryById): everything that draws or measures it uses the
+	 * simplified one by then anyway.
+	 */
 	geometry: Geometry;
 	/**
 	 * The boundary as stored simplified (`geometrySimplified`, to within 10m) - what a ruleset run
@@ -209,14 +214,34 @@ export async function listCaseBoundaries(
 }
 
 /**
+ * The most points a boundary's own geometry is read back with. Past it the maps draw the simplified
+ * geometry anyway (SITE_DISPLAY_MAX_POINTS in the app), the function screens the simplified outline
+ * or a bounding box built from it, and nothing else uses the original - so serialising and parsing
+ * megabytes of WKT only to throw it away isn't worth it. The largest real boundary has over 100,000
+ * points; its WKT is several MB.
+ */
+const BOUNDARY_READ_MAX_POINTS = 50_000;
+
+// as selectColumns, but geometryWkt is the simplified geometry's once the original is past
+// BOUNDARY_READ_MAX_POINTS (or falls back to the original when there's no simplified copy, which
+// can't happen while the column is NOT NULL - belt and braces)
+const boundaryColumns = Prisma.raw(`
+	id, geometryType, caseReference, caseName, fileName, receivedDate, acceptance, metadata,
+	CASE WHEN geometry.STNumPoints() <= ${BOUNDARY_READ_MAX_POINTS} OR geometrySimplified IS NULL
+		THEN geometry.STAsText() ELSE geometrySimplified.STAsText() END AS geometryWkt
+`);
+
+/**
  * Look up a single case boundary by id, with its simplified geometry. Returns `null` rather than
  * throwing when the id is well-formed but doesn't match any row - a genuine "not found", not an
- * error.
+ * error. Past BOUNDARY_READ_MAX_POINTS `geometry` holds the simplified boundary, which is what
+ * every caller draws or screens anyway (and matches what the function screens a bounding box of -
+ * see screenedSite in the app).
  */
 export async function getCaseBoundaryById(dbClient: PrismaClient, id: string): Promise<CaseBoundaryFeature | null> {
 	const rows = await withDeadlockRetry(
 		() => dbClient.$queryRaw<CaseBoundaryRow[]>`
-			SELECT ${selectColumns}, geometrySimplified.STAsText() AS simplifiedGeometryWkt
+			SELECT ${boundaryColumns}, geometrySimplified.STAsText() AS simplifiedGeometryWkt
 			FROM case_boundary WHERE id = CAST(${id} AS UNIQUEIDENTIFIER)
 		`
 	);
