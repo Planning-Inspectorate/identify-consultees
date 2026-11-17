@@ -2,7 +2,7 @@ import type { ManageService } from '#service';
 import { stringifyForInlineScript } from '#util/inline-json.ts';
 import type { CaseBoundaryFeature } from '@pins/identify-consultees-database/src/geospatial/case-boundaries.ts';
 import {
-	getCaseBoundaryById,
+	getCaseBoundariesByIds,
 	listCaseBoundaryFiles
 } from '@pins/identify-consultees-database/src/geospatial/case-boundaries.ts';
 import { getRuleset } from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
@@ -35,15 +35,19 @@ import type { BoundaryFileRadio, ConsulteeProjectViewModel } from './view-model.
 
 /**
  * Each of `ids`' case_boundary rows, in order - none for one that's gone. The page's own row is
- * already loaded; the case's other files are read together, as a case has only a handful, each a
- * round trip with its whole geometry.
+ * already loaded; the case's other files are read together, one round trip rather than one per
+ * file, each carrying its geometry.
  */
 async function boundaryRows(
 	db: ManageService['db'],
 	project: CaseBoundaryFeature,
 	ids: string[]
 ): Promise<(CaseBoundaryFeature | null)[]> {
-	return Promise.all(ids.map((id) => (id === project.id ? project : getCaseBoundaryById(db, id))));
+	const found = await getCaseBoundariesByIds(
+		db,
+		ids.filter((id) => id !== project.id)
+	);
+	return ids.map((id) => (id === project.id ? project : (found.get(id.toLowerCase()) ?? null)));
 }
 
 /** The boundary page's geometry for each file option. */
