@@ -33,8 +33,12 @@ describe('fingerprint-assets', () => {
 	test('shouldFingerprint and shouldBrotli guard sidecars', () => {
 		assert.equal(shouldFingerprint('javascripts/app.js.br'), false);
 		assert.equal(shouldFingerprint('javascripts/app.test.js'), false);
+		assert.equal(shouldFingerprint('javascripts/app.test.mjs'), false);
 		assert.equal(shouldFingerprint('javascripts/app-aabbccdd.js'), false);
 		assert.equal(shouldFingerprint('javascripts/app.js'), true);
+		// .mjs plugin modules import each other - an unfingerprinted one can serve
+		// stale against a new importer and break module linking for the whole graph
+		assert.equal(shouldFingerprint('javascripts/plugin.mjs'), true);
 		// vendor bundle entry points are fingerprinted, but webpack lazy chunks
 		// keep stable names (they are referenced by literal filename at runtime)
 		assert.equal(shouldFingerprint('vendor/datasets-plugin/js/index.js'), true);
@@ -115,6 +119,89 @@ describe('fingerprint-assets', () => {
 		assert.match(updated, /consulteesMapJs: 'javascripts\/consultees-map-01234567\.js'/);
 		assert.match(updated, /blobUploadJs: 'javascripts\/blob-upload-89abcdef\.js'/);
 		assert.match(updated, /vendorMapKeyPluginJs: 'vendor\/map-key-plugin\/js\/index-13579bdf\.js'/);
+	});
+
+	test('fingerprintAndCompressStaticAssets fingerprints .mjs modules and rewrites specifiers', async () => {
+		tempDir = await mkdtemp(path.join(tmpdir(), 'fingerprint-modules-'));
+		await mkdir(path.join(tempDir, 'javascripts'), { recursive: true });
+		await mkdir(path.join(tempDir, 'assets', 'js'), { recursive: true });
+		await mkdir(path.join(tempDir, 'assets', 'css'), { recursive: true });
+		// app -> plugin -> dep and app -> dep: the diamond makes the import order
+		// matter - dep's hashed name must exist before either importer is hashed
+		await writeFile(
+			path.join(tempDir, 'javascripts', 'app.js'),
+			"import { createPlugin } from './plugin.mjs';\n" +
+				"import { dep } from './dep.mjs';\n" +
+				"import './side.mjs';\n" +
+				"const lazy = import('./lazy.mjs');\n" +
+				"const plain = './data.json';\n" +
+				'export { createPlugin, dep, lazy, plain };\n'
+		);
+		await writeFile(
+			path.join(tempDir, 'javascripts', 'plugin.mjs'),
+			"import { dep } from './dep.mjs';\nimport './data.json';\nexport const createPlugin = () => dep;\n"
+		);
+		await writeFile(
+			path.join(tempDir, 'javascripts', 'up.mjs'),
+			"import '../assets/js/lib.js';\nexport const up = 1;\n"
+		);
+		await writeFile(path.join(tempDir, 'assets', 'js', 'lib.js'), 'globalThis.lib = {};\n');
+		await writeFile(path.join(tempDir, 'assets', 'css', 'site.css'), 'body { margin: 0; }\n');
+		await writeFile(path.join(tempDir, 'javascripts', 'dep.mjs'), 'export const dep = 1;\n');
+		await writeFile(path.join(tempDir, 'javascripts', 'side.mjs'), 'globalThis.side = true;\n');
+		await writeFile(path.join(tempDir, 'javascripts', 'lazy.mjs'), 'export const lazy = true;\n');
+		await writeFile(path.join(tempDir, 'javascripts', 'data.json'), '{}');
+
+		const manifest = await fingerprintAndCompressStaticAssets(tempDir);
+		const app = manifest.assets['javascripts/app.js'];
+		const plugin = manifest.assets['javascripts/plugin.mjs'];
+		const dep = manifest.assets['javascripts/dep.mjs'];
+		const side = manifest.assets['javascripts/side.mjs'];
+		const lazy = manifest.assets['javascripts/lazy.mjs'];
+		const up = manifest.assets['javascripts/up.mjs'];
+		const lib = manifest.assets['assets/js/lib.js'];
+		const site = manifest.assets['assets/css/site.css'];
+
+		assert.match(app, /^javascripts\/app-[0-9a-f]{8}\.js$/);
+		assert.match(plugin, /^javascripts\/plugin-[0-9a-f]{8}\.mjs$/);
+		assert.match(dep, /^javascripts\/dep-[0-9a-f]{8}\.mjs$/);
+		assert.match(side, /^javascripts\/side-[0-9a-f]{8}\.mjs$/);
+		assert.match(lazy, /^javascripts\/lazy-[0-9a-f]{8}\.mjs$/);
+		assert.match(up, /^javascripts\/up-[0-9a-f]{8}\.mjs$/);
+		assert.match(lib, /^assets\/js\/lib-[0-9a-f]{8}\.js$/);
+		assert.match(site, /^assets\/css\/site-[0-9a-f]{8}\.css$/);
+		assert.equal(manifest.assets['javascripts/data.json'], undefined);
+
+		// every specifier targeting a fingerprinted file resolves to the hashed name
+		const appContent = await readFile(path.join(tempDir, ...app.split('/')), 'utf8');
+		const pluginContent = await readFile(path.join(tempDir, ...plugin.split('/')), 'utf8');
+		const upContent = await readFile(path.join(tempDir, ...up.split('/')), 'utf8');
+		assert.ok(appContent.includes(`from './${path.posix.basename(plugin)}'`));
+		assert.ok(appContent.includes(`from './${path.posix.basename(dep)}'`));
+		assert.ok(appContent.includes(`import './${path.posix.basename(side)}'`));
+		assert.ok(appContent.includes(`import('./${path.posix.basename(lazy)}')`));
+		assert.ok(!appContent.includes("'./plugin.mjs'"));
+		assert.ok(pluginContent.includes(`from './${path.posix.basename(dep)}'`));
+		assert.ok(!pluginContent.includes("'./dep.mjs'"));
+		// a cross-directory specifier keeps its ../ form, pointed at the hashed file
+		assert.ok(upContent.includes(`import '${lib.replace('assets/', '../assets/')}'`));
+
+		// specifiers outside the fingerprinted set, and plain strings, stay as written
+		assert.ok(appContent.includes("'./data.json'"));
+		assert.ok(pluginContent.includes("import './data.json'"));
+
+		// fingerprinted .mjs files get the same Brotli sidecar as fingerprinted .js
+		const brBody = await readFile(`${path.join(tempDir, ...dep.split('/'))}.br`);
+		assert.ok(brBody.byteLength > 0);
+	});
+
+	test('fingerprintAndCompressStaticAssets rejects circular imports between fingerprinted modules', async () => {
+		tempDir = await mkdtemp(path.join(tmpdir(), 'fingerprint-cycle-'));
+		await mkdir(path.join(tempDir, 'javascripts'), { recursive: true });
+		await writeFile(path.join(tempDir, 'javascripts', 'a.mjs'), "import './b.mjs';\nexport const a = 1;\n");
+		await writeFile(path.join(tempDir, 'javascripts', 'b.mjs'), "import './a.mjs';\nexport const b = 1;\n");
+
+		await assert.rejects(() => fingerprintAndCompressStaticAssets(tempDir), /circular import/);
 	});
 
 	test('fingerprintAndCompressStaticAssets skips test files, sidecars, and already-hashed assets', async () => {
