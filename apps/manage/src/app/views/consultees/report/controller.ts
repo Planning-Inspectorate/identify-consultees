@@ -164,13 +164,27 @@ export function buildReportCreatedPage(service: ManageService): AsyncRequestHand
 		const downloadUrl = reportDownloadUrl(project.id, ruleset.id, selection);
 		const { consultees, failed, siteScreenedAs } = await runRulesetSafely(service, project, ruleset, req.session);
 
+		const account = req.session?.account;
+		const accountInfo =
+			account && typeof account === 'object' && 'name' in account && typeof account.name === 'string'
+				? { name: account.name }
+				: undefined;
+
 		let downloadSize = '';
 		let buildFailed = false;
 		if (!failed) {
 			try {
 				const report =
 					rememberedReportZip(downloadUrl) ??
-					(await buildReportZip({ service, project, ruleset, consultees, selection, siteScreenedAs }));
+					(await buildReportZip({
+						service,
+						project,
+						accountInfo,
+						ruleset,
+						consultees,
+						selection,
+						siteScreenedAs
+					}));
 				rememberReportZip(downloadUrl, report);
 				downloadSize = formatFileSize(report.contents.length);
 			} catch (error) {

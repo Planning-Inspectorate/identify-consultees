@@ -46,9 +46,15 @@ export function buildReportDownload(service: ManageService): AsyncRequestHandler
 			return;
 		}
 
+		const account = req.session?.account;
+		const accountInfo =
+			account && typeof account === 'object' && 'name' in account && typeof account.name === 'string'
+				? { name: account.name }
+				: undefined;
+
 		let report;
 		try {
-			report = await buildReportZip({ service, project, ruleset, consultees, selection, siteScreenedAs });
+			report = await buildReportZip({ service, project, accountInfo, ruleset, consultees, selection, siteScreenedAs });
 		} catch (error) {
 			logger.error({ error, caseId: project.id, rulesetId: ruleset.id }, 'Failed to build the report ZIP for download');
 			res.redirect(`${reportCreatedUrl(project.id, ruleset.id, selection)}&download=failed`);

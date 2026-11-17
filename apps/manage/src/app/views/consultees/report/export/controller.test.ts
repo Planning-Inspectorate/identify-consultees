@@ -148,7 +148,8 @@ describe('report download', () => {
 		await buildReportDownload(service as never)(
 			{
 				params: { caseId: realProjectId },
-				query: { ruleset, exclude: removal, add: [pickedAdd, typedAdd] }
+				query: { ruleset, exclude: removal, add: [pickedAdd, typedAdd] },
+				session: { account: { name: 'Test Name' } }
 			} as never,
 			res as never
 		);
@@ -180,6 +181,7 @@ describe('report download', () => {
 		assert.ok(sheets.includes('Borders the site'));
 		assert.ok(sheets.includes('Manually added'));
 		assert.ok(!sheets.includes(pickedParish) && !sheets.includes('Consultee area id'));
+		assert.ok(sheets.includes('Test Name'));
 
 		const parish = pdfTextLines(Buffer.from(files['maps/01 Parish, town and community councils.pdf']));
 		assert.ok(parish.includes('Parish, town and community councils: 2 in the report'));
