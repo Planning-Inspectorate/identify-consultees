@@ -105,6 +105,23 @@ const valueOf = (cell: unknown) => (cell && typeof cell === 'object' && 'value' 
 const rowValues = (row: unknown[]) => row.map(valueOf);
 
 describe('report workbook', () => {
+	it('writes names and reasons opening like a formula as literal strings, unchanged', () => {
+		// a shared string is never evaluated as a formula, however it opens - and prefixing a '
+		// would show in the cell, since quotePrefix (the "treat as text" marker) is a cell style,
+		// not part of the value. So values go in exactly as the data holds them
+		const sneaky = match('x', 'Parish, town and community councils', '=cmd|"/c calc"!A0', 'b_host_parish');
+		const sheets = sheetsOf(
+			report({
+				identified: [sneaky],
+				added: [{ id: 'y', category: 'NSIPs', name: '+SUM(1)', reason: '\t=evil()' }]
+			})
+		);
+		const values = sheets.flatMap((sheet) => sheet.data.flatMap((row) => row.map(valueOf)));
+		assert.ok(values.includes('=cmd|"/c calc"!A0'));
+		assert.ok(values.includes('+SUM(1)'));
+		assert.ok(values.includes('\t=evil()'));
+	});
+
 	it("puts a match on its first condition's group tab, matching either spelling of the first group", () => {
 		assert.equal(
 			tabForMatch(match('a', 'Parish, town and community councils', 'X', 'b_host_parish'), ruleset),
