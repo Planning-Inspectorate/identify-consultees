@@ -504,7 +504,7 @@ describe('report created page', () => {
 		assert.doesNotMatch(html, /Little Snoring/);
 
 		// and the built report is kept for the download link to serve
-		const kept = rememberedReportZip(viewModel.downloadUrl);
+		const kept = rememberedReportZip(viewModel.downloadUrl, { name: 'Test Name' });
 		assert.ok(kept);
 		const files = unzipSync(new Uint8Array(kept.contents));
 		assert.ok(Object.keys(files).some((name) => name.endsWith('.xlsx')));
@@ -518,6 +518,7 @@ describe('report created page', () => {
 		await handler(
 			{
 				params: { caseId: realProjectId },
+				session: { account: { name: 'Test Name' } },
 				query: { exclude: '55555555-5555-5555-5555-555555555555', add }
 			},
 			mockRes
@@ -527,7 +528,7 @@ describe('report created page', () => {
 		assert.match(downloadUrl, /exclude=/);
 		assert.match(downloadUrl, /add=/);
 		// the kept report reflects the selection: the removed parish is out, the added landowner in
-		const kept = rememberedReportZip(downloadUrl);
+		const kept = rememberedReportZip(downloadUrl, { name: 'Test Name' });
 		assert.ok(kept);
 		const files = unzipSync(new Uint8Array(kept.contents));
 		assert.ok(files['maps/01 Hospitals operated by NHS trusts and NHS foundation trusts (England).pdf']);

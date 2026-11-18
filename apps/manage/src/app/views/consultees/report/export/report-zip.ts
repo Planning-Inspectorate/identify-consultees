@@ -1,4 +1,5 @@
 import type { ManageService } from '#service';
+import { BoundedCache } from '#util/bounded-cache.ts';
 import type { CaseBoundaryFeature } from '@pins/identify-consultees-database/src/geospatial/case-boundaries.ts';
 import type {
 	ConsulteeMatch,
@@ -7,7 +8,6 @@ import type {
 } from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
 import { isIdentified } from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
 import type { Geometry } from '@pins/identify-consultees-database/src/geospatial/wkt.ts';
-import { MapCache } from '@planning-inspectorate/core/util';
 import { strToU8, zipSync } from 'fflate';
 import writeExcelFile from 'write-excel-file/node';
 import type { CaseMapConfig } from '../../../../maps/case-geojson.ts';
@@ -373,21 +373,31 @@ const MAX_REMEMBERED_REPORTS = 5;
  * after a restart or expiry the download just builds the report again. Process memory only -
  * nothing is stored.
  */
-const rememberedReports = new MapCache<ReportZip>(RULESET_RUN_MAX_AGE_MS / 60_000);
+const rememberedReports = new BoundedCache<ReportZip>({
+	maxEntries: MAX_REMEMBERED_REPORTS,
+	ttlMs: RULESET_RUN_MAX_AGE_MS
+});
+
+export function generateReportKey(downloadUrl: string, accountInfo: { name: string } | undefined) {
+	return `${downloadUrl}|${accountInfo ? accountInfo.name : ''}`;
+}
 
 /** The report a download URL's created page built, if it hasn't expired. */
-export function rememberedReportZip(downloadUrl: string): ReportZip | undefined {
-	return rememberedReports.get(downloadUrl);
+export function rememberedReportZip(
+	downloadUrl: string,
+	accountInfo: { name: string } | undefined
+): ReportZip | undefined {
+	const reportKey = generateReportKey(downloadUrl, accountInfo);
+	return rememberedReports.get(reportKey);
 }
 
 /** Keep a built report for its download URL to serve - see rememberedReports. */
-export function rememberReportZip(downloadUrl: string, report: ReportZip): void {
-	// a Map iterates oldest-first - drop the oldest reports once the cap is reached
-	for (const key of [...rememberedReports.cache.keys()].slice(
-		0,
-		rememberedReports.cache.size - MAX_REMEMBERED_REPORTS + 1
-	)) {
-		rememberedReports.cache.delete(key);
-	}
-	rememberedReports.set(downloadUrl, report);
+export function rememberReportZip(
+	downloadUrl: string,
+	accountInfo: { name: string } | undefined,
+	report: ReportZip
+): void {
+	const reportKey = generateReportKey(downloadUrl, accountInfo);
+
+	rememberedReports.set(reportKey, report);
 }
