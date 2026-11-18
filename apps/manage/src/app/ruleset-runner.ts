@@ -13,7 +13,17 @@ import { fetchWithTimeout } from '@planning-inspectorate/core/util';
  * function (apps/function-python, `POST /api/run-ruleset`); this is the manage app's side of that
  * call. Injected through ManageService so tests can stand in for the function.
  */
-export type RulesetRunner = (site: Geometry, ruleset: Ruleset, nearbyRadiusMetres: number) => Promise<RunRulesetResult>;
+export type RulesetRunner = (
+	site: Geometry,
+	ruleset: Ruleset,
+	nearbyRadiusMetres: number,
+	/**
+	 * The site's case_boundary row: the function checks the parishes and local authorities the
+	 * bordering conditions rest on against its actual boundary (see the function's screening.py).
+	 * Without it, they're left as the simplified first pass found them.
+	 */
+	caseBoundaryId?: string
+) => Promise<RunRulesetResult>;
 
 // a typical run takes about a second locally and the slowest real projects ~4s, but many times
 // that on the smaller Azure databases. One request, within Front Door's timeout: whether to screen
@@ -78,7 +88,7 @@ export function buildPythonRulesetRunner(options: {
 	boundingBoxAbovePoints?: number;
 }): RulesetRunner {
 	const { pythonFunctionUrl, apiKey, nearbyRadiusMetresByCategory = {}, boundingBoxAbovePoints = 0 } = options;
-	return async (site, ruleset, nearbyRadiusMetres) => {
+	return async (site, ruleset, nearbyRadiusMetres, caseBoundaryId) => {
 		if (!pythonFunctionUrl) {
 			throw new Error('PYTHON_FUNCTION_URL is not configured');
 		}
@@ -100,6 +110,7 @@ export function buildPythonRulesetRunner(options: {
 					includeGeometry: false,
 					...(boundingBoxAbovePoints > 0 ? { boundingBoxAbovePoints } : {}),
 					timeoutSeconds: (RUN_TIMEOUT_MS - FUNCTION_STOPS_EARLIER_MS) / 1000,
+					...(caseBoundaryId ? { caseBoundaryId } : {}),
 					rules: ruleset.rules.map(({ id, logicType, categories, bufferMetres, hostCategory }) => ({
 						id,
 						logicType,

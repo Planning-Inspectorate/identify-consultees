@@ -192,6 +192,7 @@ def run_ruleset_route(req: func.HttpRequest) -> func.HttpResponse:
             bounding_box=request.bounding_box,
             dataset=request.dataset,
             timeout_seconds=request.timeout_seconds,
+            case_boundary_id=request.case_boundary_id,
         )
     except UnknownDataset as error:
         return _json_response({"error": str(error)}, 400)

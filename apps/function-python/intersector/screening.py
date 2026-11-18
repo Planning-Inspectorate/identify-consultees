@@ -1,5 +1,6 @@
 """Run a ruleset against a project site: which consultee areas it identifies, and why."""
 
+import logging
 import math
 from collections.abc import Callable, Iterable
 from concurrent.futures import ThreadPoolExecutor
@@ -29,6 +30,8 @@ from intersector.tolerances import (
 )
 from setup_database.db import ConnectionParams
 
+logger = logging.getLogger(__name__)
+
 SiteScreenedAs = Literal["outline", "simplifiedOutline", "boundingBox"]
 
 
@@ -57,6 +60,7 @@ def run_ruleset(
     bounding_box: bool = False,
     dataset: str | None = None,
     timeout_seconds: float | None = None,
+    case_boundary_id: str | None = None,
 ) -> Screening:
     """Every consultee the ruleset identifies for the site, plus every area within its category's
     nearby radius (`nearby_radius_metres_by_category`, else `nearby_radius_metres`; any category
@@ -82,6 +86,9 @@ def run_ruleset(
     `dataset` screens a quarter's consultee areas (2026Q4) rather than the dataset in use; one with
     no table raises UnknownDataset. A run longer than `timeout_seconds` is stopped, its queries
     with it, and raises RunTimedOut.
+
+    Given `case_boundary_id` - the site's case_boundary row - the administrative areas the
+    conditions found are then checked on actual boundaries: see _confirm_on_actual_boundaries.
     """
     radius_by_category = nearby_radius_metres_by_category or {}
     search_radius = max([nearby_radius_metres, *radius_by_category.values()])
@@ -112,9 +119,13 @@ def run_ruleset(
         near = partial(_find_areas_near, db, site, cover)
         # one query out to the largest radius: the nearby reasons, and the answer to most conditions
         fetched = near(search_radius, excluded_categories=CATEGORIES_EXCLUDED_FROM_NEARBY, rules=rules)
-        matches_by_condition = _match_conditions(
+        matches_by_condition, hosts_by_condition = _match_conditions(
             db, site, near, rules, fetched, search_radius, boxed=site_screened_as == "boundingBox"
         )
+        if case_boundary_id is not None:
+            matches_by_condition = _confirm_on_actual_boundaries(
+                db, case_boundary_id, rules, matches_by_condition, hosts_by_condition
+            )
 
         nearby = [
             (match, radius)
@@ -205,10 +216,11 @@ def _match_conditions(
     nearby: list[AreaMatch],
     nearby_radius_metres: float,
     boxed: bool = False,
-) -> dict[str, list[AreaMatch]]:
+) -> tuple[dict[str, list[AreaMatch]], dict[str, list[str]]]:
     """Each condition's matches, by condition id - filtered from the nearby search where it can be,
-    otherwise from the condition's own query."""
+    otherwise from the condition's own query - and each bordering condition's hosts, by id."""
     matches_by_condition: dict[str, list[AreaMatch]] = {}
+    hosts_by_condition: dict[str, list[str]] = {}
     needs_query: list[RuleCondition] = []
     for rule in rules:
         if answerable_from_nearby(rule, nearby_radius_metres):
@@ -226,9 +238,11 @@ def _match_conditions(
 
     query = partial(_query_condition, db, near, site_within_margin, boxed)
     with ThreadPoolExecutor(max_workers=CONDITION_CONCURRENCY) as pool:
-        for rule, matches in zip(needs_query, pool.map(query, needs_query), strict=True):
+        for rule, (matches, hosts) in zip(needs_query, pool.map(query, needs_query), strict=True):
             matches_by_condition[rule.id] = matches
-    return matches_by_condition
+            if rule.logic_type == "bordering":
+                hosts_by_condition[rule.id] = hosts
+    return matches_by_condition, hosts_by_condition
 
 
 def _query_condition(
@@ -237,20 +251,82 @@ def _query_condition(
     site_within_margin: str | None,
     boxed: bool,
     rule: RuleCondition,
-) -> list[AreaMatch]:
+) -> tuple[list[AreaMatch], list[str]]:
     """`rule`'s matches from its own query (`near` - see _find_areas_near) - a bordering
     condition's, for a site screened against its bounding box, from the rectangle around its hosts
-    (see find_areas_bordering_box)."""
+    (see find_areas_bordering_box) - and, for a bordering condition, the hosts it found, by id."""
     if rule.logic_type == "intersection":
-        return near(rule.buffer_metres, rule.categories, rules=[rule])
+        return near(rule.buffer_metres, rule.categories, rules=[rule]), []
     if not rule.host_category:
-        return []
-    neighbours = (
+        return [], []
+    hosts, neighbours = (
         queries.find_areas_bordering_box(db, site_within_margin, rule.host_category, rule.categories)
         if boxed
         else queries.find_areas_bordering(db, site_within_margin, rule.host_category, rule.categories)
     )
-    return [AreaMatch(area, distance_metres=None) for area in neighbours]
+    return [AreaMatch(area, distance_metres=None) for area in neighbours], hosts
+
+
+def _confirm_on_actual_boundaries(
+    db: Database,
+    case_boundary_id: str,
+    rules: list[RuleCondition],
+    matches_by_condition: dict[str, list[AreaMatch]],
+    hosts_by_condition: dict[str, list[str]],
+) -> dict[str, list[AreaMatch]]:
+    """The conditions' matches with their administrative areas checked on actual boundaries. The
+    first pass screens simplified shapes with a distance margin (see tolerances.py), so a parish
+    or authority the site only comes within ~30m of counts as one it's in - and a bordering
+    condition then adds everything bordering that one too. Here, for the bordering conditions'
+    host categories (parishes and local authorities):
+
+    - an area in one of them that an intersection condition with no buffer matched is kept only
+      if its actual boundary intersects the site's actual boundary (case_boundary.geometry), and
+    - a bordering condition's host stays a host only if it does, the condition's matches kept only
+      if within BORDERING_TOLERANCE_METRES of a host that stays, on actual boundaries too.
+
+    Only what the first pass found is checked, by id - neither actual boundary goes through the
+    spatial index - so a run with a detailed site pays a second or two, not the minutes screening
+    it directly would cost. Nothing is added, and everything else, nearby reasons included, is as
+    the first pass found it: an area dropped here stays a nearby consultee if it's within the
+    radius. With no case boundary of that id, the first pass's matches are kept as they are."""
+    host_categories = {rule.host_category for rule in rules if rule.logic_type == "bordering" and rule.host_category}
+    if not host_categories:
+        return matches_by_condition
+
+    def checked(rule: RuleCondition) -> bool:
+        return rule.logic_type == "intersection" and rule.buffer_metres == 0
+
+    def in_host_category(match: AreaMatch) -> bool:
+        return match.area.properties.get("consulteeCategory") in host_categories
+
+    candidates = {host for hosts in hosts_by_condition.values() for host in hosts}
+    for rule in rules:
+        if checked(rule):
+            candidates.update(
+                match.area.id for match in matches_by_condition.get(rule.id, []) if in_host_category(match)
+            )
+    confirmed = queries.areas_intersecting_case_boundary(db, case_boundary_id, sorted(candidates))
+    if confirmed is None:
+        logger.warning("run-ruleset: no case boundary %s to check hosts against", case_boundary_id)
+        return matches_by_condition
+
+    refined = dict(matches_by_condition)
+    for rule in rules:
+        matches = matches_by_condition.get(rule.id, [])
+        if checked(rule):
+            refined[rule.id] = [match for match in matches if not in_host_category(match) or match.area.id in confirmed]
+        elif rule.id in hosts_by_condition:
+            hosts = [host for host in hosts_by_condition[rule.id] if host in confirmed]
+            bordering = queries.areas_bordering_on_actual_boundaries(db, hosts, [match.area.id for match in matches])
+            refined[rule.id] = [match for match in matches if match.area.id in bordering]
+    logger.info(
+        "run-ruleset: %d of %d candidate hosts confirmed on actual boundaries, %d matches dropped",
+        len(confirmed),
+        len(candidates),
+        sum(len(matches_by_condition.get(rule.id, [])) - len(refined.get(rule.id, [])) for rule in rules),
+    )
+    return refined
 
 
 def _combine(

@@ -37,7 +37,13 @@ Python decides which queries to run and combines the results; the geometry maths
 3. **Run the other conditions**, six at a time, each on its own connection:
    - **Wider than 20km** (three 35km conditions): one query each, limited to their category.
    - **Bordering** (four): find **hosts** (host-category areas intersecting the site), grow each by 50m, and find **neighbours** (matching-category areas intersecting a grown host, excluding the host).
-4. **Merge**: each consultee once, with its smallest distance and every reason, `condition` reasons in the ruleset's order and then `nearby`. Bordering matches nothing else measured get their distance measured here.
+4. **Check the administrative areas on actual boundaries** (`_confirm_on_actual_boundaries`), when the request names the site's case boundary (the web app always does). Steps 1-3 compare simplified shapes with a 30m margin, so a parish or authority the site only comes within 30m of counts as a host, and every area bordering it is identified too. For the bordering conditions' host categories (parishes, districts, unitaries and counties):
+   - an area matched by an intersection condition with no buffer is kept only if its actual boundary (`consultee_area.geometry`) intersects the site's (`case_boundary.geometry`), with no margin;
+   - a bordering condition's host stays a host only if it does, and its neighbours are kept only if they're within 50m of a host that stays, on actual boundaries too.
+
+   Only what steps 1-3 found is checked, by id, so the check never adds a consultee. An area it drops keeps its `nearby` reason if it has one. Locally it adds a median of 0.3s to a run, and at most 3s (a 180km route).
+
+5. **Merge**: each consultee once, with its smallest distance and every reason, `condition` reasons in the ruleset's order and then `nearby`. Bordering matches nothing else measured get their distance measured here.
 
 No geometry or metadata is read for the matches: the maps draw from their own display geometry (see [Maps](../maps.md)), and the report reads each consultee's stored row.
 
