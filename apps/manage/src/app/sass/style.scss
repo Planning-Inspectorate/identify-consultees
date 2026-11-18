@@ -238,6 +238,15 @@ $map-spinner-teal: #28a197;
 	margin: 0 !important;
 }
 
+// The category page's consultee tables (consultees/view.njk): govuk tables
+// top-align cell contents, which reads as ragged once a reason wraps onto a
+// second line - centre every cell's contents on the row instead, headers
+// included so they line up with the Select all box
+.pins-consultees-table .govuk-table__header,
+.pins-consultees-table .govuk-table__cell {
+	vertical-align: middle;
+}
+
 // The admin section's menu (admin/layout.njk): the current page in bold, marked by a left border
 .pins-admin-nav__item {
 	padding-left: index.govuk-spacing(2);
