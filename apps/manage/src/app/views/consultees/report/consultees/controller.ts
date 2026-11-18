@@ -258,6 +258,19 @@ async function renderCategoryPage(
 			.filter((removal) => removal.category === category && removal.name !== '')
 			.map((removal) => ({ name: removal.name, reason: removal.reason })),
 		removedOpen: firstQueryValue(req.query.removed) === 'open',
+		// "Remove selected" with nothing ticked lands back here on the remove page's
+		// error=select redirect - the missed choice is flagged at the table's checkboxes
+		// (at the Included consultees heading when there are none left to tick)
+		...(firstQueryValue(req.query.error) === 'select'
+			? {
+					errorSummary: [
+						{
+							text: 'Choose at least one consultee',
+							href: rows.length > 0 ? '#consultees-checkboxes-all' : '#consultees'
+						}
+					]
+				}
+			: {}),
 		rulesetFailed: failed,
 		screenedBoundingBox,
 		retryUrl: consulteesUrl(project.id, ruleset.id, category, selection)

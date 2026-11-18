@@ -47,8 +47,11 @@ interface RemoveConsulteeContext {
  * removal from the category page's checkboxes arrives the same way, just with the params
  * repeated - or, when that page's Select all box submits it (which only happens without JS, as
  * consultee-select.js strips its name), a `?select-all=` that means every listed consultee.
- * Anything else - a case or ruleset that isn't found, no targets, or one that doesn't
- * resolve - 404s. `undefined` means a response has already been sent.
+ * No targets at all is the bulk form's own missed selection - "Remove selected" with nothing
+ * ticked - so the request goes back to the category page for it to flag (`error=select`), a
+ * form-validation failure rather than a missing page. Anything else - a case or ruleset that
+ * isn't found, or a target that doesn't resolve - 404s. `undefined` means a response has
+ * already been sent.
  */
 async function removeConsulteeContext(
 	service: ManageService,
@@ -68,7 +71,7 @@ async function removeConsulteeContext(
 	const addedValues = queryValues(query.added);
 	const selectAll = queryValues(query['select-all']).length > 0;
 	if (!selectAll && matchIds.length === 0 && addedValues.length === 0) {
-		res.status(404).render('views/errors/404.njk', { pageHeading: 'Page not found' });
+		res.redirect(`${consulteesUrl(caseId, ruleset.id, category, selection)}&error=select`);
 		return undefined;
 	}
 

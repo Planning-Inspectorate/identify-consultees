@@ -378,6 +378,12 @@ test.describe('manage journeys', () => {
 		await expect(page.getByText('Borders the site')).toBeVisible();
 		await expect(page.getByRole('link', { name: /Remove/ })).toHaveCount(parishCount - removed + picked + 2);
 
+		// "Remove selected" with nothing ticked is a validation failure, not an
+		// error page - the submit comes back to the list, which flags the missed choice
+		await page.getByRole('button', { name: 'Remove selected' }).click();
+		await expect(page).toHaveURL(/\/report\/consultees\?.*category=Parish.*error=select/);
+		await expect(page.getByRole('link', { name: 'Choose at least one consultee' })).toBeVisible();
+
 		// a hand-added consultee's Remove link goes through the same reason page -
 		// its row leaves the Included consultees table and joins Removed consultees instead
 		await page.getByRole('link', { name: 'Remove Second Test Consultee' }).click();
@@ -633,6 +639,30 @@ test.describe('manage journeys', () => {
 			timeout: 15_000
 		});
 		expect(names[0]).toBe('20261020_energy.geojson');
+	});
+
+	test('a nothing-selected "Remove selected" is flagged on the page without JavaScript too', async ({ browser }) => {
+		// the validation is all server-side - the same form submit, the same redirect - so the
+		// no-JS journey flags it identically. A hand-added consultee gives the table a row
+		const context = await browser.newContext({ javaScriptEnabled: false });
+		const page = await context.newPage();
+		try {
+			const add = Buffer.from(
+				JSON.stringify({ c: 'Parish, town and community councils', n: 'E2E No-JS Consultee', r: 'Borders the site' })
+			).toString('base64url');
+			await page.goto(
+				`/consultees/${SAMPLE_CASE_ID}/report/consultees?ruleset=${SAMPLE_RULESET_ID}&category=Parish%2C+town+and+community+councils&add=${add}`
+			);
+			await expect(page.getByRole('cell', { name: 'E2E No-JS Consultee', exact: true })).toBeVisible();
+			// the enhancement never ran: the Select all box keeps the name a no-JS submit sends
+			await expect(page.locator('input[name="select-all"]')).toHaveCount(1);
+
+			await page.getByRole('button', { name: 'Remove selected' }).click();
+			await expect(page).toHaveURL(/\/report\/consultees\?.*error=select/);
+			await expect(page.getByRole('link', { name: 'Choose at least one consultee' })).toBeVisible();
+		} finally {
+			await context.close();
+		}
 	});
 
 	test('signed-out page offers sign in again', async ({ page }) => {

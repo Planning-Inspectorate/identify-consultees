@@ -155,6 +155,48 @@ describe('report consultees change page', () => {
 		assert.doesNotMatch(html, /Removed consultees/);
 	});
 
+	it('should flag a "Remove selected" submit that ticked nothing, staying on the page', async () => {
+		const nunjucks = configureNunjucks();
+		const mockRes = {
+			status: mock.fn(() => mockRes),
+			render: mock.fn((view, data) => nunjucks.render(view, data))
+		};
+		// the remove page sends a nothing-selected submit back here as ?error=select
+		await handlerFor(dbReturning([[realProjectRow()], [parishMatchRow()]]))(
+			{
+				params: { caseId: realProjectId },
+				query: { category: 'Parish, town and community councils', error: 'select' }
+			},
+			mockRes
+		);
+
+		const viewModel = mockRes.render.mock.calls[0].arguments[1];
+		assert.deepStrictEqual(viewModel.errorSummary, [
+			{ text: 'Choose at least one consultee', href: '#consultees-checkboxes-all' }
+		]);
+
+		const html = mockRes.render.mock.calls[0].result;
+		assert.match(html, /<title>Error: /);
+		assert.match(html, /There is a problem/);
+		assert.match(html, /Choose at least one consultee/);
+		assert.match(html, /href="#consultees-checkboxes-all"/);
+	});
+
+	it('should point the nothing-selected error at the list when none are left to tick', async () => {
+		const mockRes = { status: mock.fn(() => mockRes), render: mock.fn() };
+		// the ruleset covers parishes but found none - no form, no checkboxes to link to
+		await handlerFor(dbReturning([[realProjectRow()], []]))(
+			{
+				params: { caseId: realProjectId },
+				query: { category: 'Parish, town and community councils', error: 'select' }
+			},
+			mockRes
+		);
+		assert.deepStrictEqual(mockRes.render.mock.calls[0].arguments[1].errorSummary, [
+			{ text: 'Choose at least one consultee', href: '#consultees' }
+		]);
+	});
+
 	it("should draw the category's ruleset buffers around the site on its map - none for one without", async () => {
 		const ambulanceTrust = {
 			...parishMatchRow(matchId, 'East of England Ambulance Service', 4_000),
