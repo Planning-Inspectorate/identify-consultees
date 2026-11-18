@@ -9,11 +9,12 @@ $font-family: arial, helvetica, sans-serif;
 	$govuk-font-family: $font-family
 );
 
-// PINS branding for GOV.UK Frontend macros (header/nav) and PINS footer
+// Overrides of GOV.UK Frontend, MoJ and vendor component styles, plus PINS
+// chrome (header/nav, footer) - loaded after govuk-frontend so the cascade wins
 @use 'govuk-overrides';
 
 // Defra Interactive Map viewport (aligned with PINS-data-spike) - class names match the
-// map JS/templates' own naming, not BEM, same as .autocomplete__menu below
+// map JS/templates' own naming, not BEM, same as .autocomplete__menu in govuk-overrides.scss
 /* stylelint-disable-next-line selector-class-pattern */
 .app-case-map {
 	position: relative;
@@ -30,12 +31,6 @@ $font-family: arial, helvetica, sans-serif;
 /* stylelint-disable-next-line selector-class-pattern */
 .app-case-map--button-first {
 	height: auto;
-}
-
-// a case name with no spaces (underscores don't break either) overflows the green
-// confirmation panel - let it wrap anywhere instead
-.govuk-panel__body {
-	overflow-wrap: break-word;
 }
 
 /* stylelint-disable-next-line selector-class-pattern */
@@ -132,12 +127,6 @@ $map-spinner-teal: #28a197;
 	}
 }
 
-// set font-family for any autocomplete menu items
-/* stylelint-disable-next-line selector-class-pattern */
-.autocomplete__menu {
-	font-family: $font-family;
-}
-
 @media (width >= 1440px) {
 	.pins-container-wide {
 		max-width: 1280px;
@@ -153,25 +142,6 @@ $map-spinner-teal: #28a197;
 	// GOV.UK Frontend's tablet breakpoint
 	@media (width >= 40.0625em) {
 		display: block;
-	}
-}
-
-// footer link colours from the PINS design system's footer component: core's
-// pins-footer stylesheet sets these on the lone .govuk-footer__link class, which
-// GOV.UK Frontend's .govuk-footer__link:link/:visited rules outrank - so real
-// links took --govuk-link-colour (#1a65a6) and visited ones went purple.
-// Restating the colours with the same pseudo-classes (later source order wins at
-// equal specificity) makes the documented blue actually apply; hover #003078 has
-// no govuk-frontend 6 palette name ('dark-blue' now maps to blue shade-50)
-.govuk-footer__link {
-	&:link,
-	&:visited {
-		color: index.govuk-colour('blue');
-	}
-
-	&:hover {
-		/* stylelint-disable-next-line color-no-hex */
-		color: #003078;
 	}
 }
 
@@ -219,25 +189,6 @@ $map-spinner-teal: #28a197;
 	border-color: index.govuk-functional-colour(error);
 }
 
-// The bulk-remove table's MoJ multi-select pattern (consultees/view.njk +
-// javascripts/consultee-select.js): the checkbox column's items carry no visible
-// label, so they drop the item padding and sit inline; the header's "Select all"
-// toggle label sheds its margin and padding entirely. Rules copied from
-// moj-frontend's multi-select component, so class names match its own
-/* stylelint-disable-next-line selector-class-pattern */
-.moj-multi-select__checkbox {
-	display: inline-block;
-	padding-left: 0;
-}
-
-/* stylelint-disable-next-line selector-class-pattern */
-.moj-multi-select__toggle-label {
-	/* stylelint-disable-next-line declaration-no-important */
-	padding: 0 !important;
-	/* stylelint-disable-next-line declaration-no-important */
-	margin: 0 !important;
-}
-
 // The category page's consultee tables (consultees/view.njk): govuk tables
 // top-align cell contents, which reads as ragged once a reason wraps onto a
 // second line - centre every cell's contents on the row instead, headers
@@ -275,11 +226,8 @@ $map-spinner-teal: #28a197;
 // stays the native summary, so the toggle keeps working for keyboard/AT and
 // needs no JS). The revealed names carry no govuk-details border, indent or
 // padding, so their bullets continue the list above - which drops its bottom
-// margin while open for the same reason
-.govuk-list:has(+ .pins-show-more[open]) {
-	margin-bottom: 0;
-}
-
+// margin while open (the .govuk-list:has() rule for that lives in
+// govuk-overrides.scss, with the other third-party class overrides)
 .pins-show-more {
 	.govuk-details__summary {
 		padding-left: 0;

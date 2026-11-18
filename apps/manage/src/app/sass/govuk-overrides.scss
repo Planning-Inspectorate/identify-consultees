@@ -1,6 +1,65 @@
-// PINS branding for page chrome, pulled in from @planning-inspectorate/core.
-// Keep this file @use'd AFTER the govuk index in style.scss: later source order
-// means equal-specificity rules here win without needing !important.
+// Overrides of GOV.UK Frontend, MoJ and vendor component styles, plus the PINS
+// chrome partials pulled in from @planning-inspectorate/core. Keep this file
+// @use'd AFTER the govuk index in style.scss: later source order means
+// equal-specificity rules here win without needing !important.
 // (pins-header also carries the .govuk-service-navigation.pins-service-navigation styles.)
+@use 'node_modules/govuk-frontend/dist/govuk/index' as index;
 @use 'node_modules/@planning-inspectorate/core/dist/ui/header/pins-header';
 @use 'node_modules/@planning-inspectorate/core/dist/ui/footer/pins-footer';
+
+// a case name with no spaces (underscores don't break either) overflows the green
+// confirmation panel - let it wrap anywhere instead
+.govuk-panel__body {
+	overflow-wrap: break-word;
+}
+
+// footer link colours from the PINS design system's footer component: core's
+// pins-footer stylesheet sets these on the lone .govuk-footer__link class, which
+// GOV.UK Frontend's .govuk-footer__link:link/:visited rules outrank - so real
+// links took --govuk-link-colour (#1a65a6) and visited ones went purple.
+// Restating the colours with the same pseudo-classes (later source order wins at
+// equal specificity) makes the documented blue actually apply; hover #003078 has
+// no govuk-frontend 6 palette name ('dark-blue' now maps to blue shade-50)
+.govuk-footer__link {
+	&:link,
+	&:visited {
+		color: index.govuk-colour('blue');
+	}
+
+	&:hover {
+		/* stylelint-disable-next-line color-no-hex */
+		color: #003078;
+	}
+}
+
+// set font-family for any autocomplete menu items
+/* stylelint-disable-next-line selector-class-pattern */
+.autocomplete__menu {
+	font-family: index.$govuk-font-family;
+}
+
+// The bulk-remove table's MoJ multi-select pattern (consultees/view.njk +
+// javascripts/consultee-select.js): the checkbox column's items carry no visible
+// label, so they drop the item padding and sit inline; the header's "Select all"
+// toggle label sheds its margin and padding entirely. Rules copied from
+// moj-frontend's multi-select component, so class names match its own - except
+// moj-frontend uses !important on the label because its stylesheet can't rely on
+// loading after govuk-frontend's. Ours always does, and the nested compound
+// selector (two classes) matches the specificity of
+// .govuk-checkboxes--small .govuk-checkboxes__label, so source order wins
+.moj-multi-select__checkbox {
+	display: inline-block;
+	padding-left: 0;
+
+	.moj-multi-select__toggle-label {
+		padding: 0;
+		margin: 0;
+	}
+}
+
+// The report check page's "Show more" details (.pins-show-more in style.scss):
+// the revealed names carry no govuk-details border, indent or padding, so their
+// bullets continue the list above - which drops its bottom margin while open
+.govuk-list:has(+ .pins-show-more[open]) {
+	margin-bottom: 0;
+}
