@@ -68,7 +68,7 @@
 					{% set selectHtml %}
 						<div class="govuk-checkboxes__item govuk-checkboxes--small moj-multi-select__checkbox">
 							<input class="govuk-checkboxes__input" id="{{ row.select.domId }}" name="{{ row.select.param }}" type="checkbox" value="{{ row.select.value }}">
-							<label class="govuk-label govuk-checkboxes__label" for="{{ row.select.domId }}"><span class="govuk-visually-hidden">Select {{ row.name }}</span></label>
+							<label class="govuk-label govuk-checkboxes__label moj-multi-select__toggle-label" for="{{ row.select.domId }}"><span class="govuk-visually-hidden">Select {{ row.name }}</span></label>
 						</div>
 					{% endset %}
 					{# one reason per line - each item is autoescaped #}
@@ -89,6 +89,7 @@
 				{{ govukTable({
 					caption: "Included consultees",
 					captionClasses: "govuk-visually-hidden",
+					classes: "pins-consultees-table",
 					attributes: { "data-module": "moj-sortable-table consultee-select", "data-id-prefix": "consultees-" },
 					head: [
 						{ html: selectAllHtml, attributes: { id: "consultees-select-all" } },
@@ -127,6 +128,7 @@
 			{{ govukTable({
 				caption: "Removed consultees",
 				captionClasses: "govuk-visually-hidden",
+				classes: "pins-consultees-table",
 				firstCellIsHeader: true,
 				head: [
 					{ text: "Name" },
