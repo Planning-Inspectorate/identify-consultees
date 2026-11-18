@@ -175,7 +175,7 @@ export function buildReportCreatedPage(service: ManageService): AsyncRequestHand
 		if (!failed) {
 			try {
 				const report =
-					rememberedReportZip(downloadUrl) ??
+					rememberedReportZip(downloadUrl, accountInfo) ??
 					(await buildReportZip({
 						service,
 						project,
@@ -185,7 +185,7 @@ export function buildReportCreatedPage(service: ManageService): AsyncRequestHand
 						selection,
 						siteScreenedAs
 					}));
-				rememberReportZip(downloadUrl, report);
+				rememberReportZip(downloadUrl, accountInfo, report);
 				downloadSize = formatFileSize(report.contents.length);
 			} catch (error) {
 				logger.error({ error, caseId: project.id, rulesetId: ruleset.id }, 'Failed to build the report ZIP');

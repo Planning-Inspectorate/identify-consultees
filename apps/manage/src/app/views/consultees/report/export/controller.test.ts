@@ -361,12 +361,23 @@ describe('report download', () => {
 	it('serves the report the created page remembered, without running the ruleset again', async () => {
 		const query = { ruleset, add: JSON.stringify({ c: 'Landowner', n: 'Kept Report Landowner', r: '' }) };
 		const downloadUrl = reportDownloadUrl(realProjectId, ruleset, consulteeSelection(query));
-		rememberReportZip(downloadUrl, { fileName: 'kept.zip', contents: Buffer.from('the kept report') });
+		rememberReportZip(
+			downloadUrl,
+			{ name: 'Test Name' },
+			{ fileName: 'kept.zip', contents: Buffer.from('the kept report') }
+		);
 
 		const runner = rulesetRunnerReturning([]);
 		const service = serviceWith(runner);
 		const res = response();
-		await buildReportDownload(service as never)({ params: { caseId: realProjectId }, query } as never, res as never);
+		await buildReportDownload(service as never)(
+			{
+				params: { caseId: realProjectId },
+				session: { account: { name: 'Test Name' } },
+				query
+			} as never,
+			res as never
+		);
 
 		assert.equal(runner.mock.callCount(), 0);
 		assert.equal(service.db.consulteeArea.findMany.mock.callCount(), 0);

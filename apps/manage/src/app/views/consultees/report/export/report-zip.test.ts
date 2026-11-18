@@ -5,7 +5,14 @@ import { unzipSync } from 'fflate';
 import assert from 'node:assert';
 import { after, before, describe, it, mock } from 'node:test';
 import { ONE_PIXEL_PNG, pdfTextLines } from '../../../../testing/pdf-text.ts';
-import { buildReportZip, formatFileSize, rememberReportZip, rememberedReportZip, reportMapView } from './report-zip.ts';
+import {
+	buildReportZip,
+	formatFileSize,
+	generateReportKey,
+	rememberedReportZip,
+	rememberReportZip,
+	reportMapView
+} from './report-zip.ts';
 
 describe('formatFileSize', () => {
 	it('gives kilobytes under a megabyte and megabytes over it', () => {
@@ -16,21 +23,52 @@ describe('formatFileSize', () => {
 	});
 });
 
+describe('generateReportKey', () => {
+	it('combines the download URL and account name', () => {
+		assert.strictEqual(
+			generateReportKey('/consultees/a/report/download?ruleset=rs', { name: 'Jane Doe' }),
+			'/consultees/a/report/download?ruleset=rs|Jane Doe'
+		);
+	});
+
+	it('leaves the account segment empty when account info is undefined', () => {
+		assert.strictEqual(
+			generateReportKey('/consultees/a/report/download?ruleset=rs', undefined),
+			'/consultees/a/report/download?ruleset=rs|'
+		);
+	});
+
+	it('isolates keys between different accounts and unauthenticated requests for the same URL', () => {
+		const url = '/consultees/a/report/download?ruleset=rs';
+		const aliceKey = generateReportKey(url, { name: 'Alice' });
+		const bobKey = generateReportKey(url, { name: 'Bob' });
+		const anonymousKey = generateReportKey(url, undefined);
+
+		assert.notStrictEqual(aliceKey, bobKey);
+		assert.notStrictEqual(aliceKey, anonymousKey);
+	});
+
+	it('handles an empty account name string', () => {
+		assert.strictEqual(generateReportKey('/download/1', { name: '' }), '/download/1|');
+	});
+});
+
 describe('remembered report ZIPs', () => {
 	it('serves what was remembered for a download URL', () => {
 		const report = { fileName: 'report.zip', contents: Buffer.from('zip bytes') };
-		rememberReportZip('/consultees/a/report/download?ruleset=rs', report);
-		assert.strictEqual(rememberedReportZip('/consultees/a/report/download?ruleset=rs'), report);
+		const url = '/consultees/a/report/download?ruleset=rs';
+		const accountInfo = rememberReportZip(url, { name: 'Name' }, report);
+		assert.strictEqual(rememberedReportZip(url, { name: 'Name' }), report);
 	});
 
 	it('keeps only the newest few reports - each is tens of MB of process memory', () => {
 		for (let i = 0; i < 7; i++) {
-			rememberReportZip(`/download/${i}`, { fileName: `${i}.zip`, contents: Buffer.alloc(1) });
+			rememberReportZip(`/download/${i}`, { name: 'Name' }, { fileName: `${i}.zip`, contents: Buffer.alloc(1) });
 		}
 		// the oldest are evicted once five are kept
-		assert.strictEqual(rememberedReportZip('/download/0'), undefined);
-		assert.strictEqual(rememberedReportZip('/download/1'), undefined);
-		assert.ok(rememberedReportZip('/download/6'));
+		assert.strictEqual(rememberedReportZip('/download/0', { name: 'Name' }), undefined);
+		assert.strictEqual(rememberedReportZip('/download/1', { name: 'Name' }), undefined);
+		assert.ok(rememberedReportZip('/download/6', { name: 'Name' }));
 	});
 });
 

@@ -29,7 +29,13 @@ export function buildReportDownload(service: ManageService): AsyncRequestHandler
 		const selection = consulteeSelection(req.query);
 		const downloadUrl = reportDownloadUrl(project.id, ruleset.id, selection);
 
-		const remembered = rememberedReportZip(downloadUrl);
+		const account = req.session?.account;
+		const accountInfo =
+			account && typeof account === 'object' && 'name' in account && typeof account.name === 'string'
+				? { name: account.name }
+				: undefined;
+
+		const remembered = rememberedReportZip(downloadUrl, accountInfo);
 		if (remembered) {
 			logger.info({ caseId: project.id, rulesetId: ruleset.id }, 'consultee report download (as built)');
 			res.set({
@@ -45,12 +51,6 @@ export function buildReportDownload(service: ManageService): AsyncRequestHandler
 			res.redirect(reportCreatedUrl(project.id, ruleset.id, selection));
 			return;
 		}
-
-		const account = req.session?.account;
-		const accountInfo =
-			account && typeof account === 'object' && 'name' in account && typeof account.name === 'string'
-				? { name: account.name }
-				: undefined;
 
 		let report;
 		try {
