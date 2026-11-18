@@ -254,6 +254,8 @@ describe('runRulesetSafely', () => {
 
 		assert.deepStrictEqual(runner.mock.calls[0].arguments[0], simplifiedGeometry);
 		assert.deepStrictEqual(runner.mock.calls[1].arguments[0], project().geometry);
+		// and names the case boundary, whose actual boundary the function checks hosts against
+		assert.equal(runner.mock.calls[0].arguments[3], project().id);
 	});
 
 	it('takes what the function screened - its bounding box, for a site past the limit - and reads an older kept run as the outline', async () => {

@@ -163,6 +163,7 @@ def test_run_ruleset_runs_the_posted_conditions_and_returns_each_consultee_with_
         bounding_box=False,
         dataset=None,
         timeout_seconds=None,
+        case_boundary_id=None,
     )
 
 
@@ -212,6 +213,19 @@ def test_run_ruleset_screens_against_the_bounding_box_when_asked_and_says_so():
     assert json.loads(response.get_body()) == {"consultees": [], "siteScreenedAs": "boundingBox"}
 
 
+def test_run_ruleset_passes_the_case_boundary_to_check_hosts_against_on():
+    with (
+        patch.dict("os.environ", {"CONSULTEE_AREAS_API_KEY": API_KEY}),
+        patch("function_app.connection_params_from_env", return_value=object()),
+        patch("function_app.run_ruleset", return_value=Screening([], "outline")) as run,
+    ):
+        response = run_ruleset_route(_ruleset_request({**VALID_BODY, "caseBoundaryId": "B5555555-5555-5555-5555-555555555555"}))
+
+    assert response.status_code == 200
+    # lowercase, as the function's ids are
+    assert run.call_args.kwargs["case_boundary_id"] == "b5555555-5555-5555-5555-555555555555"
+
+
 def test_run_ruleset_passes_each_categorys_nearby_radius_on():
     with (
         patch.dict("os.environ", {"CONSULTEE_AREAS_API_KEY": API_KEY}),
@@ -257,6 +271,8 @@ def test_run_ruleset_passes_each_categorys_nearby_radius_on():
         {**VALID_BODY, "timeoutSeconds": 601},
         {**VALID_BODY, "timeoutSeconds": True},
         {**VALID_BODY, "timeoutSeconds": "55"},
+        {**VALID_BODY, "caseBoundaryId": "not-an-id"},
+        {**VALID_BODY, "caseBoundaryId": 7},
         {**VALID_BODY, "rules": ["not-an-object"]},
     ],
 )

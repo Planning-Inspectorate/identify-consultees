@@ -47,6 +47,7 @@ SECOND_AREA_ID = "b2222222-2222-2222-2222-222222222222"
 HOST_AREA_ID = "b3333333-3333-3333-3333-333333333333"
 NEIGHBOUR_AREA_ID = "b4444444-4444-4444-4444-444444444444"
 FIXTURE_IDS = [TEST_AREA_ID, SECOND_AREA_ID, HOST_AREA_ID, NEIGHBOUR_AREA_ID]
+CASE_BOUNDARY_ID = "b5555555-5555-5555-5555-555555555555"
 
 # 1 degree of longitude along the equator
 METRES_PER_DEGREE = 111_319.49
@@ -287,6 +288,135 @@ def test_counts_a_small_gap_in_the_data_as_bordering_but_not_a_clear_one(connect
 
     assert NEIGHBOUR_AREA_ID in ids
     assert TEST_AREA_ID not in ids
+
+
+@pytest.fixture
+def case_boundary(connection_params):
+    """Insert the test's site as a case_boundary row, as the manage app's import does (made valid,
+    with a 10m-simplified copy), and remove it afterwards. Returns the row's id."""
+    connection = pymssql.connect(
+        server=connection_params.server,
+        port=connection_params.port,
+        database=connection_params.database,
+        user=connection_params.user,
+        password=connection_params.password,
+        autocommit=True,
+    )
+
+    def cleanup():
+        with connection.cursor() as cursor:
+            cursor.execute("DELETE FROM case_boundary WHERE id = %s", (CASE_BOUNDARY_ID,))
+
+    def insert(wkt: str) -> str:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                INSERT INTO case_boundary (id, geometry, geometrySimplified, geometryType, caseReference, caseName)
+                SELECT %s, g.geometry, g.geometry.Reduce(10).MakeValid(), 'Polygon', 'TEST-PY-HOSTS', 'Test site'
+                FROM (SELECT geography::STGeomFromText(%s, 4326).MakeValid() AS geometry) AS g
+                """,
+                (CASE_BOUNDARY_ID, wkt),
+            )
+        return CASE_BOUNDARY_ID
+
+    cleanup()
+    try:
+        yield insert
+    finally:
+        cleanup()
+        connection.close()
+
+
+PARISH = "Parish, town and community councils"
+HOSPITAL = "Hospitals operated by NHS trusts and NHS foundation trusts (England)"
+ADMIN_RULES = [
+    _rule(id="host", categories=(PARISH,)),
+    _rule(id="bordering", logic_type="bordering", categories=(PARISH,), host_category=PARISH),
+    _rule(id="hospital", categories=(HOSPITAL,)),
+]
+
+
+def _site_reaching_east_to(metres_past_1_degree: float) -> str:
+    """A small site in the host parish (0-1 degrees east) whose east edge stops short of, or
+    crosses into, the parish east of it by `metres_past_1_degree`."""
+    east = 1 + metres_past_1_degree / METRES_PER_DEGREE
+    return f"POLYGON((0.9 0.4, {east} 0.4, {east} 0.5, 0.9 0.5, 0.9 0.4))"
+
+
+def _three_parishes_and_a_hospital(areas):
+    areas(
+        (HOST_AREA_ID, _square(0, 1), PARISH, "Host Parish"),
+        (NEIGHBOUR_AREA_ID, _square(1, 2), PARISH, "Parish Next Door"),
+        (TEST_AREA_ID, _square(2, 3), PARISH, "Parish Beyond"),
+        (SECOND_AREA_ID, "POLYGON((1 0.45, 1.01 0.45, 1.01 0.46, 1 0.46, 1 0.45))", HOSPITAL, "Hospital Next Door"),
+    )
+
+
+def _condition_reasons(consultees: list[Consultee]) -> dict[str, list[str]]:
+    return {
+        consultee.area.id: [reason.condition_id for reason in consultee.reasons if isinstance(reason, ConditionReason)]
+        for consultee in consultees
+    }
+
+
+def test_a_parish_the_site_only_comes_near_is_not_a_host_on_actual_boundaries(connection_params, areas, case_boundary):
+    _three_parishes_and_a_hospital(areas)
+    # 20m short of the parish next door: inside the first pass's ~30m margin, but not touching it
+    site = _site_reaching_east_to(-20)
+    site_id = case_boundary(site)
+
+    first_pass = _condition_reasons(run_ruleset(connection_params, site, ADMIN_RULES, 20_000))
+    checked = _condition_reasons(run_ruleset(connection_params, site, ADMIN_RULES, 20_000, case_boundary_id=site_id))
+
+    # the first pass takes the parish next door for a host, and the parish beyond it for a neighbour
+    assert first_pass[NEIGHBOUR_AREA_ID] == ["host", "bordering"]
+    assert first_pass[TEST_AREA_ID] == ["bordering"]
+    # on actual boundaries it isn't a host - it still borders the host parish - and the parish beyond
+    # only bordered it, so it goes
+    assert checked[HOST_AREA_ID] == ["host"]
+    assert checked[NEIGHBOUR_AREA_ID] == ["bordering"]
+    assert TEST_AREA_ID not in checked
+    # other categories keep the first pass's margin: only the administrative areas are checked
+    assert checked[SECOND_AREA_ID] == ["hospital"]
+
+
+def test_a_site_crossing_into_a_parish_however_little_makes_it_a_host(connection_params, areas, case_boundary):
+    _three_parishes_and_a_hospital(areas)
+    site = _site_reaching_east_to(5)
+
+    checked = _condition_reasons(run_ruleset(connection_params, site, ADMIN_RULES, 20_000, case_boundary_id=case_boundary(site)))
+
+    assert checked[NEIGHBOUR_AREA_ID] == ["host", "bordering"]
+    assert checked[TEST_AREA_ID] == ["bordering"]
+
+
+def test_with_no_such_case_boundary_the_first_pass_stands(connection_params, areas):
+    _three_parishes_and_a_hospital(areas)
+    site = _site_reaching_east_to(-20)
+
+    checked = _condition_reasons(
+        run_ruleset(connection_params, site, ADMIN_RULES, 20_000, case_boundary_id="b6666666-6666-6666-6666-666666666666")
+    )
+
+    assert checked[NEIGHBOUR_AREA_ID] == ["host", "bordering"]
+    assert checked[TEST_AREA_ID] == ["bordering"]
+
+
+def test_a_ruleset_with_no_bordering_conditions_checks_nothing(connection_params, areas, case_boundary):
+    _three_parishes_and_a_hospital(areas)
+    site = _site_reaching_east_to(-20)
+    rules = [rule for rule in ADMIN_RULES if rule.logic_type != "bordering"]
+
+    checked = _condition_reasons(run_ruleset(connection_params, site, rules, 20_000, case_boundary_id=case_boundary(site)))
+
+    # no host categories to check: the parish within the margin keeps its first-pass match
+    assert checked[NEIGHBOUR_AREA_ID] == ["host"]
+
+
+def test_confirming_on_actual_boundaries_with_nothing_to_confirm_asks_nothing():
+    # no hosts, or no candidates: no query - the database isn't touched (None would fail if it were)
+    assert queries.areas_bordering_on_actual_boundaries(None, [], ["a"]) == set()
+    assert queries.areas_bordering_on_actual_boundaries(None, ["a"], []) == set()
 
 
 def test_includes_an_area_just_past_a_cut_off_but_not_one_well_past_it(connection_params, areas):
@@ -650,8 +780,8 @@ def test_screens_a_quarters_dataset_when_asked_rather_than_the_one_in_use(connec
 
 def test_bordering_queries_find_nothing_with_no_categories():
     # the categories guard returns before the database is asked anything
-    assert queries.find_areas_bordering(None, "POINT(0 0)", "Parish, town and community councils", []) == []
-    assert queries.find_areas_bordering_box(None, "POLYGON((0 0, 1 0, 1 1, 0 1, 0 0))", "Parish, town and community councils", []) == []
+    assert queries.find_areas_bordering(None, "POINT(0 0)", "Parish, town and community councils", []) == ([], [])
+    assert queries.find_areas_bordering_box(None, "POLYGON((0 0, 1 0, 1 1, 0 1, 0 0))", "Parish, town and community councils", []) == ([], [])
 
 
 def test_a_consultee_deleted_between_queries_is_dropped(monkeypatch):

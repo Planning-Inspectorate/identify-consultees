@@ -30,7 +30,7 @@ What affects which consultees screening finds, and how fast, as of October 2026.
 
 ## Questions to agree
 
-1. Are the margins right: 30m on every distance threshold, 50m for bordering? Wider catches more borderline consultees; narrower lists fewer extras.
+1. Are the margins right: 30m on every distance threshold, 50m for bordering? Wider catches more borderline consultees; narrower lists fewer extras. Parishes and local authorities are now checked on actual boundaries with no margin (see [How a run works](screening-engine.md#how-a-run-works)). Those boundaries are themselves generalised (about 200m between points), so a site that only touches, or reaches a few metres into, an area is within the data's own error.
 2. Should "unparished area" rows be excluded?
 3. Which boundary submission is screened when a case has several?
 4. When can Railways be supplied split by route or region?

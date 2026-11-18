@@ -45,14 +45,18 @@ class RunRulesetRequest:
     """A quarter's consultee areas to screen (2026Q4), rather than the dataset in use."""
     timeout_seconds: float | None = None
     """How long the run may take before it's stopped - none, no limit."""
+    case_boundary_id: str | None = None
+    """The site's case_boundary row, whose actual boundary the administrative areas found are
+    checked against - see screening._confirm_on_actual_boundaries. None, no check."""
 
 
 def parse_run_ruleset_request(body: object) -> RunRulesetRequest:
     """Validate a decoded request body: `{siteWkt, rules: [{id, logicType, categories,
     bufferMetres?, hostCategory?}], nearbyRadiusMetres, nearbyRadiusMetresByCategory?,
-    boundingBoxAbovePoints?, boundingBox?, dataset?, timeoutSeconds?}` (boundingBox defaults to
-    false; with no boundingBoxAbovePoints the outline is always screened; with no dataset, the
-    dataset in use; with no timeoutSeconds, no time limit). Other fields are ignored. Raises
+    boundingBoxAbovePoints?, boundingBox?, dataset?, timeoutSeconds?, caseBoundaryId?}` (boundingBox
+    defaults to false; with no boundingBoxAbovePoints the outline is always screened; with no
+    dataset, the dataset in use; with no timeoutSeconds, no time limit; with no caseBoundaryId, the
+    administrative areas found aren't checked on actual boundaries). Other fields are ignored. Raises
     BadRequest."""
     if not isinstance(body, dict):
         raise BadRequest("request body must be a JSON object")
@@ -73,7 +77,19 @@ def parse_run_ruleset_request(body: object) -> RunRulesetRequest:
         bounding_box=_boolean(body.get("boundingBox", False), "boundingBox"),
         dataset=_dataset(body.get("dataset")),
         timeout_seconds=_timeout(body.get("timeoutSeconds")),
+        case_boundary_id=_case_boundary_id(body.get("caseBoundaryId")),
     )
+
+
+_UUID = re.compile(r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$")
+
+
+def _case_boundary_id(value: object) -> str | None:
+    if value is None:
+        return None
+    if not isinstance(value, str) or not _UUID.match(value):
+        raise BadRequest("caseBoundaryId must be a case boundary's id")
+    return value.lower()
 
 
 def _timeout(value: object) -> float | None:

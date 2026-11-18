@@ -96,6 +96,19 @@ describe('buildPythonRulesetRunner', () => {
 		});
 	});
 
+	it("sends the site's case boundary for the function to check administrative areas against", async () => {
+		const fetchMock = respondWith({ consultees: [] });
+		const run = buildPythonRulesetRunner({
+			pythonFunctionUrl: 'http://localhost:7071/api/consultee-areas',
+			apiKey: undefined
+		});
+
+		await run(site, ruleset, 20_000, 'aaaaaaaa-0000-0000-0000-000000000001');
+
+		const body = JSON.parse(String(fetchMock.mock.calls[0].arguments[1]?.body));
+		assert.equal(body.caseBoundaryId, 'aaaaaaaa-0000-0000-0000-000000000001');
+	});
+
 	it('asks for the bounding box past the configured detail, and says what the function screened', async () => {
 		const fetchMock = respondWith({ consultees: [], siteScreenedAs: 'boundingBox' });
 		const run = buildPythonRulesetRunner({

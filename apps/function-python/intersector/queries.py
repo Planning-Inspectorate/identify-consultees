@@ -206,9 +206,10 @@ def find_areas_bordering(
     site_within_margin: str,
     host_category: str,
     categories: Iterable[str],
-) -> list[ConsulteeArea]:
-    """Areas of `categories` within BORDERING_TOLERANCE_METRES of any `host_category` area that
-    intersects the site (already grown by the distance margin). Unmeasured - see AreaMatch.
+) -> tuple[list[str], list[ConsulteeArea]]:
+    """The `host_category` areas that intersect the site (already grown by the distance margin),
+    by id, and the areas of `categories` within BORDERING_TOLERANCE_METRES of any of them.
+    Unmeasured - see AreaMatch.
 
     Two round trips, not one: comparing two geometry columns can't use the spatial index (it needs
     a constant on one side) and degrades to a near full-table scan - a real 15s+ timeout. Fetching
@@ -217,7 +218,7 @@ def find_areas_bordering(
     """
     categories = list(categories)
     if not categories:
-        return []
+        return [], []
 
     # each host comes back already grown by the bordering tolerance - Somerset's neighbours by
     # distance took ~930ms, by intersects with it grown ~220ms
@@ -245,7 +246,7 @@ def find_areas_bordering(
         )
         for row in rows:
             neighbours[row["id"]] = _area_from_row(row)
-    return list(neighbours.values())
+    return [host["id"] for host in hosts], list(neighbours.values())
 
 
 def find_areas_bordering_box(
@@ -253,10 +254,10 @@ def find_areas_bordering_box(
     box_within_margin: str,
     host_category: str,
     categories: Iterable[str],
-) -> list[ConsulteeArea]:
-    """For a site screened against its bounding box: areas of `categories` within
-    BORDERING_TOLERANCE_METRES of the rectangle around every `host_category` area that intersects
-    the box (already grown by the distance margin). Unmeasured - see AreaMatch.
+) -> tuple[list[str], list[ConsulteeArea]]:
+    """For a site screened against its bounding box: the `host_category` areas that intersect the
+    box (already grown by the distance margin), by id, and the areas of `categories` within
+    BORDERING_TOLERANCE_METRES of the rectangle around them all. Unmeasured - see AreaMatch.
 
     A box can hold hundreds of hosts - find_areas_bordering's query per host took 778 queries for
     the most detailed real site - so this takes two: each host's bounding circle (no outlines read),
@@ -265,10 +266,11 @@ def find_areas_bordering_box(
     their other neighbours besides."""
     categories = list(categories)
     if not categories:
-        return []
+        return [], []
     hosts = db.query(
         f"""
-        SELECT geometrySimplified.EnvelopeCenter().Lat AS latitude,
+        SELECT {ID} AS id,
+            geometrySimplified.EnvelopeCenter().Lat AS latitude,
             geometrySimplified.EnvelopeCenter().Long AS longitude,
             geometrySimplified.EnvelopeAngle() AS angle
         FROM {db.table} {USE_SPATIAL_INDEX}
@@ -278,7 +280,7 @@ def find_areas_bordering_box(
         (host_category, box_within_margin),
     )
     if not hosts:
-        return []
+        return [], []
     # each host's bounding circle as a rectangle of longitude and latitude: its angle north and
     # south, and wider east and west - by the narrowest a degree of longitude is across them all
     south = min(host["latitude"] - host["angle"] for host in hosts)
@@ -297,7 +299,73 @@ def find_areas_bordering_box(
         """,
         (*categories, hosts_box),
     )
-    return [_area_from_row(row) for row in rows]
+    return [host["id"] for host in hosts], [_area_from_row(row) for row in rows]
+
+
+def areas_intersecting_case_boundary(db: Database, case_boundary_id: str, ids: Iterable[str]) -> set[str] | None:
+    """Of `ids`, the areas whose actual boundary (`geometry`, not `geometrySimplified`) intersects
+    case boundary `case_boundary_id`'s actual boundary - with no distance margin, since neither
+    shape is simplified. None when there's no such case boundary, so a caller can tell "none
+    intersect" from "nothing to check against".
+
+    By id rather than through the spatial index: tessellating a detailed site's actual boundary
+    for the index is what's slow (11.8s for a 111,931-point site), and the first pass has already
+    narrowed the candidates to a few dozen (1.9s for that site's 100)."""
+    [found] = db.query(
+        "SELECT COUNT(*) AS n FROM case_boundary WHERE id = TRY_CAST(%s AS UNIQUEIDENTIFIER)",
+        (case_boundary_id,),
+    )
+    if not found["n"]:
+        return None
+    ids = list(ids)
+    confirmed: set[str] = set()
+    for start in range(0, len(ids), ID_LOOKUP_BATCH_SIZE):
+        batch = ids[start : start + ID_LOOKUP_BATCH_SIZE]
+        rows = db.query(
+            f"""
+            DECLARE @site geography = (SELECT geometry FROM case_boundary WHERE id = CAST(%s AS UNIQUEIDENTIFIER));
+            SELECT {ID} AS id FROM {db.table}
+            WHERE id IN ({_placeholders(batch)}) AND geometry.STIntersects(@site) = 1
+            """,
+            (case_boundary_id, *batch),
+        )
+        confirmed.update(row["id"] for row in rows)
+    return confirmed
+
+
+def areas_bordering_on_actual_boundaries(db: Database, host_ids: Iterable[str], ids: Iterable[str]) -> set[str]:
+    """Of `ids`, the areas whose actual boundary is within BORDERING_TOLERANCE_METRES of the actual
+    boundary of one of `host_ids` other than itself - find_areas_bordering's test without the
+    simplification. Both sides are already short lists of ids, so comparing the columns directly
+    is cheap here: it's only against the whole table that it can't use the index."""
+    host_ids = list(host_ids)
+    ids = list(ids)
+    if not host_ids or not ids:
+        return set()
+    # each batch carries hosts and candidates together under SQL Server's 2,100-parameter cap
+    half = ID_LOOKUP_BATCH_SIZE // 2
+    confirmed: set[str] = set()
+    for host_start in range(0, len(host_ids), half):
+        hosts = host_ids[host_start : host_start + half]
+        for start in range(0, len(ids), half):
+            batch = ids[start : start + half]
+            # the grown hosts in a table variable, not a CTE: SQL Server doesn't keep a CTE's
+            # result, so it grew each host again for every candidate (11.7s, 56 parishes by 140)
+            rows = db.query(
+                f"""
+                SET NOCOUNT ON;
+                DECLARE @host TABLE (id UNIQUEIDENTIFIER PRIMARY KEY, grown geography NOT NULL);
+                INSERT @host SELECT id, geometry.BufferWithTolerance(%s, 1, 0)
+                FROM {db.table} WHERE id IN ({_placeholders(hosts)});
+                SELECT DISTINCT {_as_text("neighbour.id")} AS id
+                FROM {db.table} AS neighbour
+                JOIN @host AS host ON host.id <> neighbour.id AND neighbour.geometry.STIntersects(host.grown) = 1
+                WHERE neighbour.id IN ({_placeholders(batch)})
+                """,
+                (BORDERING_TOLERANCE_METRES, *hosts, *batch),
+            )
+            confirmed.update(row["id"] for row in rows)
+    return confirmed
 
 
 def _select_by_id(db: Database, columns: str, ids: list[str], params_before: tuple = ()) -> list[dict]:

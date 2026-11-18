@@ -175,7 +175,9 @@ export async function runRulesetSafely(
 	}
 	try {
 		const [run, nearbyNsips] = await Promise.all([
-			service.rulesetRunner(screenedGeometry(project), ruleset, service.nearbyConsulteeRadiusMetres),
+			// the case boundary's id, so the function can check the administrative areas it finds
+			// against the site's actual boundary rather than the simplified one screened
+			service.rulesetRunner(screenedGeometry(project), ruleset, service.nearbyConsulteeRadiusMetres, project.id),
 			findNearbyNsips(service.db, project, service.nearbyNsipRadiusMetres ?? 0)
 		]);
 		const consultees = [...run.consultees, ...nearbyNsips];
