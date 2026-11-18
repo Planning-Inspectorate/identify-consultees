@@ -212,7 +212,7 @@ test.describe('manage journeys', () => {
 		const removeLinks = page.getByRole('link', { name: /Remove/ });
 		await expect(removeLinks).toHaveCount(parishCount);
 
-		// the Included consultees table sorts client-side: Name and Identified get
+		// the Included consultees table sorts client-side: Name, Identified and Distance get
 		// sort buttons (Actions never does), and clicking cycles its column through
 		// ascending/descending - the served order is already alphabetical by name
 		const consulteesTable = page.getByRole('table', { name: 'Included consultees' });
@@ -220,6 +220,7 @@ test.describe('manage journeys', () => {
 			const nameSort = consulteesTable.getByRole('button', { name: 'Name', exact: true });
 			await expect(nameSort).toBeVisible();
 			await expect(consulteesTable.getByRole('button', { name: 'Identified', exact: true })).toBeVisible();
+			await expect(consulteesTable.getByRole('button', { name: 'Distance', exact: true })).toBeVisible();
 			// the Name cells: the checkbox column sits first, so they're td:nth-child(2)
 			const nameCells = consulteesTable.locator('tbody td:nth-child(2)');
 			const ascending = await nameCells.allInnerTexts();

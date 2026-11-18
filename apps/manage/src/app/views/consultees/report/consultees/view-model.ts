@@ -7,6 +7,11 @@ export interface ConsulteeRow {
 	 * ("Manually added" when none was).
 	 */
 	identified: string[];
+	/**
+	 * How far it is from the site, as the table shows it ("3.4 km") and in metres for sorting
+	 * (sortable-table.js) - absent for one added by hand that the run didn't find, which has none.
+	 */
+	distance?: { text: string; metres: number };
 	/** The "Remove consultee" page for this row - it records the removal reason, then returns here. */
 	removeUrl: string;
 	/** The bulk-remove checkbox for this row: the query param it submits and the input's DOM id. */

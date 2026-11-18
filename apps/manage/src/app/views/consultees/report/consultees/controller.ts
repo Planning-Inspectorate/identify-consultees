@@ -9,7 +9,7 @@ import type { MapMatch } from '../../../../maps/case-geojson.ts';
 import { addedBeyondRun, buildCaseMapConfig, markAddedByHand } from '../../../../maps/case-geojson.ts';
 import { MAP_VIEWPORT } from '../../../../maps/sample-geojson.ts';
 import { categorySettings } from '../../../../report-config.ts';
-import { labelsWithReferenceData } from '../../consultee-labels.ts';
+import { kilometres, labelsWithReferenceData } from '../../consultee-labels.ts';
 import { NEARBY_NSIPS } from '../../nearby-nsips.ts';
 import { describeReasons } from '../../reasons.ts';
 import { resolveCase } from '../../resolve-case.ts';
@@ -114,6 +114,14 @@ async function listLabels(
 	return (await labelsWithReferenceData(service.db, category, category !== NEARBY_NSIPS, rows)).labels;
 }
 
+/**
+ * A row's distance for the table's Distance column: "3.4 km", kept on one line in the narrow
+ * column by a non-breaking space, and whole metres to sort by.
+ */
+function tableDistance(metres: number): NonNullable<ConsulteeRow['distance']> {
+	return { text: kilometres(metres).replace(' ', ' '), metres: Math.round(metres) };
+}
+
 /** `matches` named as `labels` has them - "Newton (Ribble Valley)" - for the map. */
 function labelledMatches(matches: MapMatch[], labels: ReadonlyMap<string, string>): MapMatch[] {
 	return matches.map((match) => {
@@ -211,9 +219,10 @@ async function renderCategoryPage(
 		...(buffers.length > 0 ? { bufferGeojson: siteBufferGeojson(buffers) } : {})
 	};
 	const rows: ConsulteeRow[] = listedRows
-		.map(({ id, identified: reasons, removeUrl, select }) => ({
+		.map(({ id, distanceMetres, identified: reasons, removeUrl, select }) => ({
 			name: labels.get(id)!,
 			identified: reasons,
+			...(distanceMetres === undefined ? {} : { distance: tableDistance(distanceMetres) }),
 			removeUrl,
 			select
 		}))
