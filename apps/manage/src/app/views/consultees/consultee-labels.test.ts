@@ -4,6 +4,7 @@ import { describe, it } from 'node:test';
 import {
 	distinguishedLabels,
 	distinguishingDetail,
+	kilometres,
 	kilometresFromSite,
 	labelVariants,
 	nameBeforeLabel
@@ -23,6 +24,11 @@ describe('consultee labels', () => {
 		assert.strictEqual(kilometresFromSite(3_249, true), 'about 3.2 km from the site');
 		assert.strictEqual(kilometresFromSite(40_400, true), 'about 40 km from the site');
 		assert.strictEqual(kilometresFromSite(40_400), '40.4 km from the site');
+	});
+
+	it('gives a table column\'s distance to a tenth of a kilometre, without "from the site"', () => {
+		assert.strictEqual(kilometres(3_249), '3.2 km');
+		assert.strictEqual(kilometres(0), '0.0 km');
 	});
 
 	it('offers an approximate distance back as the label gave it', () => {

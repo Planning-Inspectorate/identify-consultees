@@ -73,10 +73,19 @@
 					{% endset %}
 					{# one reason per line - each item is autoescaped #}
 					{% set identifiedHtml %}{% for reason in row.identified %}{{ reason }}{% if not loop.last %}<br>{% endif %}{% endfor %}{% endset %}
+					{# sorted by its metres - one with no distance (added by hand from beyond the run)
+					   sorts after every measured one. Kept on one line in the narrow column: the
+					   distance's own space is non-breaking (see the controller), and so is this one #}
+					{% if row.distance %}
+						{% set distanceCell = { text: row.distance.text, format: "numeric", attributes: { "data-sort-value": row.distance.metres } } %}
+					{% else %}
+						{% set distanceCell = { html: "Not&nbsp;measured", format: "numeric", attributes: { "data-sort-value": 999999999 } } %}
+					{% endif %}
 					{% set tableRows = (tableRows.push([
 						{ html: selectHtml },
 						{ text: row.name, classes: "govuk-table__cell--no-wrap" },
 						{ html: identifiedHtml },
+						distanceCell,
 						{ html: removeLink }
 					]), tableRows) %}
 				{% endfor %}
@@ -95,6 +104,7 @@
 						{ html: selectAllHtml, attributes: { id: "consultees-select-all" } },
 						{ text: "Name", attributes: { "aria-sort": "none" } },
 						{ text: "Identified", attributes: { "aria-sort": "none" } },
+						{ text: "Distance", format: "numeric", attributes: { "aria-sort": "none" } },
 						{ text: "Actions" }
 					],
 					rows: tableRows

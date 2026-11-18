@@ -296,6 +296,9 @@ describe('report consultees change page', () => {
 		);
 
 		const viewModel = mockRes.render.mock.calls[0].arguments[1];
+		// its distance for the Distance column: as shown, and in whole metres to sort by
+		// (a non-breaking space between the number and its unit)
+		assert.deepStrictEqual(viewModel.rows[0].distance, { text: '0.1\u00a0km', metres: 123 });
 		assert.deepStrictEqual(viewModel.rows[0].identified, [
 			'Hospitals operated by NHS Trusts and NHS Foundation Trusts (England): within 10km of the site'
 		]);
@@ -463,6 +466,9 @@ describe('report consultees change page', () => {
 		// alphabetical by name: 'First Test Consultee', 'Little Snoring Parish Council', 'Second Test Consultee'
 		assert.strictEqual(viewModel.rows[0].name, 'First Test Consultee');
 		assert.deepStrictEqual(viewModel.rows[0].identified, ['Bordering landowner']);
+		// added by name, not from the run: no distance to show - the match the run found has one
+		assert.strictEqual(viewModel.rows[0].distance, undefined);
+		assert.deepStrictEqual(viewModel.rows[1].distance, { text: '0.0\u00a0km', metres: 0 });
 		assert.strictEqual(viewModel.rows[2].name, 'Second Test Consultee');
 		assert.deepStrictEqual(viewModel.rows[2].identified, ['Manually added']);
 

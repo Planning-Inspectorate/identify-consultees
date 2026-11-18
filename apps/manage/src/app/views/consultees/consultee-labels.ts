@@ -25,16 +25,21 @@ export interface Labelled {
 	approximate?: boolean;
 }
 
+/** A measured distance as a table column gives it - "3.2 km", to the nearest 100m. */
+export function kilometres(metres: number): string {
+	return `${(metres / 1000).toFixed(1)} km`;
+}
+
 /**
  * A distance as the add page and its labels give it - "3.2 km from the site", or for an approximate
  * one "about 3.2 km from the site", to the nearest kilometre from 10km ("about 40 km").
  */
 export function kilometresFromSite(metres: number, approximate = false): string {
-	const kilometres = metres / 1000;
 	if (!approximate) {
-		return `${kilometres.toFixed(1)} km from the site`;
+		return `${kilometres(metres)} from the site`;
 	}
-	return `about ${kilometres < 10 ? kilometres.toFixed(1) : Math.round(kilometres)} km from the site`;
+	const km = metres / 1000;
+	return `about ${km < 10 ? km.toFixed(1) : Math.round(km)} km from the site`;
 }
 
 /** A name as names are compared: case, and runs of spaces, ignored. */
