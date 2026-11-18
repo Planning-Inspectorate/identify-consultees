@@ -378,6 +378,12 @@ test.describe('manage journeys', () => {
 		await expect(page.getByText('Borders the site')).toBeVisible();
 		await expect(page.getByRole('link', { name: /Remove/ })).toHaveCount(parishCount - removed + picked + 2);
 
+		// "Remove selected" with nothing ticked is a validation failure, not an
+		// error page - the submit comes back to the list, which flags the missed choice
+		await page.getByRole('button', { name: 'Remove selected' }).click();
+		await expect(page).toHaveURL(/\/report\/consultees\?.*category=Parish.*error=select/);
+		await expect(page.getByRole('link', { name: 'Choose at least one consultee' })).toBeVisible();
+
 		// a hand-added consultee's Remove link goes through the same reason page -
 		// its row leaves the Included consultees table and joins Removed consultees instead
 		await page.getByRole('link', { name: 'Remove Second Test Consultee' }).click();
