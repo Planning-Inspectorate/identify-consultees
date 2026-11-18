@@ -212,6 +212,22 @@ test.describe('manage journeys', () => {
 		const removeLinks = page.getByRole('link', { name: /Remove/ });
 		await expect(removeLinks).toHaveCount(parishCount);
 
+		// the Included consultees table sorts client-side: Name and Identified get
+		// sort buttons (Actions never does), and clicking cycles its column through
+		// ascending/descending - the served order is already alphabetical by name
+		const consulteesTable = page.getByRole('table', { name: 'Included consultees' });
+		if (parishCount > 1) {
+			const nameSort = consulteesTable.getByRole('button', { name: 'Name', exact: true });
+			await expect(nameSort).toBeVisible();
+			await expect(consulteesTable.getByRole('button', { name: 'Identified', exact: true })).toBeVisible();
+			const ascending = await consulteesTable.getByRole('rowheader').allInnerTexts();
+			await nameSort.click();
+			await nameSort.click();
+			await expect(consulteesTable.getByRole('rowheader')).toHaveText(ascending.slice().reverse());
+			// back to the served order for the Remove flow below
+			await nameSort.click();
+		}
+
 		// removing a consultee opens a reason page first - a blank reason fails
 		// validation; submitting one returns to the category page with the row
 		// excluded and the removal listed in the open Removed consultees section
@@ -335,7 +351,8 @@ test.describe('manage journeys', () => {
 		await expect(page.getByRole('rowheader', { name: 'Second Test Consultee' })).toBeVisible();
 		await page.getByLabel('Reason for removing').fill('Added in error');
 		await page.getByRole('button', { name: 'Remove consultee' }).click();
-		const consulteesTable = page.getByRole('table', { name: 'Included consultees', exact: true });
+		// the Included consultees table locator above is reused - its accessible name
+		// grows "(column headers with buttons are sortable)" once the enhancement runs
 		await expect(consulteesTable.getByRole('rowheader', { name: 'Second Test Consultee' })).toHaveCount(0);
 		await expect(consulteesTable.getByRole('rowheader', { name: 'First Test Consultee' })).toBeVisible();
 		const removedTable = page.getByRole('table', { name: 'Removed consultees' });
