@@ -492,11 +492,20 @@ describe('manage router wiring', () => {
 		assert.match(response.text, /Enter a reason for removing this consultee(?!\.)/);
 	});
 
-	test('GET /consultees/:id/report/consultees/remove 404s without a target', async () => {
-		const response = await request(authDisabledApp).get(
+	test('GET /consultees/:id/report/consultees/remove with no target goes back to the flagged category page', async () => {
+		const agent = request.agent(authDisabledApp);
+		const response = await agent.get(
 			`/consultees/${homePageTestCaseId}/report/consultees/remove?ruleset=england-wales-post-20240430&category=Parish%2C%20town%20and%20community%20councils`
 		);
-		assert.equal(response.status, 404);
+		// "Remove selected" with nothing ticked - a validation failure the category
+		// page flags, not a missing page
+		assert.equal(response.status, 302);
+		assert.match(response.headers.location, /\/report\/consultees\?.*error=select/);
+
+		const categoryPage = await agent.get(response.headers.location);
+		assert.equal(categoryPage.status, 200);
+		assert.match(categoryPage.text, /There is a problem/);
+		assert.match(categoryPage.text, /Choose at least one consultee/);
 	});
 
 	test('GET /consultees/:id/report/created renders the report created page', async () => {

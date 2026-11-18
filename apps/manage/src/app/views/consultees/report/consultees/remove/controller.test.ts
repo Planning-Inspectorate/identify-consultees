@@ -306,8 +306,39 @@ describe('report consultee remove page', () => {
 		assert.strictEqual(mockRes.status.mock.calls[0].arguments[0], 404);
 	});
 
+	it('should send "Remove selected" with nothing ticked back to the category page to be flagged', async () => {
+		const mockRes = { status: mock.fn(() => mockRes), render: mock.fn(), redirect: mock.fn() };
+		const db = dbReturning([[realProjectRow()]], [parishMatchRow()]);
+		await removePage(db)({ params: { caseId: realProjectId }, query: parishQuery }, mockRes);
+
+		// not a missing page - a form-validation failure the category page flags (error=select)
+		assert.strictEqual(mockRes.status.mock.callCount(), 0);
+		assert.strictEqual(
+			mockRes.redirect.mock.calls[0].arguments[0],
+			`/consultees/${realProjectId}/report/consultees?ruleset=england-wales-post-20240430&category=Parish%2C%20town%20and%20community%20councils&error=select`
+		);
+
+		// the changes made so far ride back with it
+		const mockResKept = {
+			status: mock.fn(() => mockResKept),
+			render: mock.fn(),
+			redirect: mock.fn()
+		};
+		const kept = addJson('Manual Consultee');
+		await removePage(db)(
+			{
+				params: { caseId: realProjectId },
+				query: { ...parishQuery, add: kept, exclude: matchId }
+			},
+			mockResKept
+		);
+		const location = mockResKept.redirect.mock.calls[0].arguments[0];
+		assert.ok(location.includes(`add=${urlParam(addJson('Manual Consultee'))}`));
+		assert.ok(location.includes(`exclude=${matchId}`));
+		assert.ok(location.endsWith('&error=select'));
+	});
+
 	for (const [title, query] of [
-		['neither a match nor an added target', parishQuery],
 		['an unknown match id', { ...parishQuery, match: '99999999-9999-9999-9999-999999999999' }],
 		['a match already removed', { ...parishQuery, match: matchId, exclude: matchId }],
 		[
@@ -642,14 +673,23 @@ describe('report consultee remove submit', () => {
 		assert.match(mockRes.render.mock.calls[0].result, /The ruleset could not be run/);
 	});
 
+	it('should answer a no-target submit the way the GET does - back to the category page', async () => {
+		const mockRes = { status: mock.fn(() => mockRes), render: mock.fn(), redirect: mock.fn() };
+		await removeSubmit(dbReturning([[realProjectRow()]], [parishMatchRow()]))(request({ query: parishQuery }), mockRes);
+		assert.strictEqual(mockRes.status.mock.callCount(), 0);
+		assert.strictEqual(
+			mockRes.redirect.mock.calls[0].arguments[0],
+			`/consultees/${realProjectId}/report/consultees?ruleset=england-wales-post-20240430&category=Parish%2C%20town%20and%20community%20councils&error=select`
+		);
+	});
+
 	it('should 404 for a request the GET would not render', async () => {
 		const mockRes = { status: mock.fn(() => mockRes), render: mock.fn(), redirect: mock.fn() };
 		const submit = removeSubmit(dbReturning([[realProjectRow()]], [parishMatchRow()]));
 		await submit(request({ params: {} }), mockRes);
 		await submit(request({ params: { caseId: 'not-a-uuid' } }), mockRes);
-		await submit(request({ query: parishQuery }), mockRes);
 		await submit(request({ query: { ...parishQuery, match: '99999999-9999-9999-9999-999999999999' } }), mockRes);
-		assert.strictEqual(mockRes.status.mock.callCount(), 4);
+		assert.strictEqual(mockRes.status.mock.callCount(), 3);
 		for (const call of mockRes.status.mock.calls) {
 			assert.strictEqual(call.arguments[0], 404);
 		}
