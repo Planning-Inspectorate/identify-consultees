@@ -110,6 +110,7 @@ describe('interactiveBasemap', () => {
 	test("is OS's Light style, through the app, with the zooms and area OS covers", () => {
 		assert.deepEqual(interactiveBasemap(LONDON_VIEW, { OS_MAPS_API_KEY: KEY, OS_LICENCE_NUMBER: 'AC0000000000' }), {
 			interactiveBasemap: {
+				id: 'os-light',
 				url: '/maps/os/style.json',
 				attribution: osCredit({ OS_LICENCE_NUMBER: 'AC0000000000' }),
 				backgroundColor: '#f5f5f5',

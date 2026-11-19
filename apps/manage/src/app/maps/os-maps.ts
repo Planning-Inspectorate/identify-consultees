@@ -96,6 +96,8 @@ export async function fetchOsTile(key: string, zoom: number, x: number, y: numbe
 
 /** The basemap the interactive maps are drawn on - consultees-map.js passes it to InteractiveMap. */
 export interface InteractiveBasemap {
+	/** Names the draw adapter's `user_fill<id>` style expressions - no id crashes it. */
+	id: string;
 	url: string;
 	attribution: string;
 	backgroundColor: string;
@@ -120,6 +122,7 @@ export function interactiveBasemap(
 	}
 	return {
 		interactiveBasemap: {
+			id: 'os-light',
 			url: '/maps/os/style.json',
 			attribution: osCredit(env),
 			backgroundColor: '#f5f5f5',
