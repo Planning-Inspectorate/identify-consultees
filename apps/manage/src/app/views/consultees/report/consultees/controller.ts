@@ -205,9 +205,9 @@ async function renderCategoryPage(
 	const categoryName = categoryDisplayName(category);
 	const staticMapSrc = categoryStaticMapUrl(project.id, ruleset.id, category, selection);
 	const staticMapAlt = `Static map showing ${categoryName} consultees for ${project.properties.caseName}`;
-	// consultees alphabetically by name, ruleset matches and hand-added ones together - every
-	// Remove link opens the "Remove consultee" page, which records the reason before excluding
-	// the match or dropping the add
+	// the category's consultees, ruleset matches and hand-added ones together (sorted below) -
+	// every Remove link opens the "Remove consultee" page, which records the reason before
+	// excluding the match or dropping the add
 	const listedRows = [
 		...identified.map((match) => ({
 			id: match.feature.id,
@@ -279,7 +279,14 @@ async function renderCategoryPage(
 			removeUrl,
 			select
 		}))
-		.sort((a, b) => a.name.localeCompare(b.name, 'en-GB'));
+		// nearest first - the table opens sorted on Distance, so the served order matches the
+		// header's aria-sort even before the client-side sortable-table script runs; a hand-added
+		// consultee the run didn't measure ("Not measured") sorts last, by name
+		.sort(
+			(a, b) =>
+				(a.distance?.metres ?? Number.POSITIVE_INFINITY) - (b.distance?.metres ?? Number.POSITIVE_INFINITY) ||
+				a.name.localeCompare(b.name, 'en-GB')
+		);
 
 	const viewModel: ReportConsulteesViewModel = {
 		pageHeading: categoryName,

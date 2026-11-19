@@ -31,11 +31,13 @@ describe('feature-details plugin', () => {
 				consulteeId: 'x',
 				name: 'A & <B>',
 				consulteeCategory: 'Police and crime commissioners',
-				region: 'East'
+				region: 'East',
+				distance: '1.2 km'
 			}),
 			'<p class="govuk-body govuk-!-font-weight-bold govuk-!-margin-bottom-2">A &amp; &lt;B&gt;</p>' +
 				'<p class="govuk-body-s govuk-!-margin-bottom-1">Category: Police and crime commissioners</p>' +
-				'<p class="govuk-body-s govuk-!-margin-bottom-1">Region: East</p>'
+				'<p class="govuk-body-s govuk-!-margin-bottom-1">Region: East</p>' +
+				'<p class="govuk-body-s govuk-!-margin-bottom-1">Distance: 1.2 km</p>'
 		);
 		assert.match(
 			featureDetailsHtml({

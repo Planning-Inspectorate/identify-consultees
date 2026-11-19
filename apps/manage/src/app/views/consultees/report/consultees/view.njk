@@ -94,7 +94,8 @@
 				   space-separated and each module word-matches its own name. A column
 				   sorts when its header carries aria-sort - the checkbox column and
 				   Actions have none, so they never get a button; a column added later
-				   sorts the same way #}
+				   sorts the same way. Distance's "ascending" marks the served order -
+				   rows arrive nearest first and the script re-sorts to match on load #}
 				{{ govukTable({
 					caption: "Included consultees",
 					captionClasses: "govuk-visually-hidden",
@@ -104,7 +105,7 @@
 						{ html: selectAllHtml, attributes: { id: "consultees-select-all" } },
 						{ text: "Name", attributes: { "aria-sort": "none" } },
 						{ text: "Identified", attributes: { "aria-sort": "none" } },
-						{ text: "Distance", format: "numeric", attributes: { "aria-sort": "none" } },
+						{ text: "Distance", format: "numeric", attributes: { "aria-sort": "ascending" } },
 						{ text: "Actions" }
 					],
 					rows: tableRows

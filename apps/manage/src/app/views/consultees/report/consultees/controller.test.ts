@@ -153,6 +153,8 @@ describe('report consultees change page', () => {
 		assert.doesNotMatch(html, /Save and return/);
 		// nothing has been removed - the expandable Removed consultees section doesn't render
 		assert.doesNotMatch(html, /Removed consultees/);
+		// the table opens sorted by distance - the Distance header carries the sorted aria-sort
+		assert.match(html, /aria-sort="ascending"[^>]*>\s*Distance/);
 	});
 
 	it('should flag a "Remove selected" submit that ticked nothing, staying on the page', async () => {
@@ -539,7 +541,7 @@ describe('report consultees change page', () => {
 		);
 	});
 
-	it('should list the category’s consultees alphabetically, hand-added ones among the matches', async () => {
+	it('should list the category’s consultees nearest first, hand-added ones among them by name', async () => {
 		const mockRes = { status: mock.fn(() => mockRes), render: mock.fn() };
 		const firstAdd = addJson('First Test Consultee', 'Bordering landowner');
 		const secondAdd = addJson('Second Test Consultee');
@@ -560,12 +562,14 @@ describe('report consultees change page', () => {
 
 		const viewModel = mockRes.render.mock.calls[0].arguments[1];
 		assert.strictEqual(viewModel.rows.length, 3);
-		// alphabetical by name: 'First Test Consultee', 'Little Snoring Parish Council', 'Second Test Consultee'
-		assert.strictEqual(viewModel.rows[0].name, 'First Test Consultee');
-		assert.deepStrictEqual(viewModel.rows[0].identified, ['Bordering landowner']);
-		// added by name, not from the run: no distance to show - the match the run found has one
-		assert.strictEqual(viewModel.rows[0].distance, undefined);
-		assert.deepStrictEqual(viewModel.rows[1].distance, { text: '0.0\u00a0km', metres: 0 });
+		// nearest first, then by name when there's no distance to sort by:
+		// 'Little Snoring Parish Council' (0.0 km), 'First Test Consultee', 'Second Test Consultee'
+		assert.strictEqual(viewModel.rows[0].name, 'Little Snoring Parish Council');
+		assert.deepStrictEqual(viewModel.rows[0].distance, { text: '0.0\u00a0km', metres: 0 });
+		assert.strictEqual(viewModel.rows[1].name, 'First Test Consultee');
+		assert.deepStrictEqual(viewModel.rows[1].identified, ['Bordering landowner']);
+		// added by name, not from the run: no distance to show, so it sorts last by name
+		assert.strictEqual(viewModel.rows[1].distance, undefined);
 		assert.strictEqual(viewModel.rows[2].name, 'Second Test Consultee');
 		assert.deepStrictEqual(viewModel.rows[2].identified, ['Manually added']);
 
@@ -573,7 +577,7 @@ describe('report consultees change page', () => {
 		// adds all ride along so the page can drop the right one on submit
 		const addsParam = `&add=${urlParam(firstAdd)}&add=${urlParam(secondAdd)}&add=${urlParam(otherCategoryAdd)}`;
 		assert.strictEqual(
-			viewModel.rows[0].removeUrl,
+			viewModel.rows[1].removeUrl,
 			`/consultees/${realProjectId}/report/consultees/remove?ruleset=england-wales-post-20240430&category=Parish%2C%20town%20and%20community%20councils&added=0${addsParam}`
 		);
 		assert.strictEqual(
@@ -584,15 +588,19 @@ describe('report consultees change page', () => {
 		assert.ok(viewModel.backLinkUrl.includes(`add=${urlParam(firstAdd)}`));
 		assert.ok(viewModel.addConsulteeUrl.includes(`add=${urlParam(firstAdd)}`));
 		// a ruleset match's remove link keeps the adds while targeting the match
-		assert.match(viewModel.rows[1].removeUrl, /match=55555555/);
-		assert.ok(viewModel.rows[1].removeUrl.includes(`add=${urlParam(firstAdd)}`));
+		assert.match(viewModel.rows[0].removeUrl, /match=55555555/);
+		assert.ok(viewModel.rows[0].removeUrl.includes(`add=${urlParam(firstAdd)}`));
 	});
 
-	it('should sort the ruleset’s matches by name', async () => {
+	it('should sort the ruleset’s matches by distance, then name', async () => {
 		const mockRes = { status: mock.fn(() => mockRes), render: mock.fn() };
 		const db = dbReturning([
 			[realProjectRow()],
-			[parishMatchRow(matchId, 'Thorganby Parish Council'), parishMatchRow(otherMatchId, 'Cawood Parish Council')]
+			[
+				// name order would put Cawood first; distance order puts the nearer Thorganby first
+				parishMatchRow(matchId, 'Thorganby Parish Council'),
+				parishMatchRow(otherMatchId, 'Cawood Parish Council', 5000)
+			]
 		]);
 		await handlerFor(db)(
 			{ params: { caseId: realProjectId }, query: { category: 'Parish, town and community councils' } },
@@ -602,7 +610,7 @@ describe('report consultees change page', () => {
 		const viewModel = mockRes.render.mock.calls[0].arguments[1];
 		assert.deepStrictEqual(
 			viewModel.rows.map((row: { name: string }) => row.name),
-			['Cawood Parish Council', 'Thorganby Parish Council']
+			['Thorganby Parish Council', 'Cawood Parish Council']
 		);
 	});
 
@@ -726,7 +734,8 @@ describe('report consultees change page', () => {
 
 		const viewModel = mockRes.render.mock.calls[0].arguments[1];
 		assert.strictEqual(viewModel.rows.length, 2);
-		assert.strictEqual(viewModel.rows[0].name, 'Kept Consultee');
+		// the match's distance sorts it first; the kept add (unmeasured) follows
+		assert.strictEqual(viewModel.rows[1].name, 'Kept Consultee');
 		// the dropped params aren't carried forward either
 		assert.strictEqual((viewModel.backLinkUrl.match(/add=/g) ?? []).length, 1);
 	});
