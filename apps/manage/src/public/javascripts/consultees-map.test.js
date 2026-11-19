@@ -410,6 +410,65 @@ describe('consultees-map client helpers', () => {
 		// so is the loading overlay, dismissed at map:firstidle
 		assert.ok(plugins.find((plugin) => plugin.id === 'mapLoading'));
 		assert.ok(plugins.some((plugin) => plugin.id === 'featureDetails'));
+		// the measure tool needs the draw bundle, which this page's scripts omit - so neither registers
+		assert.ok(!plugins.some((plugin) => plugin.id === 'measure'));
+	});
+
+	test('initConsulteeMap registers the draw and measure plugins when the draw bundle is loaded', () => {
+		installDom(
+			`<!DOCTYPE html><html><body>
+				<div id="map-measure" class="app-consultee-map"></div>
+				<script id="map-measure-data" type="application/json">{"center":[0,0],"zoom":8,"projectGeojson":{"features":[{"type":"Feature"}]}}</script>
+			</body></html>`
+		);
+
+		const draw = { id: 'draw' };
+		const drawPlugin = mock.fn(() => draw);
+		const interact = { enable: mock.fn(), disable: mock.fn(), clear: mock.fn() };
+		const interactPlugin = mock.fn(() => interact);
+		const handlers = {};
+		const map = {
+			on: (event, handler) => {
+				(handlers[event] ??= []).push(handler);
+			}
+		};
+		const InteractiveMap = mock.fn(function InteractiveMap() {
+			return map;
+		});
+		globalThis.defra = {
+			InteractiveMap,
+			maplibreProvider: mock.fn(() => ({})),
+			datasetsPlugin: mock.fn(() => ({})),
+			drawPlugin,
+			interactPlugin
+		};
+		globalThis.window.defra = globalThis.defra;
+
+		initConsulteeMap('map-measure');
+		assert.equal(drawPlugin.mock.callCount(), 1);
+
+		// draw registers ahead of measure - the measure plugin draws through its adapter
+		const plugins = InteractiveMap.mock.calls[0].arguments[1].plugins;
+		assert.ok(plugins.indexOf(draw) > -1);
+		const measure = plugins.find((plugin) => plugin.id === 'measure');
+		assert.ok(measure);
+		assert.ok(plugins.indexOf(draw) < plugins.indexOf(measure));
+		assert.deepEqual(measure.modes, ['distance', 'path', 'area']);
+
+		// a measure session suspends feature selection so vertex clicks stop picking
+		// the consultee area under them - the pickers come back when it ends
+		for (const handler of handlers['draw:started'] ?? []) {
+			handler();
+		}
+		assert.equal(interact.disable.mock.callCount(), 1);
+		for (const handler of handlers['draw:created'] ?? []) {
+			handler();
+		}
+		assert.equal(interact.enable.mock.callCount(), 1);
+		for (const handler of handlers['draw:cancelled'] ?? []) {
+			handler();
+		}
+		assert.equal(interact.enable.mock.callCount(), 2);
 	});
 
 	test('buildSelectableLayers lists the MapLibre layers of each consultee sublayer and the project site', () => {
@@ -547,8 +606,12 @@ describe('consultees-map client helpers', () => {
 
 	test("basemapOptions draws on OS's style through the app, within its zooms and area, else OpenFreeMap", () => {
 		globalThis.window = new JSDOM('', { url: 'https://consultees.example.test/consultees/EN010001' }).window;
-		assert.deepEqual(basemapOptions(undefined).mapStyle.url, 'https://tiles.openfreemap.org/styles/liberty');
+		const freeMapStyle = basemapOptions(undefined).mapStyle;
+		assert.equal(freeMapStyle.url, 'https://tiles.openfreemap.org/styles/liberty');
+		// the draw adapter builds `user_fill<id>` expressions off mapStyle.id
+		assert.equal(freeMapStyle.id, 'openfreemap');
 		const os = {
+			id: 'os-light',
 			url: '/maps/os/style.json',
 			attribution: '© Crown copyright and database rights 2026 OS',
 			backgroundColor: '#f5f5f5',
@@ -558,6 +621,7 @@ describe('consultees-map client helpers', () => {
 		};
 		assert.deepEqual(basemapOptions(os), {
 			mapStyle: {
+				id: 'os-light',
 				url: 'https://consultees.example.test/maps/os/style.json',
 				attribution: os.attribution,
 				backgroundColor: os.backgroundColor

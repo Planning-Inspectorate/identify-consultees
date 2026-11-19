@@ -6,6 +6,8 @@
  *   layers/legend panel
  * - OS's Light basemap when the page config has one (`config.interactiveBasemap`, see app/maps/os-maps.ts -
  *   its tiles come through this app, so the OS key stays on the server), else OpenFreeMap Liberty
+ * - a Measure tool on pages that load the draw bundle (`config.vendorDrawPluginJs`) -
+ *   measure-plugin.mjs draws through the vendor draw plugin's adapter
  * - Static map fallback (PNG or SVG) via `config.fallback` when interactive init fails,
  *   owned by static-map-plugin.mjs. Fallback details travel in the page's JSON
  *   config, not data-* attributes - the InteractiveMap constructor JSON.parses
@@ -15,6 +17,7 @@
 import { createFeatureDetailsPlugin } from './feature-details-plugin.mjs';
 import { createLayersKeyPlugin } from './layers-key-plugin.mjs';
 import { createMapLoadingPlugin } from './map-loading-plugin.mjs';
+import { createMeasurePlugin } from './measure-plugin.mjs';
 import { createStaticMapPlugin } from './static-map-plugin.mjs';
 
 // consultee features carry their category colour (`colour`), assigned server-side so the static map
@@ -326,6 +329,11 @@ export function initConsulteeMap(mapId) {
 		// the category pages carry their add/remove page URLs - a selected consultee's details
 		// panel links to them; other maps have none and show the details alone
 		const featureDetailsPlugin = createFeatureDetailsPlugin(config.consulteeActions);
+		// the measure tool draws through the vendor draw plugin's adapter, so both only
+		// exist on pages that load the draw bundle (the category pages' vendorDrawPluginJs
+		// script tag) - a map without it simply has no Measure button
+		const drawPlugin = defra.drawPlugin?.();
+		const measurePlugin = drawPlugin ? createMeasurePlugin({ modes: ['distance', 'path', 'area'] }) : null;
 
 		const map = new defra.InteractiveMap(mapId, {
 			behaviour: 'inline',
@@ -341,12 +349,20 @@ export function initConsulteeMap(mapId) {
 				staticMapPlugin,
 				loadingPlugin,
 				featureDetailsPlugin,
+				...(measurePlugin ? [drawPlugin, measurePlugin] : []),
 				...(interactPlugin ? [interactPlugin] : [])
 			]
 		});
 		map.on('map:firstidle', () => loadingPlugin.dismiss());
 		if (interactPlugin) {
 			featureDetailsPlugin.wire(map, interactPlugin);
+			if (drawPlugin) {
+				// a measure session's vertex clicks land on the consultee areas too - suspend
+				// interact's feature selection while draw runs, restoring it when it ends
+				map.on('draw:started', () => interactPlugin.disable());
+				map.on('draw:created', () => interactPlugin.enable());
+				map.on('draw:cancelled', () => interactPlugin.enable());
+			}
 		}
 	} catch {
 		loadingPlugin.dismiss();
@@ -355,6 +371,8 @@ export function initConsulteeMap(mapId) {
 }
 
 const OPENFREEMAP_STYLE = {
+	// the vendor draw adapter names its style expressions `user_fill<id>` - no id crashes it
+	id: 'openfreemap',
 	url: 'https://tiles.openfreemap.org/styles/liberty',
 	attribution: 'OpenFreeMap © OpenMapTiles Data from OpenStreetMap',
 	backgroundColor: '#f5f5f0'

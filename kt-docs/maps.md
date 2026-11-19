@@ -37,6 +37,8 @@ Regional categories (police, ambulance trusts, ICBs, counties) would hide everyt
 
 Clicking a feature selects it and a "Selected on the map" panel shows its name, category, region and distance. The Defra map has no hover; selection goes through the interact plugin (`buildSelectableLayers`, `wireFeatureDetails`).
 
+The category pages also carry a Measure toolbar (distance, path and bounded-box area). `measure-plugin.mjs` is a local plugin that draws through the vendor draw plugin's adapter rather than reimplementing vertex placement, snapping and Done/Cancel chrome; `consultees-map.js` registers `defra.drawPlugin()` + `createMeasurePlugin(...)` only when the page loads the draw bundle (`vendorDrawPluginJs` in the category template), so other map hosts get no Measure button.
+
 ## Defra map gotchas found here
 
 - Each dataset needs an `idProperty` (`consulteeId`, `reference` for the project, `fileKey` for the boundary page's shapefiles). MapLibre drops string feature ids, so without it nothing can be selected and the console warns about "string native IDs".
@@ -44,6 +46,7 @@ Clicking a feature selects it and a "Selected on the map" panel shows its name, 
 - There's no fill-opacity option; `fillOpacity` is ignored and the fill drawn solid. Put the alpha in the colour (`translucent('#55A868', 0.05)`). The map-layers demo and component examples still draw solid fills for this reason.
 - A custom `symbolSvgContent` must include `{{haloColor}}`, `{{selectedColor}}` and `{{activeColor}}`, or it isn't drawn.
 - A sublayer is drawn as points only if its style sets `symbol`.
+- The draw adapter needs `mapStyle.id` — it builds `user_fill<id>` style expressions and crashes on a style without one (`OPENFREEMAP_STYLE` and the OS `interactiveBasemap` both set an id for this reason).
 
 ## Loading state
 
