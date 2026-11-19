@@ -214,21 +214,22 @@ test.describe('manage journeys', () => {
 
 		// the Included consultees table sorts client-side: Name, Identified and Distance get
 		// sort buttons (Actions never does), and clicking cycles its column through
-		// ascending/descending - the served order is already alphabetical by name
+		// ascending/descending - the served order is by distance, the Distance header's
+		// aria-sort marking it
 		const consulteesTable = page.getByRole('table', { name: 'Included consultees' });
+		await expect(consulteesTable.locator('th[aria-sort="ascending"]')).toContainText('Distance');
 		if (parishCount > 1) {
 			const nameSort = consulteesTable.getByRole('button', { name: 'Name', exact: true });
 			await expect(nameSort).toBeVisible();
 			await expect(consulteesTable.getByRole('button', { name: 'Identified', exact: true })).toBeVisible();
 			await expect(consulteesTable.getByRole('button', { name: 'Distance', exact: true })).toBeVisible();
-			// the Name cells: the checkbox column sits first, so they're td:nth-child(2)
+			// the Name cells: the checkbox column sits first, so they're td:nth-child(2).
+			// the first Name click sorts the distance-ordered rows ascending by name
 			const nameCells = consulteesTable.locator('tbody td:nth-child(2)');
+			await nameSort.click();
 			const ascending = await nameCells.allInnerTexts();
 			await nameSort.click();
-			await nameSort.click();
 			await expect(nameCells).toHaveText(ascending.slice().reverse());
-			// back to the served order for the Remove flow below
-			await nameSort.click();
 		}
 
 		// removing a consultee opens a reason page first - a blank reason fails

@@ -302,7 +302,10 @@ $map-spinner-teal: #28a197;
 	box-shadow: 0 0 0 0;
 }
 
-[aria-sort] button:focus {
+// :focus-visible, not :focus - a mouse click leaves the button focused, and we don't
+// want the sorted header to sit highlighted yellow until the next click; keyboard
+// focus still gets the full GOV.UK focus style
+[aria-sort] button:focus-visible {
 	color: index.govuk-functional-colour('focus-text');
 	outline: none;
 	background-color: index.govuk-functional-colour('focus');

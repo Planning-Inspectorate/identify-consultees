@@ -35,7 +35,7 @@ Regional categories (police, ambulance trusts, ICBs, counties) would hide everyt
 
 **The buffers are the report's.** A category's page, its static image and its report PDF draw the same ones (`views/consultees/site-buffers.ts`): each distance a buffer condition finds the category within (Ambulance trusts: 1 km and 10 km; Nearby NSIPs: `nsipRadiusKm`), grown from what the run screened - the site's outline, or its bounding box - by SQL Server and simplified for display. They're outlines of the site grown by the distance, not circles, since the conditions measure from the site's edge. A category whose conditions need an area to touch or border the site has none. One that can't be drawn is logged and left off; the rest of the map still draws.
 
-Clicking a feature selects it and a "Selected on the map" panel shows its name, category and region. The Defra map has no hover; selection goes through the interact plugin (`buildSelectableLayers`, `wireFeatureDetails`).
+Clicking a feature selects it and a "Selected on the map" panel shows its name, category, region and distance. The Defra map has no hover; selection goes through the interact plugin (`buildSelectableLayers`, `wireFeatureDetails`).
 
 ## Defra map gotchas found here
 
