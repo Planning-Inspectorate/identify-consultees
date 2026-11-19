@@ -2,7 +2,7 @@
  * "Selected on the map" feature-details plugin for the Defra Interactive Map.
  *
  * Click an area or point and a panel says what it is - a consultee's name,
- * category and region, or the project site's name and reference - and, when the
+ * category, region and distance, or the project site's name and reference - and, when the
  * page config carries `consulteeActions` URLs (the category pages'), how to act
  * on it: a nearby-only consultee (`identified: 'false'`) gets an Add link to the
  * "Add a consultee" page, its name prefilled; an identified one gets a Remove
@@ -68,8 +68,8 @@ function actionLinkHtml(properties, { addUrl, removeUrl }) {
 }
 
 /**
- * The details panel's HTML for a selected feature: a consultee's name, category
- * and region, or the project site's name and reference - then its add/remove
+ * The details panel's HTML for a selected feature: a consultee's name, category,
+ * region and distance, or the project site's name and reference - then its add/remove
  * action link, when the page gave the panel its page URLs.
  *
  * @param {object} properties
@@ -80,7 +80,8 @@ export function featureDetailsHtml(properties, actions = {}) {
 	const rows = properties.consulteeId
 		? [
 				['Category', properties.consulteeCategory],
-				['Region', properties.region]
+				['Region', properties.region],
+				['Distance', properties.distance]
 			]
 		: [['Reference', properties.reference]];
 	return (

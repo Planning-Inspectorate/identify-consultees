@@ -9,6 +9,7 @@ import type { ConsulteeMatch } from '@pins/identify-consultees-database/src/geos
 import { isIdentified } from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
 import type { Geometry } from '@pins/identify-consultees-database/src/geospatial/wkt.ts';
 import { REPORT_CONFIG } from '../report-config.ts';
+import { kilometres } from '../views/consultees/consultee-labels.ts';
 import { isNearbyNsip } from '../views/consultees/nearby-nsips.ts';
 import { assignCategoryColours, colourFor, CONSULTEE_CATEGORY_COLOURS, UNCATEGORISED } from './category-colours.ts';
 import { computeBounds, computeFittedMapView } from './geometry-bounds.ts';
@@ -177,6 +178,9 @@ function buildConsulteeMatchesGeojson(matches: MapMatch[], colours: Map<string, 
 				name: match.feature.properties.consultee ?? '',
 				consulteeCategory: categoryOf(match),
 				region: match.feature.properties.region ?? '',
+				// the "3.2 km" the details panel's Distance row shows - absent for an area
+				// added from beyond the run's reach, whose distanceMetres is a placeholder
+				...(match.beyondRun ? {} : { distance: kilometres(match.distanceMetres) }),
 				colour: projectColours.get(match.feature.id) ?? colourFor(colours, categoryOf(match)),
 				...(projectColours.has(match.feature.id) ? { ownLayer: 'true' } : {}),
 				// 'false' when only the nearby search found it, and no one added it: drawn fainter, as

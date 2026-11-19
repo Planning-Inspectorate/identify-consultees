@@ -82,6 +82,8 @@ describe('buildCaseMapConfig', () => {
 		);
 		assert.strictEqual(config.consulteeGeojson.features[0].properties.consulteeCategory, UNCATEGORISED);
 		assert.strictEqual(config.consulteeGeojson.features[0].properties.region, '');
+		// a measured match carries the "3.2 km" the details panel's Distance row shows
+		assert.strictEqual(config.consulteeGeojson.features[0].properties.distance, '0.0 km');
 	});
 
 	it('draws every match that has geometry, without a search area', () => {
@@ -308,6 +310,8 @@ describe('buildCaseMapConfig with a search area', () => {
 		const far = config.consulteeGeojson.features.find((feature) => feature.id === 'far');
 		assert.deepStrictEqual(far?.geometry, farAway);
 		assert.strictEqual(far?.properties.identified, 'true');
+		// but no distance: an area the run never measured shows no Distance row in the panel
+		assert.strictEqual(far?.properties.distance, undefined);
 		// the view takes in the site and the far one, so opens further out, between the two
 		assert.ok(config.zoom < siteOnly.zoom);
 		assert.ok(config.center[0] < -1.5 && config.center[0] > -3.5);
