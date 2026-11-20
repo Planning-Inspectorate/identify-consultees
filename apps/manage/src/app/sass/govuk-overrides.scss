@@ -94,3 +94,9 @@
 .pins-consultees-table tr.pins-consultee-row--selected > td {
 	background: index.govuk-colour('black', $variant: 'tint-95');
 }
+
+// govuk's checkbox box is background:transparent, so the selected row's grey
+// fills it too - keep the box white, as on every other row
+.pins-consultees-table tr.pins-consultee-row--selected .govuk-checkboxes__label::before {
+	background: index.govuk-colour('white');
+}
