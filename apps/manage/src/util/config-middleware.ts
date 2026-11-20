@@ -2,7 +2,12 @@ import type { Handler } from 'express';
 
 /**
  * Add configuration values to locals.
- * Asset filenames are rewritten by `npm run build` (content hash + Brotli pipeline).
+ * The asset filenames below are content-hash fingerprints rewritten by the asset
+ * build — after changing any CSS or JavaScript, run `npm run update-fingerprints`
+ * in apps/manage and commit this file with the change. Never edit the hashed
+ * names by hand: without the regenerated fingerprints the app keeps requesting
+ * the old files (served with long-lived immutable cache headers) and the change
+ * is never served in hosting environments.
  */
 export function addLocalsConfiguration(): Handler {
 	return (req, res, next) => {

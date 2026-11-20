@@ -47,7 +47,7 @@ Update these in the same PR as the change:
 
 - **Tests.** Manage app code needs 100% line, branch and function coverage (`npm run test:frontend-coverage`), and so do `packages/database` and `scripts/` (`npm run test:packages-coverage`). A new or changed page also needs its accessibility test and a Playwright journey: see [Testing: Adding a route](./kt-docs/testing.md#adding-a-route).
 - **Screenshots.** If the change alters how a page looks, run `npm run test:visual:update --workspace identify-consultees-manage` and commit the new snapshots. The baselines are macOS ones, so run it on a Mac.
-- **Asset hashes.** If you change a file in `apps/manage/public/` or the Sass, `npm run build` rewrites its fingerprinted name in `apps/manage/src/util/config-middleware.ts`. Commit that file too, or the page loads the old file.
+- **Asset hashes.** If you change a file under `apps/manage/src/public/` or the Sass, run `npm run update-fingerprints` in `apps/manage` — it rebuilds the static assets and rewrites their fingerprinted names in `apps/manage/src/util/config-middleware.ts`. **Commit that file too**: the fingerprints let every asset be served with a long-lived immutable cache header, and without the regenerated manifest the page keeps requesting the old hashed files — the change will not be seen in any hosting environment.
 - **An environment variable** needs:
   - reading and checking in `apps/manage/src/app/config.ts`, with a test in `config.test.ts`
   - a line in `apps/manage/.env.example` if it's needed locally
