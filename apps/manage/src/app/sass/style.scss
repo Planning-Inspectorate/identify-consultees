@@ -189,25 +189,14 @@ $map-spinner-teal: #28a197;
 	border-color: index.govuk-functional-colour(error);
 }
 
-// The category page's consultee tables (consultees/view.njk): govuk tables
-// top-align cell contents, which reads as ragged once a reason wraps onto a
-// second line - centre every cell's contents on the row instead, headers
-// included so they line up with the Select all box
-.pins-consultees-table .govuk-table__header,
-.pins-consultees-table .govuk-table__cell {
-	vertical-align: middle;
-}
-
-// The row-select plugin (javascripts/feature-row-select-plugin.mjs) mirrors the
-// map's selection: a row whose checkbox carries data-consultee-id can be clicked
-// to select its feature, and the selected feature's row greys
+// The category page's consultee tables (consultees/view.njk): the cell
+// alignment, edge padding and selected row's grey all override govuk table
+// styling, so they live in govuk-overrides.scss. This rule is the row-select
+// plugin's own behaviour (javascripts/feature-row-select-plugin.mjs): the
+// plugin mirrors the map's selection, and a row whose checkbox carries
+// data-consultee-id can be clicked to select its feature
 .pins-consultees-table tbody tr:has(input[data-consultee-id]) {
 	cursor: pointer;
-}
-
-.pins-consultees-table tr.pins-consultee-row--selected > th,
-.pins-consultees-table tr.pins-consultee-row--selected > td {
-	background: index.govuk-colour('black', $variant: 'tint-95');
 }
 
 // The admin section's menu (admin/layout.njk): the current page in bold, marked by a left border

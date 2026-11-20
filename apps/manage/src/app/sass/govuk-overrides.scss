@@ -63,3 +63,34 @@
 .govuk-list:has(+ .pins-show-more[open]) {
 	margin-bottom: 0;
 }
+
+// The category page's consultee tables (consultees/view.njk): govuk tables
+// top-align cell contents, which reads as ragged once a reason wraps onto a
+// second line - centre every cell's contents on the row instead, headers
+// included so they line up with the Select all box
+.pins-consultees-table .govuk-table__header,
+.pins-consultees-table .govuk-table__cell {
+	vertical-align: middle;
+}
+
+// govuk cells pad their right edge only, and the last cell not at all, so a row's
+// first and last contents sit on the table's edges - the selected row's grey just
+// makes the crowding obvious. Inset both ends the same, and always, so the grey
+// appearing shifts nothing
+.pins-consultees-table tr > th:first-child,
+.pins-consultees-table tr > td:first-child {
+	padding-left: index.govuk-spacing(2);
+}
+
+.pins-consultees-table tr > th:last-child,
+.pins-consultees-table tr > td:last-child {
+	padding-right: index.govuk-spacing(2);
+}
+
+// The row-select plugin (javascripts/feature-row-select-plugin.mjs) mirrors the
+// map's selection: the selected feature's row greys (the plugin's
+// cursor:pointer stays in style.scss - it's new behaviour, not an override)
+.pins-consultees-table tr.pins-consultee-row--selected > th,
+.pins-consultees-table tr.pins-consultee-row--selected > td {
+	background: index.govuk-colour('black', $variant: 'tint-95');
+}
