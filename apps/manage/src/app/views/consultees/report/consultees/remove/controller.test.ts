@@ -5,6 +5,7 @@ import { describe, it, mock } from 'node:test';
 import { configureNunjucks } from '../../../../../nunjucks.ts';
 import type { ConsulteeAreaMatchRow } from '../../../../../testing/ruleset-runner-stub.ts';
 import { failingRulesetRunner, rulesetRunnerReturning } from '../../../../../testing/ruleset-runner-stub.ts';
+import { RULESET_ERROR_MESSAGE } from '../../../../errors/error-messages.ts';
 import { buildReportConsulteeRemovePage, buildReportConsulteeRemoveSubmit } from './controller.ts';
 
 // a selection entry as the app's URLs carry it - base64url-encoded JSON (see urls.ts's ENCODED_JSON)
@@ -112,7 +113,6 @@ describe('report consultee remove page', () => {
 		);
 		assert.strictEqual(viewModel.reasonValue, '');
 		assert.strictEqual(viewModel.errorSummary, undefined);
-		assert.strictEqual(viewModel.rulesetFailed, false);
 
 		const html = mockRes.render.mock.calls[0].result;
 		assert.match(html, /Remove consultee/);
@@ -424,10 +424,11 @@ describe('report consultee remove page', () => {
 		});
 		await handler({ params: { caseId: realProjectId }, query: { ...parishQuery, match: matchId } }, mockRes);
 
-		const viewModel = mockRes.render.mock.calls[0].arguments[1];
-		assert.strictEqual(viewModel.rulesetFailed, true);
 		assert.strictEqual(logger.error.mock.callCount(), 1);
-		assert.match(mockRes.render.mock.calls[0].result, /The ruleset could not be run/);
+		assert.strictEqual(mockRes.status.mock.callCount(), 1);
+		assert.deepStrictEqual(mockRes.status.mock.calls[0].arguments, [500]);
+		assert.strictEqual(mockRes.render.mock.callCount(), 1);
+		assert.deepStrictEqual(mockRes.render.mock.calls[0].arguments, ['views/errors/500.njk', RULESET_ERROR_MESSAGE]);
 	});
 });
 
@@ -668,9 +669,7 @@ describe('report consultee remove submit', () => {
 		await submit(request(), mockRes);
 
 		assert.strictEqual(mockRes.redirect.mock.callCount(), 0);
-		assert.strictEqual(mockRes.render.mock.calls[0].arguments[0], 'views/consultees/report/consultees/remove/view.njk');
-		assert.strictEqual(mockRes.render.mock.calls[0].arguments[1].rulesetFailed, true);
-		assert.match(mockRes.render.mock.calls[0].result, /The ruleset could not be run/);
+		assert.deepStrictEqual(mockRes.render.mock.calls[0].arguments, ['views/errors/500.njk', RULESET_ERROR_MESSAGE]);
 	});
 
 	it('should answer a no-target submit the way the GET does - back to the category page', async () => {

@@ -7,6 +7,7 @@ import { configureNunjucks } from '../../../nunjucks.ts';
 import { ONE_PIXEL_PNG } from '../../../testing/pdf-text.ts';
 import type { ConsulteeAreaMatchRow } from '../../../testing/ruleset-runner-stub.ts';
 import { failingRulesetRunner, rulesetRunnerReturning } from '../../../testing/ruleset-runner-stub.ts';
+import { RULESET_ERROR_MESSAGE } from '../../errors/error-messages.ts';
 import { buildReportCheckPage, buildReportCreatedPage, groupedConsultees } from './controller.ts';
 import { rememberedReportZip } from './export/report-zip.ts';
 
@@ -418,10 +419,11 @@ describe('consultee report check page', () => {
 		});
 		await handler({ params: { caseId: realProjectId }, query: {} }, mockRes);
 
-		const viewModel = mockRes.render.mock.calls[0].arguments[1];
-		assert.strictEqual(viewModel.rulesetFailed, true);
 		assert.strictEqual(logger.error.mock.callCount(), 1);
-		assert.doesNotMatch(mockRes.render.mock.calls[0].result, /Identified consultees/);
+		assert.strictEqual(mockRes.status.mock.callCount(), 1);
+		assert.deepStrictEqual(mockRes.status.mock.calls[0].arguments, [500]);
+		assert.strictEqual(mockRes.render.mock.callCount(), 1);
+		assert.deepStrictEqual(mockRes.render.mock.calls[0].arguments, ['views/errors/500.njk', RULESET_ERROR_MESSAGE]);
 	});
 });
 
@@ -628,15 +630,10 @@ describe('report created page', () => {
 		const { handler, mockRes, db } = createdPage([], failingRulesetRunner());
 		await handler({ params: { caseId: realProjectId }, query: { exclude: 'abc' } }, mockRes);
 
-		const viewModel = mockRes.render.mock.calls[0].arguments[1];
-		assert.strictEqual(viewModel.rulesetFailed, true);
-		assert.match(viewModel.retryUrl, /\/report\/created\?ruleset=england-wales-post-20240430/);
-		// no report was built, so the link can't give a size
-		assert.strictEqual(db.consulteeArea.findMany.mock.callCount(), 0);
-		const html = mockRes.render.mock.calls[0].result;
-		assert.match(html, /The ruleset could not be run/);
-		assert.match(html, /The report could not be created/);
-		assert.match(html, /\(ZIP\)/);
+		assert.strictEqual(mockRes.status.mock.callCount(), 1);
+		assert.deepStrictEqual(mockRes.status.mock.calls[0].arguments, [500]);
+		assert.strictEqual(mockRes.render.mock.callCount(), 1);
+		assert.deepStrictEqual(mockRes.render.mock.calls[0].arguments, ['views/errors/500.njk', RULESET_ERROR_MESSAGE]);
 	});
 
 	it('should 404 for a present-but-unknown ruleset', async () => {

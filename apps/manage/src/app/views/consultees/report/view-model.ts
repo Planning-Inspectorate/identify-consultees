@@ -31,8 +31,6 @@ export interface ReportCheckViewModel {
 	groups: ConsulteeGroup[];
 	/** The "Create report" link - the report created confirmation page. */
 	generateReportUrl: string;
-	/** True when the ruleset couldn't be run at all - the counts would be misleading zeros. */
-	rulesetFailed: boolean;
 	retryUrl: string;
 	/** True when the site was screened against its bounding box - the list needs reviewing. */
 	screenedBoundingBox: boolean;

@@ -9,6 +9,11 @@ export interface RulesetOption {
 	checked: boolean;
 }
 
+export type RulesetError = {
+	rulesetError?: string;
+	errorSummary?: string;
+};
+
 export interface RulesetPickerViewModel {
 	pageHeading: string;
 	/** The case name - sits above the "Ruleset" heading as a caption. */

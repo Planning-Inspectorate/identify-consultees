@@ -11,9 +11,9 @@ import {
 	reportUrl,
 	rulesetUrl
 } from '../report/urls.ts';
-import { isCaseId, resolveCaseSummary } from '../resolve-case.ts';
-import { firstQueryValue } from '../run-ruleset.ts';
-import type { RulesetPickerViewModel } from './view-model.ts';
+import { isCaseId, resolveCase, resolveCaseSummary } from '../resolve-case.ts';
+import { firstQueryValue, runRulesetSafely } from '../run-ruleset.ts';
+import type { RulesetError, RulesetPickerViewModel } from './view-model.ts';
 
 /**
  * The picker's view model: a radio per ruleset, checked only when it is the user's existing
@@ -26,7 +26,7 @@ import type { RulesetPickerViewModel } from './view-model.ts';
 function pickerViewModel(
 	project: CaseBoundarySummary,
 	query: Record<string, unknown>,
-	rulesetError?: string
+	rulesetError?: RulesetError
 ): RulesetPickerViewModel {
 	const selection = consulteeSelection(query);
 	const requestedRuleset = getRuleset(firstQueryValue(query.ruleset));
@@ -45,9 +45,8 @@ function pickerViewModel(
 			text: option.name,
 			checked: !rulesetError && option.id === requestedRuleset?.id
 		})),
-		...(rulesetError
-			? { rulesetError: { text: rulesetError }, errorSummary: [{ text: rulesetError, href: '#ruleset' }] }
-			: {})
+		...(rulesetError?.rulesetError ? { rulesetError: { text: rulesetError.rulesetError } } : {}),
+		...(rulesetError?.errorSummary ? { errorSummary: [{ text: rulesetError.errorSummary, href: '#ruleset' }] } : {})
 	};
 }
 
@@ -91,8 +90,8 @@ export function buildRulesetPickerSubmit(service: ManageService): AsyncRequestHa
 			res.status(404).render('views/errors/404.njk', { pageHeading: 'Page not found' });
 			return;
 		}
-		const project = await resolveCaseSummary(db, caseId);
-		if (!project) {
+		const [project, projectFeature] = await Promise.all([resolveCaseSummary(db, caseId), resolveCase(db, caseId)]);
+		if (!project || !projectFeature) {
 			res.status(404).render('views/errors/404.njk', { pageHeading: 'Page not found' });
 			return;
 		}
@@ -101,7 +100,24 @@ export function buildRulesetPickerSubmit(service: ManageService): AsyncRequestHa
 		const chosen = firstQueryValue(req.body?.ruleset);
 		const ruleset = getRuleset(chosen);
 		if (!ruleset) {
-			res.render('views/consultees/ruleset/view.njk', pickerViewModel(project, req.query ?? {}, 'Select a ruleset'));
+			res.render(
+				'views/consultees/ruleset/view.njk',
+				pickerViewModel(project, req.query ?? {}, {
+					rulesetError: 'Select a ruleset',
+					errorSummary: 'Select a ruleset'
+				})
+			);
+			return;
+		}
+
+		// run the ruleset once before redirect, to show an error on the ruleset page, allowing for user to change the
+		// ruleset or try again - result is cached, so on success, the new page will use the cached ruleset
+		const { failed } = await runRulesetSafely(service, projectFeature, ruleset, req.session);
+		if (failed) {
+			res.render(
+				'views/consultees/ruleset/view.njk',
+				pickerViewModel(project, req.query ?? {}, { errorSummary: 'The ruleset could not run, try again' })
+			);
 			return;
 		}
 

@@ -19,10 +19,5 @@ export interface RemoveConsulteeViewModel {
 	reasonError?: { text: string };
 	/** The layout's error summary - present only on a failed submit. */
 	errorSummary?: { text: string; href: string }[];
-	/**
-	 * True when the target is a ruleset match and the run failed - the match can't be resolved,
-	 * so the page shows an error with a retry link instead of the form.
-	 */
-	rulesetFailed: boolean;
 	retryUrl: string;
 }
