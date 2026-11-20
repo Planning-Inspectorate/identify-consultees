@@ -15,16 +15,7 @@
 {% endblock %}
 
 {% block pageContent %}
-	{% if rulesetFailed %}
-		{% from "govuk/components/notification-banner/macro.njk" import govukNotificationBanner %}
-		{% set failureHtml %}
-			<h3 class="govuk-notification-banner__heading">The ruleset could not be run</h3>
-			<p class="govuk-body">No consultees are shown because the search did not finish. This is not the same as finding no consultees. <a class="govuk-notification-banner__link" href="{{ retryUrl }}">Try again</a>.</p>
-		{% endset %}
-		{{ govukNotificationBanner({ html: failureHtml }) }}
-	{% endif %}
-
-	{% if screenedBoundingBox and not rulesetFailed %}
+	{% if screenedBoundingBox %}
 		{% from "govuk/components/warning-text/macro.njk" import govukWarningText %}
 		{{ govukWarningText({
 			text: "This site's outline is too detailed to screen in time, so its consultees were found using the rectangle around it (its bounding box). The list can include consultees that are not near the site - check each one before creating the report.",
@@ -40,85 +31,83 @@
 	{% set mapConfigJson = mapConfigJson %}
 	{% include "views/partials/consultee-map-region.njk" %}
 
-	{% if not rulesetFailed %}
-		<h2 class="govuk-heading-m govuk-!-margin-top-6" id="consultees">Included consultees</h2>
+	<h2 class="govuk-heading-m govuk-!-margin-top-6" id="consultees">Included consultees</h2>
 
-		{% if rows.length == 0 %}
-			<p class="govuk-body">No consultees identified in this category.</p>
-		{% else %}
-			<form method="get" action="{{ bulkRemove.formAction }}">
-				{% for param in bulkRemove.hiddenParams %}
-					<input type="hidden" name="{{ param.name }}" value="{{ param.value }}">
-				{% endfor %}
-				{% set tableRows = [] %}
-				{# MoJ multi-select pattern: a checkbox-only first column, its header holding the
-				   Select all box. It submits `select-all` when JS never ran - the remove page
-				   reads that as every listed consultee; consultee-select.js strips the name and
-				   wires the toggling instead #}
-				{% set selectAllHtml %}
+	{% if rows.length == 0 %}
+		<p class="govuk-body">No consultees identified in this category.</p>
+	{% else %}
+		<form method="get" action="{{ bulkRemove.formAction }}">
+			{% for param in bulkRemove.hiddenParams %}
+				<input type="hidden" name="{{ param.name }}" value="{{ param.value }}">
+			{% endfor %}
+			{% set tableRows = [] %}
+			{# MoJ multi-select pattern: a checkbox-only first column, its header holding the
+					Select all box. It submits `select-all` when JS never ran - the remove page
+					reads that as every listed consultee; consultee-select.js strips the name and
+					wires the toggling instead #}
+			{% set selectAllHtml %}
+				<div class="govuk-checkboxes__item govuk-checkboxes--small moj-multi-select__checkbox">
+					<input class="govuk-checkboxes__input" id="consultees-checkboxes-all" name="select-all" type="checkbox" value="true">
+					<label class="govuk-label govuk-checkboxes__label moj-multi-select__toggle-label" for="consultees-checkboxes-all"><span class="govuk-visually-hidden">Select all</span></label>
+				</div>
+			{% endset %}
+			{% for row in rows %}
+				{% set removeLink %}
+					<a class="govuk-link" href="{{ row.removeUrl }}">Remove<span class="govuk-visually-hidden"> {{ row.name }}</span></a>
+				{% endset %}
+				{% set selectHtml %}
 					<div class="govuk-checkboxes__item govuk-checkboxes--small moj-multi-select__checkbox">
-						<input class="govuk-checkboxes__input" id="consultees-checkboxes-all" name="select-all" type="checkbox" value="true">
-						<label class="govuk-label govuk-checkboxes__label moj-multi-select__toggle-label" for="consultees-checkboxes-all"><span class="govuk-visually-hidden">Select all</span></label>
+						{#- data-consultee-id names the row's map feature for the row-select
+								plugin (javascripts/feature-row-select-plugin.mjs) - a name-only add
+								has none, and its row can't be clicked onto the map #}
+						<input class="govuk-checkboxes__input" id="{{ row.select.domId }}" name="{{ row.select.param }}" type="checkbox" value="{{ row.select.value }}"{% if row.select.consulteeId %} data-consultee-id="{{ row.select.consulteeId }}"{% endif %}>
+						<label class="govuk-label govuk-checkboxes__label moj-multi-select__toggle-label" for="{{ row.select.domId }}"><span class="govuk-visually-hidden">Select {{ row.name }}</span></label>
 					</div>
 				{% endset %}
-				{% for row in rows %}
-					{% set removeLink %}
-						<a class="govuk-link" href="{{ row.removeUrl }}">Remove<span class="govuk-visually-hidden"> {{ row.name }}</span></a>
-					{% endset %}
-					{% set selectHtml %}
-						<div class="govuk-checkboxes__item govuk-checkboxes--small moj-multi-select__checkbox">
-							{#- data-consultee-id names the row's map feature for the row-select
-							   plugin (javascripts/feature-row-select-plugin.mjs) - a name-only add
-							   has none, and its row can't be clicked onto the map #}
-							<input class="govuk-checkboxes__input" id="{{ row.select.domId }}" name="{{ row.select.param }}" type="checkbox" value="{{ row.select.value }}"{% if row.select.consulteeId %} data-consultee-id="{{ row.select.consulteeId }}"{% endif %}>
-							<label class="govuk-label govuk-checkboxes__label moj-multi-select__toggle-label" for="{{ row.select.domId }}"><span class="govuk-visually-hidden">Select {{ row.name }}</span></label>
-						</div>
-					{% endset %}
-					{# one reason per line - each item is autoescaped #}
-					{% set identifiedHtml %}{% for reason in row.identified %}{{ reason }}{% if not loop.last %}<br>{% endif %}{% endfor %}{% endset %}
-					{# sorted by its metres - one with no distance (added by hand from beyond the run)
-					   sorts after every measured one. Kept on one line in the narrow column: the
-					   distance's own space is non-breaking (see the controller), and so is this one #}
-					{% if row.distance %}
-						{% set distanceCell = { text: row.distance.text, format: "numeric", attributes: { "data-sort-value": row.distance.metres } } %}
-					{% else %}
-						{% set distanceCell = { html: "Not&nbsp;measured", format: "numeric", attributes: { "data-sort-value": 999999999 } } %}
-					{% endif %}
-					{% set tableRows = (tableRows.push([
-						{ html: selectHtml },
-						{ text: row.name, classes: "govuk-table__cell--no-wrap" },
-						{ html: identifiedHtml },
-						distanceCell,
-						{ html: removeLink }
-					]), tableRows) %}
-				{% endfor %}
-				{# MoJ sortable table (javascripts/sortable-table.js) and multi-select
-				   (javascripts/consultee-select.js) share this table - data-module is
-				   space-separated and each module word-matches its own name. A column
-				   sorts when its header carries aria-sort - the checkbox column and
-				   Actions have none, so they never get a button; a column added later
-				   sorts the same way. Distance's "ascending" marks the served order -
-				   rows arrive nearest first and the script re-sorts to match on load #}
-				{{ govukTable({
-					caption: "Included consultees",
-					captionClasses: "govuk-visually-hidden",
-					classes: "pins-consultees-table",
-					attributes: { "data-module": "moj-sortable-table consultee-select", "data-id-prefix": "consultees-" },
-					head: [
-						{ html: selectAllHtml, attributes: { id: "consultees-select-all" } },
-						{ text: "Name", attributes: { "aria-sort": "none" } },
-						{ text: "Identified", attributes: { "aria-sort": "none" } },
-						{ text: "Distance", format: "numeric", attributes: { "aria-sort": "ascending" } },
-						{ text: "Actions" }
-					],
-					rows: tableRows
-				}) }}
-				{{ govukButton({
-					text: "Remove selected",
-					classes: "govuk-button--warning"
-				}) }}
-			</form>
-		{% endif %}
+				{# one reason per line - each item is autoescaped #}
+				{% set identifiedHtml %}{% for reason in row.identified %}{{ reason }}{% if not loop.last %}<br>{% endif %}{% endfor %}{% endset %}
+				{# sorted by its metres - one with no distance (added by hand from beyond the run)
+						sorts after every measured one. Kept on one line in the narrow column: the
+						distance's own space is non-breaking (see the controller), and so is this one #}
+				{% if row.distance %}
+					{% set distanceCell = { text: row.distance.text, format: "numeric", attributes: { "data-sort-value": row.distance.metres } } %}
+				{% else %}
+					{% set distanceCell = { html: "Not&nbsp;measured", format: "numeric", attributes: { "data-sort-value": 999999999 } } %}
+				{% endif %}
+				{% set tableRows = (tableRows.push([
+					{ html: selectHtml },
+					{ text: row.name, classes: "govuk-table__cell--no-wrap" },
+					{ html: identifiedHtml },
+					distanceCell,
+					{ html: removeLink }
+				]), tableRows) %}
+			{% endfor %}
+			{# MoJ sortable table (javascripts/sortable-table.js) and multi-select
+					(javascripts/consultee-select.js) share this table - data-module is
+					space-separated and each module word-matches its own name. A column
+					sorts when its header carries aria-sort - the checkbox column and
+					Actions have none, so they never get a button; a column added later
+					sorts the same way. Distance's "ascending" marks the served order -
+					rows arrive nearest first and the script re-sorts to match on load #}
+			{{ govukTable({
+				caption: "Included consultees",
+				captionClasses: "govuk-visually-hidden",
+				classes: "pins-consultees-table",
+				attributes: { "data-module": "moj-sortable-table consultee-select", "data-id-prefix": "consultees-" },
+				head: [
+					{ html: selectAllHtml, attributes: { id: "consultees-select-all" } },
+					{ text: "Name", attributes: { "aria-sort": "none" } },
+					{ text: "Identified", attributes: { "aria-sort": "none" } },
+					{ text: "Distance", format: "numeric", attributes: { "aria-sort": "ascending" } },
+					{ text: "Actions" }
+				],
+				rows: tableRows
+			}) }}
+			{{ govukButton({
+				text: "Remove selected",
+				classes: "govuk-button--warning"
+			}) }}
+		</form>
 	{% endif %}
 
 	<div class="govuk-!-margin-top-6">

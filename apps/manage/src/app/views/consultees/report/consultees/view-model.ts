@@ -62,8 +62,6 @@ export interface ReportConsulteesViewModel {
 	 * `error=select` for the page to flag rather than leaving it to a 404.
 	 */
 	errorSummary?: { text: string; href: string }[];
-	/** True when the ruleset couldn't be run at all - the page shows an error, not an empty list. */
-	rulesetFailed: boolean;
 	/** True when the site was screened against its bounding box - the list needs reviewing. */
 	screenedBoundingBox: boolean;
 	retryUrl: string;

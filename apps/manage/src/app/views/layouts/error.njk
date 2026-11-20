@@ -16,7 +16,13 @@
 	<div class="govuk-grid-row">
 		<div class="govuk-grid-column-two-thirds">
 			{% for message in messages %}
-				<p class="govuk-body">{{ message }}</p>
+				<p class="govuk-body">
+					{% if message.href or message.href === '' %}
+						<a class="govuk-link" href={{ message.href }}>{{ message.message }}</a>.
+					{% else %}
+						{{ message }}
+					{% endif %}
+				</p>
 			{% endfor %}
 
 			<h2 class="govuk-heading-m">Contact IT if you continue to have problems with this service.</h2>
