@@ -28,6 +28,11 @@
  * `modes` defaults to ['distance'] - the multi-point path and bounded-box area are opt-in.
  * `units` ('metric' | 'imperial') picks the initial unit in the panel's Units select.
  *
+ * With more than one mode the button is a menu; a "Clear measurements" item is appended to
+ * it. Every finished measurement's feature id is kept on pluginConfig.drawnFeatureIds (the
+ * same descriptor-level slot `pending` uses), so the item can delete all of them - a finished
+ * shape no longer has to be the latest one to be removable.
+ *
  * The file is `.mjs`, not `.js`: the build fingerprints `javascripts/*.js` (content-hash
  * renames the file), so modules importing this one need a specifier that step leaves alone.
  */
@@ -35,6 +40,7 @@
 const BUTTON_ID = 'measure';
 const PANEL_ID = 'measure';
 const BUTTON_ITEM_PREFIX = 'measure-';
+const CLEAR_ITEM_ID = 'measure-clear';
 
 // mean earth radius (IUGG) - the same figure turf's distance/area helpers use
 const EARTH_RADIUS_METRES = 6371008.8;
@@ -277,6 +283,9 @@ export function handleDrawCreated(feature, context) {
 		return;
 	}
 	context.pluginConfig.pending = null;
+	// ours - the drawn feature stays on the map, so remember its id for Clear measurements
+	// (the area swap below re-adds the polygon under the same id)
+	(context.pluginConfig.drawnFeatureIds ??= []).push(feature.id);
 	if (feature?.geometry?.type !== 'LineString') {
 		return;
 	}
@@ -339,6 +348,30 @@ export function handleDrawStarted(context) {
 	context.pluginConfig.pending = null;
 }
 
+/**
+ * "Clear measurements" menu action: removes every shape a measure session finished,
+ * abandons one still being drawn, and resets the panel. The adapter's cancel() trashes
+ * the in-progress feature but doesn't emit draw:cancelled (the draw panel's own Cancel
+ * button does that itself) - emit it here so listeners that suspend on draw:started,
+ * like the consultees map's interact plugin, are re-enabled.
+ *
+ * @param {object} context - PluginContext ({ pluginConfig, pluginState, services, mapProvider })
+ */
+export function clearMeasurements(context) {
+	const { pluginConfig, pluginState, services, mapProvider } = context ?? {};
+	if (pluginConfig?.pending) {
+		pluginConfig.pending = null;
+		mapProvider?.draw?.cancel?.();
+		services?.eventBus?.emit?.('draw:cancelled');
+	}
+	const ids = pluginConfig?.drawnFeatureIds;
+	if (ids?.length) {
+		services?.getPlugin?.('draw')?.deleteFeature?.(ids);
+		pluginConfig.drawnFeatureIds = [];
+	}
+	pluginState?.dispatch?.({ type: 'SET_MEASUREMENT', payload: null });
+}
+
 const initialState = { measurement: null, units: {} };
 
 const actions = {
@@ -372,6 +405,11 @@ export function MeasureInit({ pluginConfig, pluginState, services, mapProvider, 
 		if (modes.length === 1 && buttonConfig?.[BUTTON_ID]) {
 			buttonConfig[BUTTON_ID].onClick = wire(modes[0]);
 		}
+		// the menu's trailing Clear item removes every measured shape at once
+		const clearItem = buttonConfig?.[CLEAR_ITEM_ID];
+		if (clearItem) {
+			clearItem.onClick = () => clearMeasurements(contextRef.current);
+		}
 		return () => {
 			for (const mode of modes) {
 				const item = buttonConfig?.[`${BUTTON_ITEM_PREFIX}${mode}`];
@@ -381,6 +419,9 @@ export function MeasureInit({ pluginConfig, pluginState, services, mapProvider, 
 			}
 			if (buttonConfig?.[BUTTON_ID]) {
 				buttonConfig[BUTTON_ID].onClick = null;
+			}
+			if (clearItem) {
+				clearItem.onClick = null;
 			}
 		};
 	}, [buttonConfig]);
@@ -502,6 +543,10 @@ export function MeasurePanel({ appConfig, pluginConfig, pluginState, services })
 					onClick: () => {
 						if (measurement.featureId) {
 							services?.getPlugin?.('draw')?.deleteFeature?.([measurement.featureId]);
+							const ids = pluginConfig?.drawnFeatureIds;
+							if (ids) {
+								pluginConfig.drawnFeatureIds = ids.filter((id) => id !== measurement.featureId);
+							}
 						}
 						pluginState?.dispatch?.({ type: 'SET_MEASUREMENT', payload: null });
 					}
@@ -525,8 +570,8 @@ function MeasurePanelShell(props) {
 
 /**
  * One Measure button; with more than one configured mode it opens a menu with an item
- * per mode, otherwise it's an action button wired straight to that mode (MeasureInit
- * attaches the onClick through buttonConfig either way).
+ * per mode plus a Clear measurements item, otherwise it's an action button wired straight
+ * to that mode (MeasureInit attaches the onClick through buttonConfig either way).
  */
 function buildManifest(modes) {
 	return {
@@ -540,10 +585,13 @@ function buildManifest(modes) {
 				iconId: 'app-measure',
 				...(modes.length > 1
 					? {
-							menuItems: modes.map((mode) => ({
-								id: `${BUTTON_ITEM_PREFIX}${mode}`,
-								label: MODE_META[mode].menuLabel
-							}))
+							menuItems: [
+								...modes.map((mode) => ({
+									id: `${BUTTON_ITEM_PREFIX}${mode}`,
+									label: MODE_META[mode].menuLabel
+								})),
+								{ id: CLEAR_ITEM_ID, label: 'Clear measurements' }
+							]
 						}
 					: {}),
 				mobile: { slot: 'top-left', showLabel: true },
@@ -590,6 +638,8 @@ export function createMeasurePlugin(options = {}) {
 		// the in-flight session ({ id, mode, expectStart, autoFinished }) lives on the
 		// descriptor - like the layers-key plugin's checkedCache, it survives panel remounts
 		pending: null,
+		// ids of every finished measurement's drawn feature, for Clear measurements
+		drawnFeatureIds: [],
 		load: async () => buildManifest(modes)
 	};
 }

@@ -37,7 +37,7 @@ Regional categories (police, ambulance trusts, ICBs, counties) would hide everyt
 
 Clicking a feature selects it and a "Selected on the map" panel shows its name, category, region and distance. The Defra map has no hover; selection goes through the interact plugin (`buildSelectableLayers`, `wireFeatureDetails`).
 
-The category pages also carry a Measure toolbar (distance, path and bounded-box area). `measure-plugin.mjs` is a local plugin that draws through the vendor draw plugin's adapter rather than reimplementing vertex placement, snapping and Done/Cancel chrome; `consultees-map.js` registers `defra.drawPlugin()` + `createMeasurePlugin(...)` only when the page loads the draw bundle (`vendorDrawPluginJs` in the category template), so other map hosts get no Measure button.
+The category pages also carry a Measure toolbar (distance, path and bounded-box area). `measure-plugin.mjs` is a local plugin that draws through the vendor draw plugin's adapter rather than reimplementing vertex placement, snapping and Done/Cancel chrome; `consultees-map.js` registers `defra.drawPlugin()` + `createMeasurePlugin(...)` only when the page loads the draw bundle (`vendorDrawPluginJs` in the category template), so other map hosts get no Measure button. Finished shapes stay on the map; the menu's "Clear measurements" item removes every one a session drew (the panel's Clear button removes just the latest).
 
 ## The consultees table's selected row
 
