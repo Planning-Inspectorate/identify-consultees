@@ -122,4 +122,5 @@ local.settings.json
 # Local PR screenshot helpers - kept on disk, never committed
 apps/manage/demo-server.mjs
 apps/manage/pr-screenshot.mjs
+apps/manage/scripts/csp-e2e-server.mjs
 apps/manage/shot-*.png

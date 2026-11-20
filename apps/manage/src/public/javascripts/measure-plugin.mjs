@@ -2,36 +2,43 @@
  * Measure plugin (spike) for the Defra Interactive Map.
  *
  * Adds a "Measure" toolbar button whose tools draw with the vendor draw plugin rather than
- * reimplementing drawing: every measure mode starts a `newLine` session and reads the shape
- * back, so vertex placement, snapping, keyboard/touch input, the spatial list and the
- * Done/Cancel chrome all come from draw itself. Only the parts draw doesn't cover are added:
+ * reimplementing drawing: line modes start a `newLine` session, the area mode starts a
+ * `newPolygon` session, and finished shapes re-open through `editFeature` - so vertex
+ * placement, snapping (the draw menu's Snap to feature toggle, enabled via the draw
+ * plugin's snapLayers), keyboard/touch input, the spatial list and the Done/Cancel chrome
+ * all come from draw itself. Only the parts draw doesn't cover are added:
  *
  * - `distance` (primary): a line that finishes itself the moment the second vertex lands -
  *   two clicks, one measurement.
  * - `path` (configurable): an open-ended line - the running total updates live as vertices
  *   are added, and the native Done button finishes it.
- * - `area` (configurable): two opposite corners - the second click finishes the line, which
- *   is then swapped for its bounding box on the map; the reported value is the box's area.
+ * - `area` (configurable): a polygon drawn corner by corner - vertex handles while
+ *   drawing, self-intersection and area validation built in, Done finishes it.
+ *
+ * A finished measurement stays on the map: clicking it (or the panel's Edit button)
+ * opens the draw plugin's edit session - drag, insert or delete vertices, Snap toggle
+ * included - and `draw:edited` hands the re-measured shape back. Cancelling an edit
+ * restores both the shape and the readout.
  *
  * The live readout rides the draw adapter's `geometrychange` event - the same contract the
  * draw plugin's own validation listens on. Phase-less payloads are the in-progress feature
- * (placed vertices + rubber-band cursor), so the panel updates on every mouse move;
- * `{ phase: 'commit-add', feature }` payloads carry the placed vertices only, which is what
- * triggers the auto-finish for the two-point modes.
+ * (placed vertices + rubber-band cursor during draw, the dragged feature during edit), so
+ * the panel updates on every mouse move; `commit-*` payloads carry placed/moved vertices,
+ * which is what triggers the auto-finish for the two-point mode and the refresh mid-edit.
  *
  * Usage:
  *
- *   const draw = defra.drawPlugin();
+ *   const draw = defra.drawPlugin({ snapLayers: ['consultee-areas-identified-0'] });
  *   const measure = createMeasurePlugin({ modes: ['distance', 'path', 'area'] });
  *   new defra.InteractiveMap(mapId, { ..., plugins: [draw, measure] });
  *
- * `modes` defaults to ['distance'] - the multi-point path and bounded-box area are opt-in.
+ * `modes` defaults to ['distance'] - the multi-point path and polygon area are opt-in.
  * `units` ('metric' | 'imperial') picks the initial unit in the panel's Units select.
  *
  * With more than one mode the button is a menu; a "Clear measurements" item is appended to
  * it. Every finished measurement's feature id is kept on pluginConfig.drawnFeatureIds (the
- * same descriptor-level slot `pending` uses), so the item can delete all of them - a finished
- * shape no longer has to be the latest one to be removable.
+ * same descriptor-level slot `pending`/`editing` use), so the item can delete all of them -
+ * a finished shape no longer has to be the latest one to be removable.
  *
  * The file is `.mjs`, not `.js`: the build fingerprints `javascripts/*.js` (content-hash
  * renames the file), so modules importing this one need a specifier that step leaves alone.
@@ -42,6 +49,13 @@ const PANEL_ID = 'measure';
 const BUTTON_ITEM_PREFIX = 'measure-';
 const CLEAR_ITEM_ID = 'measure-clear';
 
+// the draw control renders finished (inactive) features on these layers - mapbox-gl-draw
+// appends .cold/.hot to the ids its styles declare (styles.js), so a click on an inactive
+// fill or outline is a request to edit that shape
+const INACTIVE_DRAW_LAYERS = ['fill-inactive.cold', 'stroke-inactive.cold'];
+
+const EDIT_HINT = "Drag the shape's points to change it, then select Done.";
+
 // mean earth radius (IUGG) - the same figure turf's distance/area helpers use
 const EARTH_RADIUS_METRES = 6371008.8;
 const DEG_TO_RAD = Math.PI / 180;
@@ -50,7 +64,7 @@ const MEASURE_ICON_SVG =
 	'<path d="M2.5 7h19v10h-19z"></path>' + '<path d="M6.5 7v4M10.5 7v6M14.5 7v4M18.5 7v6"></path>';
 
 const MEASURE_LINE_STYLE = { stroke: '#1d70b8', strokeWidth: 3 };
-const MEASURE_BOX_STYLE = { stroke: '#1d70b8', strokeWidth: 2, fill: 'rgba(29, 112, 184, 0.15)' };
+const MEASURE_POLYGON_STYLE = { stroke: '#1d70b8', strokeWidth: 2, fill: 'rgba(29, 112, 184, 0.15)' };
 
 export const MEASURE_MODES = ['distance', 'path', 'area'];
 
@@ -64,8 +78,8 @@ export const MODE_META = {
 		hint: 'Click each point on the path, then select Done.'
 	},
 	area: {
-		menuLabel: 'Of a bounded box',
-		hint: 'Click two opposite corners of the box.'
+		menuLabel: 'Of an area',
+		hint: 'Click each corner of the area, then select Done.'
 	}
 };
 
@@ -149,27 +163,6 @@ export function lineLengthMetres(coordinates = []) {
 }
 
 /**
- * The closed ring of the axis-aligned box with `a` and `b` as opposite corners.
- *
- * @param {number[]} a - [lng, lat]
- * @param {number[]} b - [lng, lat]
- * @returns {number[][]}
- */
-export function boundingBoxRing(a, b) {
-	const west = Math.min(a[0], b[0]);
-	const south = Math.min(a[1], b[1]);
-	const east = Math.max(a[0], b[0]);
-	const north = Math.max(a[1], b[1]);
-	return [
-		[west, south],
-		[east, south],
-		[east, north],
-		[west, north],
-		[west, south]
-	];
-}
-
-/**
  * Geodesic area of a polygon ring in square metres - the same spherical algorithm
  * geojson-area and mapbox-gl-draw's own readouts use.
  *
@@ -187,20 +180,27 @@ export function ringAreaSquareMetres(ring = []) {
 }
 
 /**
- * The measurement for a line's vertices under a mode: length for distance/path, the
- * bounding-box area of the first-and-last corners for area. Null until there are at
- * least two points to measure.
+ * The measurement for a feature's coordinates under a mode: length for distance/path
+ * (flat [lng, lat] list), the outer ring's area for area (a Polygon's
+ * coordinates - `[[ring]]`). Null until the shape has enough points to measure.
  *
- * @param {number[][] | undefined} coordinates
+ * @param {number[][] | number[][][] | undefined} coordinates
  * @param {string} mode
  * @returns {{ metres: number } | { squareMetres: number } | null}
  */
 export function measurementForCoordinates(coordinates, mode) {
-	if (!Array.isArray(coordinates) || coordinates.length < 2) {
+	if (!Array.isArray(coordinates)) {
 		return null;
 	}
 	if (mode === 'area') {
-		return { squareMetres: ringAreaSquareMetres(boundingBoxRing(coordinates[0], coordinates[coordinates.length - 1])) };
+		const ring = coordinates[0];
+		if (!Array.isArray(ring) || ring.length < 3) {
+			return null;
+		}
+		return { squareMetres: ringAreaSquareMetres(ring) };
+	}
+	if (coordinates.length < 2 || !Array.isArray(coordinates[0])) {
+		return null;
 	}
 	return { metres: lineLengthMetres(coordinates) };
 }
@@ -220,38 +220,73 @@ export function startMeasure(mode, context) {
 		services?.eventBus?.emit?.('app:showpanel', { id: PANEL_ID, focus: false });
 		return;
 	}
+	// a tool picked mid-edit: commit the edit first so the sessions never overlap
+	if (pluginConfig.editing) {
+		mapProvider.draw.done?.();
+		pluginConfig.editing = null;
+	}
 	const id = globalThis.crypto?.randomUUID?.() ?? `measure-${Date.now()}`;
 	pluginConfig.pending = { id, mode, expectStart: true, autoFinished: false };
 	pluginState?.dispatch?.({ type: 'SET_MEASUREMENT', payload: { mode, status: 'drawing' } });
 	services?.eventBus?.emit?.('app:showpanel', { id: PANEL_ID, focus: false });
 	services?.hints?.show?.(MODE_META[mode]?.hint);
-	draw.newLine(id, MEASURE_LINE_STYLE);
+	if (mode === 'area') {
+		draw.newPolygon?.(id, MEASURE_POLYGON_STYLE);
+	} else {
+		draw.newLine(id, MEASURE_LINE_STYLE);
+	}
 }
 
 /**
  * The draw adapter's live geometry feed. Phase-less payloads are the in-progress feature
- * (coordinates include the rubber-band cursor); `commit-add` payloads carry the placed
- * vertices only, and the second placed vertex auto-finishes the two-point modes.
+ * (coordinates include the rubber-band cursor while drawing, the dragged shape while
+ * editing); `commit-*` payloads carry the feature after a vertex op - `commit-add` while
+ * drawing triggers the distance mode's auto-finish, every commit while editing refreshes
+ * the readout.
  *
  * @param {object} event - adapter 'geometrychange' payload
  * @param {object} context
  */
 export function handleGeometryChange(event, context) {
-	const pending = context?.pluginConfig?.pending;
-	if (!pending) {
+	const pluginConfig = context?.pluginConfig;
+	const pending = pluginConfig?.pending;
+	const editing = pluginConfig?.editing;
+	if (!pending && !editing) {
 		return;
 	}
 	if (event?.phase) {
-		if (event.phase !== 'commit-add' || event.feature?.geometry?.type !== 'LineString') {
+		const feature = event.feature;
+		const coordinates = feature?.geometry?.coordinates;
+		if (!Array.isArray(coordinates)) {
 			return;
 		}
-		updateLiveMeasurement(event.feature.geometry.coordinates, pending, context, true);
+		if (editing && feature.id === editing.id) {
+			updateEditedMeasurement(coordinates, editing, context);
+			return;
+		}
+		if (pending) {
+			// commit-add in the draw mode auto-finishes the two-point mode; commits in
+			// edit_vertex are an invalid create being fixed - refresh only, the draw
+			// control's own Done decides when that ends
+			const autoFinished = event.phase === 'commit-add' && context?.mapProvider?.draw?.getMode?.() === 'draw_line';
+			updateLiveMeasurement(coordinates, pending, context, autoFinished);
+		}
 		return;
 	}
-	if (context?.mapProvider?.draw?.getMode?.() !== 'draw_line' || !Array.isArray(event?.coordinates)) {
+	if (!Array.isArray(event?.coordinates)) {
 		return;
 	}
-	updateLiveMeasurement(event.coordinates, pending, context, false);
+	const drawMode = context?.mapProvider?.draw?.getMode?.();
+	if (editing && (drawMode === 'edit_vertex' || drawMode === 'edit_point')) {
+		updateEditedMeasurement(event.coordinates, editing, context);
+		return;
+	}
+	// the adapter's own sketch shape for this session's mode - or its reopened-for-fixes
+	// edit when an invalid create gets handed back to the user (edit_vertex while pending)
+	const expected = pending?.mode === 'area' ? 'draw_polygon' : 'draw_line';
+	if (pending && (drawMode === expected || drawMode === 'edit_vertex')) {
+		updateLiveMeasurement(event.coordinates, pending, context, false);
+	}
 }
 
 function updateLiveMeasurement(coordinates, pending, context, committed) {
@@ -262,17 +297,28 @@ function updateLiveMeasurement(coordinates, pending, context, committed) {
 			payload: { mode: pending.mode, status: 'drawing', ...measurement }
 		});
 	}
-	if (committed && coordinates.length >= 2 && pending.mode !== 'path' && !pending.autoFinished) {
+	if (committed && coordinates.length >= 2 && pending.mode === 'distance' && !pending.autoFinished) {
 		pending.autoFinished = true;
 		// deferred so the draw mode finishes processing the click that placed the vertex
 		setTimeout(() => context.mapProvider?.draw?.done?.(), 0);
 	}
 }
 
+function updateEditedMeasurement(coordinates, editing, context) {
+	const measurement = measurementForCoordinates(coordinates, editing.mode);
+	if (measurement) {
+		context.pluginState?.dispatch?.({
+			type: 'SET_MEASUREMENT',
+			payload: { mode: editing.mode, status: 'editing', ...measurement, featureId: editing.id }
+		});
+	}
+}
+
 /**
- * `draw:created` handler: the finished line becomes the final measurement. For `area`
- * the line is the box's diagonal - swap it for the bounding-box polygon on the map so
- * the user sees the shape that was measured.
+ * `draw:created` handler: the finished shape becomes the final measurement - the line's
+ * length, or the polygon's area for `area` sessions (draw_polygon produces the shape
+ * directly; no post-processing needed). Also fires for a shape that finished invalid,
+ * was reopened in edit mode and got fixed - still ours.
  *
  * @param {object} feature - the finished GeoJSON feature
  * @param {object} context
@@ -283,29 +329,13 @@ export function handleDrawCreated(feature, context) {
 		return;
 	}
 	context.pluginConfig.pending = null;
-	// ours - the drawn feature stays on the map, so remember its id for Clear measurements
-	// (the area swap below re-adds the polygon under the same id)
+	// ours - the drawn feature stays on the map, so remember its id (and which tool drew
+	// it) for Clear measurements and click-to-edit
 	(context.pluginConfig.drawnFeatureIds ??= []).push(feature.id);
-	if (feature?.geometry?.type !== 'LineString') {
-		return;
-	}
-	const measurement = measurementForCoordinates(feature.geometry.coordinates, pending.mode);
+	(context.pluginConfig.drawnFeatureModes ??= {})[feature.id] = pending.mode;
+	const measurement = measurementForCoordinates(feature.geometry?.coordinates, pending.mode);
 	if (!measurement) {
 		return;
-	}
-	if (pending.mode === 'area') {
-		const ring = boundingBoxRing(
-			feature.geometry.coordinates[0],
-			feature.geometry.coordinates[feature.geometry.coordinates.length - 1]
-		);
-		const draw = context.services?.getPlugin?.('draw');
-		draw?.deleteFeature?.([feature.id]);
-		draw?.addFeature?.({
-			id: feature.id,
-			type: 'Feature',
-			geometry: { type: 'Polygon', coordinates: [ring] },
-			...MEASURE_BOX_STYLE
-		});
 	}
 	context.pluginState?.dispatch?.({
 		type: 'SET_MEASUREMENT',
@@ -314,11 +344,18 @@ export function handleDrawCreated(feature, context) {
 }
 
 /**
- * `draw:cancelled` handler: the session ended with no measurement.
+ * `draw:cancelled` handler: a draw session ends with no measurement; an edit session
+ * restores the pre-edit shape - restore the pre-edit readout the same way.
  *
  * @param {object} context
  */
 export function handleDrawCancelled(context) {
+	const editing = context?.pluginConfig?.editing;
+	if (editing) {
+		context.pluginConfig.editing = null;
+		context.pluginState?.dispatch?.({ type: 'SET_MEASUREMENT', payload: editing.previous ?? null });
+		return;
+	}
 	const pending = context?.pluginConfig?.pending;
 	if (!pending) {
 		return;
@@ -331,12 +368,36 @@ export function handleDrawCancelled(context) {
 }
 
 /**
+ * `draw:edited` handler: the edit session's finished shape is the new measurement -
+ * re-measure and close the edit slot.
+ *
+ * @param {object} feature - the edited GeoJSON feature
+ * @param {object} context
+ */
+export function handleDrawEdited(feature, context) {
+	const editing = context?.pluginConfig?.editing;
+	if (!editing || feature?.id !== editing.id) {
+		return;
+	}
+	context.pluginConfig.editing = null;
+	const measurement = measurementForCoordinates(feature.geometry?.coordinates, editing.mode);
+	context.pluginState?.dispatch?.({
+		type: 'SET_MEASUREMENT',
+		payload: measurement
+			? { mode: editing.mode, status: 'done', ...measurement, featureId: feature.id }
+			: (editing.previous ?? null)
+	});
+}
+
+/**
  * `draw:started` handler: the session a measure tool kicked off consumes its expected
- * start; any other start means something else is drawing, so stop listening for ours.
+ * start; any other start means something else is drawing, so stop listening for ours -
+ * and drop any edit slot, the draw control only runs one session at a time.
  *
  * @param {object} context
  */
 export function handleDrawStarted(context) {
+	context?.pluginConfig && (context.pluginConfig.editing = null);
 	const pending = context?.pluginConfig?.pending;
 	if (!pending) {
 		return;
@@ -349,17 +410,52 @@ export function handleDrawStarted(context) {
 }
 
 /**
+ * Open a finished measurement's shape for editing - clicking it on the map (the inactive
+ * draw layers) or the panel's Edit button lands here. The draw plugin's edit session
+ * gives the shape the same vertex handles, Snap toggle and Done/Cancel chrome a draw
+ * session has; `draw:edited` hands the re-measured feature back, `draw:cancelled`
+ * restores it.
+ *
+ * @param {string} featureId - a drawnFeatureIds member
+ * @param {object} context - PluginContext ({ pluginConfig, pluginState, services })
+ */
+export function startEdit(featureId, context) {
+	const id = featureId == null ? null : String(featureId);
+	const { pluginConfig, pluginState, services } = context ?? {};
+	if (!id || pluginConfig?.pending || pluginConfig?.editing) {
+		return;
+	}
+	if (!pluginConfig?.drawnFeatureIds?.includes(id)) {
+		return;
+	}
+	const mode = pluginConfig?.drawnFeatureModes?.[id];
+	if (!mode || !services?.getPlugin?.('draw')?.editFeature?.(id)) {
+		return;
+	}
+	const measurement = pluginState?.measurement;
+	const current = measurement?.featureId === id ? measurement : null;
+	pluginConfig.editing = { id, mode, previous: current };
+	pluginState?.dispatch?.({
+		type: 'SET_MEASUREMENT',
+		payload: { ...(current ?? {}), mode, status: 'editing', featureId: id }
+	});
+	services?.hints?.show?.(EDIT_HINT);
+	services?.eventBus?.emit?.('app:showpanel', { id: PANEL_ID, focus: false });
+}
+
+/**
  * "Clear measurements" menu action: removes every shape a measure session finished,
- * abandons one still being drawn, and resets the panel. The adapter's cancel() trashes
- * the in-progress feature but doesn't emit draw:cancelled (the draw panel's own Cancel
- * button does that itself) - emit it here so listeners that suspend on draw:started,
- * like the consultees map's interact plugin, are re-enabled.
+ * abandons one still being drawn or edited, and resets the panel. The adapter's
+ * cancel() trashes the in-progress feature but doesn't emit draw:cancelled (the draw
+ * panel's own Cancel button does that itself) - emit it here so listeners that suspend
+ * on draw:started, like the consultees map's interact plugin, are re-enabled.
  *
  * @param {object} context - PluginContext ({ pluginConfig, pluginState, services, mapProvider })
  */
 export function clearMeasurements(context) {
 	const { pluginConfig, pluginState, services, mapProvider } = context ?? {};
-	if (pluginConfig?.pending) {
+	if (pluginConfig?.editing || pluginConfig?.pending) {
+		pluginConfig.editing = null;
 		pluginConfig.pending = null;
 		mapProvider?.draw?.cancel?.();
 		services?.eventBus?.emit?.('draw:cancelled');
@@ -368,6 +464,7 @@ export function clearMeasurements(context) {
 	if (ids?.length) {
 		services?.getPlugin?.('draw')?.deleteFeature?.(ids);
 		pluginConfig.drawnFeatureIds = [];
+		pluginConfig.drawnFeatureModes = {};
 	}
 	pluginState?.dispatch?.({ type: 'SET_MEASUREMENT', payload: null });
 }
@@ -434,19 +531,42 @@ export function MeasureInit({ pluginConfig, pluginState, services, mapProvider, 
 		let detachDraw = () => {};
 		const attachDraw = () => {
 			detachDraw();
+			const detachers = [];
 			const draw = mapProvider?.draw;
 			if (draw?.on) {
 				const onGeometryChange = (event) => handleGeometryChange(event, contextRef.current);
 				draw.on('geometrychange', onGeometryChange);
-				detachDraw = () => draw.off?.('geometrychange', onGeometryChange);
+				detachers.push(() => draw.off?.('geometrychange', onGeometryChange));
 			}
+			// clicking a finished measurement on the map opens its edit session - the
+			// inactive draw layers only exist once the adapter does, so same condition
+			const map = mapProvider?.map;
+			if (draw?.on && map?.on) {
+				const onShapeClick = (event) => {
+					const id = event?.features?.[0]?.properties?.id;
+					if (id != null) {
+						startEdit(id, contextRef.current);
+					}
+				};
+				for (const layerId of INACTIVE_DRAW_LAYERS) {
+					map.on('click', layerId, onShapeClick);
+				}
+				detachers.push(() => {
+					for (const layerId of INACTIVE_DRAW_LAYERS) {
+						map.off?.('click', layerId, onShapeClick);
+					}
+				});
+			}
+			detachDraw = () => detachers.forEach((detach) => detach());
 		};
 		const onCreated = (feature) => handleDrawCreated(feature, contextRef.current);
 		const onCancelled = () => handleDrawCancelled(contextRef.current);
 		const onStarted = () => handleDrawStarted(contextRef.current);
+		const onEdited = (feature) => handleDrawEdited(feature, contextRef.current);
 		eventBus.on('draw:created', onCreated);
 		eventBus.on('draw:cancelled', onCancelled);
 		eventBus.on('draw:started', onStarted);
+		eventBus.on('draw:edited', onEdited);
 		eventBus.on('draw:ready', attachDraw);
 		attachDraw();
 		return () => {
@@ -454,6 +574,7 @@ export function MeasureInit({ pluginConfig, pluginState, services, mapProvider, 
 			eventBus.off('draw:created', onCreated);
 			eventBus.off('draw:cancelled', onCancelled);
 			eventBus.off('draw:started', onStarted);
+			eventBus.off('draw:edited', onEdited);
 			eventBus.off('draw:ready', attachDraw);
 		};
 	}, [services, mapProvider]);
@@ -485,6 +606,8 @@ export function MeasurePanel({ appConfig, pluginConfig, pluginState, services })
 		body.push(
 			h('p', { key: 'hint', className: 'govuk-body-s' }, MODE_META[measurement.mode]?.hint ?? 'Draw on the map.')
 		);
+	} else if (status === 'editing') {
+		body.push(h('p', { key: 'hint', className: 'govuk-body-s' }, EDIT_HINT));
 	} else if (status === 'cancelled') {
 		body.push(h('p', { key: 'cancelled', className: 'govuk-body-s' }, 'Measurement cancelled.'));
 	} else if (status === 'unavailable') {
@@ -511,7 +634,7 @@ export function MeasurePanel({ appConfig, pluginConfig, pluginState, services })
 		);
 	}
 
-	if (hasValue && (status === 'drawing' || status === 'done')) {
+	if (hasValue && (status === 'drawing' || status === 'editing' || status === 'done')) {
 		body.push(
 			h('div', { key: 'units', className: 'govuk-form-group govuk-!-margin-bottom-2' }, [
 				h('label', { key: 'label', className: 'govuk-label govuk-!-font-size-16', htmlFor: selectId }, 'Units'),
@@ -533,6 +656,21 @@ export function MeasurePanel({ appConfig, pluginConfig, pluginState, services })
 	}
 
 	if (status === 'done') {
+		if (measurement.featureId) {
+			body.push(
+				h(
+					'button',
+					{
+						key: 'edit',
+						type: 'button',
+						className:
+							'govuk-button govuk-button--secondary govuk-!-font-size-16 govuk-!-margin-bottom-0 govuk-!-margin-right-2',
+						onClick: () => startEdit(measurement.featureId, { pluginConfig, pluginState, services })
+					},
+					'Edit measurement'
+				)
+			);
+		}
 		body.push(
 			h(
 				'button',
@@ -546,6 +684,9 @@ export function MeasurePanel({ appConfig, pluginConfig, pluginState, services })
 							const ids = pluginConfig?.drawnFeatureIds;
 							if (ids) {
 								pluginConfig.drawnFeatureIds = ids.filter((id) => id !== measurement.featureId);
+							}
+							if (pluginConfig?.drawnFeatureModes) {
+								delete pluginConfig.drawnFeatureModes[measurement.featureId];
 							}
 						}
 						pluginState?.dispatch?.({ type: 'SET_MEASUREMENT', payload: null });
@@ -617,7 +758,7 @@ function buildManifest(modes) {
  * @param {object} [options]
  * @param {string[]} [options.modes] - subset of 'distance' | 'path' | 'area' to offer.
  *   'distance' (2-point line) is the primary tool and the default when none are given;
- *   'path' adds multi-point distance and 'area' the two-corner bounded box.
+ *   'path' adds multi-point distance and 'area' polygon area.
  * @param {'metric' | 'imperial'} [options.units] - initial unit for the panel's select
  * @param {string} [options.buttonLabel] - toolbar button text (default 'Measure')
  * @param {string} [options.panelLabel] - panel heading (default 'Measure')
@@ -635,11 +776,15 @@ export function createMeasurePlugin(options = {}) {
 		units: options.units === 'imperial' ? 'imperial' : 'metric',
 		buttonLabel: options.buttonLabel,
 		panelLabel: options.panelLabel,
-		// the in-flight session ({ id, mode, expectStart, autoFinished }) lives on the
-		// descriptor - like the layers-key plugin's checkedCache, it survives panel remounts
+		// the in-flight sessions ({ id, mode, expectStart, autoFinished } for drawing,
+		// { id, mode, previous } for editing) live on the descriptor - like the
+		// layers-key plugin's checkedCache, they survive panel remounts
 		pending: null,
-		// ids of every finished measurement's drawn feature, for Clear measurements
+		editing: null,
+		// ids of every finished measurement's drawn feature, for Clear measurements, and
+		// the mode each was drawn with, for click-to-edit re-measurement
 		drawnFeatureIds: [],
+		drawnFeatureModes: {},
 		load: async () => buildManifest(modes)
 	};
 }

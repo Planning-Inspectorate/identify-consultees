@@ -7,6 +7,7 @@ import {
 	buildCategorySublayers,
 	buildDatasets,
 	buildSelectableLayers,
+	buildSnapLayers,
 	initAllConsulteeMaps,
 	initConsulteeMap,
 	interactiveZoom,
@@ -449,6 +450,10 @@ describe('consultees-map client helpers', () => {
 		initConsulteeMap('map-measure');
 		assert.equal(drawPlugin.mock.callCount(), 1);
 
+		// the draw plugin gets the map's selectable layers as snap targets, so the
+		// draw panel's "Snap to feature" toggle is offered in measure sessions
+		assert.deepEqual(drawPlugin.mock.calls[0].arguments[0].snapLayers, ['project-site', 'project-site-stroke']);
+
 		// draw registers ahead of measure - the measure plugin draws through its adapter
 		const plugins = InteractiveMap.mock.calls[0].arguments[1].plugins;
 		assert.ok(plugins.indexOf(draw) > -1);
@@ -471,6 +476,16 @@ describe('consultees-map client helpers', () => {
 			handler();
 		}
 		assert.equal(interact.enable.mock.callCount(), 2);
+
+		// editing a finished measurement suspends selection the same way
+		for (const handler of handlers['draw:editstart'] ?? []) {
+			handler();
+		}
+		assert.equal(interact.disable.mock.callCount(), 2);
+		for (const handler of handlers['draw:edited'] ?? []) {
+			handler();
+		}
+		assert.equal(interact.enable.mock.callCount(), 3);
 	});
 
 	test('buildSelectableLayers lists the MapLibre layers of each consultee sublayer and the project site', () => {
@@ -495,6 +510,22 @@ describe('consultees-map client helpers', () => {
 			]
 		);
 		assert.ok(layers.every((layer) => layer.labelProperty === 'name'));
+	});
+
+	test('buildSnapLayers reuses the selectable layer ids as snap targets', () => {
+		const area = {
+			properties: { consulteeCategory: 'Police and crime commissioners', colour: '#1d70b8' },
+			geometry: { type: 'Polygon' }
+		};
+		const datasets = buildDatasets({
+			consulteeGeojson: { features: [area] },
+			projectGeojson: { features: [{}] }
+		});
+		assert.deepEqual(
+			buildSnapLayers(datasets),
+			buildSelectableLayers(datasets).map((layer) => layer.layerId)
+		);
+		assert.deepEqual(buildSnapLayers([]), []);
 	});
 
 	test('initConsulteeMap shows a selected feature in a panel, and clears the selection when it closes', () => {

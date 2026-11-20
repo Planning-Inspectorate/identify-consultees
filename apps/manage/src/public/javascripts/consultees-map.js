@@ -285,6 +285,19 @@ export function buildSelectableLayers(datasets) {
 }
 
 /**
+ * The layers the draw plugin's "Snap to feature" toggle can snap a measuring vertex to -
+ * the same rendered layers a click can select (consultee areas, the project site, any
+ * shapefile outlines). Ids for layers a style never creates are fine: the snap query
+ * drops any that don't exist.
+ *
+ * @param {object[]} datasets - from buildDatasets
+ * @returns {string[]}
+ */
+export function buildSnapLayers(datasets) {
+	return buildSelectableLayers(datasets).map(({ layerId }) => layerId);
+}
+
+/**
  * @param {string} mapId
  */
 export function initConsulteeMap(mapId) {
@@ -332,8 +345,9 @@ export function initConsulteeMap(mapId) {
 		const featureDetailsPlugin = createFeatureDetailsPlugin(config.consulteeActions);
 		// the measure tool draws through the vendor draw plugin's adapter, so both only
 		// exist on pages that load the draw bundle (the category pages' vendorDrawPluginJs
-		// script tag) - a map without it simply has no Measure button
-		const drawPlugin = defra.drawPlugin?.();
+		// script tag) - a map without it simply has no Measure button. snapLayers gives the
+		// draw panel its "Snap to feature" toggle for measure sessions and edits
+		const drawPlugin = defra.drawPlugin?.({ snapLayers: buildSnapLayers(datasets) });
 		const measurePlugin = drawPlugin ? createMeasurePlugin({ modes: ['distance', 'path', 'area'] }) : null;
 		// and on those pages the consultees table under the map mirrors the map's
 		// selection: a row click selects its feature, a feature click greys its row
@@ -364,9 +378,13 @@ export function initConsulteeMap(mapId) {
 			featureRowSelectPlugin.wire(map, interactPlugin);
 			if (drawPlugin) {
 				// a measure session's vertex clicks land on the consultee areas too - suspend
-				// interact's feature selection while draw runs, restoring it when it ends
+				// interact's feature selection while draw runs, restoring it when it ends.
+				// Editing a finished measurement is a draw session too: draw:editstart opens
+				// it, draw:edited (or the shared draw:cancelled) closes it
 				map.on('draw:started', () => interactPlugin.disable());
+				map.on('draw:editstart', () => interactPlugin.disable());
 				map.on('draw:created', () => interactPlugin.enable());
+				map.on('draw:edited', () => interactPlugin.enable());
 				map.on('draw:cancelled', () => interactPlugin.enable());
 			}
 		}
