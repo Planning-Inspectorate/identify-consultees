@@ -305,6 +305,7 @@ Procedural and reference material lives outside this file — linked here, not d
 - [`docs/azure-devops-ci-logs.md`](./docs/azure-devops-ci-logs.md) — pulling a failing PR check's DevOps log (token or local reproduction).
 - [`docs/http-and-front-door.md`](./docs/http-and-front-door.md) — HTTP/2, HTTP/3 and the Front Door → origin topology.
 - [`docs/maps.md`](./docs/maps.md) — GIS Styling tables, static-map rules, Defra component gotchas.
+- [`docs/update-govuk-frontend.md`](./docs/update-govuk-frontend.md) — `npm run deps:update-govuk-frontend` bumps the design system and rebuilds fingerprints.
 - [`kt-docs/deployment.md`](./kt-docs/deployment.md) — pipelines, overlapping-deploy locking, and schema/data operations without redeploying the app.
 
 ## Asset fingerprinting and the local dev server
