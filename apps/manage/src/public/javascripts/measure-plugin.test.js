@@ -49,6 +49,14 @@ afterEach(() => {
 
 const flushEffects = () => new Promise((resolve) => setTimeout(resolve, 10));
 
+// effect wiring lands through preact's afterPaint flush - a rAF + setTimeout
+// chain that can outlast a single flushEffects sleep on a loaded CI agent
+const waitFor = async (predicate, attempts = 50) => {
+	for (let attempt = 0; attempt < attempts && !predicate(); attempt++) {
+		await flushEffects();
+	}
+};
+
 function fakeEventBus() {
 	const handlers = {};
 	return {
@@ -914,6 +922,7 @@ describe('MeasureInit', () => {
 		// pluginConfig without modes uses the distance default for the single-mode wiring
 		const buttonConfig = { measure: {} };
 		await renderInit({ pluginConfig: {}, buttonConfig });
+		await waitFor(() => typeof buttonConfig.measure.onClick === 'function');
 		assert.equal(typeof buttonConfig.measure.onClick, 'function');
 	});
 
