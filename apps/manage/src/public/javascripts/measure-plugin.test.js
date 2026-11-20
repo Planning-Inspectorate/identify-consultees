@@ -6,19 +6,20 @@ import {
 	DISTANCE_UNITS,
 	MeasureInit,
 	MeasurePanel,
-	boundingBoxRing,
 	clearMeasurements,
 	createMeasurePlugin,
 	defaultUnitId,
 	formatMeasurement,
 	handleDrawCancelled,
 	handleDrawCreated,
+	handleDrawEdited,
 	handleDrawStarted,
 	handleGeometryChange,
 	haversineMetres,
 	lineLengthMetres,
 	measurementForCoordinates,
 	ringAreaSquareMetres,
+	startEdit,
 	startMeasure
 } from './measure-plugin.mjs';
 
@@ -72,8 +73,18 @@ function fakeEventBus() {
 function fakeDrawPlugin(overrides = {}) {
 	return {
 		newLine: mock.fn(),
+		newPolygon: mock.fn(),
+		editFeature: mock.fn(() => true),
 		deleteFeature: mock.fn(),
 		addFeature: mock.fn(),
+		...overrides
+	};
+}
+
+function fakeMap(overrides = {}) {
+	return {
+		on: mock.fn(),
+		off: mock.fn(),
 		...overrides
 	};
 }
@@ -102,10 +113,17 @@ function fakeServices({ draw = fakeDrawPlugin(), eventBus = fakeEventBus(), hint
 }
 
 function fakeContext({
-	pluginConfig = { modes: ['distance', 'path', 'area'], units: 'metric', pending: null },
+	pluginConfig = {
+		modes: ['distance', 'path', 'area'],
+		units: 'metric',
+		pending: null,
+		editing: null,
+		drawnFeatureIds: [],
+		drawnFeatureModes: {}
+	},
 	pluginState = { measurement: null, units: {}, dispatch: mock.fn() },
 	services = fakeServices(),
-	mapProvider = { draw: fakeDrawAdapter() }
+	mapProvider = { draw: fakeDrawAdapter(), map: fakeMap() }
 } = {}) {
 	return { pluginConfig, pluginState, services, mapProvider };
 }
@@ -133,18 +151,6 @@ describe('measure-plugin geometry and units', () => {
 		assert.ok(withBend > twoPoints, 'a third vertex should add distance');
 	});
 
-	test('boundingBoxRing orders corners whichever diagonal was drawn', () => {
-		const ring = boundingBoxRing([-2, 54], [-1, 55]);
-		assert.deepEqual(ring, [
-			[-2, 54],
-			[-1, 54],
-			[-1, 55],
-			[-2, 55],
-			[-2, 54]
-		]);
-		assert.deepEqual(boundingBoxRing([-1, 55], [-2, 54]), ring);
-	});
-
 	test('ringAreaSquareMetres measures a known box', () => {
 		assert.equal(ringAreaSquareMetres(), 0);
 		// a 1° x 1° box at the equator is about 12,360 km²
@@ -158,10 +164,12 @@ describe('measure-plugin geometry and units', () => {
 		assert.ok(square > 12_000_000_000 && square < 12_800_000_000, `got ${square}`);
 	});
 
-	test('measurementForCoordinates needs two points and honours the mode', () => {
+	test('measurementForCoordinates needs two points for a line and honours the mode', () => {
 		assert.equal(measurementForCoordinates(), null);
 		assert.equal(measurementForCoordinates('nope', 'distance'), null);
 		assert.equal(measurementForCoordinates([[-2, 54]], 'distance'), null);
+		// a point's flat [lng, lat] is not a line
+		assert.equal(measurementForCoordinates([-2, 54], 'distance'), null);
 		assert.ok(
 			measurementForCoordinates(
 				[
@@ -180,15 +188,31 @@ describe('measure-plugin geometry and units', () => {
 				'path'
 			).metres > 0
 		);
-		assert.ok(
+	});
+
+	test('measurementForCoordinates measures a polygon ring for the area mode', () => {
+		const ring = [
+			[0, 0],
+			[1, 0],
+			[1, 1],
+			[0, 1],
+			[0, 0]
+		];
+		assert.equal(measurementForCoordinates(ring, 'area'), null); // a bare ring is not a polygon's coords
+		assert.equal(measurementForCoordinates([[]], 'area'), null);
+		assert.equal(
 			measurementForCoordinates(
 				[
-					[-2, 54],
-					[-1, 55]
+					[
+						[-2, 54],
+						[-1, 55]
+					]
 				],
 				'area'
-			).squareMetres > 0
-		);
+			),
+			null
+		); // too few vertices
+		assert.ok(measurementForCoordinates([ring], 'area').squareMetres > 12_000_000_000);
 	});
 
 	test('defaultUnitId resolves metric and imperial defaults', () => {
@@ -226,7 +250,9 @@ describe('createMeasurePlugin descriptor', () => {
 		assert.deepEqual(plugin.modes, ['distance']);
 		assert.equal(plugin.units, 'metric');
 		assert.equal(plugin.pending, null);
+		assert.equal(plugin.editing, null);
 		assert.deepEqual(plugin.drawnFeatureIds, []);
+		assert.deepEqual(plugin.drawnFeatureModes, {});
 	});
 
 	test('filters unknown modes, dedupes, and falls back when none remain', () => {
@@ -257,7 +283,7 @@ describe('createMeasurePlugin descriptor', () => {
 		);
 		assert.deepEqual(
 			manifest.buttons[0].menuItems.map((item) => item.label),
-			['Between two points', 'Along a path', 'Of a bounded box', 'Clear measurements']
+			['Between two points', 'Along a path', 'Of an area', 'Clear measurements']
 		);
 	});
 
@@ -328,6 +354,26 @@ describe('startMeasure', () => {
 		assert.equal(style.strokeWidth, 3);
 	});
 
+	test('area sessions draw a native polygon, not a line', () => {
+		const context = fakeContext();
+		startMeasure('area', context);
+		const drawPlugin = context.services.getPlugin('draw');
+		assert.equal(drawPlugin.newLine.mock.calls.length, 0);
+		const [featureId, style] = drawPlugin.newPolygon.mock.calls[0].arguments;
+		assert.equal(featureId, context.pluginConfig.pending.id);
+		assert.equal(style.stroke, '#1d70b8');
+		assert.ok(style.fill);
+	});
+
+	test('starting a tool mid-edit commits the edit session first', () => {
+		const context = fakeContext();
+		context.pluginConfig.editing = { id: 'f1', mode: 'area', previous: null };
+		startMeasure('distance', context);
+		assert.equal(context.mapProvider.draw.done.mock.calls.length, 1);
+		assert.equal(context.pluginConfig.editing, null);
+		assert.equal(context.pluginConfig.pending.mode, 'distance');
+	});
+
 	test('falls back to a timestamped id when crypto.randomUUID is missing', () => {
 		const crypto = globalThis.crypto;
 		delete globalThis.crypto;
@@ -378,9 +424,16 @@ describe('handleGeometryChange', () => {
 		assert.equal(context.pluginState.dispatch.mock.calls.length, 0);
 	});
 
-	test('ignores non-commit phases, non-line features and malformed previews', () => {
+	test('ignores malformed events, and other commit phases refresh without finishing', async () => {
 		const context = fakeContext();
-		context.pluginConfig.pending = { id: 'f1', mode: 'distance' };
+		context.pluginConfig.pending = { id: 'f1', mode: 'path' };
+		handleGeometryChange({ phase: 'commit-add' }, context);
+		handleGeometryChange({ phase: 'commit-add', feature: {} }, context);
+		handleGeometryChange({ coordinates: 'nope' }, context);
+		assert.equal(context.pluginState.dispatch.mock.calls.length, 0);
+
+		// a non-add commit still refreshes the readout (e.g. an invalid create reopened
+		// in edit_vertex being fixed) - but it never auto-finishes the session
 		handleGeometryChange(
 			commitEvent(
 				[
@@ -391,13 +444,12 @@ describe('handleGeometryChange', () => {
 			),
 			context
 		);
-		handleGeometryChange({ phase: 'commit-add', feature: { geometry: { type: 'Point' } } }, context);
-		handleGeometryChange({ phase: 'commit-add' }, context);
-		handleGeometryChange({ coordinates: 'nope' }, context);
-		assert.equal(context.pluginState.dispatch.mock.calls.length, 0);
+		assert.equal(context.pluginState.dispatch.mock.calls.length, 1);
+		await flushEffects();
+		assert.equal(context.mapProvider.draw.done.mock.calls.length, 0);
 	});
 
-	test('ignores previews when the adapter is not drawing a line', () => {
+	test('ignores previews from a mode the pending session is not running', () => {
 		const adapter = fakeDrawAdapter({ getMode: () => 'draw_polygon' });
 		const context = fakeContext({ mapProvider: { draw: adapter } });
 		context.pluginConfig.pending = { id: 'f1', mode: 'distance' };
@@ -433,6 +485,45 @@ describe('handleGeometryChange', () => {
 			context
 		);
 		assert.equal(context.pluginState.dispatch.mock.calls.length, 0);
+	});
+
+	test('area sessions take polygon previews - and reopened invalid ones in edit_vertex', () => {
+		const adapter = fakeDrawAdapter({ getMode: () => 'draw_polygon' });
+		const context = fakeContext({ mapProvider: { draw: adapter } });
+		context.pluginConfig.pending = { id: 'f1', mode: 'area' };
+		handleGeometryChange(
+			{
+				coordinates: [
+					[
+						[0, 0],
+						[1, 0],
+						[1, 1],
+						[0, 0]
+					]
+				]
+			},
+			context
+		);
+		assert.ok(context.pluginState.dispatch.mock.calls.at(-1).arguments[0].payload.squareMetres > 0);
+
+		// an invalid polygon finished then reopened in edit_vertex reports there too
+		adapter.getMode = mock.fn(() => 'edit_vertex');
+		handleGeometryChange(
+			{
+				coordinates: [
+					[
+						[0, 0],
+						[2, 0],
+						[2, 2],
+						[0, 2],
+						[0, 0]
+					]
+				]
+			},
+			context
+		);
+		const payload = context.pluginState.dispatch.mock.calls.at(-1).arguments[0].payload;
+		assert.ok(payload.squareMetres > 40_000_000_000);
 	});
 
 	test('preview payloads update the live measurement including the cursor', () => {
@@ -479,20 +570,121 @@ describe('handleGeometryChange', () => {
 		assert.equal(context.mapProvider.draw.done.mock.calls.length, 1);
 	});
 
-	test('bounded-box mode also finishes on the second corner', async () => {
-		const context = fakeContext();
+	test('area mode never auto-finishes - its polygon closes with Done', async () => {
+		const adapter = fakeDrawAdapter({ getMode: () => 'draw_polygon' });
+		const context = fakeContext({ mapProvider: { draw: adapter } });
 		context.pluginConfig.pending = { id: 'f1', mode: 'area' };
+		// a Polygon's committed feature carries its ring one level deeper than a line's
 		handleGeometryChange(
 			commitEvent([
-				[-2, 54],
-				[-1, 55]
+				[
+					[0, 0],
+					[1, 0],
+					[1, 1],
+					[0, 0]
+				]
 			]),
 			context
 		);
 		const dispatched = context.pluginState.dispatch.mock.calls.at(-1).arguments[0];
 		assert.ok(dispatched.payload.squareMetres > 0);
 		await flushEffects();
-		assert.equal(context.mapProvider.draw.done.mock.calls.length, 1);
+		assert.equal(adapter.done.mock.calls.length, 0);
+	});
+
+	test('editing sessions re-measure on drags and commits for their feature only', () => {
+		const adapter = fakeDrawAdapter({ getMode: () => 'edit_vertex' });
+		const context = fakeContext({ mapProvider: { draw: adapter } });
+		context.pluginConfig.editing = { id: 'f1', mode: 'area', previous: null };
+
+		// mid-drag preview - the model's coordinates are the polygon's [[ring]]
+		handleGeometryChange(
+			{
+				coordinates: [
+					[
+						[0, 0],
+						[1, 0],
+						[1, 1],
+						[0, 0]
+					]
+				]
+			},
+			context
+		);
+		let payload = context.pluginState.dispatch.mock.calls.at(-1).arguments[0].payload;
+		assert.equal(payload.status, 'editing');
+		assert.equal(payload.featureId, 'f1');
+		assert.ok(payload.squareMetres > 0);
+
+		// a committed vertex move on the same feature refreshes the figure
+		handleGeometryChange(
+			{
+				phase: 'commit-move',
+				feature: {
+					id: 'f1',
+					geometry: {
+						type: 'Polygon',
+						coordinates: [
+							[
+								[0, 0],
+								[2, 0],
+								[2, 2],
+								[0, 2],
+								[0, 0]
+							]
+						]
+					}
+				}
+			},
+			context
+		);
+		payload = context.pluginState.dispatch.mock.calls.at(-1).arguments[0].payload;
+		assert.ok(payload.squareMetres > 40_000_000_000);
+
+		// commits for a different feature - and a too-small one - are ignored
+		const calls = context.pluginState.dispatch.mock.calls.length;
+		handleGeometryChange(
+			{
+				phase: 'commit-move',
+				feature: {
+					id: 'other',
+					geometry: {
+						type: 'Polygon',
+						coordinates: [
+							[
+								[0, 0],
+								[9, 0],
+								[9, 9],
+								[0, 0]
+							]
+						]
+					}
+				}
+			},
+			context
+		);
+		handleGeometryChange(
+			{ phase: 'commit-move', feature: { id: 'f1', geometry: { type: 'Polygon', coordinates: [[[0, 0]]] } } },
+			context
+		);
+		assert.equal(context.pluginState.dispatch.mock.calls.length, calls);
+
+		// and a preview in a mode that isn't editing (session ended elsewhere) is ignored
+		adapter.getMode = mock.fn(() => 'disabled');
+		handleGeometryChange(
+			{
+				coordinates: [
+					[
+						[0, 0],
+						[9, 0],
+						[9, 9],
+						[0, 0]
+					]
+				]
+			},
+			context
+		);
+		assert.equal(context.pluginState.dispatch.mock.calls.length, calls);
 	});
 
 	test('path mode keeps drawing until Done - no auto-finish', async () => {
@@ -531,7 +723,7 @@ describe('handleGeometryChange', () => {
 });
 
 describe('draw event handlers', () => {
-	test('handleDrawCreated ignores other features and non-lines', () => {
+	test('handleDrawCreated ignores other features and unmeasurable shapes', () => {
 		const context = fakeContext();
 		context.pluginConfig.pending = { id: 'f1', mode: 'distance' };
 		handleDrawCreated(
@@ -550,9 +742,12 @@ describe('draw event handlers', () => {
 		assert.equal(context.pluginState.dispatch.mock.calls.length, 0);
 		assert.ok(context.pluginConfig.pending);
 
-		// ours but not a line - pending clears, nothing dispatches
+		// ours but a point: pending clears and the shape is still tracked for Clear -
+		// it exists on the map even though it measures nothing
 		handleDrawCreated({ id: 'f1', geometry: { type: 'Point', coordinates: [-2, 54] } }, context);
 		assert.equal(context.pluginConfig.pending, null);
+		assert.deepEqual(context.pluginConfig.drawnFeatureIds, ['f1']);
+		assert.equal(context.pluginConfig.drawnFeatureModes.f1, 'distance');
 		assert.equal(context.pluginState.dispatch.mock.calls.length, 0);
 
 		handleDrawCreated({ id: 'f1' }, fakeContext());
@@ -579,12 +774,15 @@ describe('draw event handlers', () => {
 		assert.equal(payload.featureId, 'f1');
 		assert.ok(payload.metres > 1000);
 		assert.equal(context.pluginConfig.pending, null);
-		// the finished shape is remembered so Clear measurements can remove it later
+		// the finished shape is remembered so Clear measurements and click-to-edit find it
 		assert.deepEqual(context.pluginConfig.drawnFeatureIds, ['f1']);
+		assert.equal(context.pluginConfig.drawnFeatureModes.f1, 'distance');
 	});
 
 	test('handleDrawCreated accumulates every finished feature id', () => {
-		const context = fakeContext({ pluginConfig: { modes: ['distance'], pending: null, drawnFeatureIds: ['f0'] } });
+		const context = fakeContext({
+			pluginConfig: { modes: ['distance'], pending: null, drawnFeatureIds: ['f0'], drawnFeatureModes: {} }
+		});
 		context.pluginConfig.pending = { id: 'f1', mode: 'distance' };
 		// an id list already on the descriptor is appended to, not replaced
 		handleDrawCreated(
@@ -603,7 +801,7 @@ describe('draw event handlers', () => {
 		assert.deepEqual(context.pluginConfig.drawnFeatureIds, ['f0', 'f1']);
 	});
 
-	test('handleDrawCreated swaps the area diagonal for its bounding box', () => {
+	test('handleDrawCreated keeps the drawn polygon and reports its area', () => {
 		const draw = fakeDrawPlugin();
 		const context = fakeContext({ services: fakeServices({ draw }) });
 		context.pluginConfig.pending = { id: 'f1', mode: 'area' };
@@ -611,49 +809,50 @@ describe('draw event handlers', () => {
 			{
 				id: 'f1',
 				geometry: {
-					type: 'LineString',
+					type: 'Polygon',
 					coordinates: [
-						[-2, 54],
-						[-1, 55]
+						[
+							[0, 0],
+							[1, 0],
+							[1, 1],
+							[0, 1],
+							[0, 0]
+						]
 					]
 				}
 			},
 			context
 		);
 
-		assert.deepEqual(draw.deleteFeature.mock.calls[0].arguments[0], ['f1']);
-		const added = draw.addFeature.mock.calls[0].arguments[0];
-		assert.equal(added.id, 'f1');
-		assert.equal(added.geometry.type, 'Polygon');
-		assert.equal(added.geometry.coordinates[0].length, 5);
+		// the polygon stays exactly as drawn - no swap, nothing deleted or re-added
+		assert.equal(draw.deleteFeature.mock.calls.length, 0);
+		assert.equal(draw.addFeature.mock.calls.length, 0);
 
 		const payload = context.pluginState.dispatch.mock.calls[0].arguments[0].payload;
 		assert.equal(payload.status, 'done');
-		assert.ok(payload.squareMetres > 0);
+		assert.equal(payload.featureId, 'f1');
+		assert.ok(payload.squareMetres > 12_000_000_000);
+		assert.equal(context.pluginConfig.drawnFeatureModes.f1, 'area');
 
-		// a finished line with too few vertices measures nothing
+		// a polygon with too few vertices measures nothing
 		context.pluginConfig.pending = { id: 'f2', mode: 'area' };
 		const calls = context.pluginState.dispatch.mock.calls.length;
-		handleDrawCreated({ id: 'f2', geometry: { type: 'LineString', coordinates: [[-2, 54]] } }, context);
-		assert.equal(context.pluginState.dispatch.mock.calls.length, calls);
-
-		// and the swap still works if the draw plugin has gone
-		const bare = fakeContext({ services: { getPlugin: () => undefined } });
-		bare.pluginConfig.pending = { id: 'f3', mode: 'area' };
 		handleDrawCreated(
 			{
-				id: 'f3',
+				id: 'f2',
 				geometry: {
-					type: 'LineString',
+					type: 'Polygon',
 					coordinates: [
-						[-2, 54],
-						[-1, 55]
+						[
+							[0, 0],
+							[1, 0]
+						]
 					]
 				}
 			},
-			bare
+			context
 		);
-		assert.equal(bare.pluginState.dispatch.mock.calls[0].arguments[0].payload.status, 'done');
+		assert.equal(context.pluginState.dispatch.mock.calls.length, calls);
 	});
 
 	test('handleDrawCancelled clears the pending session and reports it', () => {
@@ -668,6 +867,20 @@ describe('draw event handlers', () => {
 		});
 	});
 
+	test('handleDrawCancelled restores the pre-edit readout after a cancelled edit', () => {
+		const context = fakeContext();
+		const previous = { mode: 'area', status: 'done', squareMetres: 123, featureId: 'f1' };
+		context.pluginConfig.editing = { id: 'f1', mode: 'area', previous };
+		handleDrawCancelled(context);
+		assert.equal(context.pluginConfig.editing, null);
+		assert.deepEqual(context.pluginState.dispatch.mock.calls[0].arguments[0].payload, previous);
+
+		// an edit with nothing measured before it just resets the panel
+		context.pluginConfig.editing = { id: 'f2', mode: 'area', previous: null };
+		handleDrawCancelled(context);
+		assert.equal(context.pluginState.dispatch.mock.calls.at(-1).arguments[0].payload, null);
+	});
+
 	test('handleDrawStarted consumes the expected start and drops others', () => {
 		const context = fakeContext();
 		handleDrawStarted(context); // no pending: a no-op
@@ -677,6 +890,135 @@ describe('draw event handlers', () => {
 		// a later session that wasn't ours stops us listening
 		handleDrawStarted(context);
 		assert.equal(context.pluginConfig.pending, null);
+		// and a new session starting drops any open edit slot - draw runs one at a time
+		context.pluginConfig.editing = { id: 'f9', mode: 'area' };
+		handleDrawStarted(context);
+		assert.equal(context.pluginConfig.editing, null);
+	});
+});
+
+describe('startEdit and handleDrawEdited', () => {
+	const polygonFeature = (
+		id,
+		ring = [
+			[0, 0],
+			[1, 0],
+			[1, 1],
+			[0, 1],
+			[0, 0]
+		]
+	) => ({
+		id,
+		type: 'Feature',
+		geometry: { type: 'Polygon', coordinates: [ring] }
+	});
+
+	test('startEdit opens the draw edit session and marks the measurement editing', () => {
+		const draw = fakeDrawPlugin();
+		const context = fakeContext({ services: fakeServices({ draw }) });
+		context.services.hints = { show: mock.fn() };
+		context.pluginConfig.drawnFeatureIds = ['f1'];
+		context.pluginConfig.drawnFeatureModes = { f1: 'area' };
+		context.pluginState.measurement = { mode: 'area', status: 'done', squareMetres: 100, featureId: 'f1' };
+		startEdit('f1', context);
+
+		assert.deepEqual(draw.editFeature.mock.calls[0].arguments, ['f1']);
+		const payload = context.pluginState.dispatch.mock.calls[0].arguments[0].payload;
+		assert.equal(payload.status, 'editing');
+		assert.equal(payload.squareMetres, 100); // the previous figure stays up while editing
+		assert.equal(payload.featureId, 'f1');
+		assert.deepEqual(context.pluginConfig.editing, {
+			id: 'f1',
+			mode: 'area',
+			previous: context.pluginState.measurement
+		});
+		assert.equal(
+			context.services.hints.show.mock.calls[0].arguments[0],
+			"Drag the shape's points to change it, then select Done."
+		);
+		assert.deepEqual(context.services.eventBus.emit.mock.calls[0].arguments, [
+			'app:showpanel',
+			{ id: 'measure', focus: false }
+		]);
+	});
+
+	test('startEdit refuses unknown features, busy sessions and failed opens', () => {
+		const draw = fakeDrawPlugin();
+		const context = fakeContext({ services: fakeServices({ draw }) });
+		startEdit('f1'); // no context at all
+		startEdit(null, context);
+		startEdit('nope', context); // not one of ours
+		context.pluginConfig.drawnFeatureIds = ['f1'];
+		startEdit('f1', context); // ours but its mode was never recorded
+		context.pluginConfig.drawnFeatureModes = { f1: 'area' };
+		context.pluginConfig.pending = { id: 'x', mode: 'distance' };
+		startEdit('f1', context); // mid-draw
+		context.pluginConfig.pending = null;
+		context.pluginConfig.editing = { id: 'f2', mode: 'area' };
+		startEdit('f1', context); // mid-edit
+		context.pluginConfig.editing = null;
+		assert.equal(draw.editFeature.mock.calls.length, 0);
+
+		// the draw plugin can also decline the feature
+		const failDraw = fakeDrawPlugin({ editFeature: mock.fn(() => false) });
+		const failing = fakeContext({ services: fakeServices({ draw: failDraw }) });
+		failing.pluginConfig.drawnFeatureIds = ['f1'];
+		failing.pluginConfig.drawnFeatureModes = { f1: 'area' };
+		startEdit('f1', failing);
+		assert.equal(failing.pluginConfig.editing, null);
+		assert.equal(failing.pluginState.dispatch.mock.calls.length, 0);
+	});
+
+	test('startEdit works when the panel shows a different finished measurement', () => {
+		const draw = fakeDrawPlugin();
+		const context = fakeContext({ services: fakeServices({ draw }) });
+		context.pluginConfig.drawnFeatureIds = ['f1', 'f2'];
+		context.pluginConfig.drawnFeatureModes = { f1: 'distance', f2: 'area' };
+		context.pluginState.measurement = { mode: 'distance', status: 'done', metres: 5, featureId: 'f1' };
+		startEdit('f2', context);
+		assert.equal(context.pluginConfig.editing.id, 'f2');
+		assert.equal(context.pluginConfig.editing.previous, null);
+		const payload = context.pluginState.dispatch.mock.calls[0].arguments[0].payload;
+		assert.equal(payload.mode, 'area');
+		assert.equal(payload.status, 'editing');
+		assert.equal(payload.metres, undefined);
+	});
+
+	test('handleDrawEdited re-measures the edited shape and closes the edit', () => {
+		const context = fakeContext();
+		context.pluginConfig.editing = {
+			id: 'f1',
+			mode: 'area',
+			previous: { mode: 'area', status: 'done', squareMetres: 1, featureId: 'f1' }
+		};
+		handleDrawEdited(polygonFeature('f1'), context);
+		assert.equal(context.pluginConfig.editing, null);
+		const payload = context.pluginState.dispatch.mock.calls[0].arguments[0].payload;
+		assert.equal(payload.status, 'done');
+		assert.equal(payload.featureId, 'f1');
+		assert.ok(payload.squareMetres > 12_000_000_000);
+	});
+
+	test('handleDrawEdited ignores other features and no-session events, keeps the old figure on a dud', () => {
+		const context = fakeContext();
+		context.pluginConfig.editing = { id: 'f1', mode: 'area', previous: null };
+		handleDrawEdited(polygonFeature('other'), context);
+		assert.ok(context.pluginConfig.editing);
+		assert.equal(context.pluginState.dispatch.mock.calls.length, 0);
+		context.pluginConfig.editing = null;
+		handleDrawEdited(polygonFeature('f1'), context);
+		assert.equal(context.pluginState.dispatch.mock.calls.length, 0);
+
+		// a shape that no longer measures restores the pre-edit readout
+		const previous = { mode: 'area', status: 'done', squareMetres: 7, featureId: 'f1' };
+		context.pluginConfig.editing = { id: 'f1', mode: 'area', previous };
+		handleDrawEdited({ id: 'f1', geometry: { type: 'Point', coordinates: [0, 0] } }, context);
+		assert.deepEqual(context.pluginState.dispatch.mock.calls[0].arguments[0].payload, previous);
+
+		// and with nothing before it, the panel just resets
+		context.pluginConfig.editing = { id: 'f1', mode: 'area', previous: null };
+		handleDrawEdited({ id: 'f1', geometry: { type: 'Point', coordinates: [0, 0] } }, context);
+		assert.equal(context.pluginState.dispatch.mock.calls.at(-1).arguments[0].payload, null);
 	});
 });
 
@@ -710,6 +1052,25 @@ describe('clearMeasurements', () => {
 		assert.deepEqual(eventBus.emit.mock.calls[0].arguments, ['draw:cancelled']);
 		// finished shapes go too
 		assert.deepEqual(context.pluginConfig.drawnFeatureIds, []);
+	});
+
+	test('cancels an open edit session the same way and forgets the recorded modes', () => {
+		const eventBus = fakeEventBus();
+		const adapter = fakeDrawAdapter();
+		const draw = fakeDrawPlugin();
+		const context = fakeContext({
+			services: fakeServices({ eventBus, draw }),
+			mapProvider: { draw: adapter }
+		});
+		context.pluginConfig.editing = { id: 'f2', mode: 'area', previous: null };
+		context.pluginConfig.drawnFeatureIds = ['f1', 'f2'];
+		context.pluginConfig.drawnFeatureModes = { f1: 'distance', f2: 'area' };
+		clearMeasurements(context);
+		assert.equal(context.pluginConfig.editing, null);
+		assert.equal(adapter.cancel.mock.calls.length, 1);
+		assert.deepEqual(eventBus.emit.mock.calls[0].arguments, ['draw:cancelled']);
+		assert.deepEqual(draw.deleteFeature.mock.calls[0].arguments[0], ['f1', 'f2']);
+		assert.deepEqual(context.pluginConfig.drawnFeatureModes, {});
 	});
 
 	test('with nothing drawn it just resets the panel', () => {
@@ -788,6 +1149,18 @@ describe('MeasurePanel', () => {
 		assert.equal(select.options.length, 4);
 	});
 
+	test('shows the edit hint and the live figure while editing', async () => {
+		const container = await renderPanel({
+			pluginConfig: {},
+			pluginState: { measurement: { mode: 'area', status: 'editing', squareMetres: 500 }, units: {} }
+		});
+		assert.match(container.textContent, /Drag the shape's points/);
+		assert.match(container.textContent, /500 m²/);
+		assert.ok(container.querySelector('select'));
+		// no Edit button mid-edit - the draw panel's own Done finishes the session
+		assert.equal([...container.querySelectorAll('button')].length, 0);
+	});
+
 	test('honours an imperial default and a chosen unit, including for areas', async () => {
 		const imperial = await renderPanel({
 			pluginConfig: { units: 'imperial' },
@@ -821,19 +1194,42 @@ describe('MeasurePanel', () => {
 	test('Clear removes the measured shape, untracks it and resets the panel', async () => {
 		const draw = fakeDrawPlugin();
 		const pluginState = { measurement: doneMeasurement, units: {}, dispatch: mock.fn() };
-		const pluginConfig = { drawnFeatureIds: ['f0', 'f1'] };
+		const pluginConfig = { drawnFeatureIds: ['f0', 'f1'], drawnFeatureModes: { f0: 'distance', f1: 'distance' } };
 		const container = await renderPanel({
 			pluginConfig,
 			pluginState,
 			services: fakeServices({ draw })
 		});
-		const button = container.querySelector('button.govuk-button--secondary');
+		const button = [...container.querySelectorAll('button')].find((b) => b.textContent === 'Clear measurement');
 		assert.ok(button);
 		button.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }));
 		await flushEffects();
 		assert.deepEqual(draw.deleteFeature.mock.calls[0].arguments[0], ['f1']);
 		assert.deepEqual(pluginConfig.drawnFeatureIds, ['f0']);
+		assert.deepEqual(pluginConfig.drawnFeatureModes, { f0: 'distance' });
 		assert.deepEqual(pluginState.dispatch.mock.calls[0].arguments[0], { type: 'SET_MEASUREMENT', payload: null });
+	});
+
+	test('Edit measurement opens the draw edit session for the finished shape', async () => {
+		const draw = fakeDrawPlugin();
+		const pluginState = { measurement: doneMeasurement, units: {}, dispatch: mock.fn() };
+		const pluginConfig = {
+			drawnFeatureIds: ['f1'],
+			drawnFeatureModes: { f1: 'distance' },
+			pending: null,
+			editing: null
+		};
+		const container = await renderPanel({
+			pluginConfig,
+			pluginState,
+			services: fakeServices({ draw })
+		});
+		const button = [...container.querySelectorAll('button')].find((b) => b.textContent === 'Edit measurement');
+		assert.ok(button);
+		button.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }));
+		await flushEffects();
+		assert.deepEqual(draw.editFeature.mock.calls[0].arguments, ['f1']);
+		assert.equal(pluginState.dispatch.mock.calls.at(-1).arguments[0].payload.status, 'editing');
 	});
 
 	test('Clear without a feature id or services still resets', async () => {
@@ -929,7 +1325,13 @@ describe('MeasureInit', () => {
 	test('subscribes to draw events and attaches to the adapter on draw:ready', async () => {
 		const eventBus = fakeEventBus();
 		const adapter = fakeDrawAdapter();
-		const pluginConfig = { modes: ['distance'], pending: null };
+		const pluginConfig = {
+			modes: ['distance'],
+			pending: null,
+			editing: null,
+			drawnFeatureIds: [],
+			drawnFeatureModes: {}
+		};
 		const pluginState = { measurement: null, units: {}, dispatch: mock.fn() };
 		await renderInit({
 			pluginConfig,
@@ -939,7 +1341,7 @@ describe('MeasureInit', () => {
 		});
 
 		assert.deepEqual(adapter.on.mock.calls[0].arguments[0], 'geometrychange');
-		for (const event of ['draw:created', 'draw:cancelled', 'draw:started', 'draw:ready']) {
+		for (const event of ['draw:created', 'draw:cancelled', 'draw:started', 'draw:edited', 'draw:ready']) {
 			assert.equal(typeof eventBus.handlers[event], 'function', `handler for ${event}`);
 		}
 
@@ -970,11 +1372,76 @@ describe('MeasureInit', () => {
 			}
 		});
 		assert.equal(pluginState.dispatch.mock.calls.at(-1).arguments[0].payload.status, 'done');
+		assert.deepEqual(pluginConfig.drawnFeatureIds, ['f1']);
+		assert.equal(pluginConfig.drawnFeatureModes.f1, 'distance');
+
+		// a finished edit re-measures through the draw:edited subscription
+		pluginConfig.editing = { id: 'f1', mode: 'distance', previous: null };
+		eventBus.handlers['draw:edited']({
+			id: 'f1',
+			geometry: {
+				type: 'LineString',
+				coordinates: [
+					[-2, 54],
+					[-1, 55]
+				]
+			}
+		});
+		const edited = pluginState.dispatch.mock.calls.at(-1).arguments[0].payload;
+		assert.equal(edited.status, 'done');
+		assert.equal(edited.featureId, 'f1');
+		assert.equal(pluginConfig.editing, null);
 
 		// cancelling a later session reports through the same subscription
 		pluginConfig.pending = { id: 'f2', mode: 'path' };
 		eventBus.handlers['draw:cancelled']();
 		assert.equal(pluginState.dispatch.mock.calls.at(-1).arguments[0].payload.status, 'cancelled');
+	});
+
+	test('a click on a finished measurement opens its edit session, and unmount detaches', async () => {
+		const eventBus = fakeEventBus();
+		const adapter = fakeDrawAdapter();
+		const map = fakeMap();
+		const pluginConfig = {
+			modes: ['distance'],
+			pending: null,
+			editing: null,
+			drawnFeatureIds: ['f1'],
+			drawnFeatureModes: { f1: 'distance' }
+		};
+		const pluginState = {
+			measurement: { mode: 'distance', status: 'done', metres: 50, featureId: 'f1' },
+			units: {},
+			dispatch: mock.fn()
+		};
+		const container = await renderInit({
+			pluginConfig,
+			pluginState,
+			services: fakeServices({ eventBus }),
+			mapProvider: { draw: adapter, map }
+		});
+
+		// listeners land on the draw control's inactive fill and outline layers
+		const layerIds = map.on.mock.calls.filter((c) => c.arguments[0] === 'click').map((c) => c.arguments[1]);
+		assert.deepEqual(layerIds, ['fill-inactive.cold', 'stroke-inactive.cold']);
+		const onClick = map.on.mock.calls[0].arguments[2];
+
+		onClick({ features: [{ properties: { id: 'f1' } }] });
+		assert.equal(pluginState.dispatch.mock.calls.at(-1).arguments[0].payload.status, 'editing');
+		assert.equal(pluginConfig.editing.id, 'f1');
+
+		// clicks that resolve to no feature - or to a shape that isn't ours - do nothing
+		onClick({ features: [] });
+		onClick({ features: [{ properties: {} }] });
+		pluginConfig.editing = null;
+		onClick({ features: [{ properties: { id: 'not-ours' } }] });
+		assert.equal(pluginConfig.editing, null);
+		assert.equal(pluginState.dispatch.mock.calls.length, 1);
+
+		compat.render(null, container);
+		await flushEffects();
+		const detached = map.off.mock.calls.filter((c) => c.arguments[0] === 'click').map((c) => c.arguments[1]);
+		assert.deepEqual(detached, ['fill-inactive.cold', 'stroke-inactive.cold']);
 	});
 
 	test('reattaches when draw:ready reports a new adapter and detaches on unmount', async () => {
