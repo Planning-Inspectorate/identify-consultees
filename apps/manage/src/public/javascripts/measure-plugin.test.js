@@ -7,6 +7,7 @@ import {
 	MeasureInit,
 	MeasurePanel,
 	boundingBoxRing,
+	clearMeasurements,
 	createMeasurePlugin,
 	defaultUnitId,
 	formatMeasurement,
@@ -79,6 +80,7 @@ function fakeDrawAdapter(overrides = {}) {
 		off: mock.fn(),
 		getMode: mock.fn(() => 'draw_line'),
 		done: mock.fn(),
+		cancel: mock.fn(),
 		...overrides
 	};
 }
@@ -216,6 +218,7 @@ describe('createMeasurePlugin descriptor', () => {
 		assert.deepEqual(plugin.modes, ['distance']);
 		assert.equal(plugin.units, 'metric');
 		assert.equal(plugin.pending, null);
+		assert.deepEqual(plugin.drawnFeatureIds, []);
 	});
 
 	test('filters unknown modes, dedupes, and falls back when none remain', () => {
@@ -238,15 +241,15 @@ describe('createMeasurePlugin descriptor', () => {
 		assert.equal(typeof manifest.panels[0].render, 'function');
 	});
 
-	test('load() returns a menu with an item per configured mode', async () => {
+	test('load() returns a menu with an item per configured mode plus a clear item', async () => {
 		const manifest = await createMeasurePlugin({ modes: ['distance', 'path', 'area'] }).load();
 		assert.deepEqual(
 			manifest.buttons[0].menuItems.map((item) => item.id),
-			['measure-distance', 'measure-path', 'measure-area']
+			['measure-distance', 'measure-path', 'measure-area', 'measure-clear']
 		);
 		assert.deepEqual(
 			manifest.buttons[0].menuItems.map((item) => item.label),
-			['Between two points', 'Along a path', 'Of a bounded box']
+			['Between two points', 'Along a path', 'Of a bounded box', 'Clear measurements']
 		);
 	});
 
@@ -568,6 +571,28 @@ describe('draw event handlers', () => {
 		assert.equal(payload.featureId, 'f1');
 		assert.ok(payload.metres > 1000);
 		assert.equal(context.pluginConfig.pending, null);
+		// the finished shape is remembered so Clear measurements can remove it later
+		assert.deepEqual(context.pluginConfig.drawnFeatureIds, ['f1']);
+	});
+
+	test('handleDrawCreated accumulates every finished feature id', () => {
+		const context = fakeContext({ pluginConfig: { modes: ['distance'], pending: null, drawnFeatureIds: ['f0'] } });
+		context.pluginConfig.pending = { id: 'f1', mode: 'distance' };
+		// an id list already on the descriptor is appended to, not replaced
+		handleDrawCreated(
+			{
+				id: 'f1',
+				geometry: {
+					type: 'LineString',
+					coordinates: [
+						[-2, 54],
+						[-1, 55]
+					]
+				}
+			},
+			context
+		);
+		assert.deepEqual(context.pluginConfig.drawnFeatureIds, ['f0', 'f1']);
 	});
 
 	test('handleDrawCreated swaps the area diagonal for its bounding box', () => {
@@ -644,6 +669,59 @@ describe('draw event handlers', () => {
 		// a later session that wasn't ours stops us listening
 		handleDrawStarted(context);
 		assert.equal(context.pluginConfig.pending, null);
+	});
+});
+
+describe('clearMeasurements', () => {
+	test('deletes every finished feature in one call and resets the panel', () => {
+		const draw = fakeDrawPlugin();
+		const context = fakeContext({ services: fakeServices({ draw }) });
+		context.pluginConfig.drawnFeatureIds = ['f1', 'f2', 'f3'];
+		clearMeasurements(context);
+		assert.deepEqual(draw.deleteFeature.mock.calls[0].arguments[0], ['f1', 'f2', 'f3']);
+		assert.equal(draw.deleteFeature.mock.calls.length, 1);
+		assert.deepEqual(context.pluginConfig.drawnFeatureIds, []);
+		assert.deepEqual(context.pluginState.dispatch.mock.calls[0].arguments[0], {
+			type: 'SET_MEASUREMENT',
+			payload: null
+		});
+	});
+
+	test('cancels an in-flight session and emits draw:cancelled so listeners stay balanced', () => {
+		const eventBus = fakeEventBus();
+		const adapter = fakeDrawAdapter();
+		const context = fakeContext({
+			services: fakeServices({ eventBus }),
+			mapProvider: { draw: adapter }
+		});
+		context.pluginConfig.pending = { id: 'f4', mode: 'path' };
+		context.pluginConfig.drawnFeatureIds = ['f1'];
+		clearMeasurements(context);
+		assert.equal(context.pluginConfig.pending, null);
+		assert.equal(adapter.cancel.mock.calls.length, 1);
+		assert.deepEqual(eventBus.emit.mock.calls[0].arguments, ['draw:cancelled']);
+		// finished shapes go too
+		assert.deepEqual(context.pluginConfig.drawnFeatureIds, []);
+	});
+
+	test('with nothing drawn it just resets the panel', () => {
+		const draw = fakeDrawPlugin();
+		const context = fakeContext({ services: fakeServices({ draw }) });
+		clearMeasurements(context);
+		assert.equal(draw.deleteFeature.mock.calls.length, 0);
+		assert.equal(context.mapProvider.draw.cancel.mock.calls.length, 0);
+		assert.equal(context.pluginState.dispatch.mock.calls.length, 1);
+	});
+
+	test('tolerates missing services, adapter and context', () => {
+		const context = fakeContext({ services: {}, mapProvider: {} });
+		context.pluginConfig.pending = { id: 'f1', mode: 'distance' };
+		context.pluginConfig.drawnFeatureIds = ['f1'];
+		clearMeasurements(context); // nothing to delete through - no throw
+		assert.equal(context.pluginConfig.pending, null);
+		clearMeasurements();
+		clearMeasurements({});
+		clearMeasurements(fakeContext({ pluginConfig: {} }));
 	});
 });
 
@@ -732,11 +810,12 @@ describe('MeasurePanel', () => {
 		});
 	});
 
-	test('Clear removes the measured shape and resets the panel', async () => {
+	test('Clear removes the measured shape, untracks it and resets the panel', async () => {
 		const draw = fakeDrawPlugin();
 		const pluginState = { measurement: doneMeasurement, units: {}, dispatch: mock.fn() };
+		const pluginConfig = { drawnFeatureIds: ['f0', 'f1'] };
 		const container = await renderPanel({
-			pluginConfig: {},
+			pluginConfig,
 			pluginState,
 			services: fakeServices({ draw })
 		});
@@ -745,6 +824,7 @@ describe('MeasurePanel', () => {
 		button.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }));
 		await flushEffects();
 		assert.deepEqual(draw.deleteFeature.mock.calls[0].arguments[0], ['f1']);
+		assert.deepEqual(pluginConfig.drawnFeatureIds, ['f0']);
 		assert.deepEqual(pluginState.dispatch.mock.calls[0].arguments[0], { type: 'SET_MEASUREMENT', payload: null });
 	});
 
@@ -799,6 +879,21 @@ describe('MeasureInit', () => {
 		for (const id of Object.keys(buttonConfig)) {
 			assert.equal(buttonConfig[id].onClick, null);
 		}
+	});
+
+	test('wires the Clear measurements menu item and cleans up on unmount', async () => {
+		const buttonConfig = { 'measure-distance': {}, 'measure-path': {}, 'measure-clear': {} };
+		const context = fakeContext();
+		context.pluginConfig.drawnFeatureIds = ['f1', 'f2'];
+		const container = await renderInit({ ...context, buttonConfig });
+		assert.equal(typeof buttonConfig['measure-clear'].onClick, 'function');
+		buttonConfig['measure-clear'].onClick(null, {});
+		assert.deepEqual(context.pluginConfig.drawnFeatureIds, []);
+		const draw = context.services.getPlugin('draw');
+		assert.deepEqual(draw.deleteFeature.mock.calls[0].arguments[0], ['f1', 'f2']);
+		compat.render(null, container);
+		await flushEffects();
+		assert.equal(buttonConfig['measure-clear'].onClick, null);
 	});
 
 	test('wires the button itself when only one mode is configured', async () => {
