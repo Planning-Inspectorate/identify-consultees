@@ -198,6 +198,20 @@ $map-spinner-teal: #28a197;
 	vertical-align: middle;
 }
 
+// govuk cells pad their right edge only, and the last cell not at all, so a row's
+// first and last contents sit on the table's edges - the selected row's grey just
+// makes the crowding obvious. Inset both ends the same, and always, so the grey
+// appearing shifts nothing
+.pins-consultees-table tr > th:first-child,
+.pins-consultees-table tr > td:first-child {
+	padding-left: index.govuk-spacing(2);
+}
+
+.pins-consultees-table tr > th:last-child,
+.pins-consultees-table tr > td:last-child {
+	padding-right: index.govuk-spacing(2);
+}
+
 // The row-select plugin (javascripts/feature-row-select-plugin.mjs) mirrors the
 // map's selection: a row whose checkbox carries data-consultee-id can be clicked
 // to select its feature, and the selected feature's row greys
