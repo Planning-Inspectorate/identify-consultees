@@ -656,22 +656,22 @@ export function MeasurePanel({ appConfig, pluginConfig, pluginState, services })
 	}
 
 	if (status === 'done') {
+		const actions = [];
 		if (measurement.featureId) {
-			body.push(
+			actions.push(
 				h(
 					'button',
 					{
 						key: 'edit',
 						type: 'button',
-						className:
-							'govuk-button govuk-button--secondary govuk-!-font-size-16 govuk-!-margin-bottom-0 govuk-!-margin-right-2',
+						className: 'govuk-button govuk-button--secondary govuk-!-font-size-16',
 						onClick: () => startEdit(measurement.featureId, { pluginConfig, pluginState, services })
 					},
 					'Edit measurement'
 				)
 			);
 		}
-		body.push(
+		actions.push(
 			h(
 				'button',
 				{
@@ -695,6 +695,9 @@ export function MeasurePanel({ appConfig, pluginConfig, pluginState, services })
 				'Clear measurement'
 			)
 		);
+		// the group spaces the buttons whether they sit side by side or wrap
+		// (stacked in the narrow panel they otherwise collapse into one block)
+		body.push(h('div', { key: 'actions', className: 'govuk-button-group govuk-!-margin-bottom-0' }, actions));
 	}
 
 	return h('div', { className: 'app-measure-panel' }, body);
