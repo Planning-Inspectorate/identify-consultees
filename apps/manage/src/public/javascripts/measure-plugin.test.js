@@ -1271,6 +1271,7 @@ describe('MeasureInit', () => {
 		// handler must use the component's injected context rather than the click args
 		const context = fakeContext();
 		const container = await renderInit({ ...context, buttonConfig });
+		await waitFor(() => Object.keys(buttonConfig).every((id) => typeof buttonConfig[id].onClick === 'function'));
 		for (const id of Object.keys(buttonConfig)) {
 			assert.equal(typeof buttonConfig[id].onClick, 'function');
 		}
@@ -1290,6 +1291,7 @@ describe('MeasureInit', () => {
 		const context = fakeContext();
 		context.pluginConfig.drawnFeatureIds = ['f1', 'f2'];
 		const container = await renderInit({ ...context, buttonConfig });
+		await waitFor(() => typeof buttonConfig['measure-clear'].onClick === 'function');
 		assert.equal(typeof buttonConfig['measure-clear'].onClick, 'function');
 		buttonConfig['measure-clear'].onClick(null, {});
 		assert.deepEqual(context.pluginConfig.drawnFeatureIds, []);
@@ -1304,6 +1306,7 @@ describe('MeasureInit', () => {
 		const buttonConfig = { measure: {} };
 		const context = fakeContext({ pluginConfig: { modes: ['distance'], pending: null } });
 		const container = await renderInit({ ...context, buttonConfig });
+		await waitFor(() => typeof buttonConfig.measure.onClick === 'function');
 		assert.equal(typeof buttonConfig.measure.onClick, 'function');
 		buttonConfig.measure.onClick(null, {});
 		assert.equal(context.pluginConfig.pending.mode, 'distance');
@@ -1340,6 +1343,7 @@ describe('MeasureInit', () => {
 			mapProvider: { draw: adapter }
 		});
 
+		await waitFor(() => adapter.on.mock.calls.some((call) => call.arguments[0] === 'geometrychange'));
 		assert.deepEqual(adapter.on.mock.calls[0].arguments[0], 'geometrychange');
 		for (const event of ['draw:created', 'draw:cancelled', 'draw:started', 'draw:edited', 'draw:ready']) {
 			assert.equal(typeof eventBus.handlers[event], 'function', `handler for ${event}`);
@@ -1422,6 +1426,7 @@ describe('MeasureInit', () => {
 		});
 
 		// listeners land on the draw control's inactive fill and outline layers
+		await waitFor(() => map.on.mock.calls.some((call) => call.arguments[0] === 'click'));
 		const layerIds = map.on.mock.calls.filter((c) => c.arguments[0] === 'click').map((c) => c.arguments[1]);
 		assert.deepEqual(layerIds, ['fill-inactive.cold', 'stroke-inactive.cold']);
 		const onClick = map.on.mock.calls[0].arguments[2];
@@ -1453,6 +1458,7 @@ describe('MeasureInit', () => {
 			services: fakeServices({ eventBus }),
 			mapProvider
 		});
+		await waitFor(() => typeof eventBus.handlers['draw:ready'] === 'function');
 		// an adapter without .on is skipped
 		mapProvider.draw = {};
 		eventBus.handlers['draw:ready']();
