@@ -4,6 +4,7 @@ import { describe, it, mock } from 'node:test';
 import { configureNunjucks } from '../../../../nunjucks.ts';
 import type { ConsulteeAreaMatchRow } from '../../../../testing/ruleset-runner-stub.ts';
 import { failingRulesetRunner, rulesetRunnerReturning } from '../../../../testing/ruleset-runner-stub.ts';
+import { generateRuleSetError } from '../../../errors/error-messages.ts';
 import { buildReportConsulteesPage, comparableName } from './controller.ts';
 
 // a selection entry as the app's URLs carry it - base64url-encoded JSON (see urls.ts's ENCODED_JSON)
@@ -814,7 +815,7 @@ describe('report consultees change page', () => {
 		assert.strictEqual(mockRes.status.mock.calls[0].arguments[0], 404);
 	});
 
-	it('should flag the ruleset as failed if the run errors', async () => {
+	it('should redirect to an error page if the ruleset fails', async () => {
 		const nunjucks = configureNunjucks();
 		const mockRes = {
 			status: mock.fn(() => mockRes),
@@ -840,10 +841,16 @@ describe('report consultees change page', () => {
 			mockRes
 		);
 
-		const viewModel = mockRes.render.mock.calls[0].arguments[1];
-		assert.strictEqual(viewModel.rows.length, 0);
-		assert.strictEqual(logger.error.mock.callCount(), 1);
-		assert.doesNotMatch(mockRes.render.mock.calls[0].result, />Consultees</);
+		assert.strictEqual(mockRes.status.mock.callCount(), 1);
+		assert.deepStrictEqual(mockRes.status.mock.calls[0].arguments, [500]);
+		assert.strictEqual(mockRes.render.mock.callCount(), 1);
+		assert.deepStrictEqual(mockRes.render.mock.calls[0].arguments, [
+			'views/errors/500.njk',
+			generateRuleSetError({
+				backLinkText: 'Back to draft report',
+				backLinkUrl: '/consultees/44444444-4444-4444-4444-444444444444/report?ruleset=england-wales-post-20240430'
+			})
+		]);
 	});
 
 	it('compares names without case or extra spaces', () => {

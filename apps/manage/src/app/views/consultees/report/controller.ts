@@ -2,7 +2,7 @@ import type { ManageService } from '#service';
 import type { ConsulteeMatch, Ruleset } from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
 import { isIdentified } from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
 import type { AsyncRequestHandler } from '@planning-inspectorate/core/util';
-import { RULESET_ERROR_MESSAGE } from '../../errors/error-messages.ts';
+import { generateRuleSetError } from '../../errors/error-messages.ts';
 import { NEARBY_NSIPS } from '../nearby-nsips.ts';
 import { resolveCase } from '../resolve-case.ts';
 import { firstQueryValue, requestedRuleset, runRulesetSafely } from '../run-ruleset.ts';
@@ -112,16 +112,17 @@ export function buildReportCheckPage(service: ManageService): AsyncRequestHandle
 
 		const { consultees, failed, siteScreenedAs } = await runRulesetSafely(service, project, ruleset, req.session);
 
+		const selection: ConsulteeSelection = consulteeSelection(req.query);
+		const backLinkUrl = rulesetUrl(project.id, ruleset.id, selection);
+
 		if (failed) {
-			res.status(500).render('views/errors/500.njk', RULESET_ERROR_MESSAGE);
+			res.status(500).render('views/errors/500.njk', generateRuleSetError({ backLinkUrl }));
 			return;
 		}
 
-		const selection: ConsulteeSelection = consulteeSelection(req.query);
-
 		const viewModel: ReportCheckViewModel = {
 			pageHeading: 'Check consultees before creating the report',
-			backLinkUrl: rulesetUrl(project.id, ruleset.id, selection),
+			backLinkUrl,
 			caseName: project.properties.caseName,
 			reference: project.properties.caseReference,
 			// each Change link changes that answer alone, then comes back here keeping the others: a
@@ -170,8 +171,10 @@ export function buildReportCreatedPage(service: ManageService): AsyncRequestHand
 		const downloadUrl = reportDownloadUrl(project.id, ruleset.id, selection);
 		const { consultees, failed, siteScreenedAs } = await runRulesetSafely(service, project, ruleset, req.session);
 
+		const backLinkUrl = reportUrl(project.id, ruleset.id, selection);
+
 		if (failed) {
-			res.status(500).render('views/errors/500.njk', RULESET_ERROR_MESSAGE);
+			res.status(500).render('views/errors/500.njk', generateRuleSetError({ backLinkUrl }));
 			return;
 		}
 
@@ -210,7 +213,7 @@ export function buildReportCreatedPage(service: ManageService): AsyncRequestHand
 		const retryUrl = reportCreatedUrl(project.id, ruleset.id, selection);
 		const viewModel: ReportCreatedViewModel = {
 			pageHeading: downloadFailed ? 'Report could not be created' : 'Report created',
-			backLinkUrl: reportUrl(project.id, ruleset.id, selection),
+			backLinkUrl,
 			caseName: project.properties.caseName,
 			reference: project.properties.caseReference,
 			downloadUrl,
