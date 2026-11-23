@@ -5,7 +5,7 @@ import { describe, it, mock } from 'node:test';
 import { configureNunjucks } from '../../../../../nunjucks.ts';
 import type { ConsulteeAreaMatchRow } from '../../../../../testing/ruleset-runner-stub.ts';
 import { failingRulesetRunner, rulesetRunnerReturning } from '../../../../../testing/ruleset-runner-stub.ts';
-import { RULESET_ERROR_MESSAGE } from '../../../../errors/error-messages.ts';
+import { generateRuleSetError } from '../../../../errors/error-messages.ts';
 import { buildReportConsulteeRemovePage, buildReportConsulteeRemoveSubmit } from './controller.ts';
 
 // a selection entry as the app's URLs carry it - base64url-encoded JSON (see urls.ts's ENCODED_JSON)
@@ -428,7 +428,13 @@ describe('report consultee remove page', () => {
 		assert.strictEqual(mockRes.status.mock.callCount(), 1);
 		assert.deepStrictEqual(mockRes.status.mock.calls[0].arguments, [500]);
 		assert.strictEqual(mockRes.render.mock.callCount(), 1);
-		assert.deepStrictEqual(mockRes.render.mock.calls[0].arguments, ['views/errors/500.njk', RULESET_ERROR_MESSAGE]);
+		assert.deepStrictEqual(mockRes.render.mock.calls[0].arguments, [
+			'views/errors/500.njk',
+			generateRuleSetError({
+				backLinkUrl:
+					'/consultees/44444444-4444-4444-4444-444444444444/report/consultees?ruleset=england-wales-post-20240430&category=Parish%2C%20town%20and%20community%20councils'
+			})
+		]);
 	});
 });
 
@@ -669,7 +675,13 @@ describe('report consultee remove submit', () => {
 		await submit(request(), mockRes);
 
 		assert.strictEqual(mockRes.redirect.mock.callCount(), 0);
-		assert.deepStrictEqual(mockRes.render.mock.calls[0].arguments, ['views/errors/500.njk', RULESET_ERROR_MESSAGE]);
+		assert.deepStrictEqual(mockRes.render.mock.calls[0].arguments, [
+			'views/errors/500.njk',
+			generateRuleSetError({
+				backLinkUrl:
+					'/consultees/44444444-4444-4444-4444-444444444444/report/consultees?ruleset=england-wales-post-20240430&category=Parish%2C%20town%20and%20community%20councils'
+			})
+		]);
 	});
 
 	it('should answer a no-target submit the way the GET does - back to the category page', async () => {

@@ -14,6 +14,7 @@ import {
 } from '../../../../maps/case-geojson.ts';
 import { MAP_VIEWPORT } from '../../../../maps/sample-geojson.ts';
 import { categorySettings } from '../../../../report-config.ts';
+import { generateRuleSetError } from '../../../errors/error-messages.ts';
 import { kilometres, labelsWithReferenceData } from '../../consultee-labels.ts';
 import { NEARBY_NSIPS } from '../../nearby-nsips.ts';
 import { describeReasons } from '../../reasons.ts';
@@ -366,6 +367,14 @@ async function renderCategoryPage(
 export function buildReportConsulteesPage(service: ManageService): AsyncRequestHandler {
 	return async (req, res) => {
 		const context = await categoryContext(service, req, res);
+		if (context?.failed) {
+			const backLinkUrl = reportUrl(context.project.id, context.ruleset.id, context.selection);
+			const backLinkText = 'Back to draft report';
+			res.status(500).render('views/errors/500.njk', generateRuleSetError({ backLinkUrl, backLinkText }));
+
+			return;
+		}
+
 		if (context) {
 			await renderCategoryPage(service, req, res, context);
 		}

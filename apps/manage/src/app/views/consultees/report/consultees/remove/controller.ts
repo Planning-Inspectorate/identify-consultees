@@ -3,7 +3,7 @@ import type { Ruleset } from '@pins/identify-consultees-database/src/geospatial/
 import { isIdentified } from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
 import type { AsyncRequestHandler, AsyncRequestHandlerWithBody } from '@planning-inspectorate/core/util';
 import type { Response } from 'express';
-import { RULESET_ERROR_MESSAGE } from '../../../../errors/error-messages.ts';
+import { generateRuleSetError } from '../../../../errors/error-messages.ts';
 import { describeReasons } from '../../../reasons.ts';
 import { resolveCase, resolveCaseSummary } from '../../../resolve-case.ts';
 import type { RulesetRunStore } from '../../../run-ruleset.ts';
@@ -37,6 +37,8 @@ interface RemoveConsulteeContext {
 	selection: ConsulteeSelection;
 	/** The consultees being removed - one row of the summary table each, in param order. */
 	targets: ResolvedRemovalTarget[];
+	/** Whether or not the ruleset failed to run */
+	failed: boolean;
 }
 
 /**
@@ -86,8 +88,14 @@ async function removeConsulteeContext(
 		resolvedCaseId = project.id;
 		const { consultees, failed } = await runRulesetSafely(service, project, ruleset, store);
 		if (failed) {
-			res.status(500).render('views/errors/500.njk', RULESET_ERROR_MESSAGE);
-			return;
+			return {
+				failed: true,
+				caseId: resolvedCaseId,
+				ruleset,
+				category,
+				selection,
+				targets
+			};
 		}
 		const excluded = excludedMatchIds(selection.removed);
 		// select-all wants every match the category page listed: identified by a condition
@@ -160,6 +168,7 @@ async function removeConsulteeContext(
 		return undefined;
 	}
 	return {
+		failed: false,
 		caseId: resolvedCaseId,
 		ruleset,
 		category,
@@ -205,6 +214,14 @@ export function buildReportConsulteeRemovePage(service: ManageService): AsyncReq
 		if (!context) {
 			return;
 		}
+
+		if (context?.failed) {
+			const backLinkUrl = consulteesUrl(context.caseId, context.ruleset.id, context.category, context.selection);
+
+			res.status(500).render('views/errors/500.njk', generateRuleSetError({ backLinkUrl }));
+			return;
+		}
+
 		return res.render('views/consultees/report/consultees/remove/view.njk', viewModel(context));
 	};
 }
@@ -224,7 +241,15 @@ export function buildReportConsulteeRemoveSubmit(
 		if (!context) {
 			return;
 		}
-		const { caseId, ruleset, category, selection } = context;
+		const { caseId, ruleset, failed, category, selection } = context;
+
+		if (failed) {
+			const backLinkUrl = consulteesUrl(context.caseId, context.ruleset.id, context.category, context.selection);
+
+			res.status(500).render('views/errors/500.njk', generateRuleSetError({ backLinkUrl }));
+
+			return;
+		}
 
 		const reason = typeof req.body?.reason === 'string' ? req.body.reason.trim() : '';
 		if (!reason) {

@@ -178,7 +178,7 @@ describe('HTML security response headers', () => {
 		const response = await request(developmentApp).get(
 			`/consultees/${mapPageTestCaseId}/report/consultees?ruleset=england-wales-post-20240430&category=Parish%2C%20town%20and%20community%20councils`
 		);
-		assert.equal(response.status, 200);
+		assert.equal(response.status, 500);
 		const csp = response.headers['content-security-policy'];
 		assert.ok(typeof csp === 'string');
 		assertCspAllowsOpenFreeMap(csp, 'font-src');
