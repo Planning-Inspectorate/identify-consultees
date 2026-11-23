@@ -330,10 +330,22 @@ export function loadAssetManifest(staticDir: string): AssetManifest | null {
 
 /**
  * Rewrite known asset path literals in a source file from the manifest.
+ *
+ * The file is amended literal-by-literal, never regenerated - so a torn or
+ * empty file has nothing to amend and would be written back just as broken
+ * (seen when a dev server's concurrent non-atomic write truncated it mid-way).
+ * Failing the build instead forces a restore before the damage can be
+ * committed and start 404ing fingerprinted assets.
  */
 export async function applyAssetManifestToLocalsFile(localsFile: string, manifest: AssetManifest): Promise<void> {
 	const original = await readFile(localsFile, 'utf8');
+	if (original.trim() === '') {
+		throw new Error(
+			`${localsFile} is empty - the build amends asset literals in place rather than regenerating the file, so an empty file would be written back unchanged. Restore it (git checkout -- ${localsFile}) and rebuild.`
+		);
+	}
 	let content = original;
+	const missing: string[] = [];
 
 	for (const { logical, property } of LOCALS_ASSET_BINDINGS) {
 		const hashed = manifest.assets[logical];
@@ -343,7 +355,15 @@ export async function applyAssetManifestToLocalsFile(localsFile: string, manifes
 		const propertyPattern = new RegExp(`(${property}\\s*:\\s*)'[^']*'`);
 		if (propertyPattern.test(content)) {
 			content = content.replace(propertyPattern, `$1'${hashed}'`);
+		} else {
+			missing.push(property);
 		}
+	}
+
+	if (missing.length > 0) {
+		throw new Error(
+			`${localsFile} is missing asset literals for ${missing.join(', ')} - the build amends literals in place rather than regenerating the file, so a torn file cannot be healed. Restore it (git checkout -- ${localsFile}) or add the missing properties, then rebuild.`
+		);
 	}
 
 	// rebuilding without an asset change must not touch the file - the dev

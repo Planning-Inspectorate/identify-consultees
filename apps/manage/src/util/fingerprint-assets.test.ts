@@ -124,6 +124,50 @@ describe('fingerprint-assets', () => {
 		assert.match(updated, /vendorMapKeyPluginJs: 'vendor\/map-key-plugin\/js\/index-13579bdf\.js'/);
 	});
 
+	test('applyAssetManifestToLocalsFile leaves an unchanged file untouched', async () => {
+		tempDir = await mkdtemp(path.join(tmpdir(), 'fingerprint-locals-'));
+		const localsFile = path.join(tempDir, 'config-middleware.ts');
+		const source = `export const config = { styleFile: 'style-deadbeef.css' };\n`;
+		await writeFile(localsFile, source);
+		const { mtimeMs: before } = await stat(localsFile);
+
+		await applyAssetManifestToLocalsFile(localsFile, { assets: { 'style.css': 'style-deadbeef.css' } });
+
+		assert.equal((await stat(localsFile)).mtimeMs, before);
+		assert.equal(await readFile(localsFile, 'utf8'), source);
+	});
+
+	test('applyAssetManifestToLocalsFile rejects an empty locals file', async () => {
+		tempDir = await mkdtemp(path.join(tmpdir(), 'fingerprint-locals-'));
+		const localsFile = path.join(tempDir, 'config-middleware.ts');
+		await writeFile(localsFile, '');
+
+		await assert.rejects(
+			applyAssetManifestToLocalsFile(localsFile, { assets: { 'style.css': 'style-deadbeef.css' } }),
+			/is empty.*Restore it/s
+		);
+		assert.equal(await readFile(localsFile, 'utf8'), '');
+	});
+
+	test('applyAssetManifestToLocalsFile rejects a torn file missing bound literals', async () => {
+		tempDir = await mkdtemp(path.join(tmpdir(), 'fingerprint-locals-'));
+		const localsFile = path.join(tempDir, 'config-middleware.ts');
+		// every bound literal except styleFile is gone - the shape a truncated
+		// write leaves behind
+		await writeFile(localsFile, `export const config = { styleFile: 'style-old.css' };\n`);
+
+		await assert.rejects(
+			applyAssetManifestToLocalsFile(localsFile, {
+				assets: {
+					'style.css': 'style-deadbeef.css',
+					'javascripts/consultees-map.js': 'javascripts/consultees-map-01234567.js'
+				}
+			}),
+			/missing asset literals for consulteesMapJs.*Restore it/s
+		);
+		assert.match(await readFile(localsFile, 'utf8'), /style-old\.css/);
+	});
+
 	test('fingerprintAndCompressStaticAssets fingerprints .mjs modules and rewrites specifiers', async () => {
 		tempDir = await mkdtemp(path.join(tmpdir(), 'fingerprint-modules-'));
 		await mkdir(path.join(tempDir, 'javascripts'), { recursive: true });
