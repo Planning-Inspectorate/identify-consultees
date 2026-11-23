@@ -82,6 +82,23 @@ describe('report map PDF', () => {
 		assert.equal(lines.filter((line) => /^Project \d \(EN01000\d\)$/.test(line)).length, 5);
 	});
 
+	it('keys host and bordering authorities apart, and the category colour only for any others', async () => {
+		const keyed = (authorities: NonNullable<MapPdfInput['colours']['authorities']>) =>
+			buildMapPdf(input({ colours: { ...input().colours, authorities } })).then(pdfTextLines);
+
+		const both = await keyed({ host: '#007a7a', bordering: '#f47738', others: true });
+		for (const line of ['Host authority', 'Bordering authority', 'Other, in the report', 'The site']) {
+			assert.ok(both.includes(line), `missing "${line}"`);
+		}
+		assert.ok(!both.includes('In the report'));
+
+		// a host with no neighbours drawn, and nothing else
+		const hostOnly = await keyed({ host: '#007a7a', others: false });
+		assert.ok(hostOnly.includes('Host authority'));
+		assert.ok(!hostOnly.includes('Bordering authority'));
+		assert.ok(!hostOnly.includes('Other, in the report'));
+	});
+
 	it('credits OS on a map drawn on its basemap, with its licence under it', async () => {
 		const lines = pdfTextLines(await buildMapPdf(input({ basemap: 'os' })));
 		const credit = `© Crown copyright and database rights ${new Date().getFullYear()} OS`;

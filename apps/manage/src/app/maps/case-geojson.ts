@@ -5,12 +5,17 @@
  */
 
 import type { CaseBoundaryFeature } from '@pins/identify-consultees-database/src/geospatial/case-boundaries.ts';
-import type { ConsulteeMatch } from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
+import type {
+	AuthorityRole,
+	ConsulteeMatch,
+	Ruleset
+} from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
 import { isIdentified } from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
 import type { Geometry } from '@pins/identify-consultees-database/src/geospatial/wkt.ts';
 import { REPORT_CONFIG } from '../report-config.ts';
 import { kilometres } from '../views/consultees/consultee-labels.ts';
 import { isNearbyNsip } from '../views/consultees/nearby-nsips.ts';
+import { AUTHORITY_ROLE_STYLES } from './authority-role-styles.ts';
 import { assignCategoryColours, colourFor, CONSULTEE_CATEGORY_COLOURS, UNCATEGORISED } from './category-colours.ts';
 import { computeBounds, computeFittedMapView } from './geometry-bounds.ts';
 import type { InteractiveBasemap } from './os-maps.ts';
@@ -82,9 +87,38 @@ function categoryOf(match: Pick<ConsulteeMatch, 'feature'>): string {
 
 /**
  * A match, perhaps one a user added by hand (see markAddedByHand) - from the nearby search, or from
- * further away than the run found anything (`beyondRun`, see addedBeyondRun).
+ * further away than the run found anything (`beyondRun`, see addedBeyondRun) - and, for an
+ * administrative authority, whether the site is in it or it borders one that is (`authorityRole`,
+ * see withAuthorityRoles).
  */
-export type MapMatch = ConsulteeMatch & { addedByHand?: boolean; beyondRun?: boolean };
+export type MapMatch = ConsulteeMatch & { addedByHand?: boolean; beyondRun?: boolean; authorityRole?: AuthorityRole };
+
+/**
+ * The role a match's conditions give it: `host` when a "Host Authority" condition found it - the
+ * site is in it - else `bordering` when a "Bordering Authority" one did. One found both ways (the
+ * site crosses into it, and it borders another host) is a host. None for any other match.
+ */
+export function authorityRoleOf(
+	match: Pick<ConsulteeMatch, 'reasons'>,
+	ruleset: Pick<Ruleset, 'rules'>
+): AuthorityRole | undefined {
+	const roles = new Set(
+		match.reasons.flatMap((reason) =>
+			reason.type === 'condition'
+				? (ruleset.rules.find((rule) => rule.id === reason.conditionId)?.authorityRole ?? [])
+				: []
+		)
+	);
+	return roles.has('host') ? 'host' : roles.has('bordering') ? 'bordering' : undefined;
+}
+
+/** `matches` with each one's `authorityRole` (authorityRoleOf), so the map draws hosts apart from their neighbours. */
+export function withAuthorityRoles<T extends MapMatch>(matches: T[], ruleset: Pick<Ruleset, 'rules'>): T[] {
+	return matches.map((match) => {
+		const authorityRole = authorityRoleOf(match, ruleset);
+		return authorityRole ? { ...match, authorityRole } : match;
+	});
+}
 
 /**
  * `matches` with the ones in `ids` - nearby consultees added by hand (a typed name matched to one) - marked
@@ -167,28 +201,38 @@ export function nsipColours(matches: Pick<ConsulteeMatch, 'feature'>[]): Map<str
 function buildConsulteeMatchesGeojson(matches: MapMatch[], colours: Map<string, string>): GeoJsonFeatureCollection {
 	const drawable = matches.filter(isDrawable);
 	const projectColours = nsipColours(drawable);
+	// a host or bordering authority is drawn in its role's colour, not its category's - only when
+	// it's drawn as identified, so faint nearby context keeps its category's
 	return {
 		type: 'FeatureCollection',
-		features: drawable.map((match) => ({
-			type: 'Feature',
-			id: match.feature.id,
-			properties: {
-				// MapLibre drops string feature ids, so map selection needs the id as a property
-				consulteeId: match.feature.id,
-				name: match.feature.properties.consultee ?? '',
-				consulteeCategory: categoryOf(match),
-				region: match.feature.properties.region ?? '',
-				// the "3.2 km" the details panel's Distance row shows - absent for an area
-				// added from beyond the run's reach, whose distanceMetres is a placeholder
-				...(match.beyondRun ? {} : { distance: kilometres(match.distanceMetres) }),
-				colour: projectColours.get(match.feature.id) ?? colourFor(colours, categoryOf(match)),
-				...(projectColours.has(match.feature.id) ? { ownLayer: 'true' } : {}),
-				// 'false' when only the nearby search found it, and no one added it: drawn fainter, as
-				// context (see withFillOpacity)
-				identified: String(isDrawnAsIdentified(match))
-			},
-			geometry: match.feature.geometry
-		}))
+		features: drawable.map((match) => {
+			const role = isDrawnAsIdentified(match) ? match.authorityRole : undefined;
+			return {
+				type: 'Feature',
+				id: match.feature.id,
+				properties: {
+					// MapLibre drops string feature ids, so map selection needs the id as a property
+					consulteeId: match.feature.id,
+					name: match.feature.properties.consultee ?? '',
+					consulteeCategory: categoryOf(match),
+					region: match.feature.properties.region ?? '',
+					// the "3.2 km" the details panel's Distance row shows - absent for an area
+					// added from beyond the run's reach, whose distanceMetres is a placeholder
+					...(match.beyondRun ? {} : { distance: kilometres(match.distanceMetres) }),
+					colour:
+						projectColours.get(match.feature.id) ??
+						(role ? AUTHORITY_ROLE_STYLES[role].colour : colourFor(colours, categoryOf(match))),
+					...(projectColours.has(match.feature.id) ? { ownLayer: 'true' } : {}),
+					// 'host' or 'bordering' for an identified administrative authority - the map keys each
+					// role's colour on its own (see consultees-map.js's buildCategorySublayers)
+					...(role ? { authorityRole: role } : {}),
+					// 'false' when only the nearby search found it, and no one added it: drawn fainter, as
+					// context (see withFillOpacity)
+					identified: String(isDrawnAsIdentified(match))
+				},
+				geometry: match.feature.geometry
+			};
+		})
 	};
 }
 

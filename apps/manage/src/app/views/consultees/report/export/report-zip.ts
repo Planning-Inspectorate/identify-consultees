@@ -15,7 +15,8 @@ import {
 	addedBeyondRun,
 	buildCaseMapConfig,
 	markAddedByHand,
-	REGIONAL_FILL_OPACITY
+	REGIONAL_FILL_OPACITY,
+	withAuthorityRoles
 } from '../../../../maps/case-geojson.ts';
 import { computeBounds, computeFittedMapView, metresPerPixel } from '../../../../maps/geometry-bounds.ts';
 import { MAP_VIEWPORT } from '../../../../maps/sample-geojson.ts';
@@ -198,17 +199,29 @@ async function categoryMap(
 			context.buffers
 		)
 	]);
-	const map = buildCaseMapConfig(project, drawn, category, searchArea);
+	const map = buildCaseMapConfig(project, withAuthorityRoles(drawn, ruleset), category, searchArea);
 	const view = reportMapView(
 		map,
 		buffers.map(({ geometry }) => geometry),
 		categorySettings(category).mapMarginMetres
 	);
 	const site = projectColours(map.projectGeojson.features[0]);
+	// a host or bordering authority is drawn in its role's colour - the key gives each its own entry,
+	// and the category's colour only for the consultees drawn in it
+	const features = map.consulteeGeojson.features;
+	const roleColour = (role: string) =>
+		features.find((feature) => feature.properties.authorityRole === role)?.properties.colour;
+	const [host, bordering] = [roleColour('host'), roleColour('bordering')];
+	const others = features.filter(
+		(feature) => !feature.properties.authorityRole && feature.properties.identified !== 'false'
+	);
 	const colours = {
-		consultee: consulteeColours(map.consulteeGeojson.features[0] ?? { properties: {} }).stroke,
+		consultee: consulteeColours(others[0] ?? features[0] ?? { properties: {} }).stroke,
 		site: site.stroke,
-		siteFillOpacity: site.fillOpacity
+		siteFillOpacity: site.fillOpacity,
+		...(host || bordering
+			? { authorities: { ...(host ? { host } : {}), ...(bordering ? { bordering } : {}), others: others.length > 0 } }
+			: {})
 	};
 	// a kept run has no geometry, so without display geometry the map shows the site alone
 	const mapNote =

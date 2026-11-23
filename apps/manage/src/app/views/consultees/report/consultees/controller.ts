@@ -6,7 +6,12 @@ import { isIdentified } from '@pins/identify-consultees-database/src/geospatial/
 import type { AsyncRequestHandler } from '@planning-inspectorate/core/util';
 import type { Request, Response } from 'express';
 import type { CaseMapConfig, MapMatch } from '../../../../maps/case-geojson.ts';
-import { addedBeyondRun, buildCaseMapConfig, markAddedByHand } from '../../../../maps/case-geojson.ts';
+import {
+	addedBeyondRun,
+	buildCaseMapConfig,
+	markAddedByHand,
+	withAuthorityRoles
+} from '../../../../maps/case-geojson.ts';
 import { MAP_VIEWPORT } from '../../../../maps/sample-geojson.ts';
 import { categorySettings } from '../../../../report-config.ts';
 import { kilometres, labelsWithReferenceData } from '../../consultee-labels.ts';
@@ -270,7 +275,7 @@ async function renderCategoryPage(
 		{
 			...buildCaseMapConfig(
 				project,
-				labelledMatches(drawn, labels),
+				withAuthorityRoles(labelledMatches(drawn, labels), ruleset),
 				category,
 				searchArea,
 				{ src: staticMapSrc, alt: staticMapAlt },

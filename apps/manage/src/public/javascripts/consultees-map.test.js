@@ -170,6 +170,70 @@ describe('consultees-map client helpers', () => {
 		assert.equal(matches.sublayers[0].style.symbolBackgroundColor, '#f47738');
 	});
 
+	test('buildCategorySublayers keys host and bordering authorities apart, hosts first, in their own colours', () => {
+		const parish = (id, properties) => ({
+			type: 'Feature',
+			properties: { consulteeCategory: 'Parish, town and community councils', consulteeId: id, ...properties },
+			geometry: { type: 'Polygon', coordinates: [] }
+		});
+		const sublayers = buildCategorySublayers(
+			[
+				parish('next door', { colour: '#f47738', authorityRole: 'bordering' }),
+				parish('also next door', { colour: '#f47738', authorityRole: 'bordering' }),
+				parish('in', { colour: '#007a7a', authorityRole: 'host' }),
+				// one added by hand has no role - nor does nearby context, whatever it carries
+				parish('added', { colour: '#28a197' }),
+				parish('nearby', { colour: '#28a197', identified: 'false', authorityRole: 'host' }),
+				{
+					type: 'Feature',
+					properties: { consulteeCategory: 'Railways', consulteeId: 'railway', colour: '#1d70b8' },
+					geometry: { type: 'Polygon', coordinates: [] }
+				}
+			],
+			'identified'
+		);
+		const byLabel = new Map(sublayers.map((sublayer) => [sublayer.label, sublayer]));
+		const category = ['==', ['get', 'consulteeCategory'], 'Parish, town and community councils'];
+		const identified = ['!=', ['get', 'identified'], 'false'];
+
+		assert.deepEqual(
+			sublayers.map(({ label, style }) => [label, style.stroke]),
+			[
+				['Parish, town and community councils: host (1)', '#007a7a'],
+				['Parish, town and community councils: bordering (2)', '#f47738'],
+				['Parish, town and community councils (1)', '#28a197'],
+				['Parish, town and community councils: nearby, not identified (1)', '#28a197'],
+				['Railways (1)', '#1d70b8']
+			]
+		);
+		assert.deepEqual(byLabel.get('Parish, town and community councils: host (1)').filter, [
+			'all',
+			category,
+			identified,
+			['==', ['get', 'authorityRole'], 'host']
+		]);
+		assert.deepEqual(byLabel.get('Parish, town and community councils: bordering (2)').filter, [
+			'all',
+			category,
+			identified,
+			['==', ['get', 'authorityRole'], 'bordering']
+		]);
+		// the category's others take neither role's features
+		assert.deepEqual(byLabel.get('Parish, town and community councils (1)').filter, [
+			'all',
+			category,
+			identified,
+			['!=', ['get', 'authorityRole'], 'host'],
+			['!=', ['get', 'authorityRole'], 'bordering']
+		]);
+		// and a category with no roles filters as it always has
+		assert.deepEqual(byLabel.get('Railways (1)').filter, [
+			'all',
+			['==', ['get', 'consulteeCategory'], 'Railways'],
+			identified
+		]);
+	});
+
 	test("buildCategorySublayers fills at each category's opacity, lightest first", () => {
 		const sublayers = buildCategorySublayers(
 			[

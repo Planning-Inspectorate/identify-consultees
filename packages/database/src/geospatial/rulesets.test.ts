@@ -182,7 +182,9 @@ describe('parseRulesetCsv', () => {
 			group: 'Administative boundaries',
 			logicType: 'intersection',
 			categories: ['Unitary authorities'],
-			bufferMetres: 0
+			bufferMetres: 0,
+			// the workbook's "B Host Authority" - the maps draw its consultees as hosts
+			authorityRole: 'host'
 		});
 	});
 
@@ -201,7 +203,8 @@ describe('parseRulesetCsv', () => {
 				'National Parks UK (England)',
 				'National Parks UK (Wales)'
 			],
-			hostCategory: 'County councils (upper-tier authorities)'
+			hostCategory: 'County councils (upper-tier authorities)',
+			authorityRole: 'bordering'
 		});
 	});
 

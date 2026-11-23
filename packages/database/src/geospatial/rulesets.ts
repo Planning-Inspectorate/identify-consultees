@@ -42,7 +42,16 @@ export interface RuleCondition {
 	bufferMetres?: number;
 	/** bordering only: the category of the area that must intersect the site first. */
 	hostCategory?: string;
+	/**
+	 * The workbook's Category for an administrative authority - "B Host Authority" is `host`, "A
+	 * Bordering Authority" `bordering` - so the maps can tell a host from its neighbours. Absent for
+	 * any other condition. Not sent to the screening function.
+	 */
+	authorityRole?: AuthorityRole;
 }
+
+/** Whether a condition finds the authorities the site is in, or those bordering them. */
+export type AuthorityRole = 'host' | 'bordering';
 
 /**
  * A named ruleset: the full set of conditions to run against a project to find every consultee it
@@ -355,9 +364,10 @@ export function parseRulesetCsv(contents: string, settings: RulesetSettings = RU
 
 		const name = conditionName(cell('Category'), cell('Consultee Type(s)'));
 		const group = cell('Group');
+		const role = authority ? { authorityRole: authority[2].toLowerCase() as AuthorityRole } : {};
 		return logicType === 'bordering'
-			? { id, name, group, logicType, categories: mapping.categories, hostCategory: mapping.hostCategory }
-			: { id, name, group, logicType, categories: mapping.categories, bufferMetres: bufferKm * 1000 };
+			? { id, name, group, logicType, categories: mapping.categories, hostCategory: mapping.hostCategory, ...role }
+			: { id, name, group, logicType, categories: mapping.categories, bufferMetres: bufferKm * 1000, ...role };
 	});
 }
 

@@ -44,7 +44,8 @@ export const CONFIG_CHECKS: ConfigCheck[] = [
 		check: loads(async () => (await import('./screening-config.ts')).loadScreeningConfig())
 	},
 	{ file: 'map-view.yaml', check: loads(() => import('./maps/map-view.ts')) },
-	{ file: 'map-styles/boundary-map.yaml', check: loads(() => import('./maps/boundary-map-styles.ts')) }
+	{ file: 'map-styles/boundary-map.yaml', check: loads(() => import('./maps/boundary-map-styles.ts')) },
+	{ file: 'map-styles/authority-roles.yaml', check: loads(() => import('./maps/authority-role-styles.ts')) }
 ];
 
 function describe(error: unknown): string {

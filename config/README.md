@@ -12,6 +12,7 @@ What the service does, as opposed to how: which consultees each ruleset identifi
 | [`report.yaml`](./report.yaml) | Each report tab's columns, the metadata each category adds, and how much each category's map shows |
 | [`map-view.yaml`](./map-view.yaml) | How much the boundary page's map shows around the case's shapefiles |
 | [`map-styles/boundary-map.yaml`](./map-styles/boundary-map.yaml) | The boundary page's map colours: the newest file red, earlier ones blue |
+| [`map-styles/authority-roles.yaml`](./map-styles/authority-roles.yaml) | The consultee maps' colours for host authorities (the site is in them) and the authorities bordering them |
 | [`map-styles/consultee-map.example.yaml`](./map-styles/consultee-map.example.yaml) | **Not read yet**: proposed consultee map colours per category and sub-category |
 
 Each file explains its settings at the top.
@@ -71,6 +72,10 @@ Larger distances mean a slower search: it reaches out to the largest distance se
 ### Change the boundary map's colours
 
 Edit `map-styles/boundary-map.yaml`. Quote colours (`'#ff0000'`), since YAML reads `#` as the start of a comment, and update each style's `description`, which screen readers announce in the map key.
+
+### Change the host and bordering authority colours
+
+Edit `map-styles/authority-roles.yaml`. An administrative authority a "Host Authority" row of the rulesets workbook found is drawn in `host`'s colour, and one a "Bordering Authority" row found in `bordering`'s, on every consultee map and the report's map PDFs, so the authorities around the one the site is in stand out from it. The two colours must differ. Quote them, and keep each `description` in step with its colour.
 
 ## Rulesets
 
