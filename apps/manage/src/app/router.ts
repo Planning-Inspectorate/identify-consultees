@@ -12,6 +12,7 @@ import { createDefraVendorRouter } from './maps/vendor.ts';
 import type { EndpointRateLimiterOptions } from './rate-limit.ts';
 import { buildEndpointRateLimiter } from './rate-limit.ts';
 import { createRoutes as createConsulteeRoutes } from './views/consultees/index.ts';
+import { createRoutes as createErrorTestRoutes } from './views/error-test/index.ts';
 import { createFooterRoutes } from './views/footer/index.ts';
 import { createRoutes as createHelpRoutes } from './views/help/index.ts';
 import { createRoutes as createHomeRoutes } from './views/home/index.ts';
@@ -109,6 +110,12 @@ export function buildRouter(service: ManageService, options: BuildRouterOptions 
 	router.use('/consultees', consulteeRoutes);
 	// the user guide - behind sign-in, as it describes how rulesets are changed
 	router.use('/help', createHelpRoutes());
+	// the QA tools' error-scenario index (views/error-test) - only mounted where the flag
+	// is on (Dev and Test - see config.ts's qaTools); on Training and Prod it isn't built,
+	// so /error-test 404s like any other unmatched path
+	if (service.qaTools) {
+		router.use('/error-test', createErrorTestRoutes(service));
+	}
 	// the admin section - see admin/index.ts
 	router.use('/admin', adminRoutes);
 	router.use('/error', createErrorRoutes(service));

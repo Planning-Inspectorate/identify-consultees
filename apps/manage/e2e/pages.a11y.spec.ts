@@ -36,6 +36,7 @@ const pages = [
 	{ path: '/help', name: 'help' },
 	{ path: '/cookies', name: 'cookies' },
 	{ path: '/contact', name: 'contact' },
+	{ path: '/error-test', name: 'error scenarios index' },
 	{ path: '/admin', name: 'admin overview' },
 	{ path: '/admin/database', name: 'admin database' },
 	{ path: '/admin/database/consultee-areas', name: 'admin database consultee areas' },
