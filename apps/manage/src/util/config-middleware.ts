@@ -9,14 +9,14 @@ import { LOCALS_ASSET_BINDINGS, loadAssetManifest } from './fingerprint-assets.t
  * (or `npm run update-fingerprints`) keeps them in sync with the manifest.
  */
 const FALLBACK_ASSET_PATHS: Record<string, string> = {
-	styleFile: 'style-8665ca78.css',
+	styleFile: 'style-299264dc.css',
 	govukFrontendJs: 'assets/js/govuk-frontend.min-0391e416.js',
-	consulteesMapJs: 'javascripts/consultees-map-53679a05.js',
+	consulteesMapJs: 'javascripts/consultees-map-9502566e.js',
 	consulteeAutocompleteJs: 'javascripts/consultee-autocomplete-aea54bb1.js',
 	consulteeSelectJs: 'javascripts/consultee-select-7c9dbf6b.js',
 	blobUploadJs: 'javascripts/blob-upload-cfe8ea96.js',
 	sortableTableJs: 'javascripts/sortable-table-4136f0ca.js',
-	loadingSpinnerJs: 'javascripts/loading-spinner-ff31a3c4.js',
+	loadingSpinnerJs: 'javascripts/loading-spinner-d5a4ce0c.js',
 	accessibleAutocompleteJs: 'assets/js/accessible-autocomplete.min-876870ee.js',
 	accessibleAutocompleteCss: 'assets/css/accessible-autocomplete.min-4b7a52dc.css',
 	vendorInteractiveMapJs: 'vendor/interactive-map/js/index-66cff150.js',

@@ -21,9 +21,14 @@
  */
 
 const OVERLAY_CLASS = 'indicator-loading';
+const LEAVING_CLASS = 'indicator-loading--leaving';
 const TEXT_CLASS = 'indicator-loading__text';
 const TRIGGER_SELECTOR = '[data-loading-spinner]';
 const DEFAULT_TEXT = 'Loading';
+
+// a little longer than the 160ms --leaving fade in govuk-overrides.scss, so the
+// removal lands after the transition's last frame rather than snapping it off
+const REMOVE_AFTER_MS = 220;
 
 /**
  * The overlay DOM: the indicator spinner plus the message, announced politely -
@@ -66,20 +71,34 @@ function buildOverlay(documentTarget, text) {
  * @param {string} [text]
  */
 export function showLoadingOverlay(documentTarget, text = DEFAULT_TEXT) {
-	if (!documentTarget?.body || documentTarget.querySelector(`.${OVERLAY_CLASS}`)) {
+	if (!documentTarget?.body) {
 		return;
 	}
+	const existing = documentTarget.querySelector(`.${OVERLAY_CLASS}`);
+	if (existing && !existing.classList.contains(LEAVING_CLASS)) {
+		return;
+	}
+	// a mid-fade overlay counts as gone - drop it and let the fresh one fade in
+	existing?.remove();
 	documentTarget.body.append(buildOverlay(documentTarget, text));
 }
 
 /**
- * Drop the overlay if one is up - the back/forward-cache cleanup, and the way
- * tests reset between cases.
+ * Fade the overlay out, then drop it - the CSS transition on --leaving does the
+ * motion, so the element has to stay mounted until the fade has played. Where
+ * transitions do not run (no support, reduced motion) the class still clears
+ * the overlay visually and the timeout removes it moments later. A second call
+ * while one is in flight just re-arms the removal.
  *
  * @param {Document | undefined} documentTarget
  */
 export function removeLoadingOverlay(documentTarget) {
-	documentTarget?.querySelector(`.${OVERLAY_CLASS}`)?.remove();
+	const overlay = documentTarget?.querySelector(`.${OVERLAY_CLASS}`);
+	if (!overlay) {
+		return;
+	}
+	overlay.classList.add(LEAVING_CLASS);
+	setTimeout(() => overlay.remove(), REMOVE_AFTER_MS);
 }
 
 /**
