@@ -1,0 +1,40 @@
+{
+	"consultees": [
+		{
+			"feature": {
+				"id": "a0000000-0000-0000-0000-000000000001",
+				"properties": {
+					"sourceId": "SRC-1",
+					"consulteeCategory": "Parish, town and community councils",
+					"consulteeGroup": "Local Authorities",
+					"consulteeSubcategory": null,
+					"consulteeSubcategoryDescription": null,
+					"consultee": "Example Parish Council",
+					"region": "West Midlands"
+				}
+			},
+			"distanceMetres": 12.5,
+			"reasons": [
+				{ "type": "condition", "conditionId": "parish" },
+				{ "type": "nearby", "radiusMetres": 20000 }
+			]
+		},
+		{
+			"feature": {
+				"id": "b0000000-0000-0000-0000-000000000002",
+				"properties": {
+					"sourceId": "SRC-2",
+					"consulteeCategory": "Hospitals operated by NHS trusts and NHS foundation trusts (England)",
+					"consulteeGroup": "Health",
+					"consulteeSubcategory": null,
+					"consulteeSubcategoryDescription": null,
+					"consultee": "Example Hospital",
+					"region": "West Midlands"
+				}
+			},
+			"distanceMetres": 900,
+			"reasons": [{ "type": "nearby", "radiusMetres": 20000 }]
+		}
+	],
+	"siteScreenedAs": "boundingBox"
+}

@@ -3,15 +3,11 @@
  * Auth is disabled so journeys can run without Entra.
  */
 import { ManageService } from '#service';
-import { addLocalsConfiguration } from '#util/config-middleware.ts';
-import { createStaticAssetsMiddleware } from '#util/static-assets-middleware.ts';
-import { createBaseApp } from '@planning-inspectorate/core/app';
 import { mockLogger } from '@planning-inspectorate/core/testing';
 import type { Express } from 'express';
-import { ADMIN_MULTIPART_ROUTES } from '../admin/index.ts';
+import { createApp } from '../app.ts';
 import type { Config } from '../config.ts';
 import { loadBuildConfig } from '../config.ts';
-import { configureNunjucks } from '../nunjucks.ts';
 import { buildAuthRateLimiter, buildRouter } from '../router.ts';
 import { buildDatabaseRulesetRunner } from './ruleset-runner-stub.ts';
 
@@ -73,13 +69,9 @@ export function buildManageTestConfig(authDisabled = true, overrides: Partial<Co
 export function createManageTestApp(service: ManageService, options: CreateManageTestAppOptions = {}): Express {
 	const authRateLimiter = options.authRateLimiter ?? buildAuthRateLimiter();
 	service.logger = mockLogger() as typeof service.logger;
-	return createBaseApp({
-		service,
-		configureNunjucks,
-		router: buildRouter(service, { authRateLimiter }),
-		middlewares: [createStaticAssetsMiddleware(service.assetsStaticDir), addLocalsConfiguration()],
-		multiPartFormRoutes: ADMIN_MULTIPART_ROUTES
-	});
+	// createApp so the tests' app answers with the same OWASP headers and CSP production
+	// sends - a direct createBaseApp here once left them on helmet's defaults instead
+	return createApp(service, buildRouter(service, { authRateLimiter }));
 }
 
 /**

@@ -15,6 +15,7 @@ Keep instructions in one place and link to them — do not repeat the same rules
 | [`CONTRIBUTING.md`](./CONTRIBUTING.md)                                                                                    | Human-facing contribution workflow                                                                                |
 | [`docs/`](./docs/), [`kt-docs/`](./kt-docs/README.md)                                                                     | Procedural and onboarding detail linked from the relevant sections below                                          |
 | [`config/`](./config/README.md)                                                                                           | What the service does, not how: rulesets, map styles, nearby distances. Edit these, not code, to change behaviour |
+| [`contracts/`](./contracts/README.md)                                                                                     | JSON fixtures pinning the manage app ↔ Python function wire format; both sides' tests read them                   |
 
 When adding new guidance: put the rule here (or in a linked doc it points to), reference it from the
 pointers/skills, and do not copy the content between files.

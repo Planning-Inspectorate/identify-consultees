@@ -15,20 +15,28 @@ export async function prepareStaticAssetServing(service: ManageService): Promise
 	await ensureEmptyStaticMountDir(service.staticDir);
 }
 
-export function createApp(service: ManageService): Express {
+/**
+ * The app, with the OWASP headers and CSP wired the way production serves them. `router` is the
+ * routes the security layer wraps - createManageTestApp passes its rate-limiter-configured one so
+ * test apps answer with the same headers and CSP the live service sends.
+ */
+export function createApp(
+	service: ManageService,
+	router: ReturnType<typeof buildRouter> = buildRouter(service)
+): Express {
 	const isProduction = service.secureSession;
 	// @planning-inspectorate/core >= 1.14 mounts consumer `middlewares` before its
 	// helmet stack, which would then overwrite these headers (e.g. helmet's default
 	// HSTS replaces the OWASP values). An outer router runs after helmet while still
 	// preceding the app's routes, matching the pre-1.14 ordering.
-	const router = createRouter();
-	router.use(buildOwaspSecurityHeadersMiddleware({ isProduction }));
-	router.use(buildRouter(service));
+	const outer = createRouter();
+	outer.use(buildOwaspSecurityHeadersMiddleware({ isProduction }));
+	outer.use(router);
 
 	return createBaseApp({
 		service,
 		configureNunjucks,
-		router,
+		router: outer,
 		middlewares: [
 			createStaticAssetsMiddleware(service.assetsStaticDir),
 			addLocalsConfiguration(service.assetsStaticDir)
