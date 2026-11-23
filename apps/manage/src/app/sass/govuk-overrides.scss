@@ -100,3 +100,87 @@
 .pins-consultees-table tr.pins-consultee-row--selected .govuk-checkboxes__label::before {
 	background: index.govuk-colour('white');
 }
+
+// Page-load indicator (javascripts/loading-spinner.js): the same spinner the map
+// loading overlay uses (design-image CSS, hence the non-prefixed class names),
+// shown over the whole viewport while a slow navigation - running the ruleset or
+// building the report ZIP - is in flight. Translucent white like the map's, so
+// the page stays readable underneath
+/* stylelint-disable-next-line selector-class-pattern */
+.indicator-loading {
+	position: fixed;
+	inset: 0;
+	z-index: 1000;
+	display: flex;
+	flex-direction: column;
+	gap: index.govuk-spacing(4);
+	align-items: center;
+	justify-content: center;
+	background: rgb(index.govuk-colour('white'), 0.85);
+}
+
+/* stylelint-disable-next-line selector-class-pattern */
+.indicator-loading__text {
+	@include index.govuk-font($size: 24, $weight: bold);
+}
+
+/* stylelint-disable-next-line selector-class-pattern */
+.indicator-loading-spinner {
+	display: flex;
+	flex-direction: row;
+	align-items: center;
+	justify-content: center;
+	width: 100%;
+}
+
+/* stylelint-disable-next-line selector-class-pattern */
+.indicator-loading-spinner__container {
+	width: 100%;
+	max-width: 104px;
+}
+
+/* stylelint-disable-next-line selector-class-pattern */
+.indicator-loading-spinner__icon {
+	position: relative;
+	width: 100%;
+	height: 0;
+	padding-top: 100%;
+}
+
+/* stylelint-disable-next-line selector-class-pattern */
+.indicator-loading-spinner__icon::before {
+	position: absolute;
+	top: 0;
+	left: 0;
+	box-sizing: border-box;
+	width: 100%;
+	height: 100%;
+	content: '';
+
+	// pre-v6 GOV.UK 'turquoise' per the design image, as the map spinner
+	border: 12px solid hsl(175.04deg 60.2% 79.41%);
+	/* stylelint-disable-next-line color-no-hex */
+	border-top-color: #28a197;
+	border-radius: 50%;
+	transform: translate3d(0, 0, 0);
+	transform-origin: center;
+	animation: indicator-loading-spinner-animation 2s linear infinite;
+}
+
+@keyframes indicator-loading-spinner-animation {
+	0% {
+		transform: translate3d(0, 0, 0) rotate(0deg);
+	}
+
+	100% {
+		transform: translate3d(0, 0, 0) rotate(360deg);
+	}
+}
+
+// same accommodation as the map spinner: stop the animation under reduced motion
+@media (prefers-reduced-motion: reduce) {
+	/* stylelint-disable-next-line selector-class-pattern */
+	.indicator-loading-spinner__icon::before {
+		animation: none;
+	}
+}
