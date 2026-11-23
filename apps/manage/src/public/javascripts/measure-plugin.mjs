@@ -15,10 +15,10 @@
  * - `area` (configurable): a polygon drawn corner by corner - vertex handles while
  *   drawing, self-intersection and area validation built in, Done finishes it.
  *
- * A finished measurement stays on the map: clicking it (or the panel's Edit button)
- * opens the draw plugin's edit session - drag, insert or delete vertices, Snap toggle
- * included - and `draw:edited` hands the re-measured shape back. Cancelling an edit
- * restores both the shape and the readout.
+ * A finished measurement stays on the map: clicking it opens the draw plugin's
+ * edit session - drag, insert or delete vertices, Snap toggle included - and
+ * `draw:edited` hands the re-measured shape back. Cancelling an edit restores
+ * both the shape and the readout.
  *
  * The live readout rides the draw adapter's `geometrychange` event - the same contract the
  * draw plugin's own validation listens on. Phase-less payloads are the in-progress feature
@@ -410,9 +410,9 @@ export function handleDrawStarted(context) {
 }
 
 /**
- * Open a finished measurement's shape for editing - clicking it on the map (the inactive
- * draw layers) or the panel's Edit button lands here. The draw plugin's edit session
- * gives the shape the same vertex handles, Snap toggle and Done/Cancel chrome a draw
+ * Open a finished measurement's shape for editing - clicking it on the map (the
+ * inactive draw layers) lands here. The draw plugin's edit session gives the
+ * shape the same vertex handles, Snap toggle and Done/Cancel chrome a draw
  * session has; `draw:edited` hands the re-measured feature back, `draw:cancelled`
  * restores it.
  *
@@ -656,22 +656,7 @@ export function MeasurePanel({ appConfig, pluginConfig, pluginState, services })
 	}
 
 	if (status === 'done') {
-		const actions = [];
-		if (measurement.featureId) {
-			actions.push(
-				h(
-					'button',
-					{
-						key: 'edit',
-						type: 'button',
-						className: 'govuk-button govuk-button--secondary govuk-!-font-size-16',
-						onClick: () => startEdit(measurement.featureId, { pluginConfig, pluginState, services })
-					},
-					'Edit measurement'
-				)
-			);
-		}
-		actions.push(
+		body.push(
 			h(
 				'button',
 				{
@@ -695,9 +680,6 @@ export function MeasurePanel({ appConfig, pluginConfig, pluginState, services })
 				'Clear measurement'
 			)
 		);
-		// the group spaces the buttons whether they sit side by side or wrap
-		// (stacked in the narrow panel they otherwise collapse into one block)
-		body.push(h('div', { key: 'actions', className: 'govuk-button-group govuk-!-margin-bottom-0' }, actions));
 	}
 
 	return h('div', { className: 'app-measure-panel' }, body);

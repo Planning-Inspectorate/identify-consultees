@@ -1157,7 +1157,7 @@ describe('MeasurePanel', () => {
 		assert.match(container.textContent, /Drag the shape's points/);
 		assert.match(container.textContent, /500 m²/);
 		assert.ok(container.querySelector('select'));
-		// no Edit button mid-edit - the draw panel's own Done finishes the session
+		// no panel buttons mid-edit - the draw panel's own Done finishes the session
 		assert.equal([...container.querySelectorAll('button')].length, 0);
 	});
 
@@ -1210,26 +1210,15 @@ describe('MeasurePanel', () => {
 		assert.deepEqual(pluginState.dispatch.mock.calls[0].arguments[0], { type: 'SET_MEASUREMENT', payload: null });
 	});
 
-	test('Edit measurement opens the draw edit session for the finished shape', async () => {
-		const draw = fakeDrawPlugin();
-		const pluginState = { measurement: doneMeasurement, units: {}, dispatch: mock.fn() };
-		const pluginConfig = {
-			drawnFeatureIds: ['f1'],
-			drawnFeatureModes: { f1: 'distance' },
-			pending: null,
-			editing: null
-		};
+	test('a finished measurement offers only Clear - the shape itself is clicked to edit', async () => {
 		const container = await renderPanel({
-			pluginConfig,
-			pluginState,
-			services: fakeServices({ draw })
+			pluginConfig: {},
+			pluginState: { measurement: doneMeasurement, units: {}, dispatch: mock.fn() }
 		});
-		const button = [...container.querySelectorAll('button')].find((b) => b.textContent === 'Edit measurement');
-		assert.ok(button);
-		button.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }));
-		await flushEffects();
-		assert.deepEqual(draw.editFeature.mock.calls[0].arguments, ['f1']);
-		assert.equal(pluginState.dispatch.mock.calls.at(-1).arguments[0].payload.status, 'editing');
+		assert.deepEqual(
+			[...container.querySelectorAll('button')].map((b) => b.textContent),
+			['Clear measurement']
+		);
 	});
 
 	test('Clear without a feature id or services still resets', async () => {

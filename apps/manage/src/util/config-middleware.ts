@@ -14,7 +14,7 @@ export function addLocalsConfiguration(): Handler {
 		res.locals.config = {
 			styleFile: 'style-2ce384a4.css',
 			govukFrontendJs: 'assets/js/govuk-frontend.min-0391e416.js',
-			consulteesMapJs: 'javascripts/consultees-map-71ff93df.js',
+			consulteesMapJs: 'javascripts/consultees-map-53679a05.js',
 			consulteeAutocompleteJs: 'javascripts/consultee-autocomplete-aea54bb1.js',
 			consulteeSelectJs: 'javascripts/consultee-select-7c9dbf6b.js',
 			blobUploadJs: 'javascripts/blob-upload-cfe8ea96.js',
