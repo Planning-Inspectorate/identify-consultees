@@ -66,7 +66,12 @@ export interface ReportExport {
 	records: Map<string, ConsulteeAreaRecord>;
 	/** Consultees added by hand - one the run found with its distance from the site. */
 	added: readonly (AddedConsultee & { distanceMetres?: number })[];
-	removed: readonly RemovedConsultee[];
+	/**
+	 * Consultees removed from the report - a ruleset match with the run's `match`, so its tab lists
+	 * it as the run found it (a removed hand-added one has none). Each is listed, greyed, on its tab
+	 * with the reason it was removed, but not counted.
+	 */
+	removed: readonly (RemovedConsultee & { match?: ConsulteeMatch })[];
 	accountInfo?: { name: string };
 }
 
@@ -246,6 +251,8 @@ interface RowSource {
 	bufferKm?: number;
 	/** An NSIP's own fields (see nsipFields) - its tab's metadata. */
 	nsip?: Metadata;
+	/** Removed from the report: listed greyed, after those in it, and not counted. */
+	removed?: boolean;
 }
 
 /** Each fixed column's cell - the columns config/report.yaml can choose from. */
@@ -290,10 +297,24 @@ interface SortableRow {
 	bufferKm?: number;
 	cells: Cell[];
 	metadata: Map<string, unknown>;
+	removed: boolean;
 }
 
+/** By category, those in the report before those removed from it, then by name. */
 function byCategoryThenName(a: SortableRow, b: SortableRow): number {
-	return a.category.localeCompare(b.category, 'en-GB') || a.name.localeCompare(b.name, 'en-GB');
+	return (
+		a.category.localeCompare(b.category, 'en-GB') ||
+		Number(a.removed) - Number(b.removed) ||
+		a.name.localeCompare(b.name, 'en-GB')
+	);
+}
+
+// a removed consultee's row is greyed - GOV.UK's secondary text colour
+const REMOVED_TEXT_COLOUR = '#505A5F';
+
+/** A removed consultee's cell, greyed - an empty one stays empty. */
+function greyed(cell: Cell): Cell {
+	return cell === null ? null : { ...cell, textColor: REMOVED_TEXT_COLOUR };
 }
 
 /** What the Summary counts a consultee by: its category, and the nearest buffer a condition found it within. */
@@ -336,8 +357,12 @@ function tabContent(rows: SortableRow[], columns: readonly ReportColumn[]): Grou
 			...columns.map((column) => COLUMN_WIDTHS[column]),
 			...headings.map((heading) => Math.min(40, Math.max(12, heading.length + 2)))
 		],
-		rows: sorted.map((row) => [...row.cells, ...headings.map((heading) => metadataCell(row.metadata.get(heading)))]),
-		counted: sorted.map(({ category, bufferKm }) => ({ category, bufferKm }))
+		rows: sorted.map((row) => {
+			const cells = [...row.cells, ...headings.map((heading) => metadataCell(row.metadata.get(heading)))];
+			return row.removed ? cells.map(greyed) : cells;
+		}),
+		// a removed consultee is listed, but isn't in the report
+		counted: sorted.filter((row) => !row.removed).map(({ category, bufferKm }) => ({ category, bufferKm }))
 	};
 }
 
@@ -347,6 +372,7 @@ function sortableRow(source: RowSource, tab: GroupTab, config: ReportConfig): So
 		category: source.category ?? '',
 		name: source.name ?? '',
 		bufferKm: source.bufferKm,
+		removed: source.removed === true,
 		cells: tabSettings(tab, config).columns.map((column) => COLUMN_CELLS[column](source)),
 		metadata: exportedMetadata(
 			{ ...parseMetadata(source.record?.metadata), ...source.nsip },
@@ -355,9 +381,15 @@ function sortableRow(source: RowSource, tab: GroupTab, config: ReportConfig): So
 	};
 }
 
+/** A removed consultee's Source: that it was removed, and why. */
+function removedSource(removal: RemovedConsultee): string {
+	return `Removed: ${removal.reason}`;
+}
+
 function groupTabs(report: ReportExport, config: ReportConfig): Map<GroupTab, GroupTabContent> {
 	const rows = new Map<GroupTab, SortableRow[]>(GROUP_TABS.map((tab) => [tab, []]));
-	for (const match of report.identified) {
+	// a ruleset match's row - the source says it was removed, and why, for one removed from the report
+	const matchRow = (match: ConsulteeMatch, removal?: RemovedConsultee) => {
 		const record = report.records.get(match.feature.id);
 		const properties = match.feature.properties;
 		const tab = tabForMatch(match, report.ruleset);
@@ -370,16 +402,20 @@ function groupTabs(report: ReportExport, config: ReportConfig): Map<GroupTab, Gr
 					category: record?.consulteeCategory ?? properties.consulteeCategory,
 					region: record?.region ?? properties.region,
 					whyIdentified: describeReasons(match, report.ruleset, { nearby: false }).join('\n'),
-					source: `${report.ruleset.name} ruleset`,
+					source: removal ? removedSource(removal) : `${report.ruleset.name} ruleset`,
 					distanceMetres: match.distanceMetres,
 					record,
 					bufferKm: nearestBufferKm(match, report.ruleset),
-					...(tab === NEARBY_NSIPS ? { nsip: nsipFields(properties.consultee ?? '', nsipQuery(match)) } : {})
+					...(tab === NEARBY_NSIPS ? { nsip: nsipFields(properties.consultee ?? '', nsipQuery(match)) } : {}),
+					...(removal ? { removed: true } : {})
 				},
 				tab,
 				config
 			)
 		);
+	};
+	for (const match of report.identified) {
+		matchRow(match);
 	}
 	for (const add of report.added) {
 		// one from before additions had to be real consultees may have no stored row
@@ -397,6 +433,34 @@ function groupTabs(report: ReportExport, config: ReportConfig): Map<GroupTab, Gr
 					distanceMetres: add.distanceMetres,
 					record,
 					...(tab === NEARBY_NSIPS ? { nsip: nsipFields(add.name, add.reason) } : {})
+				},
+				tab,
+				config
+			)
+		);
+	}
+	for (const removal of report.removed) {
+		if (removal.match) {
+			matchRow(removal.match, removal);
+			continue;
+		}
+		// a hand-added consultee removed again - its addition's reason went with it - or a ruleset
+		// match the run no longer finds: listed by name
+		const tab = tabForCategory(removal.category, report.ruleset);
+		const whyIdentified = removal.id ? 'Identified by the ruleset' : 'Manually added';
+		rows.get(tab)!.push(
+			sortableRow(
+				{
+					id: removal.id,
+					name: removal.name,
+					category: removal.category,
+					region: undefined,
+					whyIdentified,
+					source: removedSource(removal),
+					distanceMetres: undefined,
+					record: undefined,
+					removed: true,
+					...(tab === NEARBY_NSIPS ? { nsip: nsipFields(removal.name, whyIdentified) } : {})
 				},
 				tab,
 				config
@@ -550,14 +614,14 @@ function nsipList(report: ReportExport): Cell[][] {
 function summarySheet(report: ReportExport, tabs: Map<GroupTab, GroupTabContent>, config: ReportConfig): SheetData {
 	const detail = (label: string, value: string | null | undefined): Cell[] => [bold(label), text(value)];
 	const tabLines = GROUP_TABS.flatMap((tab): Cell[][] => {
-		const { rows, counted } = tabs.get(tab)!;
+		const { counted } = tabs.get(tab)!;
 		const lines = summaryCounts(tab, counted, config);
 		// Nearby NSIPs are one category, so their line is their tab's total
 		if (tab === NEARBY_NSIPS) {
 			return lines.map(({ label, count: value }) => [bold(label), count(value, 'bold')]);
 		}
 		return [
-			[bold(`${tab} - Total`), count(rows.length, 'bold')],
+			[bold(`${tab} - Total`), count(counted.length, 'bold')],
 			...lines.map(({ label, count: value }): Cell[] => [{ value: label, indent: 1 }, count(value)])
 		];
 	});
