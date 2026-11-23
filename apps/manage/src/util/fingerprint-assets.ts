@@ -291,6 +291,7 @@ export async function applyAssetManifestToLocalsFile(localsFile: string, manifes
 		{ logical: 'javascripts/consultee-select.js', property: 'consulteeSelectJs' },
 		{ logical: 'javascripts/blob-upload.js', property: 'blobUploadJs' },
 		{ logical: 'javascripts/sortable-table.js', property: 'sortableTableJs' },
+		{ logical: 'javascripts/loading-spinner.js', property: 'loadingSpinnerJs' },
 		{ logical: 'assets/js/accessible-autocomplete.min.js', property: 'accessibleAutocompleteJs' },
 		{ logical: 'assets/css/accessible-autocomplete.min.css', property: 'accessibleAutocompleteCss' },
 		{ logical: 'vendor/interactive-map/js/index.js', property: 'vendorInteractiveMapJs' },

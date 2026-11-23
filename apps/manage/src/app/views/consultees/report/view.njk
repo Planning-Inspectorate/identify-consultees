@@ -114,8 +114,18 @@
 		}) }}
 	{% endfor %}
 
+	{# the created page builds the report ZIP before it can render - the
+	   loading-spinner script covers that wait #}
 	{{ govukButton({
 		text: "Create report",
-		href: generateReportUrl
+		href: generateReportUrl,
+		attributes: {
+			"data-loading-spinner": "",
+			"data-loading-text": "Creating report"
+		}
 	}) }}
+{% endblock %}
+
+{% block bodyEnd %}
+	<script type="module" src="/{{ config.loadingSpinnerJs }}"></script>
 {% endblock %}

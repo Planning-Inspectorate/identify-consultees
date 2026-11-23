@@ -12,13 +12,14 @@ import type { Handler } from 'express';
 export function addLocalsConfiguration(): Handler {
 	return (req, res, next) => {
 		res.locals.config = {
-			styleFile: 'style-2ce384a4.css',
+			styleFile: 'style-8665ca78.css',
 			govukFrontendJs: 'assets/js/govuk-frontend.min-0391e416.js',
-			consulteesMapJs: 'javascripts/consultees-map-71ff93df.js',
+			consulteesMapJs: 'javascripts/consultees-map-c52c3ff5.js',
 			consulteeAutocompleteJs: 'javascripts/consultee-autocomplete-aea54bb1.js',
 			consulteeSelectJs: 'javascripts/consultee-select-7c9dbf6b.js',
 			blobUploadJs: 'javascripts/blob-upload-cfe8ea96.js',
 			sortableTableJs: 'javascripts/sortable-table-4136f0ca.js',
+			loadingSpinnerJs: 'javascripts/loading-spinner-ff31a3c4.js',
 			accessibleAutocompleteJs: 'assets/js/accessible-autocomplete.min-876870ee.js',
 			accessibleAutocompleteCss: 'assets/css/accessible-autocomplete.min-4b7a52dc.css',
 			vendorInteractiveMapJs: 'vendor/interactive-map/js/index-66cff150.js',

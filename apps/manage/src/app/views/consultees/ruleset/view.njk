@@ -13,7 +13,9 @@
 {% block pageContent %}
 	{# the case name sits inside the legend's h1 as its caption, as the layout renders it #}
 	{% set legendHtml %}<span class="govuk-caption-l">{{ pageCaption }}</span>{{ pageHeading }}{% endset %}
-	<form method="post" action="{{ formAction }}" novalidate>
+	{# the POST runs the ruleset and the check page it redirects to can take a
+	   while to load - the loading-spinner script covers both #}
+	<form method="post" action="{{ formAction }}" novalidate data-loading-spinner data-loading-text="Identifying consultees">
 		<input type="hidden" name="_csrf" value="{{ _csrf }}">
 		{{ govukRadios({
 			idPrefix: "ruleset",
@@ -30,6 +32,12 @@
 		}) }}
 
 		{{ govukButton({
-			text: "Identify consultees"
+			text: "Identify consultees",
+			preventDoubleClick: true
 		}) }}
+	</form>
+{% endblock %}
+
+{% block bodyEnd %}
+	<script type="module" src="/{{ config.loadingSpinnerJs }}"></script>
 {% endblock %}
