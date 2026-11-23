@@ -43,6 +43,18 @@ describe('showLoadingOverlay', () => {
 		assert.equal(overlayOf(document).querySelector('.indicator-loading__text').textContent, 'First');
 	});
 
+	test('a call while one is mid-fade replaces it with a fresh overlay', () => {
+		const document = documentWith();
+		showLoadingOverlay(document, 'First');
+		removeLoadingOverlay(document);
+		showLoadingOverlay(document, 'Second');
+
+		const overlays = document.querySelectorAll('.indicator-loading');
+		assert.equal(overlays.length, 1);
+		assert.equal(overlays[0].classList.contains('indicator-loading--leaving'), false);
+		assert.equal(overlays[0].querySelector('.indicator-loading__text').textContent, 'Second');
+	});
+
 	test('does nothing without a document or a body to hang the overlay on', () => {
 		assert.doesNotThrow(() => showLoadingOverlay(undefined));
 		assert.doesNotThrow(() => showLoadingOverlay({ querySelector: () => null }));
@@ -50,10 +62,25 @@ describe('showLoadingOverlay', () => {
 });
 
 describe('removeLoadingOverlay', () => {
-	test('removes the overlay when one is up', () => {
+	test('fades the overlay out then removes it', async () => {
 		const document = documentWith();
 		showLoadingOverlay(document);
 		removeLoadingOverlay(document);
+
+		const overlay = overlayOf(document);
+		assert.ok(overlay.classList.contains('indicator-loading--leaving'));
+
+		await new Promise((resolve) => setTimeout(resolve, 300));
+		assert.equal(overlayOf(document), null);
+	});
+
+	test('a second removal while the fade is in flight is safe', async () => {
+		const document = documentWith();
+		showLoadingOverlay(document);
+		removeLoadingOverlay(document);
+		assert.doesNotThrow(() => removeLoadingOverlay(document));
+
+		await new Promise((resolve) => setTimeout(resolve, 300));
 		assert.equal(overlayOf(document), null);
 	});
 
@@ -121,7 +148,7 @@ describe('registerLoadingSpinners', () => {
 		assert.ok(overlayOf(document));
 	});
 
-	test('drops the overlay on pagehide and pageshow, for back/forward-cache restores', () => {
+	test('fades the overlay out on pagehide and pageshow, for back/forward-cache restores', async () => {
 		const document = documentWith('<a data-loading-spinner href="#">go</a>');
 		Object.defineProperty(document, 'readyState', { value: 'complete', configurable: true });
 		registerLoadingSpinners(document);
@@ -129,11 +156,14 @@ describe('registerLoadingSpinners', () => {
 			document.querySelector('a').dispatchEvent(new document.defaultView.MouseEvent('click', { cancelable: true }));
 			assert.ok(overlayOf(document));
 		};
+		const leaving = () => overlayOf(document)?.classList.contains('indicator-loading--leaving');
 		show();
 		document.defaultView.dispatchEvent(new document.defaultView.Event('pagehide'));
-		assert.equal(overlayOf(document), null);
+		assert.equal(leaving(), true);
 		show();
 		document.defaultView.dispatchEvent(new document.defaultView.Event('pageshow'));
+		assert.equal(leaving(), true);
+		await new Promise((resolve) => setTimeout(resolve, 300));
 		assert.equal(overlayOf(document), null);
 	});
 });

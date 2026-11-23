@@ -90,13 +90,16 @@ describe('map-loading-plugin', () => {
 		plugin.dismiss();
 	});
 
-	test('dismiss removes the overlay and is safe to call twice', () => {
+	test('dismiss fades the overlay out then removes it, and is safe to call twice', async () => {
 		const dom = installDom('<!DOCTYPE html><html><body><div id="map"></div></body></html>');
 		const plugin = createMapLoadingPlugin({ container: dom.window.document.getElementById('map') });
 
 		plugin.dismiss();
-		assert.equal(document.querySelector('.app-map-loading'), null);
+		const overlay = document.querySelector('.app-map-loading');
+		assert.ok(overlay.classList.contains('app-map-loading--leaving'));
 		assert.doesNotThrow(() => plugin.dismiss());
+		await nextTask(300);
+		assert.equal(document.querySelector('.app-map-loading'), null);
 	});
 
 	test('the overlay is dismissed when the component renders its error markup', async () => {
@@ -106,15 +109,19 @@ describe('map-loading-plugin', () => {
 
 		container.innerHTML = '<div class="im-c-error">There was a problem loading the map.</div>';
 		await nextTask();
+		assert.ok(document.querySelector('.app-map-loading').classList.contains('app-map-loading--leaving'));
+		await nextTask(300);
 		assert.equal(document.querySelector('.app-map-loading'), null);
 		plugin.dismiss();
 	});
 
-	test('an .im-c-error already present at creation dismisses immediately', () => {
+	test('an .im-c-error already present at creation starts the fade-out immediately', async () => {
 		const dom = installDom(
 			'<!DOCTYPE html><html><body><div id="map"><div class="im-c-error">err</div></div></body></html>'
 		);
 		const plugin = createMapLoadingPlugin({ container: dom.window.document.getElementById('map') });
+		assert.ok(document.querySelector('.app-map-loading').classList.contains('app-map-loading--leaving'));
+		await nextTask(300);
 		assert.equal(document.querySelector('.app-map-loading'), null);
 		plugin.dismiss();
 	});
@@ -126,7 +133,7 @@ describe('map-loading-plugin', () => {
 			timeoutMs: 5
 		});
 		assert.ok(document.querySelector('.app-map-loading'));
-		await nextTask(30);
+		await nextTask(300);
 		assert.equal(document.querySelector('.app-map-loading'), null);
 		plugin.dismiss();
 	});

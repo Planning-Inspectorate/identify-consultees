@@ -80,6 +80,11 @@ $font-family: arial, helvetica, sans-serif;
 	position: relative;
 }
 
+// the overlay fades in on mount and out via the --leaving class the plugin adds
+// before it removes the element (map-loading-plugin.mjs REMOVE_AFTER_MS leaves
+// the exit transition time to finish). Both are plain opacity motion - engines
+// without animation/transition support drop the declarations and the overlay
+// simply appears and vanishes, which is the right fallback anyway
 /* stylelint-disable-next-line selector-class-pattern */
 .app-map-loading {
 	position: absolute;
@@ -91,6 +96,21 @@ $font-family: arial, helvetica, sans-serif;
 	align-items: center;
 	justify-content: center;
 	background: rgb(index.govuk-colour('white'), 0.85);
+	transition: opacity 160ms ease-in;
+	animation: app-map-loading-in 200ms ease-out;
+}
+
+/* stylelint-disable-next-line selector-class-pattern */
+.app-map-loading--leaving {
+	// the fading overlay must not swallow map clicks underneath it
+	pointer-events: none;
+	opacity: 0;
+}
+
+@keyframes app-map-loading-in {
+	from {
+		opacity: 0;
+	}
 }
 
 /* stylelint-disable-next-line selector-class-pattern */
@@ -121,6 +141,12 @@ $map-spinner-teal: #28a197;
 }
 
 @media (prefers-reduced-motion: reduce) {
+	/* stylelint-disable-next-line selector-class-pattern */
+	.app-map-loading {
+		transition: none;
+		animation: none;
+	}
+
 	/* stylelint-disable-next-line selector-class-pattern */
 	.app-map-loading__spinner {
 		animation: none;

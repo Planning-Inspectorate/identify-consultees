@@ -36,6 +36,11 @@ import { watchForMapError } from './static-map-plugin.mjs';
 
 const WRAPPER_CLASS = 'app-map-loading-wrap';
 const OVERLAY_CLASS = 'app-map-loading';
+const LEAVING_CLASS = 'app-map-loading--leaving';
+
+// a little longer than the 160ms --leaving fade in style.scss, so the removal
+// lands after the transition's last frame rather than snapping it off
+const REMOVE_AFTER_MS = 220;
 const SPINNER_CLASS = 'app-map-loading__spinner';
 const TEXT_CLASS = 'app-map-loading__text';
 
@@ -94,8 +99,9 @@ function mountOverlayBeside(container, overlay) {
 }
 
 /**
- * Remove the loading overlay `plugin` created: the overlay element itself, the
- * failure watcher and the safety timeout. The positioned wrapper is left in
+ * Dismiss the loading overlay `plugin` created: the failure watcher and the
+ * safety timeout stop now, the overlay fades out via its --leaving class and
+ * is removed once the fade has played. The positioned wrapper is left in
  * place - it is inert once the app has mounted, and unwrapping would reparent
  * the live React root mid-lifecycle.
  *
@@ -104,7 +110,12 @@ function mountOverlayBeside(container, overlay) {
 function dismissOverlay(state) {
 	state.stopWatching();
 	clearTimeout(state.timer);
-	state.overlay.remove();
+	// --leaving plays the CSS fade-out; the element stays mounted until it has
+	// played, then the timeout removes it. Where transitions do not run the
+	// class still clears the overlay visually. Dismissals can race (idle event,
+	// error watcher, safety timeout) - a repeat call just re-arms the removal.
+	state.overlay.classList.add(LEAVING_CLASS);
+	setTimeout(() => state.overlay.remove(), REMOVE_AFTER_MS);
 }
 
 /**

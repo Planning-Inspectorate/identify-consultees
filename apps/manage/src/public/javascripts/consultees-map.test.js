@@ -634,7 +634,9 @@ describe('consultees-map client helpers', () => {
 		// the loading overlay covers the container until the map first idles
 		assert.ok(document.querySelector('.app-map-loading'));
 		fire('map:firstidle');
-		assert.equal(document.querySelector('.app-map-loading'), null);
+		// dismissal starts the overlay's fade-out; the plugin's own spec covers
+		// the removal once the fade has played
+		assert.ok(document.querySelector('.app-map-loading').classList.contains('app-map-loading--leaving'));
 
 		fire('map:ready');
 		assert.equal(interact.enable.mock.callCount(), 1);
