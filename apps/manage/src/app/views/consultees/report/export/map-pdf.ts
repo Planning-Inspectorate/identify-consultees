@@ -34,8 +34,17 @@ export interface MapPdfInput {
 	basemap?: 'os' | 'osm' | 'google';
 	/** How many metres a pixel of `image` covers, at its centre - for the scale bar. */
 	metresPerPixel: number;
-	/** The colours the map draws the category's consultees and the site in, for the key. */
-	colours: { consultee: string; site: string; siteFillOpacity: number };
+	/**
+	 * The colours the map draws the category's consultees and the site in, for the key - and, when
+	 * it draws host or bordering authorities in their own colours (config/map-styles/authority-roles.yaml),
+	 * each of those, and whether any other consultee is drawn in `consultee` beside them.
+	 */
+	colours: {
+		consultee: string;
+		site: string;
+		siteFillOpacity: number;
+		authorities?: { host?: string; bordering?: string; others: boolean };
+	};
 	/** The ruleset's buffers the map draws around the site - `2 km`, `10 km` - for the key. */
 	buffers: string[];
 	/** Said under the map when it couldn't draw the category's consultee areas. */
@@ -176,16 +185,30 @@ function drawKey(
 	projectColours: string[]
 ): void {
 	const shown = projectColours.slice(0, KEY_PROJECT_COLOURS);
-	const entries: [(x: number) => void, number, string][] = [
-		shown.length > 0
-			? [
-					(x) => shown.forEach((colour, index) => swatch(doc, x + index * (SWATCH + 2), y, colour, LOCAL_FILL_OPACITY)),
-					shown.length * (SWATCH + 2) - 2,
-					'In the report, a colour per project (listed on the next page)'
-				]
-			: [(x) => swatch(doc, x, y, colours.consultee, LOCAL_FILL_OPACITY), SWATCH, 'In the report'],
-		[(x) => swatch(doc, x, y, colours.site, colours.siteFillOpacity), SWATCH, 'The site']
-	];
+	const entries: [(x: number) => void, number, string][] = [];
+	const { authorities } = colours;
+	if (shown.length > 0) {
+		entries.push([
+			(x) => shown.forEach((colour, index) => swatch(doc, x + index * (SWATCH + 2), y, colour, LOCAL_FILL_OPACITY)),
+			shown.length * (SWATCH + 2) - 2,
+			'In the report, a colour per project (listed on the next page)'
+		]);
+	} else if (authorities) {
+		// hosts and their neighbours each in their own colour - then any other consultee in the category's
+		const { host, bordering } = authorities;
+		if (host) {
+			entries.push([(x) => swatch(doc, x, y, host, LOCAL_FILL_OPACITY), SWATCH, 'Host authority']);
+		}
+		if (bordering) {
+			entries.push([(x) => swatch(doc, x, y, bordering, LOCAL_FILL_OPACITY), SWATCH, 'Bordering authority']);
+		}
+		if (authorities.others) {
+			entries.push([(x) => swatch(doc, x, y, colours.consultee, LOCAL_FILL_OPACITY), SWATCH, 'Other, in the report']);
+		}
+	} else {
+		entries.push([(x) => swatch(doc, x, y, colours.consultee, LOCAL_FILL_OPACITY), SWATCH, 'In the report']);
+	}
+	entries.push([(x) => swatch(doc, x, y, colours.site, colours.siteFillOpacity), SWATCH, 'The site']);
 	if (buffers.length > 0) {
 		entries.push([
 			(x) => dashedSwatch(doc, x, y),

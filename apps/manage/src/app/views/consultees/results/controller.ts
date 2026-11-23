@@ -3,7 +3,7 @@ import { dataWatermark } from '@pins/identify-consultees-database/src/geospatial
 import { getRuleset } from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
 import type { AsyncRequestHandler } from '@planning-inspectorate/core/util';
 import { createHash } from 'node:crypto';
-import { addedBeyondRun, buildCaseMapConfig, markAddedByHand } from '../../../maps/case-geojson.ts';
+import { addedBeyondRun, buildCaseMapConfig, markAddedByHand, withAuthorityRoles } from '../../../maps/case-geojson.ts';
 import { osMapsApiKeyFromEnv } from '../../../maps/os-maps.ts';
 import { buildConsulteeStaticMapResponse, sendStaticMapResponse } from '../../../maps/serve-static-map.ts';
 import { negotiateStaticMapFormat } from '../../../maps/static-map-raster.ts';
@@ -130,7 +130,7 @@ export function buildResultsStaticMap(service: ManageService, forceSvg = false):
 			// a category's map is framed as config/report.yaml sets for the category
 			const map = buildCaseMapConfig(
 				project,
-				drawn,
+				withAuthorityRoles(drawn, ruleset),
 				category || ruleset.name,
 				searchArea,
 				undefined,

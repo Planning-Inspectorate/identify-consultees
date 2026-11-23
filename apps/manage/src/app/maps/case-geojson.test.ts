@@ -4,8 +4,10 @@ import type { Geometry } from '@pins/identify-consultees-database/src/geospatial
 import assert from 'node:assert';
 import { describe, it } from 'node:test';
 import { REPORT_CONFIG } from '../report-config.ts';
+import { AUTHORITY_ROLE_STYLES } from './authority-role-styles.ts';
 import {
 	addedBeyondRun,
+	authorityRoleOf,
 	buildCaseMapConfig,
 	buildProjectGeojson,
 	LOCAL_FILL_OPACITY,
@@ -15,7 +17,8 @@ import {
 	nsipColours,
 	REGIONAL_FILL_OPACITY,
 	SITE_DISPLAY_MAX_POINTS,
-	siteDisplayGeometry
+	siteDisplayGeometry,
+	withAuthorityRoles
 } from './case-geojson.ts';
 import { CONSULTEE_CATEGORY_COLOURS, UNCATEGORISED } from './category-colours.ts';
 import { computeFittedMapView } from './geometry-bounds.ts';
@@ -381,5 +384,84 @@ describe('buildCaseMapConfig with a search area', () => {
 		const config = buildCaseMapConfig(project(), [match('a')], 'England and Wales (Post 30 April 2024)');
 		assert.strictEqual('nearbyGeojson' in config, false);
 		assert.deepStrictEqual(config.consulteeGeojson.features[0].geometry, match('a').feature.geometry);
+	});
+});
+
+describe('host and bordering authorities', () => {
+	// the default ruleset's parish conditions, as parseRulesetCsv reads them - and one with no role
+	const ruleset = {
+		rules: [
+			{
+				id: 'b_host_parish_town_community_councils',
+				name: '"B" host Parish / Town / Community Councils',
+				group: 'Administative boundaries',
+				logicType: 'intersection' as const,
+				categories: ['Parish, town and community councils'],
+				bufferMetres: 0,
+				authorityRole: 'host' as const
+			},
+			{
+				id: 'a_bordering_community_councils_bordering_b_host_community_councils',
+				name: '"A" Community Councils bordering "B" host Community Councils',
+				group: 'Administative boundaries',
+				logicType: 'bordering' as const,
+				categories: ['Parish, town and community councils'],
+				hostCategory: 'Parish, town and community councils',
+				authorityRole: 'bordering' as const
+			},
+			{
+				id: 'railways_10km',
+				name: 'Railways',
+				group: 'Transport',
+				logicType: 'intersection' as const,
+				categories: ['Railways'],
+				bufferMetres: 10_000
+			}
+		]
+	};
+	const parish = (id: string, ...conditionIds: string[]): ConsulteeMatch => ({
+		...match(id),
+		feature: {
+			...match(id).feature,
+			properties: { consultee: id, consulteeCategory: 'Parish, town and community councils' }
+		},
+		reasons: conditionIds.map((conditionId) => ({ type: 'condition' as const, conditionId }))
+	});
+	const [host, bordering] = ruleset.rules.map((rule) => rule.id);
+
+	it("gives a match its conditions' role - a host over bordering, when it is both", () => {
+		assert.strictEqual(authorityRoleOf(parish('in', host), ruleset), 'host');
+		assert.strictEqual(authorityRoleOf(parish('next door', bordering), ruleset), 'bordering');
+		// the site crosses into it, and it borders another host
+		assert.strictEqual(authorityRoleOf(parish('both', bordering, host), ruleset), 'host');
+		// not an authority condition, one the ruleset no longer has, or only the nearby search
+		assert.strictEqual(authorityRoleOf(match('railway'), ruleset), undefined);
+		assert.strictEqual(authorityRoleOf(parish('stale', 'gone'), ruleset), undefined);
+		assert.strictEqual(authorityRoleOf({ reasons: [{ type: 'nearby', radiusMetres: 20_000 }] }, ruleset), undefined);
+	});
+
+	it("draws a host and its neighbours in their roles' colours, other consultees in their category's", () => {
+		const nearbyOnly = { ...parish('nearby'), reasons: [{ type: 'nearby' as const, radiusMetres: 20_000 }] };
+		const config = buildCaseMapConfig(
+			project(),
+			withAuthorityRoles([parish('in', host), parish('next door', bordering), match('railway'), nearbyOnly], ruleset),
+			'England and Wales (Post 30 April 2024)'
+		);
+		const byId = new Map(config.consulteeGeojson.features.map((feature) => [feature.id, feature.properties]));
+
+		assert.strictEqual(byId.get('in')?.colour, AUTHORITY_ROLE_STYLES.host.colour);
+		assert.strictEqual(byId.get('in')?.authorityRole, 'host');
+		assert.strictEqual(byId.get('next door')?.colour, AUTHORITY_ROLE_STYLES.bordering.colour);
+		assert.strictEqual(byId.get('next door')?.authorityRole, 'bordering');
+		// the rest keep their category's colour, and carry no role
+		for (const id of ['railway', 'nearby']) {
+			assert.ok(CONSULTEE_CATEGORY_COLOURS.includes(byId.get(id)?.colour as never), id);
+			assert.strictEqual(byId.get(id)?.authorityRole, undefined, id);
+		}
+	});
+
+	it('leaves a match with no role as it was', () => {
+		const railway = match('railway');
+		assert.strictEqual(withAuthorityRoles([railway], ruleset)[0], railway);
 	});
 });

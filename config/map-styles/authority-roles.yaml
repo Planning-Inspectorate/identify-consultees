@@ -1,0 +1,32 @@
+# Host and bordering authority colours: every map showing identified consultees (the ruleset
+# results, the report's category pages, their static images and the report's map PDFs). Read when
+# the app starts (apps/manage/src/app/maps/authority-role-styles.ts), which refuses to start if a
+# value here is invalid - so a change is checked by `npm run check-config` and takes effect on the
+# next deploy.
+#
+# An administrative authority the ruleset identified is drawn by its role, not its category's
+# colour, so the authorities bordering the one the site is in stand out from it:
+#   host      - found by a "Host Authority" row of the rulesets workbook: the site is in it
+#   bordering - found by a "Bordering Authority" row: it borders a host
+# One found both ways (the site crosses into it, and it borders another host) is a host. A consultee
+# only the nearby search found, or one added by hand, keeps its category's colour.
+#
+# Fill opacities are unchanged: a regional authority (a county) is still only tinted.
+#
+# The host colour is the administrative boundaries teal from the GIS Styling default values
+# (docs/maps.md). The bordering orange isn't in that sheet - it needs design sign-off. Teal and
+# orange stay apart for the common colour-vision deficiencies.
+#
+# Each style:
+#   colour       - a 6-digit hex colour, e.g. '#007a7a'. Quote it: YAML treats # as a comment.
+#   description  - the colour in words, for the map key.
+
+version: 1
+
+host:
+  colour: '#007a7a'
+  description: teal
+
+bordering:
+  colour: '#f47738'
+  description: orange

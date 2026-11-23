@@ -59,6 +59,28 @@ const SMALL_CIRCLE_SYMBOL = {
 // a dot for a consultee only the nearby search found is drawn in this much of its category's colour
 const NEARBY_POINT_ALPHA = 0.45;
 
+// an identified administrative authority's `authorityRole` (case-geojson.ts) - keyed apart in the
+// layers menu, hosts first
+const AUTHORITY_ROLES = ['host', 'bordering'];
+const ROLE_LABELS = { host: 'host', bordering: 'bordering' };
+
+function roleOrder(role) {
+	const index = AUTHORITY_ROLES.indexOf(role);
+	return index === -1 ? AUTHORITY_ROLES.length : index;
+}
+
+/**
+ * A sublayer's filters on `authorityRole`: its role's features - or, for a group with none in a
+ * category that has some, the features with neither role (a missing property reads as null, which
+ * `!=` lets through). None in a category with no roles.
+ */
+function roleFilters(role, categoryHasRoles) {
+	if (role) {
+		return [['==', ['get', 'authorityRole'], role]];
+	}
+	return categoryHasRoles ? AUTHORITY_ROLES.map((entry) => ['!=', ['get', 'authorityRole'], entry]) : [];
+}
+
 /**
  * One sublayer per consultee category, in the category's colour, so each can be shown or hidden
  * from the map's layers menu - and a second, fainter one for the category's consultees only the
@@ -67,7 +89,10 @@ const NEARBY_POINT_ALPHA = 0.45;
  * harbours) are drawn as small dots; areas are filled at their `fillOpacity`, lightest first so
  * regional tints and nearby context sit under the identified local areas. A feature marked
  * `ownLayer` - a Nearby NSIP, each another project in its own colour - has a sublayer to itself,
- * named for it, so the layers menu keys each project's colour.
+ * named for it, so the layers menu keys each project's colour. An identified administrative
+ * authority marked with its `authorityRole` - `host` (the site is in it) or `bordering` - is drawn
+ * in that role's colour (config/map-styles/authority-roles.yaml), in a sublayer of its own per
+ * role, so the layers menu keys hosts and their neighbours apart.
  *
  * @param {object[]} features
  * @param {string} idPrefix
@@ -79,11 +104,13 @@ export function buildCategorySublayers(features, idPrefix) {
 		const category = feature.properties?.consulteeCategory || 'Other';
 		const nearbyOnly = feature.properties?.identified === 'false';
 		const own = feature.properties?.ownLayer === 'true' ? feature.properties.consulteeId : undefined;
-		const key = `${nearbyOnly ? 1 : 0}${category}\n${own ?? ''}`;
+		const role = nearbyOnly ? undefined : AUTHORITY_ROLES.find((entry) => entry === feature.properties?.authorityRole);
+		const key = `${nearbyOnly ? 1 : 0}${category}\n${own ?? ''}\n${role ?? ''}`;
 		const group = groups.get(key) ?? {
 			category,
 			nearbyOnly,
 			own,
+			role,
 			name: own ? feature.properties?.name || category : undefined,
 			members: []
 		};
@@ -91,11 +118,16 @@ export function buildCategorySublayers(features, idPrefix) {
 		groups.set(key, group);
 	}
 
+	const categoriesWithRoles = new Set(
+		[...groups.values()].filter((group) => group.role).map((group) => group.category)
+	);
 	const sorted = [...groups.values()]
 		.sort(
 			(a, b) =>
 				a.category.localeCompare(b.category) ||
 				Number(a.nearbyOnly) - Number(b.nearbyOnly) ||
+				// hosts, then their neighbours, then any of the category with no role (one added by hand)
+				roleOrder(a.role) - roleOrder(b.role) ||
 				// only a category's own-layer groups get this far, and each has a name
 				String(a.name).localeCompare(String(b.name))
 		)
@@ -103,7 +135,7 @@ export function buildCategorySublayers(features, idPrefix) {
 	// sublayers draw in order
 	sorted.sort((a, b) => a.opacity - b.opacity);
 
-	return sorted.map(({ category, nearbyOnly, own, name, members, opacity }, index) => {
+	return sorted.map(({ category, nearbyOnly, own, role, name, members, opacity }, index) => {
 		const colour = members[0].properties?.colour || DEFAULT_CONSULTEE_COLOUR;
 		const isPoints = members.every((feature) => POINT_TYPES.has(feature.geometry?.type));
 		let style;
@@ -125,6 +157,8 @@ export function buildCategorySublayers(features, idPrefix) {
 			label = name;
 		} else if (nearbyOnly) {
 			label = `${category}: nearby, not identified (${members.length})`;
+		} else if (role) {
+			label = `${category}: ${ROLE_LABELS[role]} (${members.length})`;
 		}
 		return {
 			id: `${idPrefix}-${index}`,
@@ -134,7 +168,12 @@ export function buildCategorySublayers(features, idPrefix) {
 			// a category's features all have their own layers or none do - Nearby NSIPs, or not
 			filter: own
 				? ['==', ['get', 'consulteeId'], own]
-				: ['all', ['==', ['get', 'consulteeCategory'], category], identifiedFilter],
+				: [
+						'all',
+						['==', ['get', 'consulteeCategory'], category],
+						identifiedFilter,
+						...roleFilters(role, categoriesWithRoles.has(category))
+					],
 			style
 		};
 	});

@@ -36,6 +36,8 @@ projectSite:
 #   identified - it met at least one ruleset condition (the intersection logic)
 #   nearbyOnly - it was only found by the nearby search (within 20km), with no condition met
 # These are the defaults; a category below can override any value.
+# A host or bordering authority's colour is set apart from its category's, in authority-roles.yaml
+# next to this file - which the app does read.
 defaults:
   identified:
     fillOpacity: 0.35
