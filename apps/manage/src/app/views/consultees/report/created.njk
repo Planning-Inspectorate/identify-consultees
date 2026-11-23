@@ -31,14 +31,6 @@
 					<a class="govuk-link" href="{{ downloadUrl }}">{{ downloadText }}</a>
 				</p>
 			{% endif %}
-
-			{% if rulesetFailed %}
-				{% set failureHtml %}
-					<h3 class="govuk-notification-banner__heading">The ruleset could not be run</h3>
-					<p class="govuk-body">The report could not be created because the search did not finish. <a class="govuk-notification-banner__link" href="{{ retryUrl }}">Try again</a>.</p>
-				{% endset %}
-				{{ govukNotificationBanner({ html: failureHtml }) }}
-			{% endif %}
 		</div>
 	</div>
 {% endblock %}

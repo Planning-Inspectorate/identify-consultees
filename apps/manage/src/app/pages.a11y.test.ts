@@ -220,31 +220,8 @@ describe('manage page accessibility smoke', () => {
 			],
 			generateReportUrl:
 				'/consultees/11111111-1111-1111-1111-111111111111/report/created?ruleset=england-wales-post-20240430',
-			rulesetFailed: false,
 			retryUrl: '/consultees/11111111-1111-1111-1111-111111111111/report?ruleset=england-wales-post-20240430'
 		});
-		await assertNoSeriousA11yViolations(html);
-	});
-
-	test('consultee report check page when the ruleset could not be run has no serious a11y violations', async () => {
-		const html = nunjucks.render('views/consultees/report/view.njk', {
-			...pageLocals,
-			pageHeading: 'Check consultees before creating the report',
-			backLinkUrl: '/consultees/11111111-1111-1111-1111-111111111111/ruleset?ruleset=england-wales-post-20240430',
-			caseName: 'Longfield Solar Farm',
-			reference: 'EN0110007',
-			caseChangeUrl: '/',
-			shapefileName: 'EN0110007.geojson',
-			shapefileChangeUrl: '/consultees/11111111-1111-1111-1111-111111111111',
-			rulesetName: 'England and Wales (Post 30 April 2024)',
-			rulesetChangeUrl: '/consultees/11111111-1111-1111-1111-111111111111/ruleset?ruleset=england-wales-post-20240430',
-			groups: [],
-			generateReportUrl:
-				'/consultees/11111111-1111-1111-1111-111111111111/report/created?ruleset=england-wales-post-20240430',
-			rulesetFailed: true,
-			retryUrl: '/consultees/11111111-1111-1111-1111-111111111111/report?ruleset=england-wales-post-20240430'
-		});
-		assert.match(html, /The ruleset could not be run/);
 		await assertNoSeriousA11yViolations(html);
 	});
 
@@ -288,7 +265,6 @@ describe('manage page accessibility smoke', () => {
 			mapConfigJson: '{"type":"FeatureCollection","features":[]}',
 			removedRows: [{ name: 'Little Bedwyn Parish Council', reason: 'Outside the search area' }],
 			removedOpen: true,
-			rulesetFailed: false,
 			retryUrl:
 				'/consultees/11111111-1111-1111-1111-111111111111/report/consultees?ruleset=england-wales-post-20240430&category=Parish%2C%20town%20and%20community%20councils'
 		});
@@ -319,7 +295,6 @@ describe('manage page accessibility smoke', () => {
 			mapConfigJson: '{"type":"FeatureCollection","features":[]}',
 			removedRows: [],
 			removedOpen: false,
-			rulesetFailed: false,
 			retryUrl:
 				'/consultees/11111111-1111-1111-1111-111111111111/report/consultees?ruleset=england-wales-post-20240430&category=Parish%2C%20town%20and%20community%20councils'
 		});
@@ -383,7 +358,6 @@ describe('manage page accessibility smoke', () => {
 			name: 'Little Snoring Parish Council',
 			identified: ['"B" host Parishes or Community Councils: intersects the site'],
 			reasonValue: '',
-			rulesetFailed: false,
 			retryUrl:
 				'/consultees/11111111-1111-1111-1111-111111111111/report/consultees/remove?ruleset=england-wales-post-20240430&category=Parish%2C%20town%20and%20community%20councils&match=55555555-5555-5555-5555-555555555555'
 		});
@@ -405,7 +379,6 @@ describe('manage page accessibility smoke', () => {
 			reasonValue: '   ',
 			reasonError: { text: 'Enter a reason for removing this consultee' },
 			errorSummary: [{ text: 'Enter a reason for removing this consultee', href: '#removal-reason' }],
-			rulesetFailed: false,
 			retryUrl:
 				'/consultees/11111111-1111-1111-1111-111111111111/report/consultees/remove?ruleset=england-wales-post-20240430&category=Parish%2C%20town%20and%20community%20councils&match=55555555-5555-5555-5555-555555555555'
 		});
@@ -423,7 +396,6 @@ describe('manage page accessibility smoke', () => {
 			downloadUrl:
 				'/consultees/11111111-1111-1111-1111-111111111111/report/download?ruleset=england-wales-post-20240430',
 			downloadText: 'Download Longfield Solar Farm Consultee List report (ZIP, 25MB)',
-			rulesetFailed: false,
 			retryUrl: '/consultees/11111111-1111-1111-1111-111111111111/report/created?ruleset=england-wales-post-20240430'
 		});
 		await assertNoSeriousA11yViolations(html);
@@ -439,7 +411,6 @@ describe('manage page accessibility smoke', () => {
 			downloadUrl:
 				'/consultees/11111111-1111-1111-1111-111111111111/report/download?ruleset=england-wales-post-20240430',
 			downloadText: 'Download Longfield Solar Farm Consultee List report (ZIP)',
-			rulesetFailed: false,
 			retryUrl: '/consultees/11111111-1111-1111-1111-111111111111/report/created?ruleset=england-wales-post-20240430',
 			downloadFailed: true,
 			errorSummary: [
@@ -464,7 +435,6 @@ describe('manage page accessibility smoke', () => {
 			downloadUrl:
 				'/consultees/11111111-1111-1111-1111-111111111111/report/download?ruleset=england-wales-post-20240430',
 			downloadText: 'Download Longfield Solar Farm Consultee List report (ZIP)',
-			rulesetFailed: true,
 			retryUrl: '/consultees/11111111-1111-1111-1111-111111111111/report/created?ruleset=england-wales-post-20240430'
 		});
 		await assertNoSeriousA11yViolations(html);

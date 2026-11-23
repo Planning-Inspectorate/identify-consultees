@@ -25,53 +25,44 @@
 {% block pageContent %}
 	<div class="govuk-grid-row">
 		<div class="govuk-grid-column-two-thirds">
-			{% if rulesetFailed %}
-				{% from "govuk/components/notification-banner/macro.njk" import govukNotificationBanner %}
-				{% set failureHtml %}
-					<h3 class="govuk-notification-banner__heading">The ruleset could not be run</h3>
-					<p class="govuk-body">The consultee cannot be shown because the search did not finish. <a class="govuk-notification-banner__link" href="{{ retryUrl }}">Try again</a>.</p>
-				{% endset %}
-				{{ govukNotificationBanner({ html: failureHtml }) }}
-			{% else %}
-				{% set summaryRows = [] %}
-				{% for consultee in consultees %}
-					{# one reason per line - each item is autoescaped #}
-					{% set identifiedHtml %}{% for reason in consultee.identified %}{{ reason }}{% if not loop.last %}<br>{% endif %}{% endfor %}{% endset %}
-					{% set summaryRows = (summaryRows.push([
-						{ text: consultee.name, classes: "govuk-table__cell--no-wrap" },
-						{ html: identifiedHtml }
-					]), summaryRows) %}
-				{% endfor %}
-				{{ govukTable({
-					caption: "Consultees being removed" if consultees.length > 1 else "Consultee being removed",
-					captionClasses: "govuk-visually-hidden",
-					firstCellIsHeader: true,
-					head: [
-						{ text: "Name" },
-						{ text: "Identified" }
-					],
-					rows: summaryRows
+			{% set summaryRows = [] %}
+			{% for consultee in consultees %}
+				{# one reason per line - each item is autoescaped #}
+				{% set identifiedHtml %}{% for reason in consultee.identified %}{{ reason }}{% if not loop.last %}<br>{% endif %}{% endfor %}{% endset %}
+				{% set summaryRows = (summaryRows.push([
+					{ text: consultee.name, classes: "govuk-table__cell--no-wrap" },
+					{ html: identifiedHtml }
+				]), summaryRows) %}
+			{% endfor %}
+			{{ govukTable({
+				caption: "Consultees being removed" if consultees.length > 1 else "Consultee being removed",
+				captionClasses: "govuk-visually-hidden",
+				firstCellIsHeader: true,
+				head: [
+					{ text: "Name" },
+					{ text: "Identified" }
+				],
+				rows: summaryRows
+			}) }}
+
+			<form method="post" action="{{ formAction }}" novalidate>
+				<input type="hidden" name="_csrf" value="{{ _csrf }}">
+				{{ govukTextarea({
+					label: {
+						text: "Reason for removing",
+						classes: "govuk-label--m"
+					},
+					id: "removal-reason",
+					name: "reason",
+					value: reasonValue,
+					errorMessage: reasonError,
+					rows: 5
 				}) }}
 
-				<form method="post" action="{{ formAction }}" novalidate>
-					<input type="hidden" name="_csrf" value="{{ _csrf }}">
-					{{ govukTextarea({
-						label: {
-							text: "Reason for removing",
-							classes: "govuk-label--m"
-						},
-						id: "removal-reason",
-						name: "reason",
-						value: reasonValue,
-						errorMessage: reasonError,
-						rows: 5
-					}) }}
-
-					{{ govukButton({
-						text: "Remove consultee"
-					}) }}
-				</form>
-			{% endif %}
+				{{ govukButton({
+					text: "Remove consultee"
+				}) }}
+			</form>
 		</div>
 	</div>
 {% endblock %}

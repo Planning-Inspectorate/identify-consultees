@@ -72,7 +72,8 @@ export async function categoryContext(
 		(consultee) => consultee.feature.properties.consulteeCategory === category && isIdentified(consultee)
 	);
 	const nearbyNsips = category === NEARBY_NSIPS && service.nearbyNsipRadiusMetres > 0;
-	if (!failed && !found && !nearbyNsips && !rulesetCategories(ruleset).includes(category)) {
+
+	if (!found && !nearbyNsips && !rulesetCategories(ruleset).includes(category)) {
 		res.status(404).render('views/errors/404.njk', { pageHeading: 'Page not found' });
 		return undefined;
 	}
@@ -186,7 +187,7 @@ async function renderCategoryPage(
 	res: Response,
 	context: CategoryContext
 ): Promise<void> {
-	const { project, ruleset, category, consultees, failed, screenedBoundingBox } = context;
+	const { project, ruleset, category, consultees, screenedBoundingBox } = context;
 	const selection = context.selection;
 	const excluded = excludedMatchIds(selection.removed);
 
@@ -342,7 +343,6 @@ async function renderCategoryPage(
 					]
 				}
 			: {}),
-		rulesetFailed: failed,
 		screenedBoundingBox,
 		retryUrl: consulteesUrl(project.id, ruleset.id, category, selection)
 	};

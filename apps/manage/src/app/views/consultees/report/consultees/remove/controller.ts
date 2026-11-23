@@ -3,6 +3,7 @@ import type { Ruleset } from '@pins/identify-consultees-database/src/geospatial/
 import { isIdentified } from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
 import type { AsyncRequestHandler, AsyncRequestHandlerWithBody } from '@planning-inspectorate/core/util';
 import type { Response } from 'express';
+import { RULESET_ERROR_MESSAGE } from '../../../../errors/error-messages.ts';
 import { describeReasons } from '../../../reasons.ts';
 import { resolveCase, resolveCaseSummary } from '../../../resolve-case.ts';
 import type { RulesetRunStore } from '../../../run-ruleset.ts';
@@ -36,8 +37,6 @@ interface RemoveConsulteeContext {
 	selection: ConsulteeSelection;
 	/** The consultees being removed - one row of the summary table each, in param order. */
 	targets: ResolvedRemovalTarget[];
-	/** A match target whose ruleset run failed can't be resolved - the page shows an error, not the form. */
-	rulesetFailed: boolean;
 }
 
 /**
@@ -51,7 +50,7 @@ interface RemoveConsulteeContext {
  * ticked - so the request goes back to the category page for it to flag (`error=select`), a
  * form-validation failure rather than a missing page. Anything else - a case or ruleset that
  * isn't found, or a target that doesn't resolve - 404s. `undefined` means a response has
- * already been sent.
+ * already been sent. If the ruleset fails, redirect to the service unavailable page.
  */
 async function removeConsulteeContext(
 	service: ManageService,
@@ -87,14 +86,8 @@ async function removeConsulteeContext(
 		resolvedCaseId = project.id;
 		const { consultees, failed } = await runRulesetSafely(service, project, ruleset, store);
 		if (failed) {
-			return {
-				caseId: project.id,
-				ruleset,
-				category,
-				selection,
-				targets: [],
-				rulesetFailed: true
-			};
+			res.status(500).render('views/errors/500.njk', RULESET_ERROR_MESSAGE);
+			return;
 		}
 		const excluded = excludedMatchIds(selection.removed);
 		// select-all wants every match the category page listed: identified by a condition
@@ -171,8 +164,7 @@ async function removeConsulteeContext(
 		ruleset,
 		category,
 		selection,
-		targets,
-		rulesetFailed: false
+		targets
 	};
 }
 
@@ -197,7 +189,6 @@ function viewModel(context: RemoveConsulteeContext, reasonValue = '', reasonErro
 					errorSummary: [{ text: reasonError, href: '#removal-reason' }]
 				}
 			: {}),
-		rulesetFailed: context.rulesetFailed,
 		retryUrl: selfUrl
 	};
 }
@@ -232,9 +223,6 @@ export function buildReportConsulteeRemoveSubmit(
 		const context = await removeConsulteeContext(service, String(req.params.caseId ?? ''), req.query, res, req.session);
 		if (!context) {
 			return;
-		}
-		if (context.rulesetFailed) {
-			return res.render('views/consultees/report/consultees/remove/view.njk', viewModel(context));
 		}
 		const { caseId, ruleset, category, selection } = context;
 
