@@ -115,6 +115,8 @@ const removal = JSON.stringify({
 	n: 'Parish 2',
 	r: 'Dissolved'
 });
+// a hand-added consultee removed again - listed by name on its tab
+const removedAdd = JSON.stringify({ c: 'Landowner', n: 'Former Landowner', r: 'Sold the land' });
 const pickedAdd = JSON.stringify({
 	i: pickedParish,
 	c: 'Parish, town and community councils',
@@ -148,15 +150,16 @@ describe('report download', () => {
 		await buildReportDownload(service as never)(
 			{
 				params: { caseId: realProjectId },
-				query: { ruleset, exclude: removal, add: [pickedAdd, typedAdd] },
+				query: { ruleset, exclude: [removal, removedAdd], add: [pickedAdd, typedAdd] },
 				session: { account: { name: 'Test Name' } }
 			} as never,
 			res as never
 		);
 
-		// the stored rows of what's in the report: the identified parish, and the picked nearby one
+		// the stored rows of what the workbook lists: the identified parish, the removed one (listed,
+		// greyed, with its reason) and the picked nearby one
 		const [{ where }] = service.db.consulteeArea.findMany.mock.calls[0].arguments;
-		assert.deepStrictEqual(where.id.in, [identifiedParish, pickedParish]);
+		assert.deepStrictEqual(where.id.in, [identifiedParish, removedParish, pickedParish]);
 
 		const [headers] = res.set.mock.calls[0].arguments as unknown as [Record<string, string>];
 		assert.equal(headers['Content-Type'], 'application/zip');
@@ -180,6 +183,9 @@ describe('report download', () => {
 			.join('');
 		assert.ok(sheets.includes('Borders the site'));
 		assert.ok(sheets.includes('Manually added'));
+		// the removed parish is on its tab too, with why it was removed
+		assert.ok(sheets.includes('Removed: Dissolved'));
+		assert.ok(sheets.includes('Former Landowner') && sheets.includes('Removed: Sold the land'));
 		assert.ok(!sheets.includes(pickedParish) && !sheets.includes('Consultee area id'));
 		assert.ok(sheets.includes('Test Name'));
 

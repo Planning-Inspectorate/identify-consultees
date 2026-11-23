@@ -28,7 +28,7 @@ import { buildSearchAreaSafely, RULESET_RUN_MAX_AGE_MS } from '../../run-ruleset
 import type { SiteBufferCache } from '../../site-buffers.ts';
 import { categoryBufferMetres, formatBufferDistance, siteBufferGeojson, siteBuffers } from '../../site-buffers.ts';
 import { reportByCategory } from '../report-consultees.ts';
-import type { ConsulteeSelection } from '../urls.ts';
+import type { ConsulteeSelection, RemovedConsultee } from '../urls.ts';
 import { addedMatchIds, excludedMatchIds } from '../urls.ts';
 import type { MapPdfInput } from './map-pdf.ts';
 import { buildMapPdf } from './map-pdf.ts';
@@ -278,6 +278,13 @@ export async function buildReportZip({
 	const { db, logger } = service;
 	const excluded = excludedMatchIds(selection.removed);
 	const identified = consultees.filter((match) => isIdentified(match) && !excluded.has(match.feature.id));
+	// each removed ruleset match as the run found it, so its tab lists it - one the run no longer
+	// finds is listed by name, as a removed hand-added one is
+	const removed = selection.removed.map((removal): RemovedConsultee & { match?: ConsulteeMatch } => {
+		const match = removal.id ? consultees.find((candidate) => candidate.feature.id === removal.id) : undefined;
+		return match ? { ...removal, match } : removal;
+	});
+	const removedMatches = removed.flatMap((removal) => (removal.match ? [removal.match] : []));
 	// a hand-added NSIP is another case - its row is in case_boundary
 	const [addedNsips, addedConsultees] = [
 		selection.adds.filter((add) => add.category === NEARBY_NSIPS),
@@ -296,10 +303,12 @@ export async function buildReportZip({
 			(
 				await Promise.all([
 					consulteeAreaRecords(db, [
-						...identified.filter((match) => !isNearbyNsip(match)).map((match) => match.feature.id),
+						...[...identified, ...removedMatches]
+							.filter((match) => !isNearbyNsip(match))
+							.map((match) => match.feature.id),
 						...addedMatchIds(addedConsultees)
 					]),
-					nearbyNsipRecords(db, identified.filter(isNearbyNsip), addedMatchIds(addedNsips))
+					nearbyNsipRecords(db, [...identified, ...removedMatches].filter(isNearbyNsip), addedMatchIds(addedNsips))
 				])
 			).flatMap((records) => [...records])
 		),
@@ -308,7 +317,7 @@ export async function buildReportZip({
 			const found = add.id ? consultees.find((match) => match.feature.id === add.id) : undefined;
 			return found ? { ...add, distanceMetres: found.distanceMetres } : add;
 		}),
-		removed: selection.removed,
+		removed,
 		accountInfo
 	};
 	const files: Record<string, Uint8Array> = {

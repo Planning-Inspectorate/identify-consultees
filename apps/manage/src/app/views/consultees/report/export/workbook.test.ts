@@ -310,6 +310,104 @@ describe('report workbook', () => {
 		assert.equal(publicBodies.data.length, 2);
 	});
 
+	it('lists removed consultees greyed on their tabs, after those in the report, with why - but counts only those in', () => {
+		const removedMatch = match('r', 'Parish, town and community councils', 'Removed Parish', 'b_host_parish');
+		const sheets = sheetsOf(
+			report({
+				identified: [match('a', 'Parish, town and community councils', 'Zeal Parish Council', 'b_host_parish')],
+				records: new Map([['r', record('r', { consultee: 'Removed Parish', region: 'Stored region' })]]),
+				added: [{ category: 'Parish, town and community councils', name: 'Added Parish', reason: 'Asked' }],
+				removed: [
+					// a ruleset match, as the run found it
+					{
+						id: 'r',
+						category: 'Parish, town and community councils',
+						name: 'Removed Parish',
+						reason: 'Dissolved',
+						match: removedMatch
+					},
+					// a hand-added one removed again, and a ruleset match the run no longer finds
+					{
+						category: 'Hospitals operated by NHS trusts and NHS foundation trusts (England)',
+						name: 'Gone Hospital',
+						reason: 'Closed'
+					},
+					{ id: 'x', category: 'Parish, town and community councils', name: 'Absent Parish', reason: 'Merged' }
+				]
+			})
+		);
+		const admin = sheets.find((sheet) => sheet.sheet === 'Administrative boundaries')!;
+		const [header, ...rows] = admin.data;
+		const column = (name: string) => rowValues(header).indexOf(name);
+		assert.deepStrictEqual(
+			rows.map((row) => [row[column('Consultee')], row[column('Why identified')], row[column('Source')]].map(valueOf)),
+			[
+				// those in the report first, by name - then those removed from it, by name
+				['Added Parish', 'Asked', 'Manually added'],
+				['Zeal Parish Council', '"B" host Parish Councils: intersects the site', 'Test ruleset ruleset'],
+				['Absent Parish', 'Identified by the ruleset', 'Removed: Merged'],
+				['Removed Parish', '"B" host Parish Councils: intersects the site', 'Removed: Dissolved']
+			]
+		);
+		// a removed one's row is greyed - its stored values still filled in - and an empty cell stays empty
+		const removedRow = rows[3];
+		assert.equal(valueOf(removedRow[column('Region')]), 'Stored region');
+		for (const cell of removedRow) {
+			assert.ok(cell === null || (cell as { textColor?: string }).textColor === '#505A5F');
+		}
+		assert.equal((rows[1][column('Consultee')] as { textColor?: string }).textColor, undefined);
+		const publicBodies = sheets.find((sheet) => sheet.sheet === 'Public bodies')!;
+		assert.deepStrictEqual(
+			publicBodies.data
+				.slice(1)
+				.map((row) => [row[column('Consultee')], row[column('Why identified')], row[column('Source')]].map(valueOf)),
+			[['Gone Hospital', 'Manually added', 'Removed: Closed']]
+		);
+
+		// the Summary counts the two in the report, not the three removed - which it still lists
+		const summary = sheets.find((sheet) => sheet.sheet === 'Summary')!.data.map(rowValues);
+		assert.deepStrictEqual(
+			summary.find((row) => row[0] === 'Administrative boundaries - Total'),
+			['Administrative boundaries - Total', 2]
+		);
+		assert.deepStrictEqual(
+			summary.find((row) => row[0] === 'Public bodies - Total'),
+			['Public bodies - Total', 0]
+		);
+		assert.deepStrictEqual(
+			summary.find((row) => row[0] === 'Removed'),
+			['Removed', 3]
+		);
+	});
+
+	it('lists a removed Nearby NSIP on its tab, found by the run or added by hand', () => {
+		const nsip = {
+			feature: { id: 'n', properties: { consulteeCategory: NEARBY_NSIPS, consultee: 'Other Wind Farm (EN010002)' } },
+			distanceMetres: 2_000,
+			reasons: [{ type: 'nearbyNsip', radiusMetres: 35_000 }]
+		} as ConsulteeMatch;
+		const sheets = sheetsOf(
+			report({
+				removed: [
+					{ id: 'n', category: NEARBY_NSIPS, name: 'Other Wind Farm (EN010002)', reason: 'Withdrawn', match: nsip },
+					{ category: NEARBY_NSIPS, name: 'Added Solar (EN010003)', reason: 'Not relevant' }
+				]
+			})
+		);
+		const nsips = sheets.find((sheet) => sheet.sheet === NEARBY_NSIPS)!;
+		const [header, ...rows] = nsips.data;
+		const values = rows.map((row) =>
+			Object.fromEntries(rowValues(header).map((name, index) => [name, valueOf(row[index])]))
+		);
+		assert.deepStrictEqual(
+			values.map((row) => [row.Name, row.Query, row.Source]),
+			[
+				['Added Solar', 'Manually added', 'Removed: Not relevant'],
+				['Other Wind Farm', '35km buffer', 'Removed: Withdrawn']
+			]
+		);
+	});
+
 	it("spreads each tab's metadata into a column per attribute, blank where a consultee lacks one", () => {
 		const sheets = sheetsOf(
 			report({
