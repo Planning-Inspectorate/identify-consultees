@@ -212,6 +212,10 @@ function runCliViaStubbedBlob(blobPayload: string, args: string[], env: Record<s
 	return execFileSync(process.execPath, ['--input-type=module', '--experimental-strip-types', '--eval', harness], {
 		cwd: databaseDir,
 		env: { ...process.env, ...BLOB_ENV, ...env },
+		// without stdio specified, a failing child's stderr - a whole uncaught-exception dump -
+		// echoes to the parent's stderr as well as landing on the thrown error, which reads as a
+		// crash in CI logs for a test that's passing on purpose
+		stdio: 'pipe',
 		encoding: 'utf8'
 	});
 }
