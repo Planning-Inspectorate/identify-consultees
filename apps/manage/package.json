@@ -9,6 +9,7 @@
     "build": "node src/util/build.ts",
     "update-fingerprints": "node scripts/update-fingerprints.mjs",
     "check-fingerprints": "node scripts/update-fingerprints.mjs --check",
+    "check-asset-sizes": "node scripts/check-asset-sizes.mjs",
     "prestart": "node ../../scripts/kill-port.ts",
     "start": "npm run build && node src/server.ts",
     "test": "node --test",
