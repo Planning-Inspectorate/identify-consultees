@@ -11,6 +11,6 @@ export const RULESET_ERROR_MESSAGE: ErrorRenderData = {
 			href: '',
 			message: 'Refresh the page to try again'
 		},
-		'If you leave this page you will have to start this process again'
+		'If you leave this page you will have to start this process again.'
 	]
 };

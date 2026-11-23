@@ -5,7 +5,7 @@
   service" pattern (offline support variant). Every status-specific template under views/errors/
   extends this, and @planning-inspectorate/core's catch-all handlers render it directly for
   unmatched routes and unhandled errors - so there is one consistent error page for 404s, 500s
-  and anything in between.
+  and anything in between. Contains error help text tailored for internally facing users.
 
   Render inputs:
     - pageTitle / pageHeading: the h1 and browser tab title
@@ -24,16 +24,7 @@
 					{% endif %}
 				</p>
 			{% endfor %}
-
-			<h2 class="govuk-heading-m">Contact IT if you continue to have problems with this service.</h2>
-			<p class="govuk-body">
-				<a href="https://contact-us.planninginspectorate.gov.uk/hc/en-gb/requests/new" class="govuk-link">Fill out our contact form</a>
-			</p>
-			<p class="govuk-body">
-				Telephone: <a href="tel:03034445000" class="govuk-link">0303 444 5000</a><br>
-				Open Monday to Friday: 9am to 4pm.<br>
-				Closed on weekends and bank holidays.
-			</p>
+			<p class="govuk-body"><a href="https://intranet.planninginspectorate.gov.uk/task/report-it-problem/" class="govuk-link">Contact the IT service desk</a> if you continue to have problems with this service.</p>
 		</div>
 	</div>
 
