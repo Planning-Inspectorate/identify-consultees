@@ -4,6 +4,7 @@ import { after, before, describe, mock, test } from 'node:test';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import type { PrismaClient } from '../client/client.ts';
 import { loadConfig } from '../configuration/config.ts';
+import { skipIfDbUnavailable } from '../db-test-skip.ts';
 import { newDatabaseClient } from '../index.ts';
 import type { GroupLoad, LatestGroupLoad } from './consultee-area-groups.ts';
 import { GroupLoadError } from './consultee-area-groups.ts';
@@ -272,7 +273,7 @@ describe('running as a script (requires a local SQL Server - see docker-compose.
 	});
 
 	test("fails with the LoadError a clear of a quarter there's no dataset for raises", async (t) => {
-		if (!dbAvailable) return t.skip('SQL Server database not available');
+		if (!dbAvailable) return skipIfDbUnavailable(t);
 		// a quarter long before any dataset: refused before anything is cleared or loaded
 		const failure = runCli(['--clear=1999Q1', '--no-load'], {
 			...process.env,

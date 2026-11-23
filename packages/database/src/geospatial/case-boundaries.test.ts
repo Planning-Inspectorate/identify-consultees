@@ -4,6 +4,7 @@ import type { PrismaClient } from '../client/client.ts';
 import { Prisma } from '../client/client.ts';
 import { loadConfig } from '../configuration/config.ts';
 import { acquireDbTestLock, releaseDbTestLock } from '../db-test-lock.ts';
+import { skipIfDbUnavailable } from '../db-test-skip.ts';
 import { newDatabaseClient } from '../index.ts';
 import type { CaseBoundaryFeatureCollection } from './case-boundaries.ts';
 import {
@@ -51,7 +52,7 @@ async function cleanup() {
 
 describe('case boundaries (requires a local SQL Server - see docker-compose.yml)', () => {
 	test('load, list, findNear and findIntersecting round-trip a stored boundary', async (t) => {
-		if (!dbAvailable) return t.skip('SQL Server database not available');
+		if (!dbAvailable) return skipIfDbUnavailable(t);
 
 		await cleanup();
 		try {
@@ -97,7 +98,7 @@ describe('case boundaries (requires a local SQL Server - see docker-compose.yml)
 	});
 
 	test('loading the same id twice upserts rather than duplicating', async (t) => {
-		if (!dbAvailable) return t.skip('SQL Server database not available');
+		if (!dbAvailable) return skipIfDbUnavailable(t);
 
 		await cleanup();
 		try {
@@ -123,7 +124,7 @@ describe('case boundaries (requires a local SQL Server - see docker-compose.yml)
 	});
 
 	test('refuses a boundary carrying more points than the limit, before any write', async (t) => {
-		if (!dbAvailable) return t.skip('SQL Server database not available');
+		if (!dbAvailable) return skipIfDbUnavailable(t);
 
 		await cleanup();
 		try {
@@ -172,7 +173,7 @@ describe('case boundaries (requires a local SQL Server - see docker-compose.yml)
 	});
 
 	test('counts a GeometryCollection boundary across its parts for the limit', async (t) => {
-		if (!dbAvailable) return t.skip('SQL Server database not available');
+		if (!dbAvailable) return skipIfDbUnavailable(t);
 
 		await cleanup();
 		try {
@@ -206,7 +207,7 @@ describe('case boundaries (requires a local SQL Server - see docker-compose.yml)
 	});
 
 	test('getCaseBoundaryById finds a stored boundary and returns null otherwise', async (t) => {
-		if (!dbAvailable) return t.skip('SQL Server database not available');
+		if (!dbAvailable) return skipIfDbUnavailable(t);
 
 		await cleanup();
 		try {
@@ -235,7 +236,7 @@ describe('case boundaries (requires a local SQL Server - see docker-compose.yml)
 	});
 
 	test('getCaseBoundaryById reads the simplified geometry for a boundary too detailed to draw whole', async (t) => {
-		if (!dbAvailable) return t.skip('SQL Server database not available');
+		if (!dbAvailable) return skipIfDbUnavailable(t);
 
 		// a ring with more points than the read's 50,000-point cap - a 60,000-vertex circle
 		const vertices = 60_000;
@@ -269,7 +270,7 @@ describe('case boundaries (requires a local SQL Server - see docker-compose.yml)
 	});
 
 	test('getCaseBoundariesByIds reads every named boundary in one round trip, missing ones absent', async (t) => {
-		if (!dbAvailable) return t.skip('SQL Server database not available');
+		if (!dbAvailable) return skipIfDbUnavailable(t);
 
 		const secondBoundaryId = '33333333-3333-3333-3333-333333333333';
 		const missingId = '99999999-9999-9999-9999-999999999999';
@@ -308,7 +309,7 @@ describe('case boundaries (requires a local SQL Server - see docker-compose.yml)
 	});
 
 	test('getCaseBoundarySummaryById finds a stored boundary without its geometry, and returns null otherwise', async (t) => {
-		if (!dbAvailable) return t.skip('SQL Server database not available');
+		if (!dbAvailable) return skipIfDbUnavailable(t);
 
 		await cleanup();
 		try {
@@ -346,7 +347,7 @@ describe('case boundaries (requires a local SQL Server - see docker-compose.yml)
 	});
 
 	test('searchCaseBoundaries matches by name or reference and reports a total count', async (t) => {
-		if (!dbAvailable) return t.skip('SQL Server database not available');
+		if (!dbAvailable) return skipIfDbUnavailable(t);
 
 		await cleanup();
 		try {
@@ -384,7 +385,7 @@ describe('case boundaries (requires a local SQL Server - see docker-compose.yml)
 	});
 
 	test('searchCaseBoundaries returns one result per case - its newest submission', async (t) => {
-		if (!dbAvailable) return t.skip('SQL Server database not available');
+		if (!dbAvailable) return skipIfDbUnavailable(t);
 
 		const olderId = '22222222-2222-2222-2222-222222222224';
 		const undatedId = '22222222-2222-2222-2222-222222222225';
@@ -432,7 +433,7 @@ describe('case boundaries (requires a local SQL Server - see docker-compose.yml)
 	});
 
 	test('listCaseBoundaryFiles returns every file for a caseReference, newest first', async (t) => {
-		if (!dbAvailable) return t.skip('SQL Server database not available');
+		if (!dbAvailable) return skipIfDbUnavailable(t);
 
 		const olderFileId = '22222222-2222-2222-2222-222222222223';
 		const cleanupFiles = async () => {
@@ -485,7 +486,7 @@ describe('case boundaries (requires a local SQL Server - see docker-compose.yml)
 	});
 
 	test('load reports progress per batch and stores optional columns when present', async (t) => {
-		if (!dbAvailable) return t.skip('SQL Server database not available');
+		if (!dbAvailable) return skipIfDbUnavailable(t);
 
 		const secondBoundaryId = '22222222-2222-2222-2222-222222222226';
 		const progress: [number, number][] = [];
@@ -544,7 +545,7 @@ describe('case boundaries (requires a local SQL Server - see docker-compose.yml)
 	});
 
 	test('listCaseBoundaries paginates with limit and offset together', async (t) => {
-		if (!dbAvailable) return t.skip('SQL Server database not available');
+		if (!dbAvailable) return skipIfDbUnavailable(t);
 
 		const page = await listCaseBoundaries(dbClient, { limit: 5, offset: 1 });
 		assert.equal(page.type, 'FeatureCollection');
@@ -552,7 +553,7 @@ describe('case boundaries (requires a local SQL Server - see docker-compose.yml)
 	});
 
 	test('searchCaseBoundaries treats a missing or blank query as match-everything', async (t) => {
-		if (!dbAvailable) return t.skip('SQL Server database not available');
+		if (!dbAvailable) return skipIfDbUnavailable(t);
 
 		const all = await searchCaseBoundaries(dbClient);
 		assert.ok(Array.isArray(all.features));
@@ -563,7 +564,7 @@ describe('case boundaries (requires a local SQL Server - see docker-compose.yml)
 	});
 
 	test('searchCaseBoundaries still reports the match total when the page is out of range', async (t) => {
-		if (!dbAvailable) return t.skip('SQL Server database not available');
+		if (!dbAvailable) return skipIfDbUnavailable(t);
 
 		await cleanup();
 		try {
@@ -587,7 +588,7 @@ describe('case boundaries (requires a local SQL Server - see docker-compose.yml)
 		}
 	});
 	test('findNearbyCases lists other cases near a site, each once as its newest shapefile', async (t) => {
-		if (!dbAvailable) return t.skip('SQL Server database not available');
+		if (!dbAvailable) return skipIfDbUnavailable(t);
 
 		// mid-Atlantic, well away from any real case
 		const ids = {

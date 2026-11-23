@@ -3,6 +3,7 @@ import { after, before, describe, test } from 'node:test';
 import type { PrismaClient } from '../client/client.ts';
 import { loadConfig } from '../configuration/config.ts';
 import { acquireDbTestLock, releaseDbTestLock } from '../db-test-lock.ts';
+import { skipIfDbUnavailable } from '../db-test-skip.ts';
 import { newDatabaseClient } from '../index.ts';
 import { loadCaseBoundaries } from './case-boundaries.ts';
 import type { ConsulteeAreaFeatureCollection } from './consultee-areas.ts';
@@ -56,7 +57,7 @@ async function cleanup() {
 
 describe('consultee areas (requires a local SQL Server - see docker-compose.yml)', () => {
 	test('load, get and findIntersecting round-trip a stored area', async (t) => {
-		if (!dbAvailable) return t.skip('SQL Server database not available');
+		if (!dbAvailable) return skipIfDbUnavailable(t);
 
 		await cleanup();
 		try {
@@ -171,7 +172,7 @@ describe('consultee areas (requires a local SQL Server - see docker-compose.yml)
 	});
 
 	test('load reports progress per batch and stores every populated column', async (t) => {
-		if (!dbAvailable) return t.skip('SQL Server database not available');
+		if (!dbAvailable) return skipIfDbUnavailable(t);
 
 		const progress: [number, number][] = [];
 		await cleanup();
@@ -251,7 +252,7 @@ describe('consultee areas (requires a local SQL Server - see docker-compose.yml)
 	});
 
 	test('loading the same id twice upserts rather than duplicating', async (t) => {
-		if (!dbAvailable) return t.skip('SQL Server database not available');
+		if (!dbAvailable) return skipIfDbUnavailable(t);
 
 		await cleanup();
 		try {
@@ -278,7 +279,7 @@ describe('consultee areas (requires a local SQL Server - see docker-compose.yml)
 	});
 
 	test('finds a consultee by name in its category, case aside, nearest the site', async (t) => {
-		if (!dbAvailable) return t.skip('SQL Server database not available');
+		if (!dbAvailable) return skipIfDbUnavailable(t);
 
 		await cleanup();
 		try {
@@ -406,7 +407,7 @@ describe('consultee areas (requires a local SQL Server - see docker-compose.yml)
 	});
 
 	test('keeps a representative point on each area, which name lookups measure an approximate distance to', async (t) => {
-		if (!dbAvailable) return t.skip('SQL Server database not available');
+		if (!dbAvailable) return skipIfDbUnavailable(t);
 
 		await cleanup();
 		try {
@@ -493,7 +494,7 @@ describe('consultee areas (requires a local SQL Server - see docker-compose.yml)
 	});
 
 	test("gives each consultee's details, and a parish the council area it's in", async (t) => {
-		if (!dbAvailable) return t.skip('SQL Server database not available');
+		if (!dbAvailable) return skipIfDbUnavailable(t);
 
 		await cleanup();
 		try {
@@ -618,7 +619,7 @@ describe('datasetInUse', () => {
 
 describe('dataWatermark', () => {
 	test('fingerprints the data a case map is drawn from, and says when the case is missing', async (t) => {
-		if (!dbAvailable) return t.skip('SQL Server database not available');
+		if (!dbAvailable) return skipIfDbUnavailable(t);
 
 		const caseId = '22222222-2222-2222-2222-222222222222';
 		const missing = await dataWatermark(dbClient, caseId);

@@ -8,6 +8,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import type { PrismaClient } from '../client/client.ts';
 import { loadConfig } from '../configuration/config.ts';
 import { acquireDbTestLock, releaseDbTestLock } from '../db-test-lock.ts';
+import { skipIfDbUnavailable } from '../db-test-skip.ts';
 import { newDatabaseClient } from '../index.ts';
 import { deterministicId } from './geojson-import.ts';
 import { parseArgs } from './import-cli.ts';
@@ -110,7 +111,7 @@ function withGeoJson(contents: object, fn: (filePath: string) => void) {
 
 describe('running as a script (requires a local SQL Server - see docker-compose.yml)', () => {
 	test('imports a consultee-areas GeoJSON file', async (t) => {
-		if (!dbAvailable) return t.skip('SQL Server database not available');
+		if (!dbAvailable) return skipIfDbUnavailable(t);
 		// a consultee-areas import replaces the whole table - so only against CI's throwaway
 		// database, never a developer's loaded reference data
 		if (!process.env.CI && !process.env.TF_BUILD) {
@@ -147,7 +148,7 @@ describe('running as a script (requires a local SQL Server - see docker-compose.
 	});
 
 	test('imports a case-boundaries GeoJSON file', async (t) => {
-		if (!dbAvailable) return t.skip('SQL Server database not available');
+		if (!dbAvailable) return skipIfDbUnavailable(t);
 
 		await dbClient.$executeRaw`DELETE FROM case_boundary WHERE id = ${cliBoundaryId}`;
 		try {

@@ -6,6 +6,7 @@ import { after, before, describe, mock, test } from 'node:test';
 import type { PrismaClient } from '../client/client.ts';
 import { loadConfig } from '../configuration/config.ts';
 import { acquireDbTestLock, releaseDbTestLock } from '../db-test-lock.ts';
+import { skipIfDbUnavailable } from '../db-test-skip.ts';
 import { datasetInUse, listDatasets } from '../geospatial/consultee-areas.ts';
 import { newDatabaseClient } from '../index.ts';
 import {
@@ -176,7 +177,7 @@ async function sourceIds(table = 'consultee_area', category = 'Groups Test Area'
 
 describe('loading a group (requires a local SQL Server - see docker-compose.yml)', () => {
 	test("replaces the group's rows in the dataset in use, when the file is from its quarter", async (t) => {
-		if (!dbAvailable) return t.skip('SQL Server database not available');
+		if (!dbAvailable) return skipIfDbUnavailable(t);
 		await cleanup();
 		// a row over a statement's batch, so the replace's deletes take a second pass
 		const first = await load(
@@ -205,7 +206,7 @@ describe('loading a group (requires a local SQL Server - see docker-compose.yml)
 	});
 
 	test('loads a newer quarter into its own table, and uses it once every group with data is in', async (t) => {
-		if (!dbAvailable) return t.skip('SQL Server database not available');
+		if (!dbAvailable) return skipIfDbUnavailable(t);
 		await cleanup();
 		try {
 			// both groups have data in the dataset in use
@@ -254,7 +255,7 @@ describe('loading a group (requires a local SQL Server - see docker-compose.yml)
 	});
 
 	test("refuses an earlier quarter than the one in use, another group's category, an empty file or a name that isn't a group's - changing nothing", async (t) => {
-		if (!dbAvailable) return t.skip('SQL Server database not available');
+		if (!dbAvailable) return skipIfDbUnavailable(t);
 		await cleanup();
 		const file = inUseFile('groups_test');
 		await load(file, ['groups-a']);
@@ -305,7 +306,7 @@ describe('loading a group (requires a local SQL Server - see docker-compose.yml)
 	});
 
 	test("uses the app's own groups by default", async (t) => {
-		if (!dbAvailable) return t.skip('SQL Server database not available');
+		if (!dbAvailable) return skipIfDbUnavailable(t);
 		await assert.rejects(
 			() => importConsulteeAreaGroup(dbClient, path.join(dir, 'missing.geojson'), '20261020_nothing.geojson'),
 			GroupLoadError
@@ -340,7 +341,7 @@ describe('clearing consultee areas', () => {
 
 	test('empties the dataset in use (runs in CI only - it would empty the shared local table)', async (t) => {
 		if (!process.env.CI && !process.env.TF_BUILD) return t.skip('empties every consultee area - runs in CI only');
-		if (!dbAvailable) return t.skip('SQL Server database not available');
+		if (!dbAvailable) return skipIfDbUnavailable(t);
 		await load(inUseFile('groups_test'), ['groups-a']);
 		assert.ok((await clearConsulteeAreas(dbClient)) >= 1);
 		assert.equal((await groupRowCounts(dbClient, CONFIG)).get('groups_test'), 0);

@@ -10,6 +10,7 @@
     "update-fingerprints": "node scripts/update-fingerprints.mjs",
     "check-fingerprints": "node scripts/update-fingerprints.mjs --check",
     "check-asset-sizes": "node scripts/check-asset-sizes.mjs",
+    "load:smoke": "node --experimental-strip-types scripts/load-smoke-ruleset.mjs",
     "prestart": "node ../../scripts/kill-port.ts",
     "start": "npm run build && node src/server.ts",
     "test": "node --test",
