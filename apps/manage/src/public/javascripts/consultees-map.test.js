@@ -526,6 +526,52 @@ describe('consultees-map client helpers', () => {
 		assert.ok(!plugins.some((plugin) => plugin.id === 'measure'));
 		// and the plugin mirroring the consultees table's selected row with the map
 		assert.ok(plugins.some((plugin) => plugin.id === 'featureRowSelect'));
+
+		// this page has consultee features, so the labels plugin registers too,
+		// at its default zoom with no labelMinZoom in the page config
+		const consulteeLabels = plugins.find((plugin) => plugin.id === 'consulteeLabels');
+		assert.ok(consulteeLabels);
+		// the plugin labels the same datasets array the datasets plugin draws
+		assert.equal(consulteeLabels.datasets, defra.datasetsPlugin.mock.calls[0].arguments[0].datasets);
+		assert.equal(consulteeLabels.minZoom, 8);
+	});
+
+	test('initConsulteeMap tunes the labels zoom from the page config, and skips the plugin with no consultees', () => {
+		installDom(
+			`<!DOCTYPE html><html><body>
+				<div id="map-labels" class="app-consultee-map"></div>
+				<script id="map-labels-data" type="application/json">{"center":[0,0],"zoom":8,"labelMinZoom":6,"consulteeGeojson":{"features":[{"type":"Feature"}]}}</script>
+			</body></html>`
+		);
+
+		const InteractiveMap = mock.fn(function InteractiveMap() {});
+		const defra = {
+			InteractiveMap,
+			maplibreProvider: mock.fn(() => ({})),
+			datasetsPlugin: mock.fn(() => ({}))
+		};
+		globalThis.defra = defra;
+		globalThis.window.defra = defra;
+
+		initConsulteeMap('map-labels');
+		const labels = InteractiveMap.mock.calls[0].arguments[1].plugins.find((plugin) => plugin.id === 'consulteeLabels');
+		assert.ok(labels);
+		assert.equal(labels.minZoom, 6);
+
+		// a map with no consultee features (the boundary page) gets neither the
+		// label layers nor the Consultee names button
+		InteractiveMap.mock.resetCalls();
+		installDom(
+			`<!DOCTYPE html><html><body>
+				<div id="map-plain" class="app-consultee-map"></div>
+				<script id="map-plain-data" type="application/json">{"center":[0,0],"zoom":8,"projectGeojson":{"features":[{"type":"Feature"}]}}</script>
+			</body></html>`
+		);
+		globalThis.defra = defra;
+		globalThis.window.defra = defra;
+		initConsulteeMap('map-plain');
+		const plugins = InteractiveMap.mock.calls[0].arguments[1].plugins;
+		assert.ok(!plugins.some((plugin) => plugin.id === 'consulteeLabels'));
 	});
 
 	test('initConsulteeMap registers the draw and measure plugins when the draw bundle is loaded', () => {
