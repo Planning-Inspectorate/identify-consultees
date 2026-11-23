@@ -18,9 +18,16 @@ import { buildReportCheckPage, buildReportCreatedPage } from './report/controlle
 import { buildReportDownload } from './report/export/controller.ts';
 import { buildResultsStaticMap } from './results/controller.ts';
 import { buildRulesetPickerPage, buildRulesetPickerSubmit } from './ruleset/controller.ts';
+import { testFaultMiddleware } from './test-faults.ts';
 
 export function createRoutes(service: ManageService): IRouter {
 	const router = createRouter({ mergeParams: true });
+	// the QA fault triggers (test-faults.ts): ?test-fail=ruleset stores a forced failure in
+	// the session; ?test-fail=map/download fails the request carrying it. Only mounted
+	// where the QA tools flag is on - Dev and Test; the triggers can't run on Prod
+	if (service.qaTools) {
+		router.use(testFaultMiddleware(service));
+	}
 	const projectPage = buildConsulteeProjectPage(service);
 	const boundarySubmit = buildBoundarySubmit(service);
 	const boundaryStaticMap = buildBoundaryStaticMap(service);

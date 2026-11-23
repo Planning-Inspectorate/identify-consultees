@@ -52,6 +52,7 @@ const pages = [
 	{ path: '/accessibility-statement', name: 'accessibility-statement' },
 	{ path: '/cookies', name: 'cookies' },
 	{ path: '/contact', name: 'contact' },
+	{ path: '/error-test', name: 'error-scenarios-index' },
 	{ path: '/admin', name: 'admin-overview' },
 	{ path: '/admin/upload-to-blob', name: 'admin-upload-to-blob' },
 	{ path: '/admin/import-reference-data', name: 'admin-import-reference-data' },

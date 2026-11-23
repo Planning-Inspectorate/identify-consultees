@@ -28,6 +28,8 @@ import {
 } from '../report/urls.ts';
 import { resolveCase } from '../resolve-case.ts';
 import { firstQueryValue } from '../run-ruleset.ts';
+import type { TestFault } from '../test-faults.ts';
+import { requestTestFault } from '../test-faults.ts';
 import type { BoundaryFileOption } from './boundary-files.ts';
 import { boundaryFileOptions } from './boundary-files.ts';
 import { formatUploadedAt } from './format-uploaded.ts';
@@ -115,7 +117,8 @@ async function boundaryPageViewModel(
 	project: CaseBoundaryFeature,
 	options: BoundaryFileOption[],
 	query: Record<string, unknown>,
-	shapefileError?: string
+	shapefileError?: string,
+	fault?: TestFault
 ): Promise<ConsulteeProjectViewModel> {
 	const change = boundaryChange(query);
 	const fallback = {
@@ -125,7 +128,12 @@ async function boundaryPageViewModel(
 
 	const styles = buildBoundaryFileStyles(options);
 
-	const map = await mapFiles(db, project, options)
+	// the QA fault trigger (test-faults.ts): the map load fails as if the geometry store were down
+	const map = await (
+		fault === 'map'
+			? Promise.reject(new Error('test-fail=map: forced boundary map failure'))
+			: mapFiles(db, project, options)
+	)
 		.then((files) => {
 			return buildBoundaryMapConfig(
 				project.properties.caseName,
@@ -199,7 +207,15 @@ export function buildConsulteeProjectPage(service: ManageService): AsyncRequestH
 
 		const files = await listCaseBoundaryFiles(db, project.properties.caseReference);
 		const options = boundaryFileOptions(files, project.id);
-		const viewModel = await boundaryPageViewModel(db, logger, project, options, req.query, undefined);
+		const viewModel = await boundaryPageViewModel(
+			db,
+			logger,
+			project,
+			options,
+			req.query,
+			undefined,
+			requestTestFault(service, req.query)
+		);
 
 		return res.render('views/consultees/project/view.njk', viewModel);
 	};
@@ -228,7 +244,15 @@ export function buildBoundarySubmit(service: ManageService): AsyncRequestHandler
 		if (!chosen) {
 			res.render(
 				'views/consultees/project/view.njk',
-				await boundaryPageViewModel(db, logger, project, options, req.query ?? {}, 'Select a geometry')
+				await boundaryPageViewModel(
+					db,
+					logger,
+					project,
+					options,
+					req.query ?? {},
+					'Select a geometry',
+					requestTestFault(service, req.query)
+				)
 			);
 			return;
 		}

@@ -537,6 +537,48 @@ describe('manage router wiring', () => {
 		assert.equal(response.status, 404);
 	});
 
+	test('GET /error-test serves the error scenario index while the QA tools flag is on', async () => {
+		const response = await request(authDisabledApp).get('/error-test');
+		assert.equal(response.status, 200);
+		assert.match(response.text, /Error scenarios/);
+		assert.match(response.text, /Rendered error pages/);
+	});
+
+	test('GET /error-test/500 exercises the sanitising handler without leaking detail', async () => {
+		const response = await request(authDisabledApp).get('/error-test/500');
+		assert.equal(response.status, 500);
+		assert.match(response.text, /Sorry, there is a problem with the service/);
+		assert.doesNotMatch(response.text, /deliberate test error/);
+	});
+
+	test('with the QA tools flag off, /error-test 404s and ?test-fail= does nothing', async () => {
+		const qaOffService = createManageTestService(true, { qaTools: false });
+		const qaOffApp = createManageTestApp(qaOffService);
+		try {
+			const response = await request(qaOffApp).get('/error-test');
+			assert.equal(response.status, 404);
+
+			// the consultee pages take no notice of the fault param either - the middleware
+			// isn't mounted and the checks on the fault helpers return no fault
+			const mapFault = await request(qaOffApp).get(`/consultees/${homePageTestCaseId}?test-fail=map`);
+			assert.equal(mapFault.status, 200);
+			assert.match(mapFault.text, /app-consultee-map/);
+		} finally {
+			await qaOffService.db.$disconnect().catch(() => undefined);
+		}
+	});
+
+	test('?test-fail=map fails only the request carrying it while the QA tools flag is on', async () => {
+		const failed = await request(authDisabledApp).get(`/consultees/${homePageTestCaseId}?test-fail=map`);
+		assert.equal(failed.status, 200);
+		assert.match(failed.text, /problem loading the map/);
+		assert.doesNotMatch(failed.text, /app-consultee-map/);
+
+		const plain = await request(authDisabledApp).get(`/consultees/${homePageTestCaseId}`);
+		assert.equal(plain.status, 200);
+		assert.match(plain.text, /app-consultee-map/);
+	});
+
 	test('GET /auth/signout renders a sanitised 500 when session destroy fails', async () => {
 		const express = (await import('express')).default;
 		const service = createManageTestService(true);

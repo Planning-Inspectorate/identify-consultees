@@ -394,6 +394,35 @@ describe('report download', () => {
 		assert.deepStrictEqual(res.send.mock.calls[0].arguments[0], Buffer.from('the kept report'));
 	});
 
+	it('fails the download while the test-fail=download fault is set, even with a kept report', async () => {
+		// a kept copy would normally serve without a build - the fault fails it like a real outage
+		const query = { ruleset, exclude: 'dddddddd-9999-0000-0000-000000000042' };
+		const downloadUrl = reportDownloadUrl(realProjectId, ruleset, consulteeSelection(query));
+		rememberReportZip(
+			downloadUrl,
+			{ name: 'Test Name' },
+			{ fileName: 'kept.zip', contents: Buffer.from('the kept report') }
+		);
+
+		const runner = rulesetRunnerReturning([]);
+		const service = { ...serviceWith(runner), qaTools: true };
+		const res = response();
+		await buildReportDownload(service as never)(
+			{
+				params: { caseId: realProjectId },
+				query: { ...query, 'test-fail': 'download' },
+				session: { account: { name: 'Test Name' } }
+			} as never,
+			res as never
+		);
+
+		assert.equal(runner.mock.callCount(), 0);
+		assert.equal(res.send.mock.callCount(), 0);
+		const [location] = res.redirect.mock.calls[0].arguments as unknown as [string];
+		assert.match(location, new RegExp(`^/consultees/${realProjectId}/report/created\\?ruleset=${ruleset}`));
+		assert.match(location, /download=failed/);
+	});
+
 	it('goes back to the Report created page, keeping the selection, when the ruleset cannot be run', async () => {
 		const res = response();
 		await buildReportDownload(serviceWith(failingRulesetRunner()) as never)(
