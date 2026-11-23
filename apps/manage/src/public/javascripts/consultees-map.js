@@ -14,6 +14,7 @@
  *   every data-* attribute on its container.
  */
 
+import { createConsulteeLabelsPlugin } from './consultee-labels-plugin.mjs';
 import { createFeatureDetailsPlugin } from './feature-details-plugin.mjs';
 import { createFeatureRowSelectPlugin } from './feature-row-select-plugin.mjs';
 import { createLayersKeyPlugin } from './layers-key-plugin.mjs';
@@ -352,6 +353,13 @@ export function initConsulteeMap(mapId) {
 		// and on those pages the consultees table under the map mirrors the map's
 		// selection: a row click selects its feature, a feature click greys its row
 		const featureRowSelectPlugin = createFeatureRowSelectPlugin({ datasets });
+		// a plugin labels each consultee area with its name from a configured zoom
+		// (the page config's labelMinZoom), with a Consultee names toolbar button to
+		// toggle them - only where the map has consultees to label
+		const consulteeDataset = datasets.find((dataset) => dataset.id === 'consultee-areas');
+		const consulteeLabelsPlugin = consulteeDataset?.sublayers?.length
+			? createConsulteeLabelsPlugin({ datasets, minZoom: config.labelMinZoom })
+			: null;
 
 		const map = new defra.InteractiveMap(mapId, {
 			behaviour: 'inline',
@@ -364,6 +372,7 @@ export function initConsulteeMap(mapId) {
 			plugins: [
 				datasetsPlugin,
 				layersKeyPlugin,
+				...(consulteeLabelsPlugin ? [consulteeLabelsPlugin] : []),
 				staticMapPlugin,
 				loadingPlugin,
 				featureDetailsPlugin,
