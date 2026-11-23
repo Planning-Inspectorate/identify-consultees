@@ -8,6 +8,7 @@
     "dev": "node scripts/run-dev.mjs",
     "build": "node src/util/build.ts",
     "update-fingerprints": "node scripts/update-fingerprints.mjs",
+    "check-fingerprints": "node scripts/update-fingerprints.mjs --check",
     "prestart": "node ../../scripts/kill-port.ts",
     "start": "npm run build && node src/server.ts",
     "test": "node --test",

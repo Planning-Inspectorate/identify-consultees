@@ -109,6 +109,9 @@ workspace.json
 
 .static
 
+# atomic-write leftovers (killed mid-build) - e.g. config-middleware.ts.tmp
+*.tmp
+
 # generated Prisma client
 packages/database/src/client
 
