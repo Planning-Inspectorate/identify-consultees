@@ -98,6 +98,10 @@ module "app_web" {
     # whether the admin pages can upload, load and clear the reference data (Dev and Test), or only
     # report it (Training and Prod, loaded by the Load and Promote reference data pipelines)
     REFERENCE_DATA_CHANGES_ENABLED = tostring(var.reference_data_changes_enabled)
+
+    # whether the QA-only test hooks answer (Dev and Test) - e.g. the ruleset picker's
+    # failRuleset param; ignored on Training and Prod
+    QA_TOOLS_ENABLED = tostring(var.qa_tools_enabled)
   }
 
   # sticky to its slot: only the live app imports from CBOS or takes its events - a staging slot

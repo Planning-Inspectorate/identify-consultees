@@ -43,6 +43,11 @@ export interface Config extends BaseConfig {
 	// reference_data_changes_enabled in their tfvars) and locally; Training and Prod are loaded by
 	// the Load and Promote reference data pipelines instead (see kt-docs/data/data-model.md)
 	referenceDataChanges: boolean;
+	// whether the QA-only test hooks answer - currently the ruleset picker's failRuleset query
+	// param, which forces the failure screen so it can be checked by hand (see
+	// kt-docs/error-pages.md). On for Dev and Test (QA_TOOLS_ENABLED, qa_tools_enabled in their
+	// tfvars) and locally; off for Training and Prod, where the param is ignored
+	qaTools: boolean;
 	// the hours of the day, UK time, the app imports every CBOS boundary on its own - as the admin
 	// page's button does (admin/import-from-cbos/scheduled-import.ts). From CBOS_IMPORT_HOURS
 	// ("7,10,13,16,19"); empty - off - unless set, and the staging slot has it off
@@ -158,6 +163,7 @@ export function loadConfig(): Config {
 		NODE_ENV,
 		PYTHON_FUNCTION_URL,
 		PYTHON_FUNCTION_API_KEY,
+		QA_TOOLS_ENABLED,
 		SESSION_SECRET,
 		SQL_CONNECTION_STRING
 	} = process.env;
@@ -226,6 +232,7 @@ export function loadConfig(): Config {
 		cbosImportHours: parseImportHours(CBOS_IMPORT_HOURS),
 		cbosSubscriber: cbosSubscriberSettings(process.env),
 		referenceDataChanges: !isProduction || REFERENCE_DATA_CHANGES_ENABLED === 'true',
+		qaTools: !isProduction || QA_TOOLS_ENABLED === 'true',
 		auth: {
 			authority: `https://login.microsoftonline.com/${AUTH_TENANT_ID}`,
 			clientId: AUTH_CLIENT_ID || '',
