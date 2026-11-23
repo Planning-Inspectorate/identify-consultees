@@ -2,6 +2,7 @@ import type { ManageService } from '#service';
 import type { ConsulteeMatch, Ruleset } from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
 import { isIdentified } from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
 import type { AsyncRequestHandler } from '@planning-inspectorate/core/util';
+import { RULESET_ERROR_MESSAGE } from '../../errors/error-messages.ts';
 import { NEARBY_NSIPS } from '../nearby-nsips.ts';
 import { resolveCase } from '../resolve-case.ts';
 import { firstQueryValue, requestedRuleset, runRulesetSafely } from '../run-ruleset.ts';
@@ -110,6 +111,12 @@ export function buildReportCheckPage(service: ManageService): AsyncRequestHandle
 		);
 
 		const { consultees, failed, siteScreenedAs } = await runRulesetSafely(service, project, ruleset, req.session);
+
+		if (failed) {
+			res.status(500).render('views/errors/500.njk', RULESET_ERROR_MESSAGE);
+			return;
+		}
+
 		const selection: ConsulteeSelection = consulteeSelection(req.query);
 
 		const viewModel: ReportCheckViewModel = {
@@ -127,7 +134,6 @@ export function buildReportCheckPage(service: ManageService): AsyncRequestHandle
 			rulesetChangeUrl: changeRulesetUrl(project.id, ruleset.id, selection),
 			groups: groupedConsultees(ruleset, project.id, consultees, selection, service.nearbyNsipRadiusMetres > 0),
 			generateReportUrl: reportCreatedUrl(project.id, ruleset.id, selection),
-			rulesetFailed: failed,
 			retryUrl: reportUrl(project.id, ruleset.id, selection),
 			screenedBoundingBox: siteScreenedAs === 'boundingBox'
 		};
@@ -163,6 +169,11 @@ export function buildReportCreatedPage(service: ManageService): AsyncRequestHand
 		const selection: ConsulteeSelection = consulteeSelection(req.query);
 		const downloadUrl = reportDownloadUrl(project.id, ruleset.id, selection);
 		const { consultees, failed, siteScreenedAs } = await runRulesetSafely(service, project, ruleset, req.session);
+
+		if (failed) {
+			res.status(500).render('views/errors/500.njk', RULESET_ERROR_MESSAGE);
+			return;
+		}
 
 		const account = req.session?.account;
 		const accountInfo =

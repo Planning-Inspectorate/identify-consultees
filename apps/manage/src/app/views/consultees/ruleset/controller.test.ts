@@ -1,6 +1,8 @@
+import { mockLogger } from '@planning-inspectorate/core/testing';
 import assert from 'node:assert';
 import { describe, it, mock } from 'node:test';
 import { configureNunjucks } from '../../../nunjucks.ts';
+import { failingRulesetRunner, rulesetRunnerReturning } from '../../../testing/ruleset-runner-stub.ts';
 import { buildRulesetPickerPage, buildRulesetPickerSubmit } from './controller.ts';
 
 // a selection entry as the app's URLs carry it - base64url-encoded JSON (see urls.ts's ENCODED_JSON)
@@ -170,7 +172,11 @@ describe('ruleset picker submit', () => {
 			render: mock.fn(),
 			redirect: mock.fn()
 		};
-		const handler = buildRulesetPickerSubmit({ db: summaryDb() });
+		const handler = buildRulesetPickerSubmit({
+			db: summaryDb(),
+			logger: mockLogger(),
+			rulesetRunner: rulesetRunnerReturning([])
+		});
 		await handler({ params: { caseId: realProjectId }, body: { ruleset: 'england-wales-post-20240430' } }, mockRes);
 		assert.strictEqual(
 			mockRes.redirect.mock.calls[0].arguments[0],
@@ -184,7 +190,11 @@ describe('ruleset picker submit', () => {
 			render: mock.fn(),
 			redirect: mock.fn()
 		};
-		const handler = buildRulesetPickerSubmit({ db: summaryDb() });
+		const handler = buildRulesetPickerSubmit({
+			db: summaryDb(),
+			logger: mockLogger(),
+			rulesetRunner: rulesetRunnerReturning([])
+		});
 		const add = JSON.stringify({ c: 'Parish, town and community councils', n: 'Test Consultee', r: 'Adjacent' });
 		await handler(
 			{
@@ -220,6 +230,34 @@ describe('ruleset picker submit', () => {
 		const secondViewModel = mockRes.render.mock.calls[1].arguments[1];
 		assert.deepStrictEqual(secondViewModel.errorSummary, [{ text: 'Select a ruleset', href: '#ruleset' }]);
 		assert.strictEqual(mockRes.redirect.mock.callCount(), 0);
+	});
+
+	it('should re-render the picker with a ruleset failed error if the ruleset fails', async () => {
+		const mockRes = {
+			status: mock.fn(() => mockRes),
+			render: mock.fn(),
+			redirect: mock.fn()
+		};
+		const handler = buildRulesetPickerSubmit({
+			db: summaryDb(),
+			logger: mockLogger(),
+			rulesetRunner: failingRulesetRunner()
+		});
+		const add = JSON.stringify({ c: 'Parish, town and community councils', n: 'Test Consultee', r: 'Adjacent' });
+		await handler(
+			{
+				params: { caseId: realProjectId },
+				query: { exclude: 'abc', add },
+				body: { ruleset: 'england-wales-post-20240430' }
+			},
+			mockRes
+		);
+		assert.strictEqual(mockRes.render.mock.calls[0].arguments[0], 'views/consultees/ruleset/view.njk');
+		const viewModel = mockRes.render.mock.calls[0].arguments[1];
+		assert.deepStrictEqual(viewModel.errorSummary, [
+			{ text: 'The ruleset could not run, try again', href: '#ruleset' }
+		]);
+		assert.ok(viewModel.rulesets.every((ruleset) => ruleset.checked === false));
 	});
 
 	it('should keep going back to the check page through an error re-render while changing its ruleset', async () => {

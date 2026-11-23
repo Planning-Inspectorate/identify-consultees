@@ -1,4 +1,6 @@
 {% extends "views/layouts/error.njk" %}
 
 {% set pageTitle = 'Sorry, there is a problem with the service' %}
-{% set messages = ['Try again later.'] %}
+{% if not messages %}
+	{% set messages = ['Try again later.'] %}
+{% endif %}

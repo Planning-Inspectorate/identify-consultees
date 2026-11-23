@@ -841,7 +841,6 @@ describe('report consultees change page', () => {
 		);
 
 		const viewModel = mockRes.render.mock.calls[0].arguments[1];
-		assert.strictEqual(viewModel.rulesetFailed, true);
 		assert.strictEqual(viewModel.rows.length, 0);
 		assert.strictEqual(logger.error.mock.callCount(), 1);
 		assert.doesNotMatch(mockRes.render.mock.calls[0].result, />Consultees</);
