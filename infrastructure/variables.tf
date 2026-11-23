@@ -58,6 +58,12 @@ variable "reference_data_changes_enabled" {
   default     = false
 }
 
+variable "qa_tools_enabled" {
+  description = "Let the QA-only test hooks answer (Dev and Test) - currently the ruleset picker's failRuleset query param, which forces the failure screen; ignored elsewhere"
+  type        = bool
+  default     = false
+}
+
 variable "os_maps_api_key" {
   description = "The OS Data Hub key, with the OS Maps API, the maps' basemap is drawn from - one for every environment, from the consultees-os-maps variable group (see infrastructure/pipelines/terraform-cd.yaml). Unset, the maps stay on OpenStreetMap"
   type        = string

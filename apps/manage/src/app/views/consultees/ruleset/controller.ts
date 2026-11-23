@@ -23,6 +23,22 @@ import type { RulesetError, RulesetPickerViewModel } from './view-model.ts';
  * after an unanswered submit. Changing the check page's ruleset (`?change=ruleset`), its back link
  * returns to the check page as it was; otherwise to the boundary page, the step before.
  */
+/**
+ * The QA-only query param forcing the ruleset run to fail - carried through the picker's form
+ * action so the submit sees it, then ignored unless the QA tools flag is on (see config.ts's
+ * qaTools: off on Training and Prod, where the param does nothing).
+ */
+const FAIL_RULESET_PARAM = 'failRuleset';
+
+/** The URL with the QA param added if the request carried it - a `?` when it opens the query. */
+function withFailRuleset(url: string, query: Record<string, unknown>): string {
+	const failRuleset = firstQueryValue(query[FAIL_RULESET_PARAM]);
+	if (!failRuleset) {
+		return url;
+	}
+	return `${url}${url.includes('?') ? '&' : '?'}${FAIL_RULESET_PARAM}=${encodeURIComponent(failRuleset)}`;
+}
+
 function pickerViewModel(
 	project: CaseBoundarySummary,
 	query: Record<string, unknown>,
@@ -37,9 +53,12 @@ function pickerViewModel(
 		backLinkUrl: changing ? reportUrl(project.id, changing.id, selection) : boundaryUrl(project.id),
 		caseId: project.id,
 		// posts back to the URL it came from, so the submit carries the selection on to the report
-		formAction: changing
-			? changeRulesetUrl(project.id, changing.id, selection)
-			: rulesetUrl(project.id, requestedRuleset?.id, selection),
+		formAction: withFailRuleset(
+			changing
+				? changeRulesetUrl(project.id, changing.id, selection)
+				: rulesetUrl(project.id, requestedRuleset?.id, selection),
+			query
+		),
 		rulesets: RULESETS.map((option) => ({
 			value: option.id,
 			text: option.name,
@@ -110,9 +129,18 @@ export function buildRulesetPickerSubmit(service: ManageService): AsyncRequestHa
 			return;
 		}
 
+		// ?failRuleset=<anything> forces the failure screen for QA where the flag is on (see FAIL_RULESET_PARAM):
+		// the run never starts, so nothing is kept in the session and a stored run can't rescue it
+		const forceFailure = service.qaTools && firstQueryValue(req.query?.[FAIL_RULESET_PARAM]) !== '';
+		if (forceFailure) {
+			service.logger.info({ caseId, rulesetId: ruleset.id }, 'Ruleset run forced to fail by the failRuleset param');
+		}
+
 		// run the ruleset once before redirect, to show an error on the ruleset page, allowing for user to change the
 		// ruleset or try again - result is cached, so on success, the new page will use the cached ruleset
-		const { failed } = await runRulesetSafely(service, projectFeature, ruleset, req.session);
+		const { failed } = forceFailure
+			? { failed: true }
+			: await runRulesetSafely(service, projectFeature, ruleset, req.session);
 		if (failed) {
 			res.render(
 				'views/consultees/ruleset/view.njk',

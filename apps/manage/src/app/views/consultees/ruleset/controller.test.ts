@@ -113,6 +113,29 @@ describe('ruleset picker page', () => {
 		assert.ok(viewModel.rulesets.every((ruleset) => ruleset.checked === false));
 	});
 
+	it('should carry the QA failRuleset param through the form action', async () => {
+		const mockRes = {
+			status: mock.fn(() => mockRes),
+			render: mock.fn()
+		};
+		const handler = buildRulesetPickerPage({ db: summaryDb() });
+		await handler(
+			{ params: { caseId: realProjectId }, query: { ruleset: 'england-wales-post-20240430', failRuleset: 'true' } },
+			mockRes
+		);
+		assert.strictEqual(
+			mockRes.render.mock.calls[0].arguments[1].formAction,
+			`/consultees/${realProjectId}/ruleset?ruleset=england-wales-post-20240430&failRuleset=true`
+		);
+
+		// on a first visit, with no other query, the param opens it
+		await handler({ params: { caseId: realProjectId }, query: { failRuleset: 'true' } }, mockRes);
+		assert.strictEqual(
+			mockRes.render.mock.calls[1].arguments[1].formAction,
+			`/consultees/${realProjectId}/ruleset?failRuleset=true`
+		);
+	});
+
 	it('should carry the consultee selection through the form action', async () => {
 		const mockRes = {
 			status: mock.fn(() => mockRes),
@@ -258,6 +281,75 @@ describe('ruleset picker submit', () => {
 			{ text: 'The ruleset could not run, try again', href: '#ruleset' }
 		]);
 		assert.ok(viewModel.rulesets.every((ruleset) => ruleset.checked === false));
+	});
+
+	it('should re-render the picker with a ruleset failed error when failRuleset is given and the QA tools are on', async () => {
+		const mockRes = {
+			status: mock.fn(() => mockRes),
+			render: mock.fn(),
+			redirect: mock.fn()
+		};
+		const runner = rulesetRunnerReturning([]);
+		const handler = buildRulesetPickerSubmit({
+			db: summaryDb(),
+			logger: mockLogger(),
+			rulesetRunner: runner,
+			qaTools: true
+		});
+		await handler(
+			{
+				params: { caseId: realProjectId },
+				query: { failRuleset: 'true' },
+				body: { ruleset: 'england-wales-post-20240430' }
+			},
+			mockRes
+		);
+		assert.strictEqual(mockRes.render.mock.calls[0].arguments[0], 'views/consultees/ruleset/view.njk');
+		const viewModel = mockRes.render.mock.calls[0].arguments[1];
+		assert.deepStrictEqual(viewModel.errorSummary, [
+			{ text: 'The ruleset could not run, try again', href: '#ruleset' }
+		]);
+		// the run never starts - nothing can rescue it from the session either
+		assert.strictEqual(runner.mock.callCount(), 0);
+		assert.strictEqual(mockRes.redirect.mock.callCount(), 0);
+	});
+
+	it('should run the ruleset normally with the QA tools on but no failRuleset, or the param but the tools off', async () => {
+		const mockRes = {
+			status: mock.fn(() => mockRes),
+			render: mock.fn(),
+			redirect: mock.fn()
+		};
+		const qaRunner = rulesetRunnerReturning([]);
+		await buildRulesetPickerSubmit({
+			db: summaryDb(),
+			logger: mockLogger(),
+			rulesetRunner: qaRunner,
+			qaTools: true
+		})({ params: { caseId: realProjectId }, query: {}, body: { ruleset: 'england-wales-post-20240430' } }, mockRes);
+		assert.strictEqual(qaRunner.mock.callCount(), 1);
+		assert.strictEqual(
+			mockRes.redirect.mock.calls[0].arguments[0],
+			`/consultees/${realProjectId}/report?ruleset=england-wales-post-20240430`
+		);
+
+		// the param is ignored where the flag is off (Training and Prod - the partial services these
+		// tests build have no qaTools, like the flag unset)
+		const runner = rulesetRunnerReturning([]);
+		await buildRulesetPickerSubmit({
+			db: summaryDb(),
+			logger: mockLogger(),
+			rulesetRunner: runner
+		})(
+			{
+				params: { caseId: realProjectId },
+				query: { failRuleset: 'true' },
+				body: { ruleset: 'england-wales-post-20240430' }
+			},
+			mockRes
+		);
+		assert.strictEqual(runner.mock.callCount(), 1);
+		assert.strictEqual(mockRes.render.mock.callCount(), 0);
 	});
 
 	it('should keep going back to the check page through an error re-render while changing its ruleset', async () => {

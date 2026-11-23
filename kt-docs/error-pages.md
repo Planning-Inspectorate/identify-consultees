@@ -23,6 +23,18 @@ All of them share `views/layouts/error.njk`, so the header, service navigation a
 
 The real-world causes: an unmatched 404 is any mistyped URL; a record 404 is a bad or stale case link; a failed MSAL sign-in lands on `/unauthenticated`; Front Door redirects requests its managed rules block to `/error/firewall-error` (`infrastructure/front-door.tf`).
 
+## Errors with a QA-only trigger
+
+### The ruleset could not run, try again
+
+Where the QA tools flag is on - locally and on Dev and Test (`QA_TOOLS_ENABLED`, `qa_tools_enabled` in their tfvars; off on Training and Prod, where the param is ignored) - add `?failRuleset=true` to the ruleset picker's URL:
+
+```
+/consultees/<case-id>/ruleset?failRuleset=true
+```
+
+The form posts the param back, and the submit's ruleset run never starts - the picker re-renders with "There is a problem / The ruleset could not run, try again", exactly as a real failure (the Python function down, slow or erroring) shows it. No run is kept in the session, so dropping the param and submitting again goes through normally. The forced failure also logs an info line naming the param, so a real failure in the logs can't be confused with a triggered one.
+
 ## Errors that need a request, not just a URL
 
 ### CSRF failure

@@ -91,6 +91,11 @@ export class ManageService extends BaseService<PrismaClient> {
 		return this.#config.referenceDataChanges;
 	}
 
+	/** Whether the QA-only test hooks answer, or are ignored - see config.ts. */
+	get qaTools(): boolean {
+		return this.#config.qaTools;
+	}
+
 	get blobStoreConfig(): Config['blobStore'] {
 		return this.#config.blobStore;
 	}

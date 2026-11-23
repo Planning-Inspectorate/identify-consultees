@@ -32,6 +32,7 @@ const managedKeys = [
 	'NODE_ENV',
 	'PORT',
 	'PYTHON_FUNCTION_URL',
+	'QA_TOOLS_ENABLED',
 	'REFERENCE_DATA_CHANGES_ENABLED',
 	'SESSION_SECRET',
 	'SQL_CONNECTION_STRING'
@@ -340,5 +341,21 @@ describe('reference data changes on the admin pages', () => {
 		resetConfigCache();
 		setBaseEnv({ NODE_ENV: 'production', REFERENCE_DATA_CHANGES_ENABLED: 'true' });
 		assert.equal(loadConfig().referenceDataChanges, true);
+	});
+});
+
+describe('QA test tools', () => {
+	test('are on locally, and in production only where turned on - Dev and Test', () => {
+		// empty strings (not delete): loadEnvFile must not restore values from a local .env
+		setBaseEnv({ QA_TOOLS_ENABLED: '' });
+		assert.equal(loadConfig().qaTools, true);
+
+		resetConfigCache();
+		setBaseEnv({ NODE_ENV: 'production', QA_TOOLS_ENABLED: '' });
+		assert.equal(loadConfig().qaTools, false);
+
+		resetConfigCache();
+		setBaseEnv({ NODE_ENV: 'production', QA_TOOLS_ENABLED: 'true' });
+		assert.equal(loadConfig().qaTools, true);
 	});
 });
