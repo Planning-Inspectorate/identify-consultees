@@ -9,6 +9,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import type { PrismaClient } from '../client/client.ts';
 import { loadConfig } from '../configuration/config.ts';
 import { acquireDbTestLock, releaseDbTestLock } from '../db-test-lock.ts';
+import { skipIfDbUnavailable } from '../db-test-skip.ts';
 import { newDatabaseClient } from '../index.ts';
 import { deterministicId } from './geojson-import.ts';
 import { downloadBlobToTempFile, listBlobs, parseArgs } from './import-from-blob.ts';
@@ -226,7 +227,7 @@ function geoJsonFile(features: object[]): string {
 
 describe('running as a script (requires a local SQL Server - see docker-compose.yml)', () => {
 	test('downloads then imports a consultee-areas blob', async (t) => {
-		if (!dbAvailable) return t.skip('SQL Server database not available');
+		if (!dbAvailable) return skipIfDbUnavailable(t);
 		// a consultee-areas import replaces the whole table - so only against CI's throwaway
 		// database, never a developer's loaded reference data
 		if (!process.env.CI && !process.env.TF_BUILD) {
@@ -259,7 +260,7 @@ describe('running as a script (requires a local SQL Server - see docker-compose.
 	});
 
 	test('downloads then imports a case-boundaries blob', async (t) => {
-		if (!dbAvailable) return t.skip('SQL Server database not available');
+		if (!dbAvailable) return skipIfDbUnavailable(t);
 
 		await dbClient.$executeRaw`DELETE FROM case_boundary WHERE id = ${blobBoundaryId}`;
 		try {
