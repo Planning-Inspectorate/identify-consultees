@@ -1,7 +1,17 @@
 import type { Ruleset } from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { afterEach, describe, it, mock } from 'node:test';
 import { buildPythonRulesetRunner, runRulesetUrl } from './ruleset-runner.ts';
+
+// the wire format both deployables pin to - contracts/ at the repo root explains why these
+// fixtures are shared with the function's tests rather than inlined here
+const contractRequest = JSON.parse(
+	readFileSync(new URL('../../../../contracts/run-ruleset/request.json', import.meta.url), 'utf8')
+);
+const contractResponse = JSON.parse(
+	readFileSync(new URL('../../../../contracts/run-ruleset/response.json', import.meta.url), 'utf8')
+);
 
 const ruleset: Ruleset = {
 	id: 'example',
@@ -178,6 +188,41 @@ describe('buildPythonRulesetRunner', () => {
 		const run = buildPythonRulesetRunner({ pythonFunctionUrl: undefined, apiKey: undefined });
 		await assert.rejects(() => run(site, ruleset, 20_000), /PYTHON_FUNCTION_URL is not configured/);
 		assert.equal(fetchMock.mock.callCount(), 0);
+	});
+
+	it('posts exactly the request the contract fixture describes', async () => {
+		const fetchMock = respondWith({ consultees: [] });
+		const run = buildPythonRulesetRunner({
+			pythonFunctionUrl: 'http://localhost:7071/api/consultee-areas',
+			apiKey: undefined,
+			nearbyRadiusMetresByCategory: { 'Parish, town and community councils': 5_000 },
+			boundingBoxAbovePoints: 2_000
+		});
+
+		await run(site, ruleset, 20_000, 'aaaaaaaa-0000-0000-0000-000000000001');
+
+		// the function's test parses this same fixture - a field changed here without a contract
+		// change fails on one side or the other
+		assert.deepEqual(JSON.parse(String(fetchMock.mock.calls[0].arguments[1]?.body)), contractRequest);
+	});
+
+	it('maps the response the contract fixture describes', async () => {
+		respondWith(contractResponse);
+		const run = buildPythonRulesetRunner({
+			pythonFunctionUrl: 'http://localhost:7071/api/consultee-areas',
+			apiKey: undefined
+		});
+
+		assert.deepEqual(await run(site, ruleset, 20_000), {
+			consultees: contractResponse.consultees.map(
+				(consultee: { feature: { id: string; properties: object }; distanceMetres: number; reasons: object[] }) => ({
+					feature: consultee.feature,
+					distanceMetres: consultee.distanceMetres,
+					reasons: consultee.reasons
+				})
+			),
+			siteScreenedAs: 'boundingBox'
+		});
 	});
 
 	it('rejects on a non-2xx response, an unexpected body, or a network failure', async () => {

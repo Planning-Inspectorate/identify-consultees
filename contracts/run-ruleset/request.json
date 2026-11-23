@@ -1,0 +1,25 @@
+{
+	"siteWkt": "POINT(-1.5 52.5)",
+	"nearbyRadiusMetres": 20000,
+	"nearbyRadiusMetresByCategory": {
+		"Parish, town and community councils": 5000
+	},
+	"includeGeometry": false,
+	"boundingBoxAbovePoints": 2000,
+	"timeoutSeconds": 50,
+	"caseBoundaryId": "aaaaaaaa-0000-0000-0000-000000000001",
+	"rules": [
+		{
+			"id": "hospital",
+			"logicType": "intersection",
+			"categories": ["Hospitals operated by NHS trusts and NHS foundation trusts (England)"],
+			"bufferMetres": 10000
+		},
+		{
+			"id": "parish",
+			"logicType": "bordering",
+			"categories": ["Parish, town and community councils"],
+			"hostCategory": "Parish, town and community councils"
+		}
+	]
+}
