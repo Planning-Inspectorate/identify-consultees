@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { createReadStream, createWriteStream } from 'node:fs';
+import { createReadStream, createWriteStream, readFileSync } from 'node:fs';
 import { readdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { pipeline } from 'node:stream/promises';
@@ -36,6 +36,39 @@ export type AssetManifest = {
 	/** Logical path → fingerprinted public path (no leading slash). */
 	assets: Record<string, string>;
 };
+
+/** The manifest the build writes into the static root, mapping logical → fingerprinted paths. */
+export const ASSET_MANIFEST_FILENAME = 'asset-manifest.json';
+
+/**
+ * Every asset path literal config-middleware.ts emits, bound to the logical path the
+ * build fingerprints it under. The build rewrites the literals from this table and the
+ * runtime resolves the same properties from the manifest - one source of truth so the
+ * two can never disagree.
+ */
+export const LOCALS_ASSET_BINDINGS: { logical: string; property: string }[] = [
+	{ logical: 'style.css', property: 'styleFile' },
+	{ logical: 'assets/js/govuk-frontend.min.js', property: 'govukFrontendJs' },
+	{ logical: 'javascripts/consultees-map.js', property: 'consulteesMapJs' },
+	{ logical: 'javascripts/consultee-autocomplete.js', property: 'consulteeAutocompleteJs' },
+	{ logical: 'javascripts/consultee-select.js', property: 'consulteeSelectJs' },
+	{ logical: 'javascripts/blob-upload.js', property: 'blobUploadJs' },
+	{ logical: 'javascripts/sortable-table.js', property: 'sortableTableJs' },
+	{ logical: 'javascripts/loading-spinner.js', property: 'loadingSpinnerJs' },
+	{ logical: 'assets/js/accessible-autocomplete.min.js', property: 'accessibleAutocompleteJs' },
+	{ logical: 'assets/css/accessible-autocomplete.min.css', property: 'accessibleAutocompleteCss' },
+	{ logical: 'vendor/interactive-map/js/index.js', property: 'vendorInteractiveMapJs' },
+	{ logical: 'vendor/interactive-map/css/index.css', property: 'vendorInteractiveMapCss' },
+	{ logical: 'vendor/maplibre-provider/js/index.js', property: 'vendorMaplibreProviderJs' },
+	{ logical: 'vendor/datasets-plugin/js/index.js', property: 'vendorDatasetsPluginJs' },
+	{ logical: 'vendor/datasets-plugin/css/index.css', property: 'vendorDatasetsPluginCss' },
+	{ logical: 'vendor/map-key-plugin/js/index.js', property: 'vendorMapKeyPluginJs' },
+	{ logical: 'vendor/map-key-plugin/css/index.css', property: 'vendorMapKeyPluginCss' },
+	{ logical: 'vendor/interact-plugin/js/index.js', property: 'vendorInteractPluginJs' },
+	{ logical: 'vendor/draw-plugin/js/index.js', property: 'vendorDrawPluginJs' },
+	{ logical: 'vendor/map-styles-plugin/js/index.js', property: 'vendorMapStylesPluginJs' },
+	{ logical: 'vendor/map-styles-plugin/css/index.css', property: 'vendorMapStylesPluginCss' }
+];
 
 /**
  * True when a path or filename already includes an 8-char content hash segment.
@@ -271,10 +304,28 @@ export async function fingerprintAndCompressStaticAssets(staticDir: string): Pro
 		await brotliCompressFile(absolutePath);
 	}
 
-	const manifestPath = path.join(staticDir, 'asset-manifest.json');
+	const manifestPath = path.join(staticDir, ASSET_MANIFEST_FILENAME);
 	await writeFile(manifestPath, `${JSON.stringify(manifest, null, '\t')}\n`, 'utf8');
 
 	return manifest;
+}
+
+/**
+ * Read the asset manifest a build left in `staticDir`. `null` when it is absent or
+ * unreadable - callers fall back to the literals baked into config-middleware.ts,
+ * which is the correct behaviour for a source tree that has never been built.
+ */
+export function loadAssetManifest(staticDir: string): AssetManifest | null {
+	try {
+		const parsed: unknown = JSON.parse(readFileSync(path.join(staticDir, ASSET_MANIFEST_FILENAME), 'utf8'));
+		const assets = (parsed as AssetManifest | null)?.assets;
+		if (!assets || typeof assets !== 'object') {
+			return null;
+		}
+		return parsed as AssetManifest;
+	} catch {
+		return null;
+	}
 }
 
 /**
@@ -284,30 +335,7 @@ export async function applyAssetManifestToLocalsFile(localsFile: string, manifes
 	const original = await readFile(localsFile, 'utf8');
 	let content = original;
 
-	const replacements: { logical: string; property: string }[] = [
-		{ logical: 'assets/js/govuk-frontend.min.js', property: 'govukFrontendJs' },
-		{ logical: 'javascripts/consultees-map.js', property: 'consulteesMapJs' },
-		{ logical: 'javascripts/consultee-autocomplete.js', property: 'consulteeAutocompleteJs' },
-		{ logical: 'javascripts/consultee-select.js', property: 'consulteeSelectJs' },
-		{ logical: 'javascripts/blob-upload.js', property: 'blobUploadJs' },
-		{ logical: 'javascripts/sortable-table.js', property: 'sortableTableJs' },
-		{ logical: 'javascripts/loading-spinner.js', property: 'loadingSpinnerJs' },
-		{ logical: 'assets/js/accessible-autocomplete.min.js', property: 'accessibleAutocompleteJs' },
-		{ logical: 'assets/css/accessible-autocomplete.min.css', property: 'accessibleAutocompleteCss' },
-		{ logical: 'vendor/interactive-map/js/index.js', property: 'vendorInteractiveMapJs' },
-		{ logical: 'vendor/interactive-map/css/index.css', property: 'vendorInteractiveMapCss' },
-		{ logical: 'vendor/maplibre-provider/js/index.js', property: 'vendorMaplibreProviderJs' },
-		{ logical: 'vendor/datasets-plugin/js/index.js', property: 'vendorDatasetsPluginJs' },
-		{ logical: 'vendor/datasets-plugin/css/index.css', property: 'vendorDatasetsPluginCss' },
-		{ logical: 'vendor/map-key-plugin/js/index.js', property: 'vendorMapKeyPluginJs' },
-		{ logical: 'vendor/map-key-plugin/css/index.css', property: 'vendorMapKeyPluginCss' },
-		{ logical: 'vendor/interact-plugin/js/index.js', property: 'vendorInteractPluginJs' },
-		{ logical: 'vendor/draw-plugin/js/index.js', property: 'vendorDrawPluginJs' },
-		{ logical: 'vendor/map-styles-plugin/js/index.js', property: 'vendorMapStylesPluginJs' },
-		{ logical: 'vendor/map-styles-plugin/css/index.css', property: 'vendorMapStylesPluginCss' }
-	];
-
-	for (const { logical, property } of replacements) {
+	for (const { logical, property } of LOCALS_ASSET_BINDINGS) {
 		const hashed = manifest.assets[logical];
 		if (!hashed) {
 			continue;
@@ -318,16 +346,28 @@ export async function applyAssetManifestToLocalsFile(localsFile: string, manifes
 		}
 	}
 
-	const styleHashed = manifest.assets['style.css'];
-	if (styleHashed) {
-		content = content.replace(/styleFile\s*:\s*'[^']*'/, `styleFile: '${styleHashed}'`);
-	}
-
 	// rebuilding without an asset change must not touch the file - the dev
 	// watcher keys off writes, and an unchanged rewrite would retrigger it
 	if (content !== original) {
-		await writeFile(localsFile, content, 'utf8');
+		// write-then-rename so a concurrent build or a mid-write kill can never
+		// leave a torn or empty locals file (rename is atomic on the same volume)
+		const tempFile = `${localsFile}.tmp`;
+		await writeFile(tempFile, content, 'utf8');
+		await rename(tempFile, localsFile);
 	}
+}
+
+/**
+ * The bound properties whose literal in `content` differs from `manifest` - the
+ * check `npm run check-fingerprints` fails on. An empty list means the literals
+ * are exactly what a fresh build produced. A literal present without a manifest
+ * entry is a dead binding and counts as stale.
+ */
+export function staleLocalsAssetPaths(content: string, manifest: AssetManifest): string[] {
+	return LOCALS_ASSET_BINDINGS.filter(({ logical, property }) => {
+		const current = new RegExp(`${property}\\s*:\\s*'([^']*)'`).exec(content)?.[1];
+		return current !== manifest.assets[logical];
+	}).map(({ property }) => property);
 }
 
 /**

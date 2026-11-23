@@ -4,12 +4,15 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { after, describe, test } from 'node:test';
 import {
+	ASSET_MANIFEST_FILENAME,
 	applyAssetManifestToLocalsFile,
 	ensureEmptyStaticMountDir,
 	fingerprintAndCompressStaticAssets,
 	isFingerprintedAssetPath,
+	loadAssetManifest,
 	shouldBrotli,
-	shouldFingerprint
+	shouldFingerprint,
+	staleLocalsAssetPaths
 } from './fingerprint-assets.ts';
 
 describe('fingerprint-assets', () => {
@@ -216,6 +219,59 @@ describe('fingerprint-assets', () => {
 		assert.equal(manifest.assets['javascripts/example-app.test.js'], undefined);
 		assert.equal(manifest.assets['javascripts/already-aabbccdd.js'], undefined);
 		assert.equal(manifest.assets['readme.txt'], undefined);
+	});
+
+	test('loadAssetManifest reads the manifest a build wrote', async () => {
+		tempDir = await mkdtemp(path.join(tmpdir(), 'fingerprint-load-'));
+		const manifest = { assets: { 'javascripts/app.js': 'javascripts/app-01234567.js' } };
+		await writeFile(path.join(tempDir, ASSET_MANIFEST_FILENAME), JSON.stringify(manifest));
+
+		assert.deepEqual(loadAssetManifest(tempDir), manifest);
+	});
+
+	test('loadAssetManifest returns null for missing, malformed or shapeless manifests', async () => {
+		tempDir = await mkdtemp(path.join(tmpdir(), 'fingerprint-load-bad-'));
+		assert.equal(loadAssetManifest(tempDir), null);
+
+		const manifestPath = path.join(tempDir, ASSET_MANIFEST_FILENAME);
+		await writeFile(manifestPath, 'not json');
+		assert.equal(loadAssetManifest(tempDir), null);
+
+		await writeFile(manifestPath, JSON.stringify({ notAssets: true }));
+		assert.equal(loadAssetManifest(tempDir), null);
+
+		await writeFile(manifestPath, 'null');
+		assert.equal(loadAssetManifest(tempDir), null);
+	});
+
+	test('staleLocalsAssetPaths flags literals that differ from the manifest', () => {
+		// consulteesMapJs has no literal at all - a missing property is stale too,
+		// since the build rewrite can only update a literal that exists
+		const content = `export const paths = {
+	styleFile: 'style-11111111.css',
+	govukFrontendJs: 'assets/js/govuk-frontend.min-22222222.js'
+};
+`;
+		const manifest = {
+			assets: {
+				'style.css': 'style-11111111.css',
+				'assets/js/govuk-frontend.min.js': 'assets/js/govuk-frontend.min-99999999.js',
+				'javascripts/consultees-map.js': 'javascripts/consultees-map-99999999.js'
+			}
+		};
+
+		const stale = staleLocalsAssetPaths(content, manifest);
+		assert.ok(stale.includes('govukFrontendJs'));
+		assert.ok(stale.includes('consulteesMapJs'));
+		assert.ok(!stale.includes('styleFile'));
+
+		// a literal whose binding the manifest no longer produces is stale too - a
+		// dead property the file should not keep emitting
+		const missingEntry = staleLocalsAssetPaths(content, {
+			assets: { 'assets/js/govuk-frontend.min.js': 'assets/js/govuk-frontend.min-22222222.js' }
+		});
+		assert.ok(missingEntry.includes('styleFile'));
+		assert.ok(!missingEntry.includes('govukFrontendJs'));
 	});
 
 	test('ensureEmptyStaticMountDir recreates an empty directory', async () => {
