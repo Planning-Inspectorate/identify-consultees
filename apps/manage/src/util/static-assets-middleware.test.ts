@@ -220,6 +220,36 @@ describe('static-assets-middleware', () => {
 		assert.equal(response.status, 404);
 	});
 
+	test('only indexes asset requests consume the rate limiter', async () => {
+		tempDir = await mkdtemp(path.join(tmpdir(), 'static-assets-mw-limit-'));
+		const relative = 'assets/js/app-aabbccdd.js';
+		const absolute = path.join(tempDir, ...relative.split('/'));
+		await mkdir(path.dirname(absolute), { recursive: true });
+		await writeFile(absolute, 'export const value = 1;\n');
+
+		const app = express();
+		let limited = 0;
+		app.use(
+			createStaticAssetsMiddleware(tempDir, {
+				rateLimiter: (_req, _res, next) => {
+					limited++;
+					next();
+				}
+			})
+		);
+		app.use((_req, res) => res.status(200).end('page'));
+
+		// page requests, asset misses and non-GET methods stay outside the bucket
+		await request(app).get('/');
+		await request(app).get('/consultees/some-page');
+		await request(app).get('/assets/js/missing-aabbccdd.js');
+		await request(app).post(`/${relative}`);
+		assert.equal(limited, 0);
+
+		await request(app).get(`/${relative}`);
+		assert.equal(limited, 1);
+	});
+
 	test('forwards stream errors when the asset disappears after indexing', async () => {
 		tempDir = await mkdtemp(path.join(tmpdir(), 'static-assets-mw-gone-'));
 		const relative = 'assets/js/app-aabbccdd.js';

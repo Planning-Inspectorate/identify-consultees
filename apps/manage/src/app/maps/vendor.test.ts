@@ -40,18 +40,24 @@ describe('defra vendor router', () => {
 		assert.equal(revalidated.status, 304);
 	});
 
-	test('applies the configured rate limiter before serving vendor files', async () => {
+	test('applies the configured rate limiter to vendor paths only', async () => {
 		const app = express();
 		let limited = 0;
 		app.use(
 			createDefraVendorRouter({
 				maxAge: '1d',
-				rateLimiter: (req, res, next) => {
+				rateLimiter: (_req, _res, next) => {
 					limited++;
 					next();
 				}
 			})
 		);
+		app.use((_req, res) => res.status(200).end('page'));
+
+		// the router mounts at the app root - page requests must not drain the bucket
+		await request(app).get('/');
+		await request(app).get('/consultees/some-page');
+		assert.equal(limited, 0);
 
 		const response = await request(app).get(VENDOR_CSS);
 		assert.equal(response.status, 200);

@@ -268,8 +268,11 @@ const rejectSidecarRequests: RequestHandler = (req, _res, next) => {
  */
 export function createDefraVendorRouter(options: DefraVendorRouterOptions = {}): IRouter {
 	const router = createRouter();
+	const rateLimiter = options.rateLimiter ?? buildStaticAssetsRateLimiter();
 
-	router.use(options.rateLimiter ?? buildStaticAssetsRateLimiter());
+	// the router is mounted at the app root, so without the path check the limiter
+	// would count every request through the app - it is for the /vendor mounts only
+	router.use((req, res, next) => (req.path.startsWith('/vendor/') ? rateLimiter(req, res, next) : next()));
 
 	for (const [prefix, root] of Object.entries(DEFRA_VENDOR_ROOTS)) {
 		router.use(`/vendor/${prefix}`, rejectSidecarRequests);
