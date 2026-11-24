@@ -268,8 +268,10 @@ test.describe('manage journeys', () => {
 			const pickedNames = [];
 			for (let i = 0; i < bulkCount; i++) {
 				pickedNames.push((await bulkRows.nth(i).locator('td:nth-child(2)').innerText()).trim());
-				// the small-checkboxes label overlays the input - it is the hit target
-				await bulkRows.nth(i).locator('label.govuk-checkboxes__label').click();
+				// the small-checkboxes label's box (a ::before) intercepts the pointer over
+				// the input, while the label itself has no box to click - force lands the
+				// click on that pseudo-element, which toggles the input via its `for`
+				await bulkRows.nth(i).locator('input.govuk-checkboxes__input').click({ force: true });
 			}
 			await page.getByRole('button', { name: 'Remove selected' }).click();
 			await expect(page).toHaveURL(/\/report\/consultees\/remove\?.*match=/);
@@ -383,11 +385,16 @@ test.describe('manage journeys', () => {
 		await expect(page.getByText('Borders the site')).toBeVisible();
 		await expect(page.getByRole('link', { name: /Remove/ })).toHaveCount(parishCount - removed + picked + 2);
 
-		// "Remove selected" with nothing ticked is a validation failure, not an
-		// error page - the submit comes back to the list, which flags the missed choice
-		await page.getByRole('button', { name: 'Remove selected' }).click();
-		await expect(page).toHaveURL(/\/report\/consultees\?.*category=Parish.*error=select/);
-		await expect(page.getByRole('link', { name: 'Choose at least one consultee' })).toBeVisible();
+		// GIS-242 AC4: with JavaScript, "Remove selected" is hidden while nothing is
+		// ticked and returns on the first tick. The server-side "Choose at least one"
+		// flag still guards the submit - the no-JS journey below exercises it
+		const removeSelected = page.locator('#consultees-remove-selected');
+		await expect(removeSelected).toBeHidden();
+		const firstRowBox = consulteesTable.locator('tbody tr').first().locator('input.govuk-checkboxes__input');
+		await firstRowBox.click({ force: true });
+		await expect(removeSelected).toBeVisible();
+		await firstRowBox.click({ force: true });
+		await expect(removeSelected).toBeHidden();
 
 		// a hand-added consultee's Remove link goes through the same reason page -
 		// its row leaves the Included consultees table and joins Removed consultees instead
@@ -659,8 +666,10 @@ test.describe('manage journeys', () => {
 				`/consultees/${SAMPLE_CASE_ID}/report/consultees?ruleset=${SAMPLE_RULESET_ID}&category=Parish%2C+town+and+community+councils&add=${add}`
 			);
 			await expect(page.getByRole('cell', { name: 'E2E No-JS Consultee', exact: true })).toBeVisible();
-			// the enhancement never ran: the Select all box keeps the name a no-JS submit sends
+			// the enhancement never ran: the Select all box keeps the name a no-JS submit sends,
+			// and "Remove selected" stays visible - nothing else hides it
 			await expect(page.locator('input[name="select-all"]')).toHaveCount(1);
+			await expect(page.getByRole('button', { name: 'Remove selected' })).toBeVisible();
 
 			await page.getByRole('button', { name: 'Remove selected' }).click();
 			await expect(page).toHaveURL(/\/report\/consultees\?.*error=select/);

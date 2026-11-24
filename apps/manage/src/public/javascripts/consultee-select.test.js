@@ -37,6 +37,7 @@ const TABLE = `
 				${row('c', '0')}
 			</tbody>
 		</table>
+		<button class="govuk-button govuk-button--warning" id="consultees-remove-selected" type="submit">Remove selected</button>
 	</form>`;
 
 function documentWith(body = TABLE) {
@@ -125,6 +126,57 @@ describe('enhanceConsulteeSelectTable', () => {
 		const toggle = table.querySelector('#checkboxes-all');
 		assert.equal(toggle.name, '');
 		toggle.click();
+		assert.deepEqual(checkedValues(table), ['a', 'b', '0']);
+	});
+});
+
+describe('the Remove selected button (GIS-242 AC4)', () => {
+	// the fixture's row b arrives ticked; strip it for the nothing-selected cases
+	const NONE_TICKED = TABLE.replace('value="b" checked', 'value="b"');
+	const removeSelected = (document) => document.querySelector('#consultees-remove-selected');
+
+	test('hides when nothing is ticked on load, returns on the first tick', () => {
+		const document = documentWith(NONE_TICKED);
+		const table = document.querySelector('table');
+		enhanceConsulteeSelectTable(table);
+		assert.equal(removeSelected(document).classList.contains('govuk-!-display-none'), true);
+		table.querySelector('#select-a').click();
+		assert.equal(removeSelected(document).classList.contains('govuk-!-display-none'), false);
+		table.querySelector('#select-a').click();
+		assert.equal(removeSelected(document).classList.contains('govuk-!-display-none'), true);
+	});
+
+	test('stays shown while any box is ticked', () => {
+		const document = documentWith();
+		const table = document.querySelector('table');
+		enhanceConsulteeSelectTable(table);
+		assert.equal(removeSelected(document).classList.contains('govuk-!-display-none'), false);
+	});
+
+	test('Select all reveals it and clearing the toggle hides it again', () => {
+		const document = documentWith(NONE_TICKED);
+		const table = document.querySelector('table');
+		enhanceConsulteeSelectTable(table);
+		const toggle = selectAll(table);
+		toggle.click();
+		assert.equal(removeSelected(document).classList.contains('govuk-!-display-none'), false);
+		toggle.click();
+		assert.equal(removeSelected(document).classList.contains('govuk-!-display-none'), true);
+	});
+
+	test('leaves it alone when the button is not rendered', () => {
+		const document = documentWith(NONE_TICKED.replace(' id="consultees-remove-selected"', ''));
+		const table = document.querySelector('table');
+		assert.doesNotThrow(() => enhanceConsulteeSelectTable(table));
+		selectAll(table).click();
+		assert.deepEqual(checkedValues(table), ['a', 'b', '0']);
+	});
+
+	test('leaves it alone when the table is not in a form', () => {
+		const document = documentWith(NONE_TICKED.replace('<form method="get">', '').replace('</form>', ''));
+		const table = document.querySelector('table');
+		assert.doesNotThrow(() => enhanceConsulteeSelectTable(table));
+		selectAll(table).click();
 		assert.deepEqual(checkedValues(table), ['a', 'b', '0']);
 	});
 });
