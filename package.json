@@ -48,9 +48,9 @@
   },
   "dependencies": {
     "@azure/identity": "^4.14.1",
-    "@azure/msal-node": "^7.2.1",
+    "@azure/msal-node": "^7.2.2",
     "@azure/storage-blob": "^12.29.0",
-    "@defra/interactive-map": "^0.0.51-apha",
+    "@defra/interactive-map": "^0.0.52-alpha",
     "@planning-inspectorate/core": "^1.15.1",
     "@prisma/adapter-mssql": "^7.10.1",
     "@prisma/client": "^7.10.1",
