@@ -1,3 +1,4 @@
+import { buildStaticAssetsRateLimiter } from '#util/static-assets-middleware.ts';
 import { DEFRA_VENDOR_ROOTS } from '#util/vendor-assets.ts';
 import express from 'express';
 import assert from 'node:assert/strict';
@@ -7,12 +8,12 @@ import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { describe, test } from 'node:test';
-import { brotliDecompressSync } from 'node:zlib';
+import { brotliCompressSync, brotliDecompressSync, gzipSync } from 'node:zlib';
 import request from 'supertest';
 import {
 	clearVendorBrotliCacheForTests,
 	createDefraVendorRouter,
-	createVendorBrotliHandler,
+	createVendorCompressedHandler,
 	maxAgeToSeconds
 } from './vendor.ts';
 
@@ -159,21 +160,47 @@ describe('defra vendor router', () => {
 		const binary = await request(app).get('/vendor/map-key-plugin/js/nonexistent.bin').set('Accept-Encoding', 'br');
 		assert.equal(binary.status, 404);
 	});
+
+	test('never serves .br or .gz sidecars as raw files', async () => {
+		const app = express();
+		app.use(createDefraVendorRouter({ maxAge: '1d' }));
+
+		// these sidecars exist on disk beside index.js - they must 404 like a miss
+		const brotli = await request(app).get(`${VENDOR_JS}.br`);
+		assert.equal(brotli.status, 404);
+
+		const gzip = await request(app).get(`${VENDOR_JS}.gz`);
+		assert.equal(gzip.status, 404);
+
+		// an encoded extension reaches the same place after decoding
+		const encoded = await request(app).get(`${VENDOR_JS}%2ebr`);
+		assert.equal(encoded.status, 404);
+	});
+
+	test('unsafe paths fall through to express.static, which denies them', async () => {
+		const app = express();
+		app.use(createDefraVendorRouter({ maxAge: '1d' }));
+
+		const traversal = await request(app).get('/vendor/map-key-plugin/js/..%2f..%2fsecret.js');
+		assert.ok(traversal.status >= 400);
+	});
 });
 
-describe('vendor brotli handler (direct)', () => {
+describe('vendor compressed handler (direct)', () => {
 	function invoke(
-		handler: ReturnType<typeof createVendorBrotliHandler>,
+		handler: ReturnType<typeof createVendorCompressedHandler>,
 		{
 			method = 'GET',
 			path: reqPath = '/x.js',
-			headers = {}
-		}: { method?: string; path?: string; headers?: Record<string, string> } = {}
+			headers = {},
+			headersSent = false
+		}: { method?: string; path?: string; headers?: Record<string, string>; headersSent?: boolean } = {}
 	) {
 		const req = { method, path: reqPath, get: (name: string) => headers[name.toLowerCase()] };
 		const headersSet: Record<string, string | number> = {};
 		let ended = false;
 		const res = {
+			headersSent,
 			setHeader: (name: string, value: string | number) => {
 				headersSet[name.toLowerCase()] = value;
 			},
@@ -193,7 +220,7 @@ describe('vendor brotli handler (direct)', () => {
 	test('passes through non-GET methods, unsafe paths and non-compressible files', async () => {
 		const root = await mkdtemp(path.join(tmpdir(), 'vendor-br-'));
 		await writeFile(path.join(root, 'data.bin'), Buffer.alloc(4096, 1));
-		const handler = createVendorBrotliHandler(root, '1d');
+		const handler = createVendorCompressedHandler(root, '1d');
 		const brHeaders = { 'accept-encoding': 'br' };
 
 		const post = await invoke(handler, { method: 'POST', headers: brHeaders });
@@ -210,7 +237,7 @@ describe('vendor brotli handler (direct)', () => {
 		const root = await mkdtemp(path.join(tmpdir(), 'vendor-br-'));
 		await mkdir(path.join(root, 'adir.js'));
 		await writeFile(path.join(root, 'tiny.js'), 'x=1');
-		const handler = createVendorBrotliHandler(root, '1d');
+		const handler = createVendorCompressedHandler(root, '1d');
 		const brHeaders = { 'accept-encoding': 'br' };
 
 		const missing = await invoke(handler, { path: '/missing.js', headers: brHeaders });
@@ -226,7 +253,7 @@ describe('vendor brotli handler (direct)', () => {
 	test('passes through when the client does not accept br', async () => {
 		const root = await mkdtemp(path.join(tmpdir(), 'vendor-br-'));
 		await writeFile(path.join(root, 'big.js'), Buffer.alloc(4096, 1));
-		const handler = createVendorBrotliHandler(root, '1d');
+		const handler = createVendorCompressedHandler(root, '1d');
 
 		const result = await invoke(handler, { path: '/big.js', headers: { 'accept-encoding': 'gzip' } });
 		assert.equal(result.fellThrough, true);
@@ -240,7 +267,7 @@ describe('vendor brotli handler (direct)', () => {
 		clearVendorBrotliCacheForTests();
 		const root = await mkdtemp(path.join(tmpdir(), 'vendor-br-'));
 		await writeFile(path.join(root, 'big.js'), Buffer.alloc(4096, 1));
-		const handler = createVendorBrotliHandler(root, '1d', {
+		const handler = createVendorCompressedHandler(root, '1d', {
 			compress: () => Promise.reject(new Error('compress boom'))
 		});
 
@@ -249,12 +276,179 @@ describe('vendor brotli handler (direct)', () => {
 		assert.equal(result.ended, false);
 	});
 
+	test('serves a build-time .br sidecar in preference to the runtime encode', async () => {
+		clearVendorBrotliCacheForTests();
+		const root = await mkdtemp(path.join(tmpdir(), 'vendor-br-'));
+		const source = path.join(root, 'chunk.js');
+		const body = `globalThis.chunk = ${'1'.repeat(4096)};\n`;
+		await writeFile(source, body);
+		const compressed = brotliCompressSync(body);
+		await writeFile(`${source}.br`, compressed);
+
+		const app = express();
+		app.use(
+			'/vendor/test',
+			buildStaticAssetsRateLimiter(),
+			createVendorCompressedHandler(root, '1d', {
+				compress: () => Promise.reject(new Error('runtime encode must not run'))
+			})
+		);
+		app.use((_req, res) => res.status(404).end());
+
+		// a 200 proves the sidecar path ran: the injected encode throws, so any
+		// attempt at the runtime path would have fallen through to the 404
+		const response = await request(app).get('/vendor/test/chunk.js').set('Accept-Encoding', 'br');
+		assert.equal(response.status, 200);
+		assert.equal(response.headers['content-encoding'], 'br');
+		assert.equal(Number(response.headers['content-length']), compressed.length);
+		assert.equal(response.text, body);
+	});
+
+	test('serves a .gz sidecar to gzip clients, including HEAD', async () => {
+		const root = await mkdtemp(path.join(tmpdir(), 'vendor-gz-'));
+		const source = path.join(root, 'chunk.js');
+		const body = `globalThis.chunk = ${'1'.repeat(4096)};\n`;
+		await writeFile(source, body);
+		const compressed = gzipSync(body);
+		await writeFile(`${source}.gz`, compressed);
+
+		const app = express();
+		app.use('/vendor/test', buildStaticAssetsRateLimiter(), createVendorCompressedHandler(root, '1d'));
+		app.use((_req, res) => res.status(404).end());
+
+		const response = await request(app).get('/vendor/test/chunk.js').set('Accept-Encoding', 'gzip');
+		assert.equal(response.status, 200);
+		assert.equal(response.headers['content-encoding'], 'gzip');
+		assert.equal(Number(response.headers['content-length']), compressed.length);
+		// superagent transparently decompresses, so the body is the source bytes
+		assert.equal(response.text, body);
+
+		const head = await request(app).head('/vendor/test/chunk.js').set('Accept-Encoding', 'gzip');
+		assert.equal(head.status, 200);
+		assert.equal(head.headers['content-encoding'], 'gzip');
+		assert.equal(Number(head.headers['content-length']), compressed.length);
+	});
+
+	test('a stale sidecar (older than the source) is ignored for the runtime encode', async () => {
+		clearVendorBrotliCacheForTests();
+		const root = await mkdtemp(path.join(tmpdir(), 'vendor-br-'));
+		const source = path.join(root, 'chunk.js');
+		await writeFile(source, `globalThis.chunk = ${'1'.repeat(4096)};\n`);
+		// sidecar written then pushed into the past: the shape an in-place
+		// package update or deps:patch-* rewrite leaves behind
+		await writeFile(`${source}.br`, brotliCompressSync('STALE'));
+		const past = new Date(Date.now() - 60_000);
+		await utimes(`${source}.br`, past, past);
+		let runtimeEncodes = 0;
+
+		const app = express();
+		app.use(
+			'/vendor/test',
+			buildStaticAssetsRateLimiter(),
+			createVendorCompressedHandler(root, '1d', {
+				compress: async (input: Buffer) => {
+					runtimeEncodes++;
+					return brotliCompressSync(input);
+				}
+			})
+		);
+		app.use((_req, res) => res.status(404).end());
+
+		const response = await request(app).get('/vendor/test/chunk.js').set('Accept-Encoding', 'br');
+		assert.equal(response.status, 200);
+		assert.equal(response.headers['content-encoding'], 'br');
+		assert.equal(runtimeEncodes, 1);
+	});
+
+	test('a gzip-only client falls through when no .gz sidecar exists', async () => {
+		const root = await mkdtemp(path.join(tmpdir(), 'vendor-gz-'));
+		await writeFile(path.join(root, 'chunk.js'), `globalThis.chunk = ${'1'.repeat(4096)};\n`);
+		const handler = createVendorCompressedHandler(root, '1d');
+
+		const result = await invoke(handler, { path: '/chunk.js', headers: { 'accept-encoding': 'gzip' } });
+		assert.equal(result.fellThrough, true);
+	});
+
+	test('the runtime encode is memoised across requests for the same file', async () => {
+		clearVendorBrotliCacheForTests();
+		const root = await mkdtemp(path.join(tmpdir(), 'vendor-br-'));
+		await writeFile(path.join(root, 'big.js'), Buffer.alloc(4096, 1));
+		let encodes = 0;
+		const handler = createVendorCompressedHandler(root, '1d', {
+			compress: async (input: Buffer) => {
+				encodes++;
+				return brotliCompressSync(input);
+			}
+		});
+		const brHeaders = { 'accept-encoding': 'br' };
+
+		await invoke(handler, { path: '/big.js', headers: brHeaders });
+		await invoke(handler, { path: '/big.js', headers: brHeaders });
+		assert.equal(encodes, 1, 'the second request must reuse the memoised variant');
+	});
+
+	test('HEAD through the runtime encode ends with headers only', async () => {
+		clearVendorBrotliCacheForTests();
+		const root = await mkdtemp(path.join(tmpdir(), 'vendor-br-'));
+		await writeFile(path.join(root, 'big.js'), Buffer.alloc(4096, 1));
+		const handler = createVendorCompressedHandler(root, '1d');
+
+		const head = await invoke(handler, { method: 'HEAD', path: '/big.js', headers: { 'accept-encoding': 'br' } });
+		assert.equal(head.ended, true);
+		assert.equal(head.body, undefined, 'a HEAD sends no body');
+		assert.equal(head.headersSet['content-encoding'], 'br');
+		assert.ok(Number(head.headersSet['content-length']) > 0);
+	});
+
+	test('falls through when the runtime encode yields no variant', async () => {
+		clearVendorBrotliCacheForTests();
+		const root = await mkdtemp(path.join(tmpdir(), 'vendor-br-'));
+		await writeFile(path.join(root, 'big.js'), Buffer.alloc(4096, 1));
+		const handler = createVendorCompressedHandler(root, '1d', {
+			compress: () => Promise.resolve(undefined)
+		});
+
+		const result = await invoke(handler, { path: '/big.js', headers: { 'accept-encoding': 'br' } });
+		assert.equal(result.fellThrough, true);
+		assert.equal(result.ended, false);
+	});
+
+	test('a failed sidecar stream is forwarded to next when headers are unsent', async () => {
+		const root = await mkdtemp(path.join(tmpdir(), 'vendor-br-'));
+		const source = path.join(root, 'chunk.js');
+		await writeFile(source, `globalThis.chunk = ${'1'.repeat(4096)};\n`);
+		await writeFile(`${source}.br`, brotliCompressSync('BODY'));
+		const handler = createVendorCompressedHandler(root, '1d');
+
+		// the mock response is not a writable stream, so piping the sidecar into
+		// it fails - with headers unsent the error goes to next()
+		const result = await invoke(handler, { path: '/chunk.js', headers: { 'accept-encoding': 'br' } });
+		assert.equal(result.fellThrough, true);
+		assert.equal(result.ended, false);
+	});
+
+	test('a failed sidecar stream is swallowed once headers are sent', async () => {
+		const root = await mkdtemp(path.join(tmpdir(), 'vendor-br-'));
+		const source = path.join(root, 'chunk.js');
+		await writeFile(source, `globalThis.chunk = ${'1'.repeat(4096)};\n`);
+		await writeFile(`${source}.br`, brotliCompressSync('BODY'));
+		const handler = createVendorCompressedHandler(root, '1d');
+
+		const result = await invoke(handler, {
+			path: '/chunk.js',
+			headers: { 'accept-encoding': 'br' },
+			headersSent: true
+		});
+		assert.equal(result.fellThrough, false);
+		assert.equal(result.ended, false);
+	});
+
 	test('recompresses when the file changes (mtime-based cache key)', async () => {
 		clearVendorBrotliCacheForTests();
 		const root = await mkdtemp(path.join(tmpdir(), 'vendor-br-'));
 		const file = path.join(root, 'big.js');
 		await writeFile(file, Buffer.alloc(4096, 1));
-		const handler = createVendorBrotliHandler(root, '1d');
+		const handler = createVendorCompressedHandler(root, '1d');
 		const brHeaders = { 'accept-encoding': 'br' };
 
 		const first = await invoke(handler, { path: '/big.js', headers: brHeaders });

@@ -6,7 +6,7 @@ import { SAMPLE_CASE_ID, SAMPLE_CASE_REFERENCE, SAMPLE_RULESET_ID } from './fixt
  * reference must actually serve, and the fingerprinted ones must carry the
  * long-lived caching contract the fingerprinting exists for -
  * `Cache-Control: immutable, max-age=31536000` with a Brotli response for
- * clients that accept `br`.
+ * clients that accept `br` and a gzip response for clients that accept `gzip`.
  *
  * A stale literal or a missing build output is a hard 404 on an
  * immutable-cached asset that breaks every page requesting it - this spec is
@@ -63,17 +63,30 @@ test('every asset every page references serves, fingerprinted ones immutable and
 			failures.push(`${url} referenced by ${where}: HTTP ${response.status()}`);
 			continue;
 		}
-		if (!FINGERPRINTED.test(url)) {
+		const headers = response.headers();
+		if (FINGERPRINTED.test(url)) {
+			const cacheControl = headers['cache-control'] ?? '';
+			if (!cacheControl.includes('immutable') || !cacheControl.includes('max-age=31536000')) {
+				failures.push(`${url}: Cache-Control "${cacheControl}" is not the fingerprinted-asset contract`);
+			}
+		}
+		if (!BROTLI_ELIGIBLE.test(url)) {
 			continue;
 		}
-		const headers = response.headers();
-		const cacheControl = headers['cache-control'] ?? '';
-		if (!cacheControl.includes('immutable') || !cacheControl.includes('max-age=31536000')) {
-			failures.push(`${url}: Cache-Control "${cacheControl}" is not the fingerprinted-asset contract`);
-		}
-		if (BROTLI_ELIGIBLE.test(url) && headers['content-encoding'] !== 'br') {
+		if (headers['content-encoding'] !== 'br') {
 			failures.push(
 				`${url}: expected a Brotli response for accept-encoding: br, got "${headers['content-encoding'] ?? 'none'}"`
+			);
+		}
+		// an encoded variant exists, so the response must vary on Accept-Encoding
+		// or a shared cache could replay compressed bytes to a plain client
+		if (!(headers['vary'] ?? '').toLowerCase().includes('accept-encoding')) {
+			failures.push(`${url}: missing Vary: Accept-Encoding on a compressible asset`);
+		}
+		const gzip = await request.get(url, { headers: { 'accept-encoding': 'gzip' } });
+		if (gzip.ok() && gzip.headers()['content-encoding'] !== 'gzip') {
+			failures.push(
+				`${url}: expected a gzip response for accept-encoding: gzip, got "${gzip.headers()['content-encoding'] ?? 'none'}"`
 			);
 		}
 	}

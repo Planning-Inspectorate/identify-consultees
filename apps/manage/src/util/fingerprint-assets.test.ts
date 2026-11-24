@@ -1,8 +1,9 @@
 import assert from 'node:assert/strict';
-import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, stat, utimes, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { after, describe, test } from 'node:test';
+import { brotliDecompressSync, gunzipSync } from 'node:zlib';
 import {
 	ASSET_MANIFEST_FILENAME,
 	applyAssetManifestToLocalsFile,
@@ -10,7 +11,7 @@ import {
 	fingerprintAndCompressStaticAssets,
 	isFingerprintedAssetPath,
 	loadAssetManifest,
-	shouldBrotli,
+	shouldCompress,
 	shouldFingerprint,
 	staleLocalsAssetPaths
 } from './fingerprint-assets.ts';
@@ -29,12 +30,14 @@ describe('fingerprint-assets', () => {
 		assert.equal(isFingerprintedAssetPath('style-635ae645.css'), true);
 		assert.equal(isFingerprintedAssetPath('govuk-frontend.min-abcdef12.js'), true);
 		assert.equal(isFingerprintedAssetPath('govuk-frontend.min-abcdef12.js.br'), true);
+		assert.equal(isFingerprintedAssetPath('govuk-frontend.min-abcdef12.js.gz'), true);
 		assert.equal(isFingerprintedAssetPath('govuk-frontend.min.js'), false);
 		assert.equal(isFingerprintedAssetPath('style.css'), false);
 	});
 
-	test('shouldFingerprint and shouldBrotli guard sidecars', () => {
+	test('shouldFingerprint and shouldCompress guard sidecars', () => {
 		assert.equal(shouldFingerprint('javascripts/app.js.br'), false);
+		assert.equal(shouldFingerprint('javascripts/app.js.gz'), false);
 		assert.equal(shouldFingerprint('javascripts/app.test.js'), false);
 		assert.equal(shouldFingerprint('javascripts/app.test.mjs'), false);
 		assert.equal(shouldFingerprint('javascripts/app-aabbccdd.js'), false);
@@ -48,12 +51,13 @@ describe('fingerprint-assets', () => {
 		assert.equal(shouldFingerprint('vendor/datasets-plugin/css/index.css'), true);
 		assert.equal(shouldFingerprint('vendor/datasets-plugin/js/6924.js'), false);
 		assert.equal(shouldFingerprint('vendor/datasets-plugin/js/index-01234567.js'), false);
-		assert.equal(shouldBrotli('style.css.br'), false);
-		assert.equal(shouldBrotli('style.css'), true);
-		assert.equal(shouldBrotli('image.png'), false);
+		assert.equal(shouldCompress('style.css.br'), false);
+		assert.equal(shouldCompress('style.css.gz'), false);
+		assert.equal(shouldCompress('style.css'), true);
+		assert.equal(shouldCompress('image.png'), false);
 	});
 
-	test('fingerprintAndCompressStaticAssets hashes JS/CSS and writes Brotli sidecars', async () => {
+	test('fingerprintAndCompressStaticAssets hashes JS/CSS and writes br/gzip sidecars', async () => {
 		tempDir = await mkdtemp(path.join(tmpdir(), 'fingerprint-assets-'));
 		await mkdir(path.join(tempDir, 'assets', 'js'), { recursive: true });
 		await mkdir(path.join(tempDir, 'assets', 'images'), { recursive: true });
@@ -79,6 +83,15 @@ describe('fingerprint-assets', () => {
 		const hashedGovuk = path.join(tempDir, ...manifest.assets['assets/js/govuk-frontend.min.js'].split('/'));
 		const brBody = await readFile(`${hashedGovuk}.br`);
 		assert.ok(brBody.byteLength > 0);
+		assert.deepEqual(brotliDecompressSync(brBody).toString(), 'console.log("govuk");\n');
+		assert.deepEqual(gunzipSync(await readFile(`${hashedGovuk}.gz`)).toString(), 'console.log("govuk");\n');
+
+		// unfingerprinted compressible files get sidecars too - favicons, manifests
+		// and other files the fingerprint globs do not cover
+		const styleGz = gunzipSync(await readFile(path.join(tempDir, 'style-aabbccdd.css.gz')));
+		assert.equal(styleGz.toString(), 'body{color:red}');
+		const manifestGz = gunzipSync(await readFile(path.join(tempDir, 'asset-manifest.json.gz')));
+		assert.ok(manifestGz.byteLength > 0);
 
 		const writtenManifest = JSON.parse(await readFile(path.join(tempDir, 'asset-manifest.json'), 'utf8'));
 		assert.deepEqual(writtenManifest.assets['style.css'], 'style-aabbccdd.css');
@@ -166,6 +179,39 @@ describe('fingerprint-assets', () => {
 			/missing asset literals for consulteesMapJs.*Restore it/s
 		);
 		assert.match(await readFile(localsFile, 'utf8'), /style-old\.css/);
+	});
+
+	test('fingerprintAndCompressStaticAssets reuses previous sidecars and clears orphans', async () => {
+		tempDir = await mkdtemp(path.join(tmpdir(), 'fingerprint-reuse-'));
+		await mkdir(path.join(tempDir, 'javascripts'), { recursive: true });
+		await writeFile(path.join(tempDir, 'javascripts', 'app.js'), 'export const a = 1;\n');
+		const readme = path.join(tempDir, 'readme.txt');
+		await writeFile(readme, 'version one\n');
+		// an orphan sidecar: its base file is gone before the build even starts
+		await writeFile(path.join(tempDir, 'ghost.css.br'), 'stale');
+
+		const first = await fingerprintAndCompressStaticAssets(tempDir);
+		const appPath = path.join(tempDir, ...first.assets['javascripts/app.js'].split('/'));
+		const brMtime = (await stat(`${appPath}.br`)).mtimeMs;
+		const gzMtime = (await stat(`${appPath}.gz`)).mtimeMs;
+
+		// a rebuild re-copies sources (identical content, fresh mtimes), and the
+		// one unfingerprinted file changed - only its sidecars must be rebuilt
+		await writeFile(path.join(tempDir, 'javascripts', 'app.js'), 'export const a = 1;\n');
+		await writeFile(readme, 'version two, longer\n');
+		const future = new Date(Date.now() + 60_000);
+		await utimes(readme, future, future);
+
+		const second = await fingerprintAndCompressStaticAssets(tempDir);
+		assert.deepEqual(second.assets, first.assets);
+
+		// the content-addressed name pins the bytes, so its existing sidecars
+		// are reused untouched rather than re-encoded
+		assert.equal((await stat(`${appPath}.br`)).mtimeMs, brMtime);
+		assert.equal((await stat(`${appPath}.gz`)).mtimeMs, gzMtime);
+		// the orphan is swept, and the changed file was recompressed
+		await assert.rejects(stat(path.join(tempDir, 'ghost.css.br')));
+		assert.equal(gunzipSync(await readFile(`${readme}.gz`)).toString(), 'version two, longer\n');
 	});
 
 	test('fingerprintAndCompressStaticAssets fingerprints .mjs modules and rewrites specifiers', async () => {
