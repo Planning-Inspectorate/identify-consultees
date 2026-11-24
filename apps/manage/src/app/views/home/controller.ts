@@ -5,14 +5,21 @@ import { getRuleset } from '@pins/identify-consultees-database/src/geospatial/ru
 import type { AsyncRequestHandler } from '@planning-inspectorate/core/util';
 import type { Request, Response } from 'express';
 import type { CbosCaseRefresh } from '../../cbos/refresh-cases.ts';
-import { boundaryUrl, changedStep } from '../consultees/report/urls.ts';
+import type { ConsulteeSelection } from '../consultees/report/urls.ts';
+import {
+	boundaryUrl,
+	changedStep,
+	consulteeSelection,
+	encodeCompactSelection,
+	reportUrl
+} from '../consultees/report/urls.ts';
 import { buildPagination } from './pagination.ts';
 import type { HomeViewModel, ProjectGeometry } from './view-model.ts';
 
 const PAGE_SIZE_OPTIONS = [25, 50, 100];
 const DEFAULT_PAGE_SIZE = 25;
 // the search's own fields, which Refresh cases carries back to it
-const SEARCH_FIELDS = ['q', 'pageSize', 'change', 'ruleset'];
+const SEARCH_FIELDS = ['q', 'pageSize', 'change', 'ruleset', 'case', 'selection'];
 
 function firstQueryValue(value: unknown): string {
 	if (Array.isArray(value)) {
@@ -33,11 +40,12 @@ function parsePage(value: unknown): number {
 
 function toProjectGeometry(
 	summary: CaseBoundarySummary,
-	changingProject?: { step: 'project'; rulesetId: string }
+	changingProject: { step: 'project'; rulesetId: string; caseId?: string } | undefined,
+	selection: ConsulteeSelection
 ): ProjectGeometry {
 	return {
 		id: summary.id,
-		href: boundaryUrl(summary.id, changingProject),
+		href: boundaryUrl(summary.id, changingProject, selection),
 		reference: summary.reference,
 		caseName: summary.caseName,
 		stage: summary.acceptance
@@ -63,11 +71,22 @@ export function buildHomePage(service: ManageService): AsyncRequestHandler {
 		const pageSize = parsePageSize(req.query.pageSize);
 		const page = parsePage(req.query.page);
 
-		// changing the check page's project: the search keeps its ruleset, for the project picked
+		// changing the check page's project: the search keeps its ruleset for the project picked, and
+		// its case and selection - the "Back to draft report" link returns to the draft unchanged
 		const change = changedStep(req.query);
+		const selection = consulteeSelection(req.query);
 		const changingProject =
 			change?.step === 'project' && getRuleset(change.rulesetId)
-				? { step: 'project' as const, rulesetId: change.rulesetId }
+				? {
+						step: 'project' as const,
+						rulesetId: change.rulesetId,
+						...(change.caseId ? { caseId: change.caseId } : {}),
+						// the selection rides through the search's forms as the single compact param - the
+						// per-entry params a long selection expands to could pass Front Door's URL limit
+						...(selection.removed.length + selection.adds.length > 0
+							? { selectionParam: encodeCompactSelection(selection) }
+							: {})
+					}
 				: undefined;
 
 		const hrefForPage = (targetPage: number): string => {
@@ -76,7 +95,9 @@ export function buildHomePage(service: ManageService): AsyncRequestHandler {
 				...(searchQuery ? { q: searchQuery } : {}),
 				pageSize: String(pageSize),
 				page: String(targetPage),
-				...(changingProject ? { change: changingProject.step, ruleset: changingProject.rulesetId } : {})
+				...(changingProject ? { change: changingProject.step, ruleset: changingProject.rulesetId } : {}),
+				...(changingProject?.caseId ? { case: changingProject.caseId } : {}),
+				...(changingProject?.selectionParam ? { selection: changingProject.selectionParam } : {})
 			});
 			return `/?${params.toString()}`;
 		};
@@ -91,7 +112,7 @@ export function buildHomePage(service: ManageService): AsyncRequestHandler {
 					limit: pageSize,
 					offset: (page - 1) * pageSize
 				});
-				geometries = features.map((summary) => toProjectGeometry(summary, changingProject));
+				geometries = features.map((summary) => toProjectGeometry(summary, changingProject, selection));
 				resultsTotal = total;
 			} catch (error) {
 				logger.error({ error }, 'Failed to search case boundaries');
@@ -109,6 +130,14 @@ export function buildHomePage(service: ManageService): AsyncRequestHandler {
 
 		const viewModel: HomeViewModel = {
 			pageHeading: 'Identify consultees for a national infrastructure project',
+			// the draft report the project is being changed for - "Back to draft report" returns to
+			// it as it was, without applying a change. No case, no report to go back to
+			...(changingProject?.caseId
+				? {
+						backLinkUrl: reportUrl(changingProject.caseId, changingProject.rulesetId, selection),
+						backLinkText: 'Back to draft report'
+					}
+				: {}),
 			searchQuery,
 			pageSize,
 			page,

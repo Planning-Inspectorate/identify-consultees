@@ -127,8 +127,9 @@ export function buildReportCheckPage(service: ManageService): AsyncRequestHandle
 			reference: project.properties.caseReference,
 			// each Change link changes that answer alone, then comes back here keeping the others: a
 			// different project (and its shapefile) keeps the ruleset; a different shapefile of this
-			// project keeps the ruleset and the consultees added and removed
-			caseChangeUrl: changeProjectUrl(ruleset.id),
+			// project keeps the ruleset and the consultees added and removed. The project search keeps
+			// this case and the selection too, so its "Back to draft report" returns here unchanged
+			caseChangeUrl: changeProjectUrl(project.id, ruleset.id, selection),
 			shapefileName: project.properties.fileName ?? 'Not provided',
 			shapefileChangeUrl: boundaryUrl(project.id, { step: 'shapefile', rulesetId: ruleset.id }, selection),
 			rulesetName: ruleset.name,
