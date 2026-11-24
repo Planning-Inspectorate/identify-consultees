@@ -1,0 +1,19 @@
+# Buffer styles: every map showing identified consultees (the ruleset results and the report's category pages).
+# The project boundary page has its own file next to this one: boundary-map.yaml. How far around
+# the site nearby consultees are shown is set per category in ../nearby-consultees.yaml.
+
+version: 1
+
+bufferStyles:
+  - colour: '#0b0c0c'
+    strokeWidth: 2
+    strokeDash: [1, 1]
+    description: black, no fill, small border dashes, small border dashes gap
+  - colour: '#0b0c0c'
+    strokeWidth: 2
+    strokeDash: [3, 3]
+    description: black, no fill, medium border dashes, medium border dashes gap
+  - colour: '#0b0c0c'
+    strokeWidth: 2
+    strokeDash: [3, 9]
+    description: black, no fill, medium border dashes, large border dashes gap

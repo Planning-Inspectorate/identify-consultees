@@ -2,6 +2,8 @@ import type { ManageService } from '#service';
 import type { CaseBoundaryFeature } from '@pins/identify-consultees-database/src/geospatial/case-boundaries.ts';
 import type { Ruleset, SiteScreenedAs } from '@pins/identify-consultees-database/src/geospatial/rulesets.ts';
 import type { Geometry } from '@pins/identify-consultees-database/src/geospatial/wkt.ts';
+import type { BufferDatasetStyle, BufferMapStyles } from '../../maps/buffer-map-styles.ts';
+import { BUFFER_MAP_STYLES, toBufferDatasetStyle } from '../../maps/buffer-map-styles.ts';
 import { computeBounds } from '../../maps/geometry-bounds.ts';
 import type { GeoJsonFeatureCollection } from '../../maps/sample-geojson.ts';
 import { grownSite } from './grown-site.ts';
@@ -73,6 +75,7 @@ export function screenedSite(project: CaseBoundaryFeature, siteScreenedAs: SiteS
 export interface SiteBuffer {
 	metres: number;
 	geometry: Geometry;
+	style: BufferDatasetStyle;
 }
 
 /** Buffers already drawn, by distance - so the maps of one report grow each only once. */
@@ -104,15 +107,49 @@ export async function siteBuffers(
 	);
 	return grown.filter((buffer): buffer is SiteBuffer => buffer.geometry !== undefined);
 }
+/**
+ * For each site buffer, work out the appropriate style to apply, by iterating through
+ * the available buffers, looping if more buffers are added
+ */
+export function assignBufferStyles(
+	siteBuffers: SiteBuffer[],
+	consulteeMapStyles: BufferMapStyles = BUFFER_MAP_STYLES
+): BufferDatasetStyle[] {
+	const { buffers } = consulteeMapStyles;
+	const totalBuffers = buffers.length;
+
+	const sortedSiteBuffers = [...siteBuffers].sort((a, b) => a.metres - b.metres);
+
+	const datasetStyles: BufferDatasetStyle[] = [];
+
+	sortedSiteBuffers.forEach((siteBuffer, index) => {
+		const originalIndex = siteBuffers.indexOf(siteBuffer);
+		datasetStyles[originalIndex] = toBufferDatasetStyle(buffers[index % totalBuffers]);
+	});
+
+	return datasetStyles;
+}
 
 /** The buffers as the maps take them: a feature each, labelled with its distance. */
 export function siteBufferGeojson(buffers: SiteBuffer[]): GeoJsonFeatureCollection {
+	const datasetStyles = assignBufferStyles(buffers);
+
 	return {
 		type: 'FeatureCollection',
-		features: buffers.map(({ metres, geometry }) => ({
-			type: 'Feature',
-			properties: { label: formatBufferDistance(metres) },
-			geometry
-		}))
+		features: buffers.map(({ metres, geometry }, index) => {
+			const style = datasetStyles[index];
+			return {
+				type: 'Feature',
+				properties: {
+					label: `Ruleset buffer ${formatBufferDistance(metres)}`,
+					metres: String(metres),
+					stroke: style.stroke,
+					strokeWidth: String(style.strokeWidth),
+					strokeDashArray: JSON.stringify(style.strokeDashArray),
+					description: style.symbolDescription
+				},
+				geometry
+			};
+		})
 	};
 }

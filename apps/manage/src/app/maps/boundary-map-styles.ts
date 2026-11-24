@@ -1,7 +1,7 @@
 import { CONFIG_DIR } from '@pins/identify-consultees-database/src/config-dir.ts';
-import { load } from 'js-yaml';
-import { readFileSync } from 'node:fs';
 import path from 'node:path';
+import type { DefraStyleConfig } from './style-utils.ts';
+import { HEX_COLOUR, isRecord, loadVersionedMapStylesFile, onlyKeys } from './style-utils.ts';
 
 /**
  * Styles for the project boundary page's map, from config/map-styles/boundary-map.yaml: the most recent
@@ -22,36 +22,19 @@ export interface BoundaryMapStyles {
 	earlier: BoundaryFileStyle[];
 }
 
-/** A file's style as the Defra datasets plugin takes it (see consultees-map.js). */
 export interface BoundaryDatasetStyle {
-	stroke: string;
-	strokeWidth: number;
-	strokeDashArray?: [number, number];
-	fill: string;
-	symbolDescription: string;
+	stroke: DefraStyleConfig['stroke'];
+	strokeWidth: DefraStyleConfig['strokeWidth'];
+	strokeDashArray?: DefraStyleConfig['strokeDashArray'];
+	fill: DefraStyleConfig['fill'];
+	symbolDescription: DefraStyleConfig['symbolDescription'];
 }
 
-const HEX_COLOUR = /^#[0-9a-fA-F]{6}$/;
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-	return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-/** Refuse keys `section` doesn't have - a misspelt optional one (strokeDash) would otherwise be ignored. */
-function onlyKeys(section: Record<string, unknown>, allowed: string[], name: string): void {
-	const unknown = Object.keys(section).filter((key) => !allowed.includes(key));
-	if (unknown.length > 0) {
-		throw new Error(
-			`config/map-styles/boundary-map.yaml: ${name} has ${unknown.map((key) => `"${key}"`).join(', ')} - it can only have ${allowed.join(', ')}`
-		);
-	}
-}
-
-function parseStyle(value: unknown, path: string): BoundaryFileStyle {
+function parseStyle(value: unknown, stylePath: string, path: string): BoundaryFileStyle {
 	if (!isRecord(value)) {
 		throw new Error(`${path} must be a style`);
 	}
-	onlyKeys(value, ['colour', 'fillOpacity', 'strokeWidth', 'strokeDash', 'description'], path);
+	onlyKeys(value, ['colour', 'fillOpacity', 'strokeWidth', 'strokeDash', 'description'], stylePath, path);
 	const { colour, fillOpacity, strokeWidth, strokeDash, description } = value;
 	if (typeof colour !== 'string' || !HEX_COLOUR.test(colour)) {
 		throw new Error(`${path}.colour must be a 6-digit hex colour, like '#C44E52'`);
@@ -84,24 +67,24 @@ function parseStyle(value: unknown, path: string): BoundaryFileStyle {
 	};
 }
 
-export function parseBoundaryMapStyles(text: string): BoundaryMapStyles {
-	const document = text.trim() === '' ? null : load(text);
-	if (!isRecord(document) || document.version !== 1) {
-		throw new Error('config/map-styles/boundary-map.yaml must be a version 1 document');
-	}
-	onlyKeys(document, ['version', 'mostRecent', 'earlier'], 'the document');
+export function parseBoundaryMapStyles(document: Record<string, unknown>, stylePath: string): BoundaryMapStyles {
+	onlyKeys(document, ['version', 'mostRecent', 'earlier'], stylePath, 'the document');
 	if (!Array.isArray(document.earlier) || document.earlier.length === 0) {
-		throw new Error('config/map-styles/boundary-map.yaml: earlier must list at least one style');
+		throw new Error(`${stylePath}: earlier must list at least one style`);
 	}
+
 	return {
-		mostRecent: parseStyle(document.mostRecent, 'mostRecent'),
-		earlier: document.earlier.map((style, index) => parseStyle(style, `earlier[${index}]`))
+		mostRecent: parseStyle(document.mostRecent, stylePath, 'mostRecent'),
+		earlier: document.earlier.map((style, index) => parseStyle(style, stylePath, `earlier[${index}]`))
 	};
 }
 
-export const BOUNDARY_MAP_STYLES = parseBoundaryMapStyles(
-	readFileSync(path.join(CONFIG_DIR, 'map-styles', 'boundary-map.yaml'), 'utf8')
-);
+export function readBoundaryMapStyles(stylePath: string): BoundaryMapStyles {
+	const document = loadVersionedMapStylesFile(stylePath, 1);
+	return parseBoundaryMapStyles(document, stylePath);
+}
+
+export const BOUNDARY_MAP_STYLES = readBoundaryMapStyles(path.join(CONFIG_DIR, 'map-styles', 'boundary-map.yaml'));
 
 /**
  * Each file's position by received date: 0 for the most recent, then 1, 2... A file with no date

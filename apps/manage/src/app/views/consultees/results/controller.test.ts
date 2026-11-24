@@ -306,10 +306,9 @@ describe('consultees results static map', () => {
 			);
 			return String(mockRes.send.mock.calls[0].arguments[0]);
 		};
-		// railways are found within 10km of the site
-		assert.match(await svg('Railways'), /stroke-dasharray="8 5"/);
+		assert.match(await svg('Railways'), /stroke-dasharray="1 1"/);
 		// parishes must intersect it - no buffer
-		assert.doesNotMatch(await svg('Parish, town and community councils'), /stroke-dasharray="8 5"/);
+		assert.doesNotMatch(await svg('Parish, town and community councils'), /stroke-dasharray/);
 	});
 
 	it('should 503 rather than serve a cacheable empty map if the ruleset query fails', async () => {

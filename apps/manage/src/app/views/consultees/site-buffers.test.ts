@@ -3,13 +3,12 @@ import type { Ruleset } from '@pins/identify-consultees-database/src/geospatial/
 import { mockLogger } from '@planning-inspectorate/core/testing';
 import assert from 'node:assert';
 import { describe, it, mock } from 'node:test';
-import {
-	categoryBufferMetres,
-	formatBufferDistance,
-	screenedSite,
-	siteBufferGeojson,
-	siteBuffers
-} from './site-buffers.ts';
+import type { BufferMapStyles } from '../../maps/buffer-map-styles.ts';
+import { assignBufferStyles, categoryBufferMetres, formatBufferDistance, screenedSite } from './site-buffers.ts';
+
+import type { SiteBuffer } from './site-buffers.ts';
+
+import { siteBufferGeojson, siteBuffers } from './site-buffers.ts';
 
 const RULESET: Ruleset = {
 	id: 'test-ruleset',
@@ -159,10 +158,131 @@ describe("the site's buffers", () => {
 			{
 				type: 'FeatureCollection',
 				features: [
-					{ type: 'Feature', properties: { label: '500 m' }, geometry: square(0.1) },
-					{ type: 'Feature', properties: { label: '10 km' }, geometry: square(0.2) }
+					{
+						type: 'Feature',
+						properties: {
+							description: 'black, no fill, small border dashes, small border dashes gap',
+							label: 'Ruleset buffer 500 m',
+							metres: '500',
+							stroke: '#0b0c0c',
+							strokeDashArray: '[1,1]',
+							strokeWidth: '2'
+						},
+						geometry: square(0.1)
+					},
+					{
+						type: 'Feature',
+						properties: {
+							description: 'black, no fill, medium border dashes, medium border dashes gap',
+							label: 'Ruleset buffer 10 km',
+							metres: '10000',
+							stroke: '#0b0c0c',
+							strokeDashArray: '[3,3]',
+							strokeWidth: '2'
+						},
+						geometry: square(0.2)
+					}
 				]
 			}
 		);
+	});
+});
+
+const DUMMY_GEOMETRY = {
+	type: 'Polygon' as const,
+	coordinates: [
+		[
+			[-1.6, 52.4],
+			[-1.4, 52.4],
+			[-1.4, 52.6],
+			[-1.6, 52.6],
+			[-1.6, 52.4]
+		]
+	]
+};
+
+const buffer = (metres: number): SiteBuffer => ({
+	metres,
+	geometry: DUMMY_GEOMETRY,
+	style: {
+		stroke: '#000000',
+		strokeWidth: 1,
+		strokeDashArray: [1, 0],
+		symbolDescription: ''
+	}
+});
+
+const MAP_STYLES: BufferMapStyles = {
+	buffers: [
+		{
+			colour: '#111111',
+			strokeWidth: 1,
+			strokeDash: [2, 2],
+			description: '2 dash'
+		},
+		{
+			colour: '#333333',
+			strokeWidth: 3,
+			strokeDash: [6, 6],
+			description: '6 dash'
+		},
+		{
+			colour: '#222222',
+			strokeWidth: 2,
+			strokeDash: [4, 4],
+			description: '4 dash'
+		}
+	]
+};
+
+describe('assigning buffer styles', () => {
+	it('maps each buffer to the style for its distance range, preserving input order', () => {
+		const siteBuffers = [buffer(1), buffer(10_000), buffer(500), buffer(4_999), buffer(5_000), buffer(35_000)];
+
+		// 2, 4 ,4, 6, 2, 6
+
+		assert.deepStrictEqual(assignBufferStyles(siteBuffers, MAP_STYLES), [
+			{
+				stroke: '#111111',
+				strokeDashArray: [2, 2],
+				strokeWidth: 1,
+				symbolDescription: '2 dash'
+			},
+
+			{
+				stroke: '#333333',
+				strokeWidth: 3,
+				strokeDashArray: [6, 6],
+				symbolDescription: '6 dash'
+			},
+
+			{
+				stroke: '#333333',
+				strokeWidth: 3,
+				strokeDashArray: [6, 6],
+				symbolDescription: '6 dash'
+			},
+
+			{
+				stroke: '#222222',
+				strokeWidth: 2,
+				strokeDashArray: [4, 4],
+				symbolDescription: '4 dash'
+			},
+
+			{
+				stroke: '#111111',
+				strokeWidth: 1,
+				strokeDashArray: [2, 2],
+				symbolDescription: '2 dash'
+			},
+
+			{
+				stroke: '#222222',
+				strokeWidth: 2,
+				strokeDashArray: [4, 4],
+				symbolDescription: '4 dash'
+			}
+		]);
 	});
 });

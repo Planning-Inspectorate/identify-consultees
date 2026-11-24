@@ -983,18 +983,33 @@ describe('static-map buffers', () => {
 		const svg = overlay(emptyCollection, {
 			labels: false,
 			bufferGeojson: collection(
-				{ properties: { label: '2 km' }, geometry: box(-1.8, 50.62, -1.7, 50.68) },
+				{
+					properties: { label: '2 km', stroke: '#0b0c0c', strokeWidth: '2', strokeDashArray: '[3, 3]' },
+					geometry: box(-1.8, 50.62, -1.7, 50.68)
+				},
 				// its top is off the map
-				{ properties: { label: '10 km' }, geometry: box(-1.9, 50.6, -1.6, 52) },
-				{ properties: {}, geometry: box(-1.85, 50.61, -1.65, 50.69) },
+				{
+					properties: { label: '10 km', stroke: '#0b0c0c', strokeWidth: '2', strokeDashArray: '[3, 3]' },
+					geometry: box(-1.9, 50.6, -1.6, 52)
+				},
+				{
+					properties: { stroke: '#0b0c0c', strokeWidth: '2', strokeDashArray: '[3, 3]' },
+					geometry: box(-1.85, 50.61, -1.65, 50.69)
+				},
 				// beside the site, not around it - nowhere above or below it to go
-				{ properties: { label: 'beside' }, geometry: box(-1.72, 50.6, -1.7, 50.7) },
+				{
+					properties: { label: 'beside', stroke: '#0b0c0c', strokeWidth: '2', strokeDashArray: '[3, 3]' },
+					geometry: box(-1.72, 50.6, -1.7, 50.7)
+				},
 				// nothing to draw
-				{ properties: { label: 'none' }, geometry: { type: 'Polygon', coordinates: [[[-1.8, 50.6]]] } }
+				{
+					properties: { label: '', stroke: '#0b0c0c', strokeWidth: '2', strokeDashArray: '[3, 3]' },
+					geometry: { type: 'Polygon', coordinates: [[[-1.8, 50.6]]] }
+				}
 			)
 		});
-		assert.equal(svg.match(/stroke-dasharray="8 5"/g)?.length, 4);
-		assert.match(svg, /<path d="[^"]+" fill="none" stroke="#0b0c0c" stroke-width="2" stroke-dasharray="8 5"\/>/);
+		assert.equal(svg.match(/stroke-dasharray="3 3"/g)?.length, 4);
+		assert.match(svg, /<path d="[^"]+" fill="none" stroke="#0b0c0c" stroke-width="2" stroke-dasharray="3 3"\/>/);
 		const drawn = labels(svg);
 		assert.deepEqual(
 			drawn.map(({ text }) => text),
@@ -1008,7 +1023,10 @@ describe('static-map buffers', () => {
 	test("keeps the areas' labels clear of a buffer's", () => {
 		const drawn = labels(
 			overlay(collection({ properties: { name: 'Abbey Parish' }, geometry: box(-1.8, 50.6, -1.7, 50.7) }), {
-				bufferGeojson: collection({ properties: { label: '2 km' }, geometry: box(-1.8, 50.6, -1.7, 50.65) })
+				bufferGeojson: collection({
+					properties: { label: '2 km', stroke: '#0b0c0c', strokeWidth: '2', strokeDashArray: '[3, 3]' },
+					geometry: box(-1.8, 50.6, -1.7, 50.65)
+				})
 			})
 		);
 		assert.deepEqual(

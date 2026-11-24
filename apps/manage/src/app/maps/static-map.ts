@@ -552,9 +552,6 @@ function pathForFeature(
 	return `<path d="${subpaths.join(' ')}" ${fillAttributes} stroke="${colours.stroke}" stroke-width="1.5"/>`;
 }
 
-// a buffer's outline: dark and dashed, so it reads as a distance rather than as another area
-const BUFFER_STROKE = '#0b0c0c';
-
 function bufferPath(
 	feature: GeoJsonFeature,
 	project: (lng: number, lat: number) => [number, number],
@@ -562,9 +559,14 @@ function bufferPath(
 	height: number
 ): string {
 	const subpaths = visibleGeometryPixels(feature.geometry, project, width, height).map(svgPathCommandsForLine);
+	const { stroke, strokeWidth, strokeDashArray } = feature.properties;
+
+	const strokeDashArrayAsArray = JSON.parse(strokeDashArray);
+	const strokeDashArrayString = `${strokeDashArrayAsArray[0]} ${strokeDashArrayAsArray[0]}`;
+
 	return subpaths.length === 0
 		? ''
-		: `<path d="${subpaths.join(' ')}" fill="none" stroke="${BUFFER_STROKE}" stroke-width="2" stroke-dasharray="8 5"/>`;
+		: `<path d="${subpaths.join(' ')}" fill="none" stroke="${stroke}" stroke-width="${strokeWidth}" stroke-dasharray="${strokeDashArrayString}"/>`;
 }
 
 const LABEL_FONT_SIZE = 11;
