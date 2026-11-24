@@ -4,54 +4,41 @@ import { describe, mock, test } from 'node:test';
 import {
 	duringIdleTime,
 	injectPrefetchLinks,
-	prefetchAssets,
+	prefetchTemplate,
 	registerPrefetchMapAssets,
 	supportsLinkPrefetch,
 	warmCacheWithFetch
 } from './prefetch-map-assets.js';
 
 function documentWith(body = '') {
-	const dom = new JSDOM(`<!DOCTYPE html><html><body>${body}</body></html>`);
+	const dom = new JSDOM(`<!DOCTYPE html><html><head></head><body>${body}</body></html>`);
 	return dom.window.document;
 }
 
-const ISLAND = `<script type="application/json" id="prefetch-map-assets-data">
-	[{ "href": "/vendor/interactive-map/js/index-a1b2c3d4.js", "as": "script" },
-	 { "href": "/vendor/interactive-map/css/index-e5f6a7b8.css", "as": "style" }]
-</script>`;
+const ISLAND = `<template id="prefetch-map-assets-data">
+	<link rel="prefetch" href="/vendor/interactive-map/js/index-a1b2c3d4.js" as="script" fetchpriority="low">
+	<link rel="prefetch" href="/vendor/interactive-map/css/index-e5f6a7b8.css" as="style" fetchpriority="low">
+</template>`;
 
 /** Let a pending duringIdleTime setTimeout callback run. */
 const flushIdle = () => new Promise((resolve) => setTimeout(resolve, 10));
 
-describe('prefetchAssets', () => {
-	test('reads the page island into a usable asset list', () => {
+describe('prefetchTemplate', () => {
+	test('finds the page island', () => {
 		const document = documentWith(ISLAND);
-		assert.deepStrictEqual(prefetchAssets(document), [
-			{ href: '/vendor/interactive-map/js/index-a1b2c3d4.js', as: 'script' },
-			{ href: '/vendor/interactive-map/css/index-e5f6a7b8.css', as: 'style' }
-		]);
+		const template = prefetchTemplate(document);
+		assert.equal(template.tagName, 'TEMPLATE');
+		assert.equal(template.content.querySelectorAll('link[rel="prefetch"]').length, 2);
 	});
 
-	test('returns nothing without an island, or for a document that has none', () => {
-		assert.deepStrictEqual(prefetchAssets(documentWith()), []);
-		assert.deepStrictEqual(prefetchAssets(undefined), []);
+	test('is undefined without an island, or for a document that has none', () => {
+		assert.equal(prefetchTemplate(documentWith()), undefined);
+		assert.equal(prefetchTemplate(undefined), undefined);
 	});
 
-	test('returns nothing for malformed JSON or a non-array payload', () => {
-		const bad = documentWith(`<script type="application/json" id="prefetch-map-assets-data">not json</script>`);
-		assert.deepStrictEqual(prefetchAssets(bad), []);
-		const object = documentWith(`<script type="application/json" id="prefetch-map-assets-data">{"href":"/x"}</script>`);
-		assert.deepStrictEqual(prefetchAssets(object), []);
-	});
-
-	test('drops entries that are not usable prefetch hints', () => {
-		const document = documentWith(
-			`<script type="application/json" id="prefetch-map-assets-data">
-				[{ "href": "/a.js", "as": "script" }, { "href": "", "as": "script" },
-				 { "as": "script" }, { "href": "/b.css", "as": "font" }, null]
-			</script>`
-		);
-		assert.deepStrictEqual(prefetchAssets(document), [{ href: '/a.js', as: 'script' }]);
+	test('is undefined when the island element is not a template', () => {
+		const document = documentWith(`<script id="prefetch-map-assets-data" type="application/json">[]</script>`);
+		assert.equal(prefetchTemplate(document), undefined);
 	});
 });
 
@@ -62,26 +49,24 @@ describe('supportsLinkPrefetch', () => {
 });
 
 describe('injectPrefetchLinks', () => {
-	test('appends one lowest-priority prefetch link per asset', () => {
-		const document = documentWith();
-		injectPrefetchLinks(
-			[
-				{ href: '/vendor/a/index.js', as: 'script' },
-				{ href: '/vendor/a/index.css', as: 'style' }
-			],
-			document
-		);
-		const links = document.querySelectorAll('link[rel="prefetch"]');
+	test('adopts the island links into head, attributes untouched', () => {
+		const document = documentWith(ISLAND);
+		const template = prefetchTemplate(document);
+		injectPrefetchLinks(template, document);
+		const links = document.head.querySelectorAll('link[rel="prefetch"]');
 		assert.equal(links.length, 2);
-		assert.equal(links[0].getAttribute('href'), '/vendor/a/index.js');
+		assert.equal(links[0].getAttribute('href'), '/vendor/interactive-map/js/index-a1b2c3d4.js');
 		assert.equal(links[0].getAttribute('as'), 'script');
 		assert.equal(links[0].getAttribute('fetchpriority'), 'low');
 		assert.equal(links[1].getAttribute('as'), 'style');
+		// the template keeps its own content - a second prime adopts another copy
+		assert.equal(template.content.querySelectorAll('link').length, 2);
 	});
 });
 
 describe('warmCacheWithFetch', () => {
-	test('fetches every asset at low priority and consumes the body so it caches', async () => {
+	test('fetches every island href at low priority and consumes the body so it caches', async () => {
+		const document = documentWith(ISLAND);
 		const fetched = [];
 		const view = {
 			fetch: async (href, init) => {
@@ -89,20 +74,21 @@ describe('warmCacheWithFetch', () => {
 				return { arrayBuffer: async () => new ArrayBuffer(4) };
 			}
 		};
-		await warmCacheWithFetch([{ href: '/vendor/a.js' }, { href: '/vendor/b.css' }], view);
+		await warmCacheWithFetch(prefetchTemplate(document), view);
 		assert.deepStrictEqual(fetched, [
-			{ href: '/vendor/a.js', init: { priority: 'low' } },
-			{ href: '/vendor/b.css', init: { priority: 'low' } }
+			{ href: '/vendor/interactive-map/js/index-a1b2c3d4.js', init: { priority: 'low' } },
+			{ href: '/vendor/interactive-map/css/index-e5f6a7b8.css', init: { priority: 'low' } }
 		]);
 	});
 
 	test('a failed prime is swallowed, not thrown', async () => {
+		const document = documentWith(ISLAND);
 		const view = {
 			fetch: async () => {
 				throw new Error('network down');
 			}
 		};
-		await assert.doesNotReject(() => warmCacheWithFetch([{ href: '/vendor/a.js' }], view));
+		await assert.doesNotReject(() => warmCacheWithFetch(prefetchTemplate(document), view));
 	});
 });
 
@@ -135,7 +121,7 @@ describe('registerPrefetchMapAssets', () => {
 		assert.doesNotThrow(() => registerPrefetchMapAssets({}));
 	});
 
-	test('after load, idle time injects a prefetch link per island asset', async () => {
+	test('after load, idle time adopts the island links into head', async () => {
 		const document = documentWith(ISLAND);
 		const view = document.defaultView;
 		// jsdom reports prefetch as unsupported - pretend it is, like Chromium
@@ -151,11 +137,11 @@ describe('registerPrefetchMapAssets', () => {
 		});
 
 		registerPrefetchMapAssets(document);
-		assert.equal(document.querySelectorAll('link[rel="prefetch"]').length, 0);
+		assert.equal(document.head.querySelectorAll('link[rel="prefetch"]').length, 0);
 		view.dispatchEvent(new view.Event('load'));
 		await flushIdle();
 
-		const links = document.querySelectorAll('link[rel="prefetch"]');
+		const links = document.head.querySelectorAll('link[rel="prefetch"]');
 		assert.equal(links.length, 2);
 		assert.equal(links[0].getAttribute('href'), '/vendor/interactive-map/js/index-a1b2c3d4.js');
 	});
@@ -194,7 +180,7 @@ describe('registerPrefetchMapAssets', () => {
 		assert.equal(fetched.length, 2);
 	});
 
-	test('an empty island primes nothing', async () => {
+	test('a page with no island primes nothing', async () => {
 		const document = documentWith();
 		const view = document.defaultView;
 		const fetched = [];
@@ -206,7 +192,7 @@ describe('registerPrefetchMapAssets', () => {
 		registerPrefetchMapAssets(document);
 		view.dispatchEvent(new view.Event('load'));
 		await flushIdle();
-		assert.equal(document.querySelectorAll('link[rel="prefetch"]').length, 0);
+		assert.equal(document.head.querySelectorAll('link[rel="prefetch"]').length, 0);
 		assert.equal(fetched.length, 0);
 	});
 });
