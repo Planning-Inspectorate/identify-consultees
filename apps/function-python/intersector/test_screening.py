@@ -24,6 +24,8 @@ from intersector.models import (
 )
 from intersector.queries import bounding_box, point_count
 from intersector.screening import (
+    _confirm_on_actual_boundaries,
+    _find_areas_near,
     _measure_unmeasured,
     _nearest_first,
     answerable_from_nearby,
@@ -793,3 +795,43 @@ def test_a_consultee_deleted_between_queries_is_dropped(monkeypatch):
     _measure_unmeasured(None, "POINT(0 0)", consultees)
 
     assert consultees == {}
+
+
+def test_an_area_the_cover_reaches_but_the_site_cannot_is_dropped(monkeypatch):
+    # distances from the covering outline are never further than from the site, so a match a
+    # condition could reach via the cover is re-measured from the site - and goes entirely when
+    # that measurement is past the radius and margin, not even kept as approximate
+    near = [_match(TEST_AREA_ID, 0), _match(SECOND_AREA_ID, 0)]
+    monkeypatch.setattr(queries, "find_areas_near", lambda *_args: near)
+    monkeypatch.setattr(queries, "measure_distances", lambda *_args: {TEST_AREA_ID: 100, SECOND_AREA_ID: 2_000})
+
+    found = _find_areas_near(None, "POINT(0 0)", "POLYGON((0 0, 1 0, 1 1, 0 1, 0 0))", 1_000, rules=[_rule()])
+
+    assert [match.area.id for match in found] == [TEST_AREA_ID]
+    assert found[0].distance_metres == 100
+
+
+def test_a_condition_that_is_neither_checked_nor_a_host_keeps_its_matches(monkeypatch):
+    # the second pass only refines exact-intersection checks and bordering conditions' hosts: a
+    # buffered condition is neither, so its first-pass matches carry straight through
+    buffered = _rule(id="buffered", buffer_metres=5_000)
+    bordering = _rule(
+        id="bordering",
+        logic_type="bordering",
+        categories=("Neighbours",),
+        host_category="Parish, town and community councils",
+    )
+    kept = _match("kept", 0)
+    neighbour = _match("neighbour", 0, "Neighbours")
+    monkeypatch.setattr(queries, "areas_intersecting_case_boundary", lambda *_args: {"host1"})
+    monkeypatch.setattr(queries, "areas_bordering_on_actual_boundaries", lambda *_args: {"neighbour"})
+
+    refined = _confirm_on_actual_boundaries(
+        None,
+        CASE_BOUNDARY_ID,
+        [buffered, bordering],
+        {"buffered": [kept], "bordering": [neighbour]},
+        {"bordering": ["host1"]},
+    )
+
+    assert refined == {"buffered": [kept], "bordering": [neighbour]}

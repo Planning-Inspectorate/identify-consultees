@@ -2,15 +2,16 @@
 
 ## Layers
 
-| Layer                | Where                                                                      | What it proves                                                                              |
-| -------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
-| Unit and integration | `node --test`, `*.test.ts` beside the code in `apps/manage` and `packages` | Controllers, helpers, HTTP wiring (`supertest`), client JS (`public/javascripts/*.test.js`) |
-| GOV.UK fixtures      | `govuk-frontend-components.test.ts`                                        | Macro HTML still matches GOV.UK Frontend's own fixtures                                     |
-| Accessibility smoke  | `pages.a11y.test.ts` (axe and jsdom)                                       | Rendered Nunjucks pages                                                                     |
-| Browser journeys     | Playwright `chromium-e2e`, `chromium-a11y`                                 | Journeys, axe, skip link, landmarks and focus in a real browser                             |
-| Cross-browser        | `firefox-render`, `webkit-render` (`e2e/*.render.spec.ts`)                 | Pages paint their chrome and content outside Chromium                                       |
-| Visual regression    | `chromium-visual`, opt-in                                                  | Screenshot of every page against committed baselines                                        |
-| Python               | `pytest`, `ruff` in `apps/function-python`                                 | The screening engine. Database tests skip when no database is reachable                     |
+| Layer                | Where                                                                      | What it proves                                                                                                               |
+| -------------------- | -------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| Unit and integration | `node --test`, `*.test.ts` beside the code in `apps/manage` and `packages` | Controllers, helpers, HTTP wiring (`supertest`), client JS (`public/javascripts/*.test.js`)                                  |
+| GOV.UK fixtures      | `govuk-frontend-components.test.ts`                                        | Macro HTML still matches GOV.UK Frontend's own fixtures                                                                      |
+| Accessibility smoke  | `pages.a11y.test.ts` (axe and jsdom)                                       | Rendered Nunjucks pages                                                                                                      |
+| Browser journeys     | Playwright `chromium-e2e`, `chromium-a11y`                                 | Journeys, axe, skip link, landmarks and focus in a real browser                                                              |
+| Map boot             | Playwright `chromium-e2e` (`e2e/maps.e2e.spec.ts`)                         | Map pages end interactive or fallen-back with no pageerror; Measure click-through; static-map endpoints serve and revalidate |
+| Cross-browser        | `firefox-render`, `webkit-render` (`e2e/*.render.spec.ts`)                 | Pages paint their chrome and content outside Chromium                                                                        |
+| Visual regression    | `chromium-visual`, opt-in                                                  | Screenshot of every page against committed baselines                                                                         |
+| Python               | `pytest`, `ruff` in `apps/function-python`                                 | The screening engine, at 100% statement and branch coverage. Database tests skip when no database is reachable               |
 
 ## Commands
 

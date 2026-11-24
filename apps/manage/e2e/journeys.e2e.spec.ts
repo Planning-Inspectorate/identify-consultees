@@ -705,6 +705,25 @@ test.describe('manage journeys', () => {
 		}
 	});
 
+	test('a failed ruleset run flags the picker, and the retry without the QA param runs', async ({ page }) => {
+		// ?failRuleset= is the QA trigger for the failure screen (qaTools is on in the e2e
+		// service): the submit never starts the run and the picker comes back flagged.
+		// The param rides along in the re-rendered form's action, so retrying from that
+		// page fails again - recovery is a fresh picker without the param
+		await page.goto(`/consultees/${SAMPLE_CASE_ID}/ruleset?failRuleset=1`);
+		await page.getByRole('radio', { name: SAMPLE_RULESET_NAME }).check();
+		await page.getByRole('button', { name: 'Identify consultees' }).click();
+
+		await expect(page.locator('.govuk-error-summary')).toContainText('The ruleset could not run, try again');
+		// the flagged submit re-renders rather than redirecting, so the picker's selection is lost
+		await expect(page.getByRole('radio', { name: SAMPLE_RULESET_NAME })).not.toBeChecked();
+
+		await page.goto(`/consultees/${SAMPLE_CASE_ID}/ruleset`);
+		await page.getByRole('radio', { name: SAMPLE_RULESET_NAME }).check();
+		await page.getByRole('button', { name: 'Identify consultees' }).click();
+		await expect(page).toHaveURL(new RegExp(`/consultees/${SAMPLE_CASE_ID}/report\\?ruleset=${SAMPLE_RULESET_ID}`));
+	});
+
 	test('signed-out page offers sign in again', async ({ page }) => {
 		await page.goto('/signed-out');
 		await expect(page.getByText('You have signed out').first()).toBeVisible();
