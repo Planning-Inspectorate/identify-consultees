@@ -2,6 +2,7 @@ import { mockLogger } from '@planning-inspectorate/core/testing';
 import assert from 'node:assert';
 import { describe, it, mock } from 'node:test';
 import { configureNunjucks } from '../../nunjucks.ts';
+import { consulteeSelection } from '../consultees/report/urls.ts';
 import { buildHomePage, buildRefreshCases } from './controller.ts';
 
 function newRow(overrides: Partial<{ id: string; caseReference: string; caseName: string }> = {}) {
@@ -99,20 +100,72 @@ describe('home page', () => {
 			return { viewModel: mockRes.render.mock.calls[0].arguments[1], html: mockRes.render.mock.calls[0].result };
 		};
 		const ruleset = 'england-wales-post-20240430';
-		const { viewModel, html } = await render({ query: { change: 'project', ruleset, q: 'Wind' } });
-		// the project picked goes to its boundary page, and from there straight back to the check page
-		assert.strictEqual(viewModel.geometries[0].href, `/consultees/aaaa?change=project&ruleset=${ruleset}`);
-		assert.ok(viewModel.pagination.next.href.endsWith(`&change=project&ruleset=${ruleset}`));
-		// and a new search keeps it too
+		const caseId = '99999999-9999-9999-9999-999999999999';
+		const { viewModel, html } = await render({
+			query: { change: 'project', ruleset, case: caseId, q: 'Wind' }
+		});
+		// "Back to draft report" returns to the check page the change started from, without
+		// applying it - the project picked is only carried to its boundary page
+		assert.strictEqual(viewModel.backLinkUrl, `/consultees/${caseId}/report?ruleset=${ruleset}`);
+		assert.strictEqual(viewModel.backLinkText, 'Back to draft report');
+		assert.match(html, /Back to draft report/);
+		// the project picked goes to its boundary page keeping the check page's case, and from
+		// there straight back to the check page
+		assert.strictEqual(
+			viewModel.geometries[0].href,
+			`/consultees/aaaa?change=project&ruleset=${ruleset}&case=${caseId}`
+		);
+		assert.ok(viewModel.pagination.next.href.endsWith(`&change=project&ruleset=${ruleset}&case=${caseId}`));
+		// and a new search keeps it all too
 		assert.match(html, /<input type="hidden" name="change" value="project">/);
 		assert.match(html, new RegExp(`<input type="hidden" name="ruleset" value="${ruleset}">`));
+		assert.match(html, new RegExp(`<input type="hidden" name="case" value="${caseId}">`));
+
+		// no case - a link not from the check page - means no draft report to go back to
+		const noCase = await render({ query: { change: 'project', ruleset, q: 'Wind' } });
+		assert.strictEqual(noCase.viewModel.backLinkUrl, undefined);
+		assert.strictEqual(noCase.viewModel.geometries[0].href, `/consultees/aaaa?change=project&ruleset=${ruleset}`);
+		assert.doesNotMatch(noCase.html, /name="case"/);
 
 		// a plain search, or a ruleset that isn't one, is the start of the journey
 		for (const query of [{}, { change: 'project', ruleset: 'not-a-ruleset' }]) {
 			const plain = await render({ query });
 			assert.strictEqual(plain.viewModel.geometries[0].href, '/consultees/aaaa');
+			assert.strictEqual(plain.viewModel.backLinkUrl, undefined);
 			assert.doesNotMatch(plain.html, /name="change"/);
 		}
+	});
+
+	it("should keep the check page's consultee selection through the search when changing its project", async () => {
+		const nunjucks = configureNunjucks();
+		const mockRes = { render: mock.fn((view, data) => nunjucks.render(view, data)) };
+		const rows = [{ ...newRow({ id: 'aaaa' }), totalCount: 60n }];
+		const ruleset = 'england-wales-post-20240430';
+		const caseId = '99999999-9999-9999-9999-999999999999';
+		const exclude = '55555555-5555-5555-5555-555555555555';
+		await buildHomePage({ logger: mockLogger(), db: createMockDb(rows) })(
+			{ query: { change: 'project', ruleset, case: caseId, exclude, q: 'Wind' } },
+			mockRes
+		);
+		const viewModel = mockRes.render.mock.calls[0].arguments[1];
+		const html = mockRes.render.mock.calls[0].result;
+
+		// the removal rides to the report "Back to draft report" returns to, and to the boundary
+		// page each project link opens
+		assert.strictEqual(viewModel.backLinkUrl, `/consultees/${caseId}/report?ruleset=${ruleset}&exclude=${exclude}`);
+		assert.strictEqual(
+			viewModel.geometries[0].href,
+			`/consultees/aaaa?change=project&ruleset=${ruleset}&case=${caseId}&exclude=${exclude}`
+		);
+		// through the search's forms and page links it travels as the single compact param -
+		// and it decodes back to the same selection
+		assert.ok(viewModel.pagination.next.href.includes('&selection='));
+		const hidden = /<input type="hidden" name="selection" value="([^"]+)">/.exec(html)?.[1];
+		assert.ok(hidden);
+		assert.deepStrictEqual(consulteeSelection({ selection: hidden }), {
+			removed: [{ id: exclude, category: '', name: '', reason: '' }],
+			adds: []
+		});
 	});
 
 	it('should map acceptance to the stage shown in the results table', async () => {
@@ -309,7 +362,18 @@ describe('home page', () => {
 		const nunjucks = configureNunjucks();
 		const mockRes = { render: mock.fn((view, data) => nunjucks.render(view, data)) };
 		const homePage = buildHomePage({ logger: mockLogger(), db: createMockDb() });
-		await homePage({ query: { q: 'EN01', change: 'project', ruleset: 'england-wales-post-20240430' } }, mockRes);
+		await homePage(
+			{
+				query: {
+					q: 'EN01',
+					change: 'project',
+					ruleset: 'england-wales-post-20240430',
+					case: '99999999-9999-9999-9999-999999999999',
+					exclude: '55555555-5555-5555-5555-555555555555'
+				}
+			},
+			mockRes
+		);
 
 		const html = mockRes.render.mock.calls[0].result;
 		assert.strictEqual(mockRes.render.mock.calls[0].arguments[1].refreshing, undefined);
@@ -320,6 +384,9 @@ describe('home page', () => {
 		assert.match(form, /name="pageSize" value="25"/);
 		assert.match(form, /name="change" value="project"/);
 		assert.match(form, /name="ruleset" value="england-wales-post-20240430"/);
+		// the case and its selection ride along too, keeping "Back to draft report" after the refresh
+		assert.match(form, /name="case" value="99999999-9999-9999-9999-999999999999"/);
+		assert.match(form, /name="selection" value="[^"]+"/);
 	});
 });
 
@@ -333,14 +400,24 @@ describe('refresh cases', () => {
 		const refresh = newRefresh();
 		const mockRes = { redirect: mock.fn() };
 		buildRefreshCases({ logger }, refresh)(
-			{ body: { _csrf: 'token', q: 'EN01', pageSize: '50', change: 'project', ruleset: 'england-wales' } },
+			{
+				body: {
+					_csrf: 'token',
+					q: 'EN01',
+					pageSize: '50',
+					change: 'project',
+					ruleset: 'england-wales',
+					case: 'case-id',
+					selection: 'compact-selection'
+				}
+			},
 			mockRes
 		);
 
 		assert.strictEqual(refresh.start.mock.callCount(), 1);
 		assert.strictEqual(
 			mockRes.redirect.mock.calls[0].arguments[0],
-			'/?q=EN01&pageSize=50&change=project&ruleset=england-wales&refreshing=1'
+			'/?q=EN01&pageSize=50&change=project&ruleset=england-wales&case=case-id&selection=compact-selection&refreshing=1'
 		);
 		assert.strictEqual(logger.info.mock.calls[0].arguments[1], 'Refreshing cases from CBOS');
 	});

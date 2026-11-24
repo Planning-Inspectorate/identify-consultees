@@ -522,13 +522,26 @@ test.describe('manage journeys', () => {
 		await expect(page).toHaveURL(checkPage);
 
 		// the project: the search - a new one keeping the ruleset - and its project links keeping it
-		// for the one picked
+		// for the one picked. "Back to draft report" leaves the search without changing the project
+		const projectSearch = new RegExp(`/\\?change=project&ruleset=${SAMPLE_RULESET_ID}&case=${SAMPLE_CASE_ID}$`);
+		const projectBoundaryLink = `a[href="/consultees/${SAMPLE_CASE_ID}?change=project&ruleset=${SAMPLE_RULESET_ID}&case=${SAMPLE_CASE_ID}"]`;
 		await page.getByRole('link', { name: 'Change project' }).click();
-		await expect(page).toHaveURL(new RegExp(`/\\?change=project&ruleset=${SAMPLE_RULESET_ID}$`));
+		await expect(page).toHaveURL(projectSearch);
+		await page.getByRole('link', { name: 'Back to draft report' }).click();
+		await expect(page).toHaveURL(checkPage);
+
+		// the link stays after a new search, and after a project's boundary page leads back
+		await page.getByRole('link', { name: 'Change project' }).click();
 		await page.getByLabel('Find a project').fill(SAMPLE_CASE_REFERENCE);
 		await page.getByRole('button', { name: 'Search' }).click();
-		await expect(page).toHaveURL(new RegExp(`change=project&ruleset=${SAMPLE_RULESET_ID}`));
-		await page.locator(`a[href="/consultees/${SAMPLE_CASE_ID}?change=project&ruleset=${SAMPLE_RULESET_ID}"]`).click();
+		await expect(page).toHaveURL(new RegExp(`change=project&ruleset=${SAMPLE_RULESET_ID}&case=${SAMPLE_CASE_ID}`));
+		await expect(page.getByRole('link', { name: 'Back to draft report' })).toBeVisible();
+		await page.locator(projectBoundaryLink).click();
+		await page.getByRole('link', { name: 'Back', exact: true }).click();
+		await expect(page).toHaveURL(projectSearch);
+		await expect(page.getByRole('link', { name: 'Back to draft report' })).toBeVisible();
+
+		await page.locator(projectBoundaryLink).click();
 		await page.locator(`input[name="shapefile"][value="${SAMPLE_CASE_ID}"]`).check();
 		await page.getByRole('button', { name: 'Continue' }).click();
 		await expect(page).toHaveURL(checkPage);

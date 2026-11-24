@@ -80,12 +80,14 @@ async function mapFiles(
 
 /**
  * The check page's project or shapefile being changed (see changedStep): the ruleset it keeps, and
- * - for a shapefile, the same project's - the consultees added and removed. None for a ruleset
- * that isn't one, so a bad link carries on through the journey instead.
+ * - for a shapefile, the same project's - the consultees added and removed. A project change keeps
+ * the check page's case for the links back to the search, but not the selection - the removed and
+ * added consultees were the old project's. None for a ruleset that isn't one, so a bad link
+ * carries on through the journey instead.
  */
 function boundaryChange(
 	query: Record<string, unknown>
-): { step: 'project' | 'shapefile'; rulesetId: string; selection: ConsulteeSelection } | undefined {
+): { step: 'project' | 'shapefile'; rulesetId: string; caseId?: string; selection: ConsulteeSelection } | undefined {
 	const change = changedStep(query);
 	if (!change || change.step === 'ruleset' || !getRuleset(change.rulesetId)) {
 		return undefined;
@@ -93,6 +95,7 @@ function boundaryChange(
 	return {
 		step: change.step,
 		rulesetId: change.rulesetId,
+		...(change.caseId ? { caseId: change.caseId } : {}),
 		selection: change.step === 'shapefile' ? consulteeSelection(query) : consulteeSelection()
 	};
 }
@@ -148,18 +151,27 @@ async function boundaryPageViewModel(
 			return undefined;
 		});
 
+	// a project change's links keep the check page's case and the selection it had - the search's
+	// "Back to draft report" reaches the draft through them (Continue alone drops the selection)
+	const keptSelection = change?.step === 'project' ? consulteeSelection(query) : change?.selection;
+
 	return {
 		pageHeading: 'Project boundary',
 		pageCaption: project.properties.caseName,
 		reference: project.properties.caseReference,
 		caseName: project.properties.caseName,
 		caseId: project.id,
-		// changing the check page's shapefile, back to it as it was; its project, back to the search
+		// changing the check page's shapefile, back to it as it was; its project, back to the
+		// search keeping the check page's case and selection for its own "Back to draft report"
 		...(change?.step === 'shapefile'
 			? { backLinkUrl: reportUrl(project.id, change.rulesetId, change.selection) }
-			: { backLinkUrl: change ? changeProjectUrl(change.rulesetId) : '/' }),
+			: {
+					backLinkUrl: change
+						? changeProjectUrl(change.caseId ?? '', change.rulesetId, keptSelection ?? consulteeSelection())
+						: '/'
+				}),
 		backLinkText: 'Back',
-		formAction: boundaryUrl(project.id, change, change?.selection),
+		formAction: boundaryUrl(project.id, change, keptSelection),
 		files: options.map((option, index): BoundaryFileRadio => ({
 			value: option.id,
 			text: option.label,
@@ -170,7 +182,7 @@ async function boundaryPageViewModel(
 		...(shapefileError
 			? { shapefileError: { text: shapefileError }, errorSummary: [{ text: shapefileError, href: '#shapefile' }] }
 			: {}),
-		retryUrl: boundaryUrl(project.id, change, change?.selection),
+		retryUrl: boundaryUrl(project.id, change, keptSelection),
 		...(map
 			? {
 					mapId: 'case-map',

@@ -76,6 +76,37 @@ describe('manage page accessibility smoke', () => {
 		await assertNoSeriousA11yViolations(html);
 	});
 
+	test('home page changing the check page project has no serious a11y violations', async () => {
+		const html = nunjucks.render('views/home/view.njk', {
+			...pageLocals,
+			pageHeading: 'Identify consultees for a national infrastructure project',
+			backLinkUrl: '/consultees/11111111-1111-1111-1111-111111111111/report?ruleset=england-wales-post-20240430',
+			backLinkText: 'Back to draft report',
+			searchQuery: 'EN01',
+			pageSize: 25,
+			resultsFrom: 1,
+			resultsTo: 1,
+			resultsTotal: 1,
+			pagination: null,
+			changingProject: {
+				step: 'project',
+				rulesetId: 'england-wales-post-20240430',
+				caseId: '11111111-1111-1111-1111-111111111111',
+				selectionParam: 'eJyrVkrLz1eyUkpKLFKqBQA1nQaE'
+			},
+			geometries: [
+				{
+					id: '22222222-2222-2222-2222-222222222222',
+					href: '/consultees/22222222-2222-2222-2222-222222222222?change=project&ruleset=england-wales-post-20240430&case=11111111-1111-1111-1111-111111111111',
+					reference: 'EN010013',
+					caseName: 'Clocaenog Forest Wind Farm',
+					stage: 'Acceptance'
+				}
+			]
+		});
+		await assertNoSeriousA11yViolations(html);
+	});
+
 	test('home page refreshing cases has no serious a11y violations', async () => {
 		const html = nunjucks.render('views/home/view.njk', {
 			...pageLocals,

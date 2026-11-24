@@ -194,7 +194,7 @@ export function fitsInReportUrl(url: string): boolean {
 
 const entryFields = (entry: SelectionEntry): string[] => [entry.id ?? '', entry.category, entry.name, entry.reason];
 
-function encodeCompactSelection(selection: ConsulteeSelection): string {
+export function encodeCompactSelection(selection: ConsulteeSelection): string {
 	const json = JSON.stringify({ x: selection.removed.map(entryFields), a: selection.adds.map(entryFields) });
 	return deflateRawSync(json, { level: 9 }).toString('base64url');
 }
@@ -297,18 +297,34 @@ export function rulesetUrl(caseId: string, rulesetId?: string, selection: Consul
  */
 export type ChangedStep = 'project' | 'shapefile' | 'ruleset';
 
-/** The answer being changed, and the ruleset to keep - none unless both are in the query. */
-export function changedStep(query: Record<string, unknown> = {}): { step: ChangedStep; rulesetId: string } | undefined {
+/**
+ * The answer being changed, the ruleset to keep and - a project change's - the check page's
+ * case, so the project search's "Back to draft report" can return to it. None unless step and
+ * ruleset are both in the query.
+ */
+export function changedStep(
+	query: Record<string, unknown> = {}
+): { step: ChangedStep; rulesetId: string; caseId?: string } | undefined {
 	const [step] = queryValues(query.change);
 	const [rulesetId] = queryValues(query.ruleset);
+	const [caseId] = queryValues(query.case);
 	return (step === 'project' || step === 'shapefile' || step === 'ruleset') && rulesetId
-		? { step, rulesetId }
+		? { step, rulesetId, ...(caseId ? { caseId } : {}) }
 		: undefined;
 }
 
-/** The check page's project Change link: the project search, keeping the ruleset for the project picked. */
-export function changeProjectUrl(rulesetId: string): string {
-	return `/?change=project&ruleset=${encodeURIComponent(rulesetId)}`;
+/**
+ * The check page's project Change link: the project search, keeping the ruleset for the project
+ * picked and the check page's own case and selection - so its "Back to draft report" returns to
+ * the draft without changing the project.
+ */
+export function changeProjectUrl(
+	caseId: string,
+	rulesetId: string,
+	selection: ConsulteeSelection = NO_SELECTION
+): string {
+	const url = `/?change=project&ruleset=${encodeURIComponent(rulesetId)}`;
+	return appendSelection(caseId ? `${url}&case=${encodeURIComponent(caseId)}` : url, selection);
 }
 
 /**
@@ -317,13 +333,20 @@ export function changeProjectUrl(rulesetId: string): string {
  */
 export function boundaryUrl(
 	caseId: string,
-	change?: { step: 'project' | 'shapefile'; rulesetId: string },
+	change?: { step: 'project' | 'shapefile'; rulesetId: string; caseId?: string },
 	selection: ConsulteeSelection = NO_SELECTION
 ): string {
 	const url = `/consultees/${encodeURIComponent(caseId)}`;
-	return change
-		? appendSelection(`${url}?change=${change.step}&ruleset=${encodeURIComponent(change.rulesetId)}`, selection)
-		: url;
+	if (!change) {
+		return url;
+	}
+	// a project change keeps the check page's case too - its back link to the search keeps it
+	// for "Back to draft report"
+	const originCase = change.step === 'project' && change.caseId ? `&case=${encodeURIComponent(change.caseId)}` : '';
+	return appendSelection(
+		`${url}?change=${change.step}&ruleset=${encodeURIComponent(change.rulesetId)}${originCase}`,
+		selection
+	);
 }
 
 /** The check page's ruleset Change link: the picker, its back link and answer both leading back to the check page. */

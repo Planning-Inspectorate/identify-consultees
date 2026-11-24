@@ -143,7 +143,10 @@ describe('consultee report check page', () => {
 		assert.strictEqual(viewModel.reference, 'EN010099');
 		// each Change changes that answer alone, then comes back here: the project search keeping the
 		// ruleset, this project's shapefiles keeping the ruleset, and the ruleset picker
-		assert.strictEqual(viewModel.caseChangeUrl, '/?change=project&ruleset=england-wales-post-20240430');
+		assert.strictEqual(
+			viewModel.caseChangeUrl,
+			`/?change=project&ruleset=england-wales-post-20240430&case=${realProjectId}`
+		);
 		assert.strictEqual(viewModel.shapefileName, 'Not provided');
 		assert.strictEqual(
 			viewModel.shapefileChangeUrl,

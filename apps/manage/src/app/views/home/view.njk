@@ -48,6 +48,12 @@
 		{% if changingProject %}
 			<input type="hidden" name="change" value="{{ changingProject.step }}">
 			<input type="hidden" name="ruleset" value="{{ changingProject.rulesetId }}">
+			{% if changingProject.caseId %}
+				<input type="hidden" name="case" value="{{ changingProject.caseId }}">
+			{% endif %}
+			{% if changingProject.selectionParam %}
+				<input type="hidden" name="selection" value="{{ changingProject.selectionParam }}">
+			{% endif %}
 		{% endif %}
 	</form>
 
@@ -61,6 +67,12 @@
 		{% if changingProject %}
 			<input type="hidden" name="change" value="{{ changingProject.step }}">
 			<input type="hidden" name="ruleset" value="{{ changingProject.rulesetId }}">
+			{% if changingProject.caseId %}
+				<input type="hidden" name="case" value="{{ changingProject.caseId }}">
+			{% endif %}
+			{% if changingProject.selectionParam %}
+				<input type="hidden" name="selection" value="{{ changingProject.selectionParam }}">
+			{% endif %}
 		{% endif %}
 		<p class="govuk-body govuk-!-margin-bottom-2">
 			Cannot find a project? Cases are imported from CBOS 5 times a day. Refresh them to get any added since.

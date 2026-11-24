@@ -141,12 +141,25 @@ describe('consultee project boundary page', () => {
 			]
 		);
 
-		// a different project: back to the search keeping the ruleset, nothing checked, no selection
-		const project = await render({ change: 'project', ruleset, exclude });
-		assert.strictEqual(project.backLinkUrl, `/?change=project&ruleset=${ruleset}`);
+		// a different project: back to the search keeping the ruleset - and the check page's case
+		// and selection, so the search's "Back to draft report" returns to it unchanged. Nothing
+		// checked: the file the check page has belongs to the project being changed away from
+		const project = await render({ change: 'project', ruleset, case: siblingProjectId, exclude });
+		assert.strictEqual(
+			project.backLinkUrl,
+			`/?change=project&ruleset=${ruleset}&case=${siblingProjectId}&exclude=${exclude}`
+		);
 		assert.strictEqual(project.backLinkText, 'Back');
-		assert.strictEqual(project.formAction, `/consultees/${realProjectId}?change=project&ruleset=${ruleset}`);
+		assert.strictEqual(
+			project.formAction,
+			`/consultees/${realProjectId}?change=project&ruleset=${ruleset}&case=${siblingProjectId}&exclude=${exclude}`
+		);
+		assert.strictEqual(project.retryUrl, project.formAction);
 		assert.ok(project.files.every((file: { checked?: boolean }) => !file.checked));
+
+		// without the check page's case - a link not from it - the selection alone rides back
+		const noCase = await render({ change: 'project', ruleset, exclude });
+		assert.strictEqual(noCase.backLinkUrl, `/?change=project&ruleset=${ruleset}&exclude=${exclude}`);
 
 		// a ruleset that isn't one, or no step, carries on through the journey
 		for (const query of [
