@@ -4,7 +4,7 @@ Where the non-functional guards live and, for the ones that are deliberately not
 
 ## In the pipeline today
 
-- **Coverage** — hard 100% line/function/branch gates: `test:packages-coverage` for `packages/database/src` and `scripts/`, `run-frontend-coverage.mjs` for `apps/manage/src`, `--cov-fail-under=100` for `apps/function-python`.
+- **Coverage** — hard 100% line/function/branch gates: `test:packages-coverage` for `packages/database/src` and `scripts/`, `run-frontend-coverage.mjs` for `apps/manage/src`, `--cov --cov-branch --cov-fail-under=100` for `apps/function-python`.
 - **Asset integrity** — `check-fingerprints` (committed literals vs a fresh build) and `check-asset-sizes` (bundle budgets) after `npm run build`; `e2e/pages.assets.e2e.spec.ts` asserts every referenced asset serves immutable + Brotli.
 - **Security** — `npm audit --audit-level=high` in the parallel static checks; `e2e/pages.security.e2e.spec.ts` asserts the OWASP headers on real responses.
 - **Contracts** — `contracts/run-ruleset/` pins the manage app ↔ Python function wire format; both sides' tests read it.

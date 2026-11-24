@@ -1,4 +1,5 @@
 import json
+import uuid
 
 import pymssql
 import pytest
@@ -75,3 +76,34 @@ def test_fetch_consultee_areas_normalises_each_row(connection_params):
                 cursor.execute("DELETE FROM consultee_area WHERE id = %s", (area_id,))
     finally:
         connection.close()
+
+
+def test_fetch_consultee_areas_leaves_a_null_last_updated_alone(monkeypatch):
+    # lastUpdated can come back NULL - the row must still normalise and serialise; only a real
+    # datetime gets isoformat()
+    class FakeCursor:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return False
+
+        def execute(self, *_args):
+            pass
+
+        def fetchall(self):
+            return [{"id": uuid.UUID(int=0), "lastUpdated": None}]
+
+    class FakeConnection:
+        def cursor(self):
+            return FakeCursor()
+
+        def close(self):
+            pass
+
+    monkeypatch.setattr("querying.consultee_areas.connect", lambda *_args, **_kwargs: FakeConnection())
+
+    [row] = fetch_consultee_areas(None)
+
+    assert row == {"id": str(uuid.UUID(int=0)), "lastUpdated": None}
+    json.dumps(row)

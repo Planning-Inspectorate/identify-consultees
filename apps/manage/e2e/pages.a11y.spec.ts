@@ -41,6 +41,8 @@ const pages = [
 	{ path: '/admin/database', name: 'admin database' },
 	{ path: '/admin/database/consultee-areas', name: 'admin database consultee areas' },
 	{ path: '/admin/database/case-boundaries', name: 'admin database case boundaries' },
+	{ path: '/admin/upload-to-blob', name: 'admin upload to blob' },
+	{ path: '/admin/import-reference-data', name: 'admin import reference data' },
 	{ path: '/unauthenticated', name: '401 unauthenticated' },
 	{ path: '/error/firewall-error', name: 'firewall error' },
 	{ path: '/this-page-does-not-exist', name: '404' }
@@ -67,6 +69,22 @@ test.describe('browser accessibility', () => {
 	for (const pageCase of pages) {
 		test(`${pageCase.name} has no critical or serious axe violations`, async ({ page }) => {
 			await page.goto(pageCase.path);
+			await expect(page.locator('#main-content, main').first()).toBeVisible();
+			await expectNoSeriousAxeViolations(page);
+		});
+	}
+
+	// the row pages' urls carry a seeded row's id, so the way in is the list page's first
+	// row link - keeping the id out of the spec keeps it working whatever data is seeded
+	for (const [listPath, name] of [
+		['/admin/database/consultee-areas', 'admin database consultee area row'],
+		['/admin/database/case-boundaries', 'admin database case boundary row']
+	] as const) {
+		test(`${name} has no critical or serious axe violations`, async ({ page }) => {
+			await page.goto(listPath);
+			const rowLink = page.locator('.govuk-table .govuk-link').first();
+			await expect(rowLink).toBeAttached();
+			await rowLink.click();
 			await expect(page.locator('#main-content, main').first()).toBeVisible();
 			await expectNoSeriousAxeViolations(page);
 		});
