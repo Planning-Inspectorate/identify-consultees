@@ -8,13 +8,14 @@ import {
 	toDatasetStyle
 } from './boundary-map-styles.ts';
 
-const VALID = `
-version: 1
-mostRecent: { colour: '#C44E52', fillOpacity: 0.45, strokeWidth: 3, description: red }
-earlier:
-  - { colour: '#1d70b8', fillOpacity: 0.15, strokeWidth: 2, strokeDash: [4, 2], description: blue dashed }
-  - { colour: '#f47738', fillOpacity: 0.15, strokeWidth: 2, description: orange }
-`;
+const VALID = {
+	version: 1,
+	mostRecent: { colour: '#C44E52', fillOpacity: 0.45, strokeWidth: 3, description: 'red' },
+	earlier: [
+		{ colour: '#1d70b8', fillOpacity: 0.15, strokeWidth: 2, strokeDash: [4, 2], description: 'blue dashed' },
+		{ colour: '#f47738', fillOpacity: 0.15, strokeWidth: 2, description: 'orange' }
+	]
+};
 
 describe('boundary map styles', () => {
 	it('loads the shipped config/map-styles/boundary-map.yaml, with the most recent file red', () => {
@@ -25,7 +26,7 @@ describe('boundary map styles', () => {
 	});
 
 	it('parses each style, keeping a dash pattern only where one is given', () => {
-		const styles = parseBoundaryMapStyles(VALID);
+		const styles = parseBoundaryMapStyles(VALID, 'test.yaml');
 		assert.deepStrictEqual(styles.mostRecent, {
 			colour: '#C44E52',
 			fillOpacity: 0.45,
@@ -36,28 +37,45 @@ describe('boundary map styles', () => {
 		assert.strictEqual(styles.earlier[1].strokeDash, undefined);
 	});
 
-	const invalid: [string, string, RegExp][] = [
-		['an empty file', '', /version 1 document/],
-		['not a document', 'just text', /version 1 document/],
-		['the wrong version', VALID.replace('version: 1', 'version: 2'), /version 1 document/],
-		['no earlier styles', VALID.replace(/earlier:[\s\S]*/, 'earlier: []'), /at least one style/],
-		['a style that is not an object', VALID.replace(/mostRecent: .*/, 'mostRecent: red'), /mostRecent must be a style/],
-		['a named colour', VALID.replace("'#C44E52'", 'red'), /mostRecent\.colour/],
-		['an opacity above 1', VALID.replace('fillOpacity: 0.45', 'fillOpacity: 45'), /mostRecent\.fillOpacity/],
-		['a zero stroke width', VALID.replace('strokeWidth: 3', 'strokeWidth: 0'), /mostRecent\.strokeWidth/],
-		['a three-part dash', VALID.replace('[4, 2]', '[4, 2, 1]'), /earlier\[0\]\.strokeDash/],
-		['a negative dash', VALID.replace('[4, 2]', '[4, -2]'), /earlier\[0\]\.strokeDash/],
-		['a missing description', VALID.replace(', description: orange', ''), /earlier\[1\]\.description/],
+	const invalid: [string, Record<string, unknown>, RegExp][] = [
+		['no earlier styles', { ...VALID, earlier: [] }, /at least one style/],
+		['a style that is not an object', { ...VALID, mostRecent: 'red' }, /mostRecent must be a style/],
+		['a named colour', { ...VALID, mostRecent: { ...VALID.mostRecent, colour: 'red' } }, /mostRecent\.colour/],
+		[
+			'an opacity above 1',
+			{ ...VALID, mostRecent: { ...VALID.mostRecent, fillOpacity: 45 } },
+			/mostRecent\.fillOpacity/
+		],
+		[
+			'a zero stroke width',
+			{ ...VALID, mostRecent: { ...VALID.mostRecent, strokeWidth: 0 } },
+			/mostRecent\.strokeWidth/
+		],
+		[
+			'a three-part dash',
+			{ ...VALID, earlier: [{ ...VALID.earlier[0], strokeDash: [4, 2, 1] }] },
+			/earlier\[0\]\.strokeDash/
+		],
+		[
+			'a negative dash',
+			{ ...VALID, earlier: [{ ...VALID.earlier[0], strokeDash: [4, -2] }] },
+			/earlier\[0\]\.strokeDash/
+		],
+		[
+			'a missing description',
+			{ ...VALID, earlier: [VALID.earlier[0], { colour: '#f47738', fillOpacity: 0.15, strokeWidth: 2 }] },
+			/earlier\[1\]\.description/
+		],
 		[
 			'a misspelt style setting',
-			VALID.replace('[4, 2]', '[4, 2], strokedash: [1, 1]'),
+			{ ...VALID, earlier: [{ ...VALID.earlier[0], strokedash: [1, 1] }] },
 			/earlier\[0\] has "strokedash" - it can only have colour, fillOpacity, strokeWidth, strokeDash, description/
 		],
-		['a misspelt top-level setting', `${VALID}\nlatest: {}`, /the document has "latest" - it can only have version/]
+		['a misspelt top-level setting', { ...VALID, latest: {} }, /the document has "latest" - it can only have version/]
 	];
-	for (const [name, text, error] of invalid) {
+	for (const [name, document, error] of invalid) {
 		it(`rejects ${name}`, () => {
-			assert.throws(() => parseBoundaryMapStyles(text), error);
+			assert.throws(() => parseBoundaryMapStyles(document, 'test/file/path.yaml'), error);
 		});
 	}
 
@@ -74,7 +92,7 @@ describe('boundary map styles', () => {
 	});
 
 	it('gives the most recent file its style and repeats the earlier list as needed', () => {
-		const styles = parseBoundaryMapStyles(VALID);
+		const styles = parseBoundaryMapStyles(VALID, 'test/file/path.yaml');
 		assert.strictEqual(styleForRank(0, styles).colour, '#C44E52');
 		assert.strictEqual(styleForRank(1, styles).colour, '#1d70b8');
 		assert.strictEqual(styleForRank(2, styles).colour, '#f47738');
@@ -83,7 +101,7 @@ describe('boundary map styles', () => {
 	});
 
 	it('turns a style into the map plugin style, with the opacity in the fill colour', () => {
-		const [dashed, solid] = parseBoundaryMapStyles(VALID).earlier;
+		const [dashed, solid] = parseBoundaryMapStyles(VALID, 'test/file/path.yaml').earlier;
 		assert.deepStrictEqual(toDatasetStyle(dashed), {
 			stroke: '#1d70b8',
 			strokeWidth: 2,

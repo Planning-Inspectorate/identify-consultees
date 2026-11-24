@@ -221,7 +221,7 @@ describe('report consultees change page', () => {
 		const ambulance = await mapFor('Ambulance trusts', ambulanceTrust);
 		assert.deepStrictEqual(
 			ambulance.bufferGeojson.features.map((feature: { properties: { label: string } }) => feature.properties.label),
-			['1 km', '10 km']
+			['Ruleset buffer 1 km', 'Ruleset buffer 10 km']
 		);
 		// a parish must intersect the site - no buffer to draw
 		assert.strictEqual(

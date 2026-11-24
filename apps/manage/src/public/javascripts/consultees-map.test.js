@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { afterEach, describe, mock, test } from 'node:test';
 import {
 	basemapOptions,
-	bufferDataset,
+	buildBufferSublayers,
 	buildCategorySublayers,
 	buildDatasets,
 	buildSelectableLayers,
@@ -335,30 +335,77 @@ describe('consultees-map client helpers', () => {
 		assert.equal(translucent('#ff0000', 0.2), 'rgba(255, 0, 0, 0.2)');
 	});
 
-	test("buildDatasets draws the ruleset's buffers dashed, under everything, keyed with their distances", () => {
-		const buffer = (label) => ({
+	test("buildDatasets draws the ruleset's buffers dashed, under everything, with a sublayer per buffer", () => {
+		const buffer = (label, metres, properties = {}) => ({
 			type: 'Feature',
-			properties: { label },
+			properties: { label, metres, ...properties },
 			geometry: { type: 'Polygon', coordinates: [] }
 		});
 		const datasets = buildDatasets({
 			projectGeojson: { features: [{ type: 'Feature' }] },
 			consulteeGeojson: { features: [{ type: 'Feature' }] },
-			bufferGeojson: { features: [buffer('1 km'), buffer('10 km')] }
+			bufferGeojson: {
+				features: [
+					buffer('10 km', '10000'),
+					buffer('1 km', '1000', { stroke: '#1d70b8', strokeWidth: '3', strokeDashArray: '[4, 2]' })
+				]
+			}
 		});
 		assert.deepEqual(
 			datasets.map((dataset) => dataset.id),
 			['ruleset-buffers', 'consultee-areas', 'project-site']
 		);
 		const [buffers] = datasets;
-		assert.equal(buffers.label, 'Ruleset buffers (1 km, 10 km)');
+		assert.equal(buffers.label, 'Ruleset Buffers');
+		assert.equal(buffers.idProperty, 'bufferId');
 		// an outline alone - nothing filled to hide what's under it
-		assert.deepEqual(buffers.style, { stroke: '#0b0c0c', strokeWidth: 2, strokeDashArray: [2, 2] });
-		assert.equal(bufferDataset({ features: [buffer('35 km')] }).label, 'Ruleset buffer (35 km)');
+		assert.deepEqual(buffers.style, { stroke: '#0b0c0c', strokeWidth: 2, strokeDashArray: [1, 1] });
+		assert.deepEqual(buffers.sublayers, [
+			{
+				id: 'buffer-0',
+				label: '1 km',
+				visible: true,
+				filter: ['==', ['get', 'label'], '1 km'],
+				style: { stroke: '#1d70b8', strokeWidth: 3, strokeDashArray: [4, 2] }
+			},
+			{
+				id: 'buffer-1',
+				label: '10 km',
+				visible: true,
+				filter: ['==', ['get', 'label'], '10 km'],
+				style: { stroke: '#0b0c0c', strokeWidth: 2, strokeDashArray: [1, 1] }
+			}
+		]);
 		// none without any
 		assert.ok(!buildDatasets({ bufferGeojson: { features: [] } }).some((dataset) => dataset.id === 'ruleset-buffers'));
 	});
 
+	test('buildBufferSublayers falls back to default label and style when feature properties are omitted', () => {
+		const sublayers = buildBufferSublayers([{ type: 'Feature', geometry: { type: 'Polygon', coordinates: [] } }]);
+		assert.deepEqual(sublayers, [
+			{
+				id: 'buffer-0',
+				label: 'Ruleset buffer (0 km)',
+				visible: true,
+				filter: ['==', ['get', 'label'], 'Ruleset buffer (0 km)'],
+				style: { stroke: '#0b0c0c', strokeWidth: 2, strokeDashArray: [1, 1] }
+			}
+		]);
+	});
+
+	test('buildDatasets orders shapefiles, ruleset buffers, consultee areas, and project site from bottom to top', () => {
+		const feature = { type: 'Feature', geometry: { type: 'Polygon', coordinates: [] } };
+		const datasets = buildDatasets({
+			shapefileDatasets: [{ id: 'file-a', label: 'a.geojson', geojson: { features: [feature] } }],
+			bufferGeojson: { features: [feature] },
+			consulteeGeojson: { features: [feature] },
+			projectGeojson: { features: [feature] }
+		});
+		assert.deepEqual(
+			datasets.map((dataset) => dataset.id),
+			['file-a', 'ruleset-buffers', 'consultee-areas', 'project-site']
+		);
+	});
 	test('buildDatasets omits empty collections', () => {
 		assert.deepEqual(buildDatasets({ projectGeojson: { features: [] }, consulteeGeojson: null }), []);
 	});

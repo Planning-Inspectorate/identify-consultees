@@ -11,7 +11,7 @@ import { LOCALS_ASSET_BINDINGS, loadAssetManifest } from './fingerprint-assets.t
 const FALLBACK_ASSET_PATHS: Record<string, string> = {
 	styleFile: 'style-299264dc.css',
 	govukFrontendJs: 'assets/js/govuk-frontend.min-0391e416.js',
-	consulteesMapJs: 'javascripts/consultees-map-9502566e.js',
+	consulteesMapJs: 'javascripts/consultees-map-3c11b963.js',
 	consulteeAutocompleteJs: 'javascripts/consultee-autocomplete-aea54bb1.js',
 	consulteeSelectJs: 'javascripts/consultee-select-e8c33a98.js',
 	blobUploadJs: 'javascripts/blob-upload-cfe8ea96.js',

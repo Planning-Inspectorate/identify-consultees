@@ -45,7 +45,8 @@ export const CONFIG_CHECKS: ConfigCheck[] = [
 	},
 	{ file: 'map-view.yaml', check: loads(() => import('./maps/map-view.ts')) },
 	{ file: 'map-styles/boundary-map.yaml', check: loads(() => import('./maps/boundary-map-styles.ts')) },
-	{ file: 'map-styles/authority-roles.yaml', check: loads(() => import('./maps/authority-role-styles.ts')) }
+	{ file: 'map-styles/authority-roles.yaml', check: loads(() => import('./maps/authority-role-styles.ts')) },
+	{ file: 'map-styles/buffer-map.yaml', check: loads(() => import('./maps/buffer-map-styles.ts')) }
 ];
 
 function describe(error: unknown): string {

@@ -196,28 +196,41 @@ export function readMapConfig(mapId) {
 	}
 }
 
-// as the report's PDF draws a buffer: a dark dashed outline, nothing filled
-const BUFFER_COLOUR = '#0b0c0c';
+const FALLBACK_BUFFER_STYLE = {
+	stroke: '#0b0c0c',
+	strokeWidth: 2,
+	strokeDashArray: [1, 1]
+};
 
-/**
- * The ruleset's buffers around the site, outlined dashed and keyed with their distances - "Ruleset
- * buffers (1 km, 10 km)", as the report's PDF keys them.
- * @param {{ features: { properties: { label: string } }[] }} geojson
- * @returns {object}
- */
-export function bufferDataset(geojson) {
-	const distances = geojson.features.map((feature) => feature.properties.label);
-	return {
-		id: 'ruleset-buffers',
-		label: `Ruleset ${distances.length === 1 ? 'buffer' : 'buffers'} (${distances.join(', ')})`,
-		geojson,
-		minZoom: 0,
-		maxZoom: 24,
-		visible: true,
-		showInKey: true,
-		showInMenu: true,
-		style: { stroke: BUFFER_COLOUR, strokeWidth: 2, strokeDashArray: [2, 2] }
-	};
+export function buildBufferSublayers(features) {
+	const layers = [];
+	for (const feature of features) {
+		layers.push({
+			label: feature.properties?.label ?? `Ruleset buffer (0 km)`,
+			metres: feature.properties?.metres || '0',
+			stroke: feature.properties?.stroke || FALLBACK_BUFFER_STYLE.stroke,
+			strokeWidth: Number(feature.properties?.strokeWidth) || FALLBACK_BUFFER_STYLE.strokeWidth,
+			strokeDashArray: feature.properties?.strokeDashArray
+				? JSON.parse(feature.properties.strokeDashArray)
+				: FALLBACK_BUFFER_STYLE.strokeDashArray
+		});
+	}
+
+	const sorted = [...layers].sort((a, b) => Number(a.metres) - Number(b.metres));
+
+	return sorted.map((layer, index) => {
+		return {
+			id: `buffer-${index}`,
+			label: layer.label,
+			visible: true,
+			filter: ['==', ['get', 'label'], layer.label],
+			style: {
+				stroke: layer.stroke,
+				strokeWidth: layer.strokeWidth,
+				strokeDashArray: layer.strokeDashArray
+			}
+		};
+	});
 }
 
 /**
@@ -254,7 +267,18 @@ export function buildDatasets(config) {
 
 	// datasets draw in order: the ruleset's buffers under everything, the project site on top
 	if (config.bufferGeojson?.features?.length > 0) {
-		datasets.push(bufferDataset(config.bufferGeojson));
+		datasets.push({
+			id: 'ruleset-buffers',
+			label: 'Ruleset Buffers',
+			idProperty: 'bufferId', // TODO: check this
+			geojson: config.bufferGeojson,
+			minZoom: 0,
+			maxZoom: 24,
+			showInKey: true,
+			showInMenu: true,
+			style: FALLBACK_BUFFER_STYLE,
+			sublayers: buildBufferSublayers(config.bufferGeojson.features)
+		});
 	}
 
 	if (config.consulteeGeojson?.features?.length > 0) {
