@@ -261,7 +261,17 @@ export function createStaticAssetsMiddleware(
 	const rateLimiter = options.rateLimiter ?? buildStaticAssetsRateLimiter();
 	const router = createRouter();
 
-	router.use(rateLimiter);
+	// this middleware runs for every app request, but the limiter exists for the
+	// filesystem-backed asset responses - only index hits consume its bucket, so
+	// page traffic (and primed-cache bursts) cannot starve real asset requests
+	router.use((req, res, next) => {
+		const key = req.method === 'GET' || req.method === 'HEAD' ? staticAssetRequestKey(req.path) : null;
+		if (key !== null && assetIndex.has(key)) {
+			rateLimiter(req, res, next);
+			return;
+		}
+		next();
+	});
 	router.use(async (req, res, next) => {
 		if (req.method !== 'GET' && req.method !== 'HEAD') {
 			next();

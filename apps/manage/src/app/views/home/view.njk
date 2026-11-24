@@ -119,3 +119,18 @@
 		<p class="govuk-body govuk-!-margin-top-6">No project geometries match your search.</p>
 	{% endif %}
 {% endblock %}
+
+{% block bodyEnd %}
+	{# every journey reaches an interactive map, so after load and while the page
+	   is idle the map's bundles are fetched into the HTTP cache ready for it
+	   (javascripts/prefetch-map-assets.js, fed by the JSON island below); the
+	   speculation rule prefetches a hovered project's boundary page too, in the
+	   browsers that support it and ignored everywhere else #}
+	<script type="speculationrules"{% if cspNonce %} nonce="{{ cspNonce }}"{% endif %}>
+		{ "prefetch": [{ "where": { "href_matches": "/consultees/*" }, "eagerness": "moderate" }] }
+	</script>
+	{% if config.mapPrefetchAssetsJson %}
+		<script type="application/json" id="prefetch-map-assets-data">{{ config.mapPrefetchAssetsJson | safe }}</script>
+		<script type="module" src="/{{ config.prefetchMapAssetsJs }}"></script>
+	{% endif %}
+{% endblock %}

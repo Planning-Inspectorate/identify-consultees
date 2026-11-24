@@ -65,6 +65,7 @@ export const LOCALS_ASSET_BINDINGS: { logical: string; property: string }[] = [
 	{ logical: 'javascripts/blob-upload.js', property: 'blobUploadJs' },
 	{ logical: 'javascripts/sortable-table.js', property: 'sortableTableJs' },
 	{ logical: 'javascripts/loading-spinner.js', property: 'loadingSpinnerJs' },
+	{ logical: 'javascripts/prefetch-map-assets.js', property: 'prefetchMapAssetsJs' },
 	{ logical: 'assets/js/accessible-autocomplete.min.js', property: 'accessibleAutocompleteJs' },
 	{ logical: 'assets/css/accessible-autocomplete.min.css', property: 'accessibleAutocompleteCss' },
 	{ logical: 'vendor/interactive-map/js/index.js', property: 'vendorInteractiveMapJs' },

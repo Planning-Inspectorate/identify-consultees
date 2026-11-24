@@ -81,6 +81,19 @@ test.describe('manage journeys', () => {
 		await expect(page.getByText(SAMPLE_CASE_NAME).first()).toBeVisible();
 	});
 
+	test('home page idle-primes the interactive map bundles for later pages', async ({ page }) => {
+		await page.goto('/');
+		// Chromium speculates the hovered project's boundary page too - ignored elsewhere
+		await expect(page.locator('script[type="speculationrules"]')).toBeAttached();
+		// after load, during idle time: each map page's entry bundle, the map module
+		// graph, and the vendor chunks a map always pulls - all at the lowest priority
+		await expect(page.locator('link[rel="prefetch"][fetchpriority="low"]').first()).toBeAttached();
+		await expect(page.locator('link[rel="prefetch"][href^="/vendor/interactive-map/js/index-"]')).toBeAttached();
+		await expect(page.locator('link[rel="prefetch"][href="/vendor/interactive-map/js/im-core.js"]')).toBeAttached();
+		await expect(page.locator('link[rel="prefetch"][href^="/javascripts/consultees-map-"]')).toBeAttached();
+		await expect(page.locator('link[rel="prefetch"][href^="/javascripts/static-map-plugin-"]')).toBeAttached();
+	});
+
 	test('home page flags a blank search', async ({ page }) => {
 		await page.goto('/?q=');
 		await expect(page.locator('.govuk-error-summary')).toContainText('Enter a search term');
