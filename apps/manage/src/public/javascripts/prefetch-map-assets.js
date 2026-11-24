@@ -3,38 +3,25 @@
  * idle. Every journey reaches a map, so the page's own network quiet time
  * warms the bundles a later page will request: nothing is fetched until after
  * `load`, then only inside an idle callback, so the priming can never compete
- * with the homepage's own resources. Browsers that support
- * `<link rel="prefetch">` get those (the lowest-priority, next-navigation
- * hint); others - Safari, where prefetch is still flag-gated - get a
- * `fetch()` whose consumed body lands in the same HTTP cache the map page's
- * `<script>`/`<link>` tags later hit.
+ * with the homepage's own resources. The server renders the hints as an inert
+ * `<template>` of `<link rel="prefetch">` nodes - browsers that support link
+ * prefetch get those nodes adopted into `<head>`; others - Safari, where
+ * prefetch is still flag-gated - get a `fetch()` whose consumed body lands in
+ * the same HTTP cache the map page's `<script>`/`<link>` tags later hit.
  */
 
 const DATA_ISLAND_ID = 'prefetch-map-assets-data';
-const VALID_AS_TYPES = new Set(['script', 'style']);
 
 /**
- * The island's [{ href, as }] list - nothing when it is absent, malformed, or
- * holds no usable entries.
+ * The island's inert `<template>` of server-rendered prefetch links - undefined
+ * when the page has none. The hrefs are same-origin paths escaped by the
+ * template engine, so the nodes are adopted verbatim rather than rebuilt.
  * @param {Document | undefined} documentTarget
- * @returns {{ href: string, as: string }[]}
+ * @returns {HTMLTemplateElement | undefined}
  */
-export function prefetchAssets(documentTarget = globalThis.document) {
-	const island = documentTarget?.getElementById(DATA_ISLAND_ID);
-	if (!island) {
-		return [];
-	}
-	try {
-		const parsed = JSON.parse(island.textContent);
-		if (!Array.isArray(parsed)) {
-			return [];
-		}
-		return parsed.filter(
-			(asset) => asset && typeof asset.href === 'string' && asset.href !== '' && VALID_AS_TYPES.has(asset.as)
-		);
-	} catch {
-		return [];
-	}
+export function prefetchTemplate(documentTarget = globalThis.document) {
+	const template = documentTarget?.getElementById(DATA_ISLAND_ID);
+	return template?.content ? template : undefined;
 }
 
 /**
@@ -49,32 +36,28 @@ export function supportsLinkPrefetch(documentTarget) {
 }
 
 /**
- * One prefetch link per asset, at the lowest fetch priority.
- * @param {{ href: string, as: string }[]} assets
+ * Adopts the island's prefetch links into `<head>`. The template's content is
+ * inert until cloned into the live document; the clones keep the server's
+ * href/as/fetchpriority attributes untouched.
+ * @param {HTMLTemplateElement} template
  * @param {Document} documentTarget
  */
-export function injectPrefetchLinks(assets, documentTarget) {
-	for (const asset of assets) {
-		const link = documentTarget.createElement('link');
-		link.rel = 'prefetch';
-		link.href = asset.href;
-		link.setAttribute('as', asset.as);
-		link.setAttribute('fetchpriority', 'low');
-		documentTarget.head.appendChild(link);
-	}
+export function injectPrefetchLinks(template, documentTarget) {
+	documentTarget.head.appendChild(template.content.cloneNode(true));
 }
 
 /**
- * The no-prefetch fallback: low-priority fetches whose responses are fully
- * consumed so they are committed to the HTTP cache for the next page's
- * `<script>`/`<link>` to hit. Failures are ignored - a missed prime only
- * means the map loads as it does today.
- * @param {{ href: string }[]} assets
+ * The no-prefetch fallback: low-priority fetches for each of the island's link
+ * hrefs, every response fully consumed so it is committed to the HTTP cache for
+ * the next page's `<script>`/`<link>` to hit. Failures are ignored - a missed
+ * prime only means the map loads as it does today.
+ * @param {HTMLTemplateElement} template
  * @param {Window} windowTarget
  */
-export async function warmCacheWithFetch(assets, windowTarget) {
+export async function warmCacheWithFetch(template, windowTarget) {
+	const hrefs = Array.from(template.content.querySelectorAll('link[href]'), (link) => link.getAttribute('href'));
 	await Promise.all(
-		assets.map(async ({ href }) => {
+		hrefs.map(async (href) => {
 			try {
 				const response = await windowTarget.fetch(href, { priority: 'low' });
 				await response.arrayBuffer();
@@ -101,7 +84,7 @@ export function duringIdleTime(windowTarget, task) {
 }
 
 /**
- * Reads the page's asset island and primes it once the page has loaded and
+ * Adopts the page's server-rendered prefetch hints once the page has loaded and
  * gone idle.
  * @param {Document | undefined} documentTarget
  */
@@ -113,14 +96,14 @@ export function registerPrefetchMapAssets(documentTarget = globalThis.document) 
 
 	const prime = () => {
 		duringIdleTime(view, () => {
-			const assets = prefetchAssets(documentTarget);
-			if (assets.length === 0) {
+			const template = prefetchTemplate(documentTarget);
+			if (!template) {
 				return;
 			}
 			if (supportsLinkPrefetch(documentTarget)) {
-				injectPrefetchLinks(assets, documentTarget);
+				injectPrefetchLinks(template, documentTarget);
 			} else {
-				void warmCacheWithFetch(assets, view);
+				void warmCacheWithFetch(template, view);
 			}
 		});
 	};

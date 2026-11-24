@@ -1,7 +1,6 @@
 import type { Handler } from 'express';
 import type { AssetManifest } from './fingerprint-assets.ts';
 import { LOCALS_ASSET_BINDINGS, loadAssetManifest } from './fingerprint-assets.ts';
-import { stringifyForInlineScript } from './inline-json.ts';
 import { buildMapPrefetchAssets } from './map-prefetch.ts';
 
 /**
@@ -20,7 +19,7 @@ const FALLBACK_ASSET_PATHS: Record<string, string> = {
 	blobUploadJs: 'javascripts/blob-upload-cfe8ea96.js',
 	sortableTableJs: 'javascripts/sortable-table-4136f0ca.js',
 	loadingSpinnerJs: 'javascripts/loading-spinner-d5a4ce0c.js',
-	prefetchMapAssetsJs: 'javascripts/prefetch-map-assets-e19fca82.js',
+	prefetchMapAssetsJs: 'javascripts/prefetch-map-assets-839e8d82.js',
 	accessibleAutocompleteJs: 'assets/js/accessible-autocomplete.min-876870ee.js',
 	accessibleAutocompleteCss: 'assets/css/accessible-autocomplete.min-4b7a52dc.css',
 	vendorInteractiveMapJs: 'vendor/interactive-map/js/index-66cff150.js',
@@ -67,20 +66,18 @@ function resolveAssetPaths(staticDir: string | undefined, manifest: AssetManifes
  * Add configuration values to locals. Asset paths resolve once at app start
  * from the build's asset manifest under `staticDir`, falling back to the
  * literals above when no manifest exists - so the fingerprinted filenames
- * served always match the files the same build produced. `mapPrefetchAssetsJson`
- * is the map bundles' idle-time prime list the homepage renders for
- * javascripts/prefetch-map-assets.js (see util/map-prefetch.ts).
+ * served always match the files the same build produced. `mapPrefetchAssets`
+ * is the map bundles' idle-time prime list the homepage renders as inert
+ * template links for javascripts/prefetch-map-assets.js (see util/map-prefetch.ts).
  */
 export function addLocalsConfiguration(staticDir?: string): Handler {
 	const manifest = staticDir ? loadAssetManifest(staticDir) : null;
 	const assetPaths = resolveAssetPaths(staticDir, manifest);
-	const mapPrefetchAssetsJson = stringifyForInlineScript(
-		buildMapPrefetchAssets({ assetPaths, manifestAssets: manifest?.assets })
-	);
+	const mapPrefetchAssets = buildMapPrefetchAssets({ assetPaths, manifestAssets: manifest?.assets });
 	return (req, res, next) => {
 		res.locals.config = {
 			...assetPaths,
-			mapPrefetchAssetsJson,
+			mapPrefetchAssets,
 			headerTitle: 'Identify consultees',
 			// the support links the site footer lists - generic Planning Inspectorate pages.
 			// Help and Contact are deliberately left out until their content has had a proper

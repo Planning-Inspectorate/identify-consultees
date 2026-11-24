@@ -129,8 +129,12 @@
 	<script type="speculationrules"{% if cspNonce %} nonce="{{ cspNonce }}"{% endif %}>
 		{ "prefetch": [{ "where": { "href_matches": "/consultees/*" }, "eagerness": "moderate" }] }
 	</script>
-	{% if config.mapPrefetchAssetsJson %}
-		<script type="application/json" id="prefetch-map-assets-data">{{ config.mapPrefetchAssetsJson | safe }}</script>
+	{% if config.mapPrefetchAssets.length %}
+		<template id="prefetch-map-assets-data">
+			{% for asset in config.mapPrefetchAssets %}
+				<link rel="prefetch" href="{{ asset.href }}" as="{{ asset.as }}" fetchpriority="low">
+			{% endfor %}
+		</template>
 		<script type="module" src="/{{ config.prefetchMapAssetsJs }}"></script>
 	{% endif %}
 {% endblock %}
