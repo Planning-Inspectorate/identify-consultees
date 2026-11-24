@@ -25,11 +25,22 @@ const CONTENT_TYPES: Record<string, string> = {
 	'.xml': 'application/xml; charset=utf-8'
 };
 
+type CompressedVariant = {
+	/** Absolute path of the sidecar discovered at startup. */
+	absolutePath: string;
+	/** Compressed size, for Content-Length. */
+	size: number;
+};
+
 type IndexedAsset = {
 	/** Absolute path discovered at startup (never derived from the request). */
 	absolutePath: string;
+	/** Plain size, for Content-Length on the identity variant. */
+	size: number;
 	/** Optional Brotli sidecar discovered at startup. */
-	brotliAbsolutePath?: string;
+	brotli?: CompressedVariant;
+	/** Optional gzip sidecar discovered at startup. */
+	gzip?: CompressedVariant;
 	/** Weak ETag derived from file size + mtime at startup. */
 	etag: string;
 	/** HTTP-date string for the Last-Modified header (second precision). */
@@ -52,11 +63,46 @@ export function contentTypeFor(filePath: string): string {
 	return CONTENT_TYPES[ext] ?? 'application/octet-stream';
 }
 
-export function acceptsBrotli(acceptEncodingHeader: string | undefined): boolean {
+/**
+ * Content-negotiate an Accept-Encoding header against the variants a file
+ * actually has. Parses q-values and the `*` wildcard per RFC 9110 — an
+ * explicitly listed coding beats the wildcard, so `br;q=0, *;q=1` refuses br.
+ * br wins ties because it is the smaller wire format; the client's quality
+ * ordering is honoured otherwise.
+ */
+export function preferredEncoding(
+	acceptEncodingHeader: string | undefined,
+	available: { br?: boolean; gzip?: boolean }
+): 'br' | 'gzip' | null {
 	if (!acceptEncodingHeader) {
-		return false;
+		return null;
 	}
-	return acceptEncodingHeader.split(',').some((part) => part.trim().toLowerCase().startsWith('br'));
+	const qualities = new Map<string, number>();
+	for (const part of acceptEncodingHeader.split(',')) {
+		const [token, ...parameters] = part.split(';');
+		const name = token.trim().toLowerCase();
+		if (!name) {
+			continue;
+		}
+		let quality = 1;
+		for (const parameter of parameters) {
+			const [key, value] = parameter.split('=');
+			if (key?.trim().toLowerCase() === 'q') {
+				const parsed = Number(value);
+				if (!Number.isNaN(parsed)) {
+					quality = parsed;
+				}
+			}
+		}
+		qualities.set(name, quality);
+	}
+	const quality = (name: string): number => qualities.get(name) ?? qualities.get('*') ?? 0;
+	const brQuality = available.br ? quality('br') : 0;
+	const gzipQuality = available.gzip ? quality('gzip') : 0;
+	if (brQuality <= 0 && gzipQuality <= 0) {
+		return null;
+	}
+	return brQuality >= gzipQuality ? 'br' : 'gzip';
 }
 
 /**
@@ -127,22 +173,34 @@ function buildStaticAssetIndex(staticDir: string): ReadonlyMap<string, IndexedAs
 				walk(absolutePath);
 				continue;
 			}
-			if (!stats.isFile() || name.endsWith('.br')) {
+			if (!stats.isFile() || name.endsWith('.br') || name.endsWith('.gz')) {
 				continue;
 			}
 
 			const relativePosix = path.relative(resolvedStaticDir, absolutePath).split(path.sep).join('/');
-			const brotliAbsolutePath = `${absolutePath}.br`;
 			// floor to seconds: HTTP dates can't express sub-second precision
 			const lastModifiedMs = Math.floor(stats.mtimeMs / 1000) * 1000;
 			const entry: IndexedAsset = {
 				absolutePath,
+				size: stats.size,
 				etag: `W/"${stats.size}-${lastModifiedMs}"`,
 				lastModified: new Date(lastModifiedMs).toUTCString(),
 				lastModifiedMs
 			};
-			if (existsSync(brotliAbsolutePath)) {
-				entry.brotliAbsolutePath = brotliAbsolutePath;
+			const sidecar = (extension: string): CompressedVariant | undefined => {
+				const sidecarPath = `${absolutePath}.${extension}`;
+				if (!existsSync(sidecarPath)) {
+					return undefined;
+				}
+				return { absolutePath: sidecarPath, size: statSync(sidecarPath).size };
+			};
+			const brotli = sidecar('br');
+			if (brotli) {
+				entry.brotli = brotli;
+			}
+			const gzip = sidecar('gz');
+			if (gzip) {
+				entry.gzip = gzip;
 			}
 			index.set(relativePosix, entry);
 		}
@@ -189,7 +247,7 @@ export function staticAssetRequestKey(requestPath: string): string | null {
 /**
  * Serve files from the built `.static` directory with:
  * - Lookup against a startup file index (no user-controlled path joins)
- * - Brotli precompressed sidecars when the client accepts `br`
+ * - Precompressed `.br`/`.gz` sidecars negotiated from Accept-Encoding
  * - Rate limiting
  * - `Cache-Control: public, max-age=31536000, immutable` only for fingerprinted assets
  * - `ETag`/`Last-Modified` validators so stale-but-unchanged assets can be
@@ -222,22 +280,26 @@ export function createStaticAssetsMiddleware(
 			return;
 		}
 
-		const brotliPath = entry.brotliAbsolutePath;
-		const useBrotli = acceptsBrotli(req.get('accept-encoding') ?? undefined) && brotliPath !== undefined;
-		const fileToSend = useBrotli ? brotliPath : entry.absolutePath;
+		const encoding = preferredEncoding(req.get('accept-encoding') ?? undefined, {
+			br: entry.brotli !== undefined,
+			gzip: entry.gzip !== undefined
+		});
+		const variant = encoding === 'br' ? entry.brotli : encoding === 'gzip' ? entry.gzip : undefined;
+		const fileToSend = variant?.absolutePath ?? entry.absolutePath;
 
 		res.status(200);
 		res.setHeader('Content-Type', contentTypeFor(entry.absolutePath));
+		res.setHeader('Content-Length', variant?.size ?? entry.size);
 		setCacheControl(res, entry.absolutePath);
 		res.setHeader('ETag', entry.etag);
 		res.setHeader('Last-Modified', entry.lastModified);
-		if (brotliPath !== undefined) {
-			// the response varies on Accept-Encoding whenever a br variant exists,
-			// even when this particular response is not the encoded one
+		if (entry.brotli !== undefined || entry.gzip !== undefined) {
+			// the response varies on Accept-Encoding whenever an encoded variant
+			// exists, even when this particular response is not the encoded one
 			res.setHeader('Vary', 'Accept-Encoding');
 		}
-		if (useBrotli) {
-			res.setHeader('Content-Encoding', 'br');
+		if (encoding) {
+			res.setHeader('Content-Encoding', encoding);
 		}
 
 		if (isFreshRequest(req, entry)) {

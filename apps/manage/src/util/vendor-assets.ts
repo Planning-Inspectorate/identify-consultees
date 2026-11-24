@@ -1,6 +1,7 @@
-import { copyFile, mkdir, rm } from 'node:fs/promises';
+import { copyFile, mkdir, readdir, rm, stat } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import path from 'node:path';
+import { compressFileToSidecars, shouldCompress } from './fingerprint-assets.ts';
 
 const require = createRequire(import.meta.url);
 // resolve() points at dist/umd/index.js — walk up to the package root
@@ -44,5 +45,37 @@ export async function copyDefraVendorEntryAssets(staticDir: string): Promise<voi
 		const destination = path.join(vendorDir, ...prefix.split('/'), entryFile);
 		await mkdir(path.dirname(destination), { recursive: true });
 		await copyFile(path.join(root, entryFile), destination);
+	}
+}
+
+/** Files this small compress to little gain — not worth a br/gz variant. */
+const MIN_SIDECAR_BYTES = 1024;
+/** Bound parallel encodes so the multi-MB chunks don't pile into memory at once. */
+const SIDECAR_WRITE_CONCURRENCY = 8;
+
+/**
+ * Write `.br`/`.gz` sidecars next to every compressible vendor file in
+ * node_modules (the webpack lazy chunks the /vendor mounts serve). Sidecars
+ * live beside the file they compress on purpose: a @defra/interactive-map
+ * update replaces the package directory wholesale, so a stale sidecar can
+ * never outlive its source. `compressFileToSidecars` keeps fresh sidecars,
+ * so unchanged packages cost nothing on a rebuild.
+ */
+export async function writeVendorCompressionSidecars(
+	roots: Readonly<Record<string, string>> = DEFRA_VENDOR_ROOTS
+): Promise<void> {
+	for (const root of Object.values(roots)) {
+		const compressible = (await readdir(root, { recursive: true, withFileTypes: true }))
+			.filter((entry) => entry.isFile() && shouldCompress(entry.name))
+			.map((entry) => path.join(entry.parentPath, entry.name));
+		for (let index = 0; index < compressible.length; index += SIDECAR_WRITE_CONCURRENCY) {
+			await Promise.all(
+				compressible.slice(index, index + SIDECAR_WRITE_CONCURRENCY).map(async (filePath) => {
+					if ((await stat(filePath)).size >= MIN_SIDECAR_BYTES) {
+						await compressFileToSidecars(filePath);
+					}
+				})
+			);
+		}
 	}
 }

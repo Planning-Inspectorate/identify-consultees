@@ -1,15 +1,25 @@
 import { createHash } from 'node:crypto';
 import { createReadStream, createWriteStream, readFileSync } from 'node:fs';
-import { readdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
+import { readdir, readFile, rename, rm, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { pipeline } from 'node:stream/promises';
-import { createBrotliCompress, constants as zlibConstants } from 'node:zlib';
+import { createBrotliCompress, createGzip, constants as zlibConstants } from 'node:zlib';
 
 /** Content-hash segment used in fingerprinted filenames (8 hex chars). */
 const ASSET_HASH_PATTERN = /-[0-9a-f]{8}(?=\.[^.]+$)/i;
 
-/** Compressible text-ish assets suitable for Brotli (sidecars or runtime compression). */
-export const BROTLI_EXTENSIONS = new Set(['.css', '.js', '.mjs', '.svg', '.json', '.map', '.txt', '.xml', '.html']);
+/** Compressible text-ish assets that get precompressed .br/.gz sidecars at build time. */
+export const COMPRESSIBLE_EXTENSIONS = new Set([
+	'.css',
+	'.js',
+	'.mjs',
+	'.svg',
+	'.json',
+	'.map',
+	'.txt',
+	'.xml',
+	'.html'
+]);
 
 /** Files we fingerprint at build time (relative to staticDir, posix-style). */
 const FINGERPRINT_GLOBS = [
@@ -76,12 +86,12 @@ export const LOCALS_ASSET_BINDINGS: { logical: string; property: string }[] = [
 export function isFingerprintedAssetPath(filePath: string): boolean {
 	const base = path.basename(filePath);
 	// Ignore compression sidecars when detecting fingerprinting
-	const withoutBr = base.endsWith('.br') ? base.slice(0, -3) : base;
-	return ASSET_HASH_PATTERN.test(withoutBr);
+	const withoutSidecar = base.replace(/\.(br|gz)$/i, '');
+	return ASSET_HASH_PATTERN.test(withoutSidecar);
 }
 
 export function shouldFingerprint(relativePosixPath: string): boolean {
-	if (relativePosixPath.endsWith('.br')) {
+	if (relativePosixPath.endsWith('.br') || relativePosixPath.endsWith('.gz')) {
 		return false;
 	}
 	if (/\.test\.m?js$/.test(relativePosixPath)) {
@@ -93,12 +103,12 @@ export function shouldFingerprint(relativePosixPath: string): boolean {
 	return FINGERPRINT_GLOBS.some((pattern) => pattern.test(relativePosixPath));
 }
 
-export function shouldBrotli(relativePosixPath: string): boolean {
-	if (relativePosixPath.endsWith('.br')) {
+export function shouldCompress(relativePosixPath: string): boolean {
+	if (relativePosixPath.endsWith('.br') || relativePosixPath.endsWith('.gz')) {
 		return false;
 	}
 	const ext = path.extname(relativePosixPath).toLowerCase();
-	return BROTLI_EXTENSIONS.has(ext);
+	return COMPRESSIBLE_EXTENSIONS.has(ext);
 }
 
 async function walkFiles(dir: string): Promise<string[]> {
@@ -223,23 +233,50 @@ function rewriteModuleSpecifiers(
 	});
 }
 
-async function brotliCompressFile(absolutePath: string): Promise<void> {
-	const brPath = `${absolutePath}.br`;
-	await pipeline(
-		createReadStream(absolutePath),
-		createBrotliCompress({
-			params: {
-				[zlibConstants.BROTLI_PARAM_QUALITY]: 11,
-				[zlibConstants.BROTLI_PARAM_MODE]: zlibConstants.BROTLI_MODE_TEXT
-			}
-		}),
-		createWriteStream(brPath)
-	);
+async function statOrNull(filePath: string) {
+	try {
+		return await stat(filePath);
+	} catch {
+		return null;
+	}
 }
 
 /**
- * Fingerprint selected assets, write Brotli sidecars for fingerprinted compressible files,
- * and emit `asset-manifest.json` for template wiring.
+ * Write `<file>.br` (Brotli quality 11) and `<file>.gz` (gzip best compression)
+ * sidecars so serving is a stat + stream, never an encode. Existing sidecars
+ * are reused, not rewritten: a fingerprinted (content-addressed) name pins the
+ * exact bytes the sidecar was made from, and for everything else a sidecar
+ * newer than the source is already current. The reuse check matters for the
+ * multi-MB vendor chunks, where re-encoding on every dev-server restart would
+ * stall the build for a minute.
+ */
+export async function compressFileToSidecars(absolutePath: string): Promise<void> {
+	const sourceStats = await stat(absolutePath);
+	const contentAddressed = isFingerprintedAssetPath(absolutePath);
+	const writeSidecar = async (extension: string, createCompress: () => NodeJS.ReadWriteStream): Promise<void> => {
+		const sidecarPath = `${absolutePath}.${extension}`;
+		const existing = await statOrNull(sidecarPath);
+		if (existing && (contentAddressed || existing.mtimeMs >= sourceStats.mtimeMs)) {
+			return;
+		}
+		await pipeline(createReadStream(absolutePath), createCompress(), createWriteStream(sidecarPath));
+	};
+	await Promise.all([
+		writeSidecar('br', () =>
+			createBrotliCompress({
+				params: {
+					[zlibConstants.BROTLI_PARAM_QUALITY]: 11,
+					[zlibConstants.BROTLI_PARAM_MODE]: zlibConstants.BROTLI_MODE_TEXT
+				}
+			})
+		),
+		writeSidecar('gz', () => createGzip({ level: zlibConstants.Z_BEST_COMPRESSION }))
+	]);
+}
+
+/**
+ * Fingerprint selected assets, write `.br`/`.gz` sidecars for every compressible
+ * file, and emit `asset-manifest.json` for template wiring.
  *
  * Modules that import each other (`./dep.mjs`) are renamed dependencies-first and
  * each importer's specifiers rewritten to the hashed names before it is hashed.
@@ -252,15 +289,8 @@ export async function fingerprintAndCompressStaticAssets(staticDir: string): Pro
 	const allFiles = await walkFiles(staticDir);
 	const manifest: AssetManifest = { assets: {} };
 
-	// Remove stale Brotli sidecars before renaming
-	await Promise.all(
-		allFiles.filter((filePath) => filePath.endsWith('.br')).map((filePath) => rm(filePath, { force: true }))
-	);
-
-	const filesAfterCleanup = await walkFiles(staticDir);
-
 	const fingerprintable = new Map<string, string>();
-	for (const absolutePath of filesAfterCleanup) {
+	for (const absolutePath of allFiles) {
 		const relative = toPosixRelative(staticDir, absolutePath);
 		if (shouldFingerprint(relative)) {
 			fingerprintable.set(relative, absolutePath);
@@ -296,16 +326,29 @@ export async function fingerprintAndCompressStaticAssets(staticDir: string): Pro
 	}
 
 	const afterFingerprint = await walkFiles(staticDir);
+	const compressible: string[] = [];
 	for (const absolutePath of afterFingerprint) {
-		const relative = toPosixRelative(staticDir, absolutePath);
-		if (!isFingerprintedAssetPath(relative) || !shouldBrotli(relative)) {
+		if (absolutePath.endsWith('.br') || absolutePath.endsWith('.gz')) {
+			// a sidecar whose base file no longer exists is an orphan of a renamed
+			// or deleted asset - remove it; one still paired with its source is
+			// kept so unchanged assets reuse the sidecar from a previous build
+			const base = absolutePath.slice(0, absolutePath.lastIndexOf('.'));
+			if (!(await statOrNull(base))) {
+				await rm(absolutePath, { force: true });
+			}
 			continue;
 		}
-		await brotliCompressFile(absolutePath);
+		if (shouldCompress(toPosixRelative(staticDir, absolutePath))) {
+			compressible.push(absolutePath);
+		}
+	}
+	for (const absolutePath of compressible) {
+		await compressFileToSidecars(absolutePath);
 	}
 
 	const manifestPath = path.join(staticDir, ASSET_MANIFEST_FILENAME);
 	await writeFile(manifestPath, `${JSON.stringify(manifest, null, '\t')}\n`, 'utf8');
+	await compressFileToSidecars(manifestPath);
 
 	return manifest;
 }

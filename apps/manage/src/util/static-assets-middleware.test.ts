@@ -6,12 +6,13 @@ import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { after, describe, test } from 'node:test';
-import { brotliCompressSync } from 'node:zlib';
+import { brotliCompressSync, gzipSync } from 'node:zlib';
 import request from 'supertest';
 import {
 	buildStaticAssetsRateLimiter,
 	createStaticAssetsMiddleware,
 	FINGERPRINTED_CACHE_CONTROL,
+	preferredEncoding,
 	staticAssetRequestKey,
 	UNFINGERPRINTED_CACHE_CONTROL
 } from './static-assets-middleware.ts';
@@ -65,14 +66,17 @@ describe('static-assets-middleware', () => {
 		assert.match(unknownType.headers['content-type'] || '', /octet-stream/);
 	});
 
-	test('serves fingerprinted assets with immutable cache and optional Brotli', async () => {
+	test('serves fingerprinted assets with immutable cache and negotiated br/gzip', async () => {
 		tempDir = await mkdtemp(path.join(tmpdir(), 'static-assets-mw-'));
 		const fingerprinted = 'assets/js/app-aabbccdd.js';
 		const absolute = path.join(tempDir, ...fingerprinted.split('/'));
 		await mkdir(path.dirname(absolute), { recursive: true });
 		const body = 'export const value = 1;\n';
 		await writeFile(absolute, body);
-		await writeFile(`${absolute}.br`, brotliCompressSync(body));
+		const brBody = brotliCompressSync(body);
+		const gzBody = gzipSync(body);
+		await writeFile(`${absolute}.br`, brBody);
+		await writeFile(`${absolute}.gz`, gzBody);
 
 		const app = express();
 		app.use(
@@ -82,21 +86,63 @@ describe('static-assets-middleware', () => {
 		);
 		app.use((_req, res) => res.status(404).end());
 
-		const plain = await request(app).get(`/${fingerprinted}`);
+		// supertest sends its own Accept-Encoding, so identity must be explicit
+		const plain = await request(app).get(`/${fingerprinted}`).set('Accept-Encoding', 'identity');
 		assert.equal(plain.status, 200);
 		assert.equal(plain.headers['cache-control'], FINGERPRINTED_CACHE_CONTROL);
 		assert.equal(plain.text, body);
 		assert.equal(plain.headers['content-encoding'], undefined);
+		assert.equal(Number(plain.headers['content-length']), body.length);
 
 		const br = await request(app).get(`/${fingerprinted}`).set('Accept-Encoding', 'gzip, deflate, br');
 		assert.equal(br.status, 200);
 		assert.equal(br.headers['content-encoding'], 'br');
 		assert.equal(br.headers['cache-control'], FINGERPRINTED_CACHE_CONTROL);
 		assert.equal(br.headers['vary'], 'Accept-Encoding');
+		assert.equal(Number(br.headers['content-length']), brBody.length);
+
+		const gzip = await request(app).get(`/${fingerprinted}`).set('Accept-Encoding', 'gzip');
+		assert.equal(gzip.status, 200);
+		assert.equal(gzip.headers['content-encoding'], 'gzip');
+		assert.equal(Number(gzip.headers['content-length']), gzBody.length);
+
+		// br is refused - fall back to the gzip variant the client does accept
+		const brRefused = await request(app).get(`/${fingerprinted}`).set('Accept-Encoding', 'br;q=0, gzip;q=1');
+		assert.equal(brRefused.status, 200);
+		assert.equal(brRefused.headers['content-encoding'], 'gzip');
+
+		// identity when every offered variant is refused
+		const allRefused = await request(app).get(`/${fingerprinted}`).set('Accept-Encoding', 'br;q=0, gzip;q=0');
+		assert.equal(allRefused.status, 200);
+		assert.equal(allRefused.headers['content-encoding'], undefined);
 
 		// the unencoded variant must also carry Vary so shared caches (e.g. Front
 		// Door) key the object on Accept-Encoding and don't mix the two up
 		assert.equal(plain.headers['vary'], 'Accept-Encoding');
+	});
+
+	test('preferredEncoding honours q-values, wildcards and availability', () => {
+		const both = { br: true, gzip: true };
+		assert.equal(preferredEncoding(undefined, both), null);
+		assert.equal(preferredEncoding('', both), null);
+		assert.equal(preferredEncoding('br', both), 'br');
+		assert.equal(preferredEncoding('gzip', both), 'gzip');
+		// server prefers the smaller br format on ties
+		assert.equal(preferredEncoding('gzip, deflate, br', both), 'br');
+		// the client's quality ordering is honoured
+		assert.equal(preferredEncoding('gzip;q=1, br;q=0.5', both), 'gzip');
+		assert.equal(preferredEncoding('br;q=0, gzip', both), 'gzip');
+		assert.equal(preferredEncoding('br;q=0, gzip;q=0', both), null);
+		// an explicit listing beats the wildcard: br is refused here despite *;q=1
+		assert.equal(preferredEncoding('br;q=0, *;q=1', both), 'gzip');
+		assert.equal(preferredEncoding('*;q=0', both), null);
+		assert.equal(preferredEncoding('deflate', both), null);
+		// empty and malformed entries are ignored, not fatal
+		assert.equal(preferredEncoding(', br', both), 'br');
+		assert.equal(preferredEncoding('br;q=oops, gzip', both), 'br');
+		// a variant the file does not have is never picked
+		assert.equal(preferredEncoding('br, gzip', { gzip: true }), 'gzip');
+		assert.equal(preferredEncoding('br, gzip', {}), null);
 	});
 
 	test('revalidates unchanged assets with 304 via ETag and Last-Modified', async () => {

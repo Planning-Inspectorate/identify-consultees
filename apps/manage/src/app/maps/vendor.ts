@@ -1,15 +1,17 @@
-import { BROTLI_EXTENSIONS } from '#util/fingerprint-assets.ts';
+import { COMPRESSIBLE_EXTENSIONS } from '#util/fingerprint-assets.ts';
 import {
-	acceptsBrotli,
 	buildStaticAssetsRateLimiter,
 	contentTypeFor,
+	preferredEncoding,
 	staticAssetRequestKey
 } from '#util/static-assets-middleware.ts';
 import { DEFRA_VENDOR_ROOTS } from '#util/vendor-assets.ts';
 import type { IRouter, Request, RequestHandler, Response } from 'express';
 import express, { Router as createRouter } from 'express';
+import { createReadStream } from 'node:fs';
 import { readFile, stat } from 'node:fs/promises';
 import path from 'node:path';
+import { pipeline } from 'node:stream/promises';
 import { promisify } from 'node:util';
 import { brotliCompress, constants as zlibConstants } from 'node:zlib';
 import { etagMatches } from './static-map-cache.ts';
@@ -37,7 +39,7 @@ const MIN_BROTLI_BYTES = 1024;
 
 const compressAsync = promisify(brotliCompress);
 
-type CompressFn = (input: Buffer) => Promise<Buffer>;
+type CompressFn = (input: Buffer) => Promise<Buffer | undefined>;
 
 /**
  * In-process cache of compressed vendor files. The key embeds path + size +
@@ -81,14 +83,7 @@ function weakEtagFor(size: number, mtimeMs: number): string {
 	return `W/"${size}-${Math.floor(mtimeMs / 1000) * 1000}"`;
 }
 
-async function compressedVariant(
-	absolutePath: string,
-	size: number,
-	compress: CompressFn
-): Promise<Buffer | undefined> {
-	if (size < MIN_BROTLI_BYTES) {
-		return undefined;
-	}
+async function compressedVariant(absolutePath: string, compress: CompressFn): Promise<Buffer | undefined> {
 	return compress(await readFile(absolutePath));
 }
 
@@ -114,7 +109,7 @@ function getBrotliVariant(
 		brotliVariants.delete(previousKey);
 	}
 	latestKeyByPath.set(absolutePath, key);
-	const pending = compressedVariant(absolutePath, size, compress);
+	const pending = compressedVariant(absolutePath, compress);
 	// attach a noop rejection handler so a failed encode is not reported as an
 	// unhandled rejection before the next requester awaits the cached promise
 	pending.catch(() => {});
@@ -123,11 +118,15 @@ function getBrotliVariant(
 }
 
 /**
- * Serve the Brotli variant of a vendor file when the client accepts `br`.
- * Non-br requests (and misses) fall through to the express.static mount, which
- * keeps its exact 404/ETag/Cache-Control behaviour.
+ * Serve a precompressed variant of a vendor file negotiated from
+ * Accept-Encoding. The build writes `.br`/`.gz` sidecars beside each file; a
+ * sidecar is used only while it is not older than its source — an in-place
+ * package update or a deps:patch-* rewrite makes it stale, and the memoised
+ * runtime Brotli encode (or the plain file) takes over until the next build.
+ * Requests with no usable variant fall through to the express.static mount,
+ * which keeps its exact 404/ETag/Cache-Control behaviour.
  */
-export function createVendorBrotliHandler(
+export function createVendorCompressedHandler(
 	root: string,
 	maxAge: string | number | undefined,
 	options: { compress?: CompressFn } = {}
@@ -147,13 +146,13 @@ export function createVendorBrotliHandler(
 			return;
 		}
 
-		const compressible = BROTLI_EXTENSIONS.has(path.extname(key).toLowerCase());
+		const compressible = COMPRESSIBLE_EXTENSIONS.has(path.extname(key).toLowerCase());
 		// the response varies on Accept-Encoding for every compressible file,
 		// including the plain variant served by express.static after next()
 		if (compressible) {
 			res.setHeader('Vary', 'Accept-Encoding');
 		}
-		if (!compressible || !acceptsBrotli(req.get('accept-encoding') ?? undefined)) {
+		if (!compressible) {
 			next();
 			return;
 		}
@@ -171,6 +170,31 @@ export function createVendorBrotliHandler(
 			return;
 		}
 
+		const freshSidecar = async (extension: string) => {
+			const sidecarPath = `${absolutePath}.${extension}`;
+			try {
+				const sidecarStats = await stat(sidecarPath);
+				if (sidecarStats.mtimeMs >= stats.mtimeMs) {
+					return { absolutePath: sidecarPath, size: sidecarStats.size };
+				}
+			} catch {
+				return undefined;
+			}
+			return undefined;
+		};
+		const [brotliSidecar, gzipSidecar] = await Promise.all([freshSidecar('br'), freshSidecar('gz')]);
+
+		// gzip exists only as a build sidecar; br can also come from the runtime
+		// encode, which keeps its size floor
+		const encoding = preferredEncoding(req.get('accept-encoding') ?? undefined, {
+			br: brotliSidecar !== undefined || stats.size >= MIN_BROTLI_BYTES,
+			gzip: gzipSidecar !== undefined
+		});
+		if (!encoding) {
+			next();
+			return;
+		}
+
 		const etag = weakEtagFor(stats.size, stats.mtimeMs);
 		res.setHeader('Content-Type', contentTypeFor(absolutePath));
 		res.setHeader('Cache-Control', `public, max-age=${maxAgeSeconds}`);
@@ -179,6 +203,25 @@ export function createVendorBrotliHandler(
 
 		if (etagMatches(req.get('if-none-match') ?? undefined, etag)) {
 			res.status(304).end();
+			return;
+		}
+
+		const sidecar = encoding === 'br' ? brotliSidecar : gzipSidecar;
+		if (sidecar) {
+			res.setHeader('Content-Encoding', encoding);
+			res.setHeader('Content-Length', sidecar.size);
+			res.status(200);
+			if (req.method === 'HEAD') {
+				res.end();
+				return;
+			}
+			try {
+				await pipeline(createReadStream(sidecar.absolutePath), res);
+			} catch (error) {
+				if (!res.headersSent) {
+					next(error);
+				}
+			}
 			return;
 		}
 
@@ -201,9 +244,27 @@ export function createVendorBrotliHandler(
 }
 
 /**
+ * Build-time sidecars are negotiation internals, not content: express.static
+ * would happily serve `chunk.js.br` as raw bytes, so a request for one misses
+ * exactly like a nonexistent asset. staticAssetRequestKey decodes the path so
+ * encoded extensions (index.js%2ebr) miss the same way.
+ */
+const SIDECAR_EXTENSIONS = new Set(['.br', '.gz']);
+
+const rejectSidecarRequests: RequestHandler = (req, _res, next) => {
+	const key = staticAssetRequestKey(req.path);
+	if (key && SIDECAR_EXTENSIONS.has(path.extname(key).toLowerCase())) {
+		next(Object.assign(new Error('Not Found'), { statusCode: 404 }));
+		return;
+	}
+	next();
+};
+
+/**
  * Serve Defra Interactive Map UMD/CSS assets from node_modules
- * (same pattern as PINS-data-spike vendor mounts), with lazy in-process
- * Brotli for compressible files when the client accepts `br`.
+ * (same pattern as PINS-data-spike vendor mounts), preferring the build-time
+ * `.br`/`.gz` sidecars beside each file and falling back to lazy in-process
+ * Brotli when the client accepts `br` and no fresh sidecar exists.
  */
 export function createDefraVendorRouter(options: DefraVendorRouterOptions = {}): IRouter {
 	const router = createRouter();
@@ -211,7 +272,8 @@ export function createDefraVendorRouter(options: DefraVendorRouterOptions = {}):
 	router.use(options.rateLimiter ?? buildStaticAssetsRateLimiter());
 
 	for (const [prefix, root] of Object.entries(DEFRA_VENDOR_ROOTS)) {
-		router.use(`/vendor/${prefix}`, createVendorBrotliHandler(root, options.maxAge));
+		router.use(`/vendor/${prefix}`, rejectSidecarRequests);
+		router.use(`/vendor/${prefix}`, createVendorCompressedHandler(root, options.maxAge));
 		router.use(`/vendor/${prefix}`, express.static(root, { index: false, fallthrough: false, maxAge: options.maxAge }));
 	}
 

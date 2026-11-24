@@ -4,7 +4,7 @@ import { createRequire } from 'node:module';
 import path from 'node:path';
 import { loadBuildConfig } from '../app/config.ts';
 import { applyAssetManifestToLocalsFile, fingerprintAndCompressStaticAssets } from './fingerprint-assets.ts';
-import { copyDefraVendorEntryAssets } from './vendor-assets.ts';
+import { copyDefraVendorEntryAssets, writeVendorCompressionSidecars } from './vendor-assets.ts';
 
 /**
  * Do all steps to run the build
@@ -41,6 +41,10 @@ async function run(): Promise<void> {
 	await copyDefraVendorEntryAssets(config.staticDir);
 
 	const manifest = await fingerprintAndCompressStaticAssets(config.staticDir);
+	// vendor lazy chunks keep stable names and stay in node_modules, so their
+	// sidecars are written beside them - a package update then replaces files
+	// and sidecars together and a stale variant can never be served
+	await writeVendorCompressionSidecars();
 	await applyAssetManifestToLocalsFile(localsFile, manifest);
 }
 
