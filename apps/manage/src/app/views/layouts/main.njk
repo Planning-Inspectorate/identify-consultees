@@ -7,6 +7,8 @@
 {% from "views/layouts/components/footer.njk" import appFooter %}
 
 {% block head %}
+	{# Concise page summary for search results and assistive tech that expose document metadata. #}
+	<meta name="description" content="{{ metaDescription | default(config.metaDescription) }}">
 	{# setup the header tags, to link to the styles #}
     <link rel="stylesheet" href="/{{ config.styleFile }}"/>
 {% endblock %}

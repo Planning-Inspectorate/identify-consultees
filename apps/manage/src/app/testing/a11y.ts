@@ -15,6 +15,7 @@ export const pageLocals = {
 		vendorInteractiveMapCss: 'vendor/interactive-map/css/index.css',
 		vendorMaplibreProviderJs: 'vendor/maplibre-provider/js/index.js',
 		headerTitle: 'Identify consultees',
+		metaDescription: 'Identify organisations that must be consulted about a national infrastructure project.',
 		// the same support links config-middleware puts on every page
 		footerLinks: [
 			{ text: 'Help', link: '/help' },

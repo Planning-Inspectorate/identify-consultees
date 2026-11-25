@@ -79,6 +79,9 @@ export function addLocalsConfiguration(staticDir?: string): Handler {
 			...assetPaths,
 			mapPrefetchAssets,
 			headerTitle: 'Identify consultees',
+			// Concise document summary for assistive tech and search results (Lighthouse /
+			// content best practices). Pages can override via res.locals.metaDescription.
+			metaDescription: 'Identify organisations that must be consulted about a national infrastructure project.',
 			// the support links the site footer lists - generic Planning Inspectorate pages.
 			// Help and Contact are deliberately left out until their content has had a proper
 			// audit; the pages themselves stay routed. `hidden` keeps a page routed but takes
