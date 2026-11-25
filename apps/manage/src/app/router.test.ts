@@ -69,6 +69,10 @@ describe('manage router wiring', () => {
 		const response = await request(authDisabledApp).get('/?q=Router+Test+Fixture');
 		assert.equal(response.status, 200);
 		assert.match(response.text, /Identify consultees for a national infrastructure project/);
+		assert.match(
+			response.text,
+			/<meta name="description" content="Identify organisations that must be consulted about a national infrastructure project.">/
+		);
 		assert.match(response.text, /Router Test Fixture Wind Farm/);
 		assert.match(response.text, new RegExp(`/consultees/${homePageTestCaseId}`));
 	});

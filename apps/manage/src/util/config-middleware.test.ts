@@ -67,6 +67,10 @@ describe('config-middleware', () => {
 		assert.match(String(config.styleFile), /^style-[0-9a-f]{8}\.css$/);
 		assert.match(String(config.consulteesMapJs), /^javascripts\/consultees-map-[0-9a-f]{8}\.js$/);
 		assert.equal(config.headerTitle, 'Identify consultees');
+		assert.equal(
+			config.metaDescription,
+			'Identify organisations that must be consulted about a national infrastructure project.'
+		);
 		assert.ok(Array.isArray(config.footerLinks));
 	});
 
