@@ -20,35 +20,6 @@ Keep instructions in one place and link to them — do not repeat the same rules
 When adding new guidance: put the rule here (or in a linked doc it points to), reference it from the
 pointers/skills, and do not copy the content between files.
 
-## AI agent identification and co-authorship
-
-AI agents working on this repository must not identify themselves as AI or co-authors in any repository-visible content. All contributions should appear as normal human contributions.
-
-### Required rules for all AI agents
-
-- **Do not identify as an AI** in any GitHub-visible surface: PR titles/bodies, commit messages, code comments, documentation, issue comments, review comments, or other repo content.
-- **Do not add AI co-author tags** in commit messages (e.g., `Co-Authored-By: AI <...>`).
-- **Do not include AI attribution** in documentation files, README, or code comments.
-- **Do not reference AI tools or models** in user-facing documentation or code.
-- **Write as a normal human contributor** — the output should be indistinguishable from work done by a human team member.
-
-### IDE and editor settings
-
-To prevent IDE AI features from automatically adding co-authorship metadata:
-
-- The `.vscode/settings.json` file includes settings to disable AI co-author features where possible.
-- Disable AI-powered commit message generation and co-author attribution in your editor.
-- Do not configure automated AI co-authorship trailers in git hooks or editor extensions.
-
-### Rationale
-
-This policy ensures:
-
-- Repository history and documentation remain clean and professional.
-- External reviewers and users see contributions as team work, not AI-generated.
-- Compliance with government service standards that expect human accountability for code and documentation.
-- Avoidance of AI-generated content appearing in official public-sector repositories.
-
 ## GitHub and pull request practices (PINS)
 
 PINS expects specific GitHub practices on their repos. Follow these for every PR in this project (and when preparing a branch for review).
@@ -89,7 +60,6 @@ When the feature branch has diverged or accumulated noise:
 - Still never force-push `main` (or `master`).
 - Still only commit / push / open PRs when the user asks (or existing user rules already authorize that step); when they do, apply the practices above.
 - When the request that started the work names a JIRA ticket (e.g. `GIS-159`), always mention it in the PR body and link it (`https://pins-ds.atlassian.net/browse/<TICKET-ID>`), so the change can be tracked and tested against the ticket.
-- Follow the AI identification rules above: do not identify as an AI or add AI co-authorship in any GitHub-visible content.
 - Devin: pass the PR body to `gh pr create` with `--body-file <file>` — write it to a scratch file first. Inline heredocs (`--body "$(cat <<'EOF' … EOF)"`) get mangled by Devin's shell quoting and break the command. Other agents can use whatever works for them.
 
 ### Verifying changes before opening a PR
@@ -122,7 +92,6 @@ And mechanically:
 - [ ] Commit subjects are semantic (`feat:` / `fix:` / `docs:` / …).
 - [ ] Any JIRA ticket named in the request is mentioned and linked in the PR body.
 - [ ] No secrets, `.env`, or production data dumps in the diff.
-- [ ] No AI self-identification in the PR description, commits, or diff.
 - [ ] All tests and the CI checks (lint, typecheck, format, coverage) pass locally — see "Verifying changes before opening a PR".
 
 ### Screenshots on UI-change PRs
