@@ -269,7 +269,7 @@ test.describe('manage journeys', () => {
 		}
 
 		// sorting and selecting compose: order the table descending by Name, tick
-		// its first rows in the new order, and "Remove selected" carries them - in
+		// its first rows in the new order, and "Remove selected consultees" carries them - in
 		// that order - to the remove page, where one reason excludes them together
 		const bulkCount = Math.min(2, parishCount - removed);
 		if (bulkCount > 0) {
@@ -286,7 +286,7 @@ test.describe('manage journeys', () => {
 				// click on that pseudo-element, which toggles the input via its `for`
 				await bulkRows.nth(i).locator('input.govuk-checkboxes__input').click({ force: true });
 			}
-			await page.getByRole('button', { name: 'Remove selected' }).click();
+			await page.getByRole('button', { name: 'Remove selected consultees' }).click();
 			await expect(page).toHaveURL(/\/report\/consultees\/remove\?.*match=/);
 			// the remove page lists the selection in the order the sorted table sent it
 			const removalTable = page.getByRole('table', { name: /Consultees? being removed/ });
@@ -398,7 +398,7 @@ test.describe('manage journeys', () => {
 		await expect(page.getByText('Borders the site')).toBeVisible();
 		await expect(page.getByRole('link', { name: /Remove/ })).toHaveCount(parishCount - removed + picked + 2);
 
-		// GIS-242 AC4: with JavaScript, "Remove selected" is hidden while nothing is
+		// GIS-242 AC4: with JavaScript, "Remove selected consultees" is hidden while nothing is
 		// ticked and returns on the first tick. The server-side "Choose at least one"
 		// flag still guards the submit - the no-JS journey below exercises it
 		const removeSelected = page.locator('#consultees-remove-selected');
@@ -679,7 +679,9 @@ test.describe('manage journeys', () => {
 		expect(names[0]).toBe('20261020_energy.geojson');
 	});
 
-	test('a nothing-selected "Remove selected" is flagged on the page without JavaScript too', async ({ browser }) => {
+	test('a nothing-selected "Remove selected consultees" is flagged on the page without JavaScript too', async ({
+		browser
+	}) => {
 		// the validation is all server-side - the same form submit, the same redirect - so the
 		// no-JS journey flags it identically. A hand-added consultee gives the table a row
 		const context = await browser.newContext({ javaScriptEnabled: false });
@@ -693,11 +695,11 @@ test.describe('manage journeys', () => {
 			);
 			await expect(page.getByRole('cell', { name: 'E2E No-JS Consultee', exact: true })).toBeVisible();
 			// the enhancement never ran: the Select all box keeps the name a no-JS submit sends,
-			// and "Remove selected" stays visible - nothing else hides it
+			// and "Remove selected consultees" stays visible - nothing else hides it
 			await expect(page.locator('input[name="select-all"]')).toHaveCount(1);
-			await expect(page.getByRole('button', { name: 'Remove selected' })).toBeVisible();
+			await expect(page.getByRole('button', { name: 'Remove selected consultees' })).toBeVisible();
 
-			await page.getByRole('button', { name: 'Remove selected' }).click();
+			await page.getByRole('button', { name: 'Remove selected consultees' }).click();
 			await expect(page).toHaveURL(/\/report\/consultees\?.*error=select/);
 			await expect(page.getByRole('link', { name: 'Choose at least one consultee' })).toBeVisible();
 		} finally {

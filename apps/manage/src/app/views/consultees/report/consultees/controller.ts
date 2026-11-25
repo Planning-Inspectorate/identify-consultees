@@ -336,7 +336,7 @@ async function renderCategoryPage(
 			.filter((removal) => removal.category === category && removal.name !== '')
 			.map((removal) => ({ name: removal.name, reason: removal.reason })),
 		removedOpen: firstQueryValue(req.query.removed) === 'open',
-		// "Remove selected" with nothing ticked lands back here on the remove page's
+		// "Remove selected consultees" with nothing ticked lands back here on the remove page's
 		// error=select redirect - the missed choice is flagged at the table's checkboxes
 		// (at the Included consultees heading when there are none left to tick)
 		...(firstQueryValue(req.query.error) === 'select'

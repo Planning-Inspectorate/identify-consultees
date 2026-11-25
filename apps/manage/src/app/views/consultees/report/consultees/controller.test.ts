@@ -161,7 +161,7 @@ describe('report consultees change page', () => {
 		assert.match(html, /aria-sort="ascending"[^>]*>\s*Distance/);
 	});
 
-	it('should flag a "Remove selected" submit that ticked nothing, staying on the page', async () => {
+	it('should flag a "Remove selected consultees" submit that ticked nothing, staying on the page', async () => {
 		const nunjucks = configureNunjucks();
 		const mockRes = {
 			status: mock.fn(() => mockRes),

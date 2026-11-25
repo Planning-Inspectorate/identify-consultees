@@ -306,7 +306,7 @@ describe('report consultee remove page', () => {
 		assert.strictEqual(mockRes.status.mock.calls[0].arguments[0], 404);
 	});
 
-	it('should send "Remove selected" with nothing ticked back to the category page to be flagged', async () => {
+	it('should send "Remove selected consultees" with nothing ticked back to the category page to be flagged', async () => {
 		const mockRes = { status: mock.fn(() => mockRes), render: mock.fn(), redirect: mock.fn() };
 		const db = dbReturning([[realProjectRow()]], [parishMatchRow()]);
 		await removePage(db)({ params: { caseId: realProjectId }, query: parishQuery }, mockRes);
