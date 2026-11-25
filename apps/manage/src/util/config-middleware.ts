@@ -15,7 +15,7 @@ const FALLBACK_ASSET_PATHS: Record<string, string> = {
 	govukFrontendJs: 'assets/js/govuk-frontend.min-0391e416.js',
 	consulteesMapJs: 'javascripts/consultees-map-04824bef.js',
 	consulteeAutocompleteJs: 'javascripts/consultee-autocomplete-aea54bb1.js',
-	consulteeSelectJs: 'javascripts/consultee-select-e8c33a98.js',
+	consulteeSelectJs: 'javascripts/consultee-select-d0dca33a.js',
 	blobUploadJs: 'javascripts/blob-upload-cfe8ea96.js',
 	sortableTableJs: 'javascripts/sortable-table-4136f0ca.js',
 	loadingSpinnerJs: 'javascripts/loading-spinner-d5a4ce0c.js',

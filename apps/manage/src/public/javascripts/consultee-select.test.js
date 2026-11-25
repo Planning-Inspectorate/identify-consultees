@@ -37,7 +37,7 @@ const TABLE = `
 				${row('c', '0')}
 			</tbody>
 		</table>
-		<button class="govuk-button govuk-button--warning" id="consultees-remove-selected" type="submit">Remove selected</button>
+		<button class="govuk-button govuk-button--secondary" id="consultees-remove-selected" type="submit">Remove selected consultees</button>
 	</form>`;
 
 function documentWith(body = TABLE) {
@@ -130,7 +130,7 @@ describe('enhanceConsulteeSelectTable', () => {
 	});
 });
 
-describe('the Remove selected button (GIS-242 AC4)', () => {
+describe('the Remove selected consultees button (GIS-242 AC4)', () => {
 	// the fixture's row b arrives ticked; strip it for the nothing-selected cases
 	const NONE_TICKED = TABLE.replace('value="b" checked', 'value="b"');
 	const removeSelected = (document) => document.querySelector('#consultees-remove-selected');

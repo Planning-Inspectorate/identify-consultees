@@ -497,7 +497,7 @@ describe('manage router wiring', () => {
 		const response = await agent.get(
 			`/consultees/${homePageTestCaseId}/report/consultees/remove?ruleset=england-wales-post-20240430&category=Parish%2C%20town%20and%20community%20councils`
 		);
-		// "Remove selected" with nothing ticked - a validation failure the category
+		// "Remove selected consultees" with nothing ticked - a validation failure the category
 		// page flags, not a missing page
 		assert.equal(response.status, 302);
 		assert.match(response.headers.location, /\/report\/consultees\?.*error=select/);

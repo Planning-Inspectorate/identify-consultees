@@ -58,7 +58,7 @@ export interface ReportConsulteesViewModel {
 	/** Opens the Removed consultees section - set by the remove page's redirect back here. */
 	removedOpen: boolean;
 	/**
-	 * The bulk-remove form's missed selection - set when "Remove selected" comes back here on
+	 * The bulk-remove form's missed selection - set when "Remove selected consultees" comes back here on
 	 * `error=select` for the page to flag rather than leaving it to a 404.
 	 */
 	errorSummary?: { text: string; href: string }[];

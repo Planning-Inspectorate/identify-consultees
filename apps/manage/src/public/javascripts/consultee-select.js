@@ -6,7 +6,7 @@
  * becomes a pure control that never submits) and wires the toggling: it checks
  * or clears every row checkbox, and each row checkbox keeps it in sync.
  *
- * It also hides the "Remove selected" submit while nothing is ticked (GIS-242
+ * It also hides the "Remove selected consultees" submit while nothing is ticked (GIS-242
  * AC4). The button is server-rendered plainly so a no-JS submit still reaches
  * the "choose at least one" validation - only this enhancement hides it, and
  * it returns on the first tick. `govuk-!-display-none`, not the `hidden`

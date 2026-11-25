@@ -48,7 +48,7 @@ interface RemoveConsulteeContext {
  * removal from the category page's checkboxes arrives the same way, just with the params
  * repeated - or, when that page's Select all box submits it (which only happens without JS, as
  * consultee-select.js strips its name), a `?select-all=` that means every listed consultee.
- * No targets at all is the bulk form's own missed selection - "Remove selected" with nothing
+ * No targets at all is the bulk form's own missed selection - "Remove selected consultees" with nothing
  * ticked - so the request goes back to the category page for it to flag (`error=select`), a
  * form-validation failure rather than a missing page. Anything else - a case or ruleset that
  * isn't found, or a target that doesn't resolve - 404s. `undefined` means a response has
