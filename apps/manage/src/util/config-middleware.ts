@@ -22,16 +22,16 @@ const FALLBACK_ASSET_PATHS: Record<string, string> = {
 	prefetchMapAssetsJs: 'javascripts/prefetch-map-assets-839e8d82.js',
 	accessibleAutocompleteJs: 'assets/js/accessible-autocomplete.min-876870ee.js',
 	accessibleAutocompleteCss: 'assets/css/accessible-autocomplete.min-4b7a52dc.css',
-	vendorInteractiveMapJs: 'vendor/interactive-map/js/index-66cff150.js',
-	vendorInteractiveMapCss: 'vendor/interactive-map/css/index-5ba273be.css',
+	vendorInteractiveMapJs: 'vendor/interactive-map/js/index-411dd9cf.js',
+	vendorInteractiveMapCss: 'vendor/interactive-map/css/index-1dc44d9c.css',
 	vendorMaplibreProviderJs: 'vendor/maplibre-provider/js/index-3a0fcba3.js',
-	vendorDatasetsPluginJs: 'vendor/datasets-plugin/js/index-21ca1f65.js',
+	vendorDatasetsPluginJs: 'vendor/datasets-plugin/js/index-386e3433.js',
 	vendorDatasetsPluginCss: 'vendor/datasets-plugin/css/index-1a74fe4f.css',
 	vendorMapKeyPluginJs: 'vendor/map-key-plugin/js/index-4e840312.js',
 	vendorMapKeyPluginCss: 'vendor/map-key-plugin/css/index-aa93b682.css',
-	vendorInteractPluginJs: 'vendor/interact-plugin/js/index-8932494c.js',
-	vendorDrawPluginJs: 'vendor/draw-plugin/js/index-1f40ff7e.js',
-	vendorMapStylesPluginJs: 'vendor/map-styles-plugin/js/index-c9ffb685.js',
+	vendorInteractPluginJs: 'vendor/interact-plugin/js/index-4b1a3373.js',
+	vendorDrawPluginJs: 'vendor/draw-plugin/js/index-2352f5d0.js',
+	vendorMapStylesPluginJs: 'vendor/map-styles-plugin/js/index-0a294411.js',
 	vendorMapStylesPluginCss: 'vendor/map-styles-plugin/css/index-d8fa9e70.css'
 };
 
