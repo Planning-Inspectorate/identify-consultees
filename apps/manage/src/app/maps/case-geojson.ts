@@ -14,9 +14,8 @@ import { isIdentified } from '@pins/identify-consultees-database/src/geospatial/
 import type { Geometry } from '@pins/identify-consultees-database/src/geospatial/wkt.ts';
 import { REPORT_CONFIG } from '../report-config.ts';
 import { kilometres } from '../views/consultees/consultee-labels.ts';
-import { isNearbyNsip } from '../views/consultees/nearby-nsips.ts';
 import { AUTHORITY_ROLE_STYLES } from './authority-role-styles.ts';
-import { assignCategoryColours, colourFor, CONSULTEE_CATEGORY_COLOURS, UNCATEGORISED } from './category-colours.ts';
+import { assignCategoryColours, colourFor, UNCATEGORISED } from './category-colours.ts';
 import { computeBounds, computeFittedMapView } from './geometry-bounds.ts';
 import type { InteractiveBasemap } from './os-maps.ts';
 import { interactiveBasemap } from './os-maps.ts';
@@ -180,27 +179,11 @@ function isDrawable(match: MapMatch): match is DrawableMatch {
 }
 
 /**
- * A colour for each Nearby NSIP drawn - each is another project, so each has its own, from the
- * category palette in name order, so the map, its static image and the report's PDF agree.
- */
-export function nsipColours(matches: Pick<ConsulteeMatch, 'feature'>[]): Map<string, string> {
-	const nsips = matches
-		.filter(isNearbyNsip)
-		.map((match) => ({ id: match.feature.id, name: match.feature.properties.consultee ?? '' }))
-		.toSorted((a, b) => a.name.localeCompare(b.name, 'en-GB') || a.id.localeCompare(b.id));
-	return new Map(
-		nsips.map(({ id }, index) => [id, CONSULTEE_CATEGORY_COLOURS[index % CONSULTEE_CATEGORY_COLOURS.length]])
-	);
-}
-
-/**
  * The consultees that have geometry to draw. A run's matches carry none (the function is never
- * asked for it), so these are drawn from display geometry (see buildCaseMapConfig). A Nearby NSIP
- * is drawn in its own colour (nsipColours), marked `ownLayer` so the map lists it on its own.
+ * asked for it), so these are drawn from display geometry (see buildCaseMapConfig).
  */
 function buildConsulteeMatchesGeojson(matches: MapMatch[], colours: Map<string, string>): GeoJsonFeatureCollection {
 	const drawable = matches.filter(isDrawable);
-	const projectColours = nsipColours(drawable);
 	// a host or bordering authority is drawn in its role's colour, not its category's - only when
 	// it's drawn as identified, so faint nearby context keeps its category's
 	return {
@@ -219,10 +202,7 @@ function buildConsulteeMatchesGeojson(matches: MapMatch[], colours: Map<string, 
 					// the "3.2 km" the details panel's Distance row shows - absent for an area
 					// added from beyond the run's reach, whose distanceMetres is a placeholder
 					...(match.beyondRun ? {} : { distance: kilometres(match.distanceMetres) }),
-					colour:
-						projectColours.get(match.feature.id) ??
-						(role ? AUTHORITY_ROLE_STYLES[role].colour : colourFor(colours, categoryOf(match))),
-					...(projectColours.has(match.feature.id) ? { ownLayer: 'true' } : {}),
+					colour: role ? AUTHORITY_ROLE_STYLES[role].colour : colourFor(colours, categoryOf(match)),
 					// 'host' or 'bordering' for an identified administrative authority - the map keys each
 					// role's colour on its own (see consultees-map.js's buildCategorySublayers)
 					...(role ? { authorityRole: role } : {}),

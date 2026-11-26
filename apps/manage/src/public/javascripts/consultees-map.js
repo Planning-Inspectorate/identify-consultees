@@ -88,12 +88,10 @@ function roleFilters(role, categoryHasRoles) {
  * nearby search found (`identified: 'false'`), which aren't in the report but show what's nearby:
  * a thin dashed outline and the lighter `fillOpacity` the page gives them. Points (hospitals,
  * harbours) are drawn as small dots; areas are filled at their `fillOpacity`, lightest first so
- * regional tints and nearby context sit under the identified local areas. A feature marked
- * `ownLayer` - a Nearby NSIP, each another project in its own colour - has a sublayer to itself,
- * named for it, so the layers menu keys each project's colour. An identified administrative
- * authority marked with its `authorityRole` - `host` (the site is in it) or `bordering` - is drawn
- * in that role's colour (config/map-styles/authority-roles.yaml), in a sublayer of its own per
- * role, so the layers menu keys hosts and their neighbours apart.
+ * regional tints and nearby context sit under the identified local areas.
+ * An identified administrative  authority marked with its `authorityRole` - `host` (the site is in it)
+ * or `bordering` - is drawn in that role's colour (config/map-styles/authority-roles.yaml), in
+ * a sublayer of its own per role, so the layers menu keys hosts and their neighbours apart.
  *
  * @param {object[]} features
  * @param {string} idPrefix
@@ -104,15 +102,12 @@ export function buildCategorySublayers(features, idPrefix) {
 	for (const feature of features) {
 		const category = feature.properties?.consulteeCategory || 'Other';
 		const nearbyOnly = feature.properties?.identified === 'false';
-		const own = feature.properties?.ownLayer === 'true' ? feature.properties.consulteeId : undefined;
 		const role = nearbyOnly ? undefined : AUTHORITY_ROLES.find((entry) => entry === feature.properties?.authorityRole);
-		const key = `${nearbyOnly ? 1 : 0}${category}\n${own ?? ''}\n${role ?? ''}`;
+		const key = `${nearbyOnly ? 1 : 0}${category}\n${role ?? ''}`;
 		const group = groups.get(key) ?? {
 			category,
 			nearbyOnly,
-			own,
 			role,
-			name: own ? feature.properties?.name || category : undefined,
 			members: []
 		};
 		group.members.push(feature);
@@ -128,15 +123,13 @@ export function buildCategorySublayers(features, idPrefix) {
 				a.category.localeCompare(b.category) ||
 				Number(a.nearbyOnly) - Number(b.nearbyOnly) ||
 				// hosts, then their neighbours, then any of the category with no role (one added by hand)
-				roleOrder(a.role) - roleOrder(b.role) ||
-				// only a category's own-layer groups get this far, and each has a name
-				String(a.name).localeCompare(String(b.name))
+				roleOrder(a.role) - roleOrder(b.role)
 		)
 		.map((group) => ({ ...group, opacity: Number(group.members[0].properties?.fillOpacity) || DEFAULT_FILL_OPACITY }));
 	// sublayers draw in order
 	sorted.sort((a, b) => a.opacity - b.opacity);
 
-	return sorted.map(({ category, nearbyOnly, own, role, name, members, opacity }, index) => {
+	return sorted.map(({ category, nearbyOnly, role, members, opacity }, index) => {
 		const colour = members[0].properties?.colour || DEFAULT_CONSULTEE_COLOUR;
 		const isPoints = members.every((feature) => POINT_TYPES.has(feature.geometry?.type));
 		let style;
@@ -154,9 +147,7 @@ export function buildCategorySublayers(features, idPrefix) {
 			? ['==', ['get', 'identified'], 'false']
 			: ['!=', ['get', 'identified'], 'false'];
 		let label = `${category} (${members.length})`;
-		if (own) {
-			label = name;
-		} else if (nearbyOnly) {
+		if (nearbyOnly) {
 			label = `${category}: nearby, not identified (${members.length})`;
 		} else if (role) {
 			label = `${category}: ${ROLE_LABELS[role]} (${members.length})`;
@@ -167,14 +158,12 @@ export function buildCategorySublayers(features, idPrefix) {
 			visible: true,
 			label,
 			// a category's features all have their own layers or none do - Nearby NSIPs, or not
-			filter: own
-				? ['==', ['get', 'consulteeId'], own]
-				: [
-						'all',
-						['==', ['get', 'consulteeCategory'], category],
-						identifiedFilter,
-						...roleFilters(role, categoriesWithRoles.has(category))
-					],
+			filter: [
+				'all',
+				['==', ['get', 'consulteeCategory'], category],
+				identifiedFilter,
+				...roleFilters(role, categoriesWithRoles.has(category))
+			],
 			style
 		};
 	});

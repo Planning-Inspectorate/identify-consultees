@@ -14,7 +14,6 @@ import {
 	markAddedByHand,
 	NEARBY_LOCAL_FILL_OPACITY,
 	NEARBY_REGIONAL_FILL_OPACITY,
-	nsipColours,
 	REGIONAL_FILL_OPACITY,
 	SITE_DISPLAY_MAX_POINTS,
 	siteDisplayGeometry,
@@ -325,40 +324,21 @@ describe('buildCaseMapConfig with a search area', () => {
 		);
 	});
 
-	it('draws each Nearby NSIP in its own colour, in name order, on a layer of its own', () => {
+	it('draws each NSIP in the same colour and in the same layer', () => {
 		const nsip = (id: string, name: string): ConsulteeMatch => ({
 			...match(id),
 			feature: { ...match(id).feature, properties: { consulteeCategory: 'NSIPs', consultee: name } },
 			reasons: [{ type: 'nearbyNsip', radiusMetres: 35_000 }]
 		});
 		const matches = [nsip('z', 'Zephyr Wind (EN010003)'), nsip('a', 'Abbey Solar (EN010001)'), match('rail')];
-		assert.deepStrictEqual(
-			[...nsipColours(matches)],
-			[
-				['a', CONSULTEE_CATEGORY_COLOURS[0]],
-				['z', CONSULTEE_CATEGORY_COLOURS[1]]
-			]
-		);
-
-		// the same name twice goes by id; one with no name sorts first
-		const unnamed = {
-			...nsip('m', ''),
-			feature: { ...nsip('m', '').feature, properties: { consulteeCategory: 'NSIPs' } }
-		};
-		assert.deepStrictEqual([...nsipColours([nsip('y', 'Same'), nsip('x', 'Same'), unnamed]).keys()], ['m', 'x', 'y']);
-
 		const config = buildCaseMapConfig(project(), matches, 'NSIPs');
 		assert.deepStrictEqual(
-			config.consulteeGeojson.features.map((feature) => [
-				feature.id,
-				feature.properties.colour,
-				feature.properties.ownLayer
-			]),
+			config.consulteeGeojson.features.map((feature) => [feature.id, feature.properties.colour]),
 			[
-				['z', CONSULTEE_CATEGORY_COLOURS[1], 'true'],
-				['a', CONSULTEE_CATEGORY_COLOURS[0], 'true'],
-				// any other consultee keeps its category's colour, on its category's layer
-				['rail', config.consulteeGeojson.features[2].properties.colour, undefined]
+				['z', CONSULTEE_CATEGORY_COLOURS[0]],
+				['a', CONSULTEE_CATEGORY_COLOURS[0]],
+				// any other consultee uses the next colour
+				['rail', CONSULTEE_CATEGORY_COLOURS[1]]
 			]
 		);
 	});
