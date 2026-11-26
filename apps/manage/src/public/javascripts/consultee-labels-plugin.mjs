@@ -13,9 +13,11 @@
  *
  * Pass the same `datasets` array given to `defra.datasetsPlugin`: each consultee
  * sublayer's id names the leaf layer it pairs with, and its `filter` is reused so a
- * label layer covers exactly the features its sublayer draws. The labels attach to the
- * dataset's own GeoJSON source - found by scanning the style for the leaf layers, so
- * nothing is assumed about how the datasets plugin names sources internally.
+ * label layer covers exactly the features its sublayer draws. Labels draw from a
+ * dedicated one-point-per-feature GeoJSON source built from the dataset's `geojson`
+ * (so a MultiPolygon consultee is named once, on its largest part). Without `geojson`,
+ * they fall back to the dataset's own source - found by scanning the style for the leaf
+ * layers, so nothing is assumed about how the datasets plugin names sources internally.
  *
  * The text font is the basemap's own: the first font stack a style text layer declares
  * (Liberty's, or the OS Light style's - both serve OpenFreeMap's glyphs; see
@@ -33,6 +35,9 @@
 const BUTTON_ID = 'consulteeLabels';
 const DATASET_ID = 'consultee-areas';
 const LABELS_LAYER_SUFFIX = '-names';
+/** Dedicated GeoJSON source of one Point per consultee - avoids MapLibre placing a
+ *  symbol on every Polygon part of a MultiPolygon (which duplicates names on the map). */
+const LABELS_SOURCE_SUFFIX = '-label-points';
 export const DEFAULT_LABEL_MIN_ZOOM = 8;
 
 // both basemaps' glyphs come from tiles.openfreemap.org (see os-maps.ts), whose
@@ -87,6 +92,130 @@ export function datasetSourceId(styleLayers, dataset) {
 }
 
 /**
+ * Approximate signed area of a ring (shoelace). Used only to pick the largest part of a
+ * MultiPolygon for its single label point - absolute value, not a real-world area.
+ *
+ * @param {[number, number][]} ring
+ * @returns {number}
+ */
+function ringArea(ring) {
+	let sum = 0;
+	for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+		sum += ring[j][0] * ring[i][1] - ring[i][0] * ring[j][1];
+	}
+	return sum / 2;
+}
+
+/**
+ * Average of a ring's vertices, skipping a duplicated closing coordinate when present.
+ *
+ * @param {[number, number][] | undefined} ring
+ * @returns {[number, number] | undefined}
+ */
+function ringCentroid(ring) {
+	if (!ring?.length) {
+		return undefined;
+	}
+	const closed =
+		ring.length > 1 && ring[0][0] === ring[ring.length - 1][0] && ring[0][1] === ring[ring.length - 1][1];
+	const count = closed ? ring.length - 1 : ring.length;
+	if (count === 0) {
+		return undefined;
+	}
+	let lng = 0;
+	let lat = 0;
+	for (let i = 0; i < count; i++) {
+		lng += ring[i][0];
+		lat += ring[i][1];
+	}
+	return [lng / count, lat / count];
+}
+
+/**
+ * One map coordinate to label a feature at. MapLibre's `symbol-placement: point` otherwise
+ * places a label on every Polygon inside a MultiPolygon, so an unparished area (or any
+ * multi-part boundary) would show the same name several times. Prefer the largest part.
+ *
+ * @param {object | undefined} geometry - a GeoJSON geometry
+ * @returns {[number, number] | undefined}
+ */
+export function labelPointOfGeometry(geometry) {
+	if (!geometry?.type) {
+		return undefined;
+	}
+	switch (geometry.type) {
+		case 'Point':
+			return geometry.coordinates;
+		case 'MultiPoint':
+			return geometry.coordinates?.[0];
+		case 'LineString': {
+			const coords = geometry.coordinates ?? [];
+			return coords[Math.floor(coords.length / 2)];
+		}
+		case 'MultiLineString': {
+			let best;
+			let bestLength = -1;
+			for (const line of geometry.coordinates ?? []) {
+				if ((line?.length ?? 0) > bestLength) {
+					bestLength = line.length;
+					best = line[Math.floor(line.length / 2)];
+				}
+			}
+			return best;
+		}
+		case 'Polygon':
+			return ringCentroid(geometry.coordinates?.[0]);
+		case 'MultiPolygon': {
+			let best;
+			let bestArea = -1;
+			for (const polygon of geometry.coordinates ?? []) {
+				const area = Math.abs(ringArea(polygon?.[0] ?? []));
+				if (area > bestArea) {
+					bestArea = area;
+					best = ringCentroid(polygon?.[0]);
+				}
+			}
+			return best;
+		}
+		default:
+			return undefined;
+	}
+}
+
+/**
+ * A Point FeatureCollection for label layers: one point per consultee feature (deduped by
+ * `consulteeId` / feature id), carrying the same properties the sublayer filters match on.
+ *
+ * @param {object[]} features - GeoJSON features from the consultee dataset
+ * @returns {{ type: 'FeatureCollection', features: object[] }}
+ */
+export function labelPointCollection(features) {
+	const seen = new Set();
+	const points = [];
+	for (const feature of features ?? []) {
+		const id = feature?.properties?.consulteeId ?? feature?.id;
+		if (id != null) {
+			const key = String(id);
+			if (seen.has(key)) {
+				continue;
+			}
+			seen.add(key);
+		}
+		const coordinates = labelPointOfGeometry(feature?.geometry);
+		if (!coordinates) {
+			continue;
+		}
+		points.push({
+			type: 'Feature',
+			...(feature.id !== undefined ? { id: feature.id } : {}),
+			properties: feature.properties ?? {},
+			geometry: { type: 'Point', coordinates }
+		});
+	}
+	return { type: 'FeatureCollection', features: points };
+}
+
+/**
  * One sublayer's label layer: `symbol` text at the feature's `name`, anchored under a
  * point consultee's dot or centred on an area. `minzoom` is the configured level names
  * appear from; collision detection (the defaults - no `text-allow-overlap`) declutters
@@ -95,7 +224,8 @@ export function datasetSourceId(styleLayers, dataset) {
  * @param {object} dataset - the consultee dataset entry
  * @param {object} sublayer - one of its sublayers (id, filter, style)
  * @param {object} options
- * @param {string} options.sourceId - the dataset's source, from datasetSourceId
+ * @param {string} options.sourceId - the labels' GeoJSON source (point-per-feature when
+ *   available, otherwise the dataset's own source)
  * @param {number} options.minZoom - labels appear from this zoom
  * @param {string[]} options.textFont - the font stack, from basemapTextFont
  * @returns {object} a MapLibre layer definition
@@ -162,11 +292,37 @@ export function siblingVisible(map, dataset, sublayer) {
 }
 
 /**
+ * The GeoJSON source labels should draw from: a dedicated one-point-per-feature source
+ * when the dataset carries `geojson` (so MultiPolygon consultees get a single name),
+ * otherwise the dataset's own source once its leaf layers exist.
+ *
+ * @param {object} map - the MapLibre map
+ * @param {object} dataset
+ * @param {object[]} styleLayers
+ * @returns {string | undefined}
+ */
+function ensureLabelSourceId(map, dataset, styleLayers) {
+	const features = dataset.geojson?.features;
+	if (features?.length) {
+		const labelSourceId = `${dataset.id}${LABELS_SOURCE_SUFFIX}`;
+		if (!map.getSource?.(labelSourceId)) {
+			map.addSource?.(labelSourceId, {
+				type: 'geojson',
+				data: labelPointCollection(features)
+			});
+		}
+		return map.getSource?.(labelSourceId) ? labelSourceId : undefined;
+	}
+	return datasetSourceId(styleLayers, dataset);
+}
+
+/**
  * Add any missing label layers and bring every one's visibility in line - idempotent,
  * so it can run on every map event: a label shows where labels are on
- * (`labelsEnabled`) and its sublayer is drawn. No-ops until the dataset's
- * layers exist (the source can't be found before then), so callers can fire it early
- * and let `idle`/`datasets:changed` land it.
+ * (`labelsEnabled`) and its sublayer is drawn. Prefers a point-per-feature source built
+ * from the dataset's `geojson` so MultiPolygon consultees are named once; falls back to
+ * the dataset source once its leaf layers exist. Callers can fire it early and let
+ * `idle`/`datasets:changed` land it.
  *
  * @param {object | undefined} map - the MapLibre map
  * @param {object} pluginConfig - the plugin descriptor (datasets, datasetId, minZoom, labelsOn, mlMap)
@@ -178,7 +334,7 @@ export function syncConsulteeLabels(map, pluginConfig) {
 		return;
 	}
 	const styleLayers = map.getStyle()?.layers ?? [];
-	const sourceId = datasetSourceId(styleLayers, dataset);
+	const sourceId = ensureLabelSourceId(map, dataset, styleLayers);
 	if (!sourceId) {
 		return;
 	}
