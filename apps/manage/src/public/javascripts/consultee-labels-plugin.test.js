@@ -8,6 +8,8 @@ import {
 	consulteeLabelLayer,
 	createConsulteeLabelsPlugin,
 	datasetSourceId,
+	labelPointCollection,
+	labelPointOfGeometry,
 	labelsEnabled,
 	siblingVisible,
 	syncConsulteeLabels,
@@ -58,10 +60,21 @@ const waitFor = async (predicate, attempts = 50) => {
 function fakeMaplibre(styleLayers = []) {
 	// copied, so a setLayoutProperty in one test can't leak into the shared fixtures
 	const layers = new Map(styleLayers.map((layer) => [layer.id, { ...layer, layout: { ...layer.layout } }]));
+	const sources = new Map();
 	return {
 		layers,
+		sources,
 		getStyle: () => ({ layers: [...layers.values()] }),
 		getLayer: (id) => layers.get(id),
+		getSource: (id) => sources.get(id),
+		addSource: mock.fn((id, source) => {
+			sources.set(id, {
+				...source,
+				setData: mock.fn((data) => {
+					sources.get(id).data = data;
+				})
+			});
+		}),
 		addLayer: mock.fn((layer) =>
 			layers.set(layer.id, { ...layer, layout: { visibility: 'visible', ...layer.layout } })
 		),
@@ -113,7 +126,119 @@ const POINT_SUBLAYER = {
 	filter: ['==', ['get', 'consulteeCategory'], 'Hospitals']
 };
 
-const DATASET = { id: 'consultee-areas', sublayers: [AREA_SUBLAYER, POINT_SUBLAYER] };
+const SQUARE = [
+	[0, 0],
+	[0, 2],
+	[2, 2],
+	[2, 0],
+	[0, 0]
+];
+const SMALL_SQUARE = [
+	[10, 10],
+	[10, 10.5],
+	[10.5, 10.5],
+	[10.5, 10],
+	[10, 10]
+];
+
+const DATASET = {
+	id: 'consultee-areas',
+	sublayers: [AREA_SUBLAYER, POINT_SUBLAYER],
+	geojson: {
+		type: 'FeatureCollection',
+		features: [
+			{
+				id: 'sunderland',
+				properties: {
+					consulteeId: 'sunderland',
+					name: 'Sunderland, unparished area (Sunderland, 3.6 km from the site)',
+					consulteeCategory: 'Councils'
+				},
+				geometry: {
+					type: 'MultiPolygon',
+					coordinates: [[SMALL_SQUARE], [SQUARE], [SMALL_SQUARE]]
+				}
+			},
+			{
+				id: 'hospital',
+				properties: {
+					consulteeId: 'hospital',
+					name: 'City Hospital',
+					consulteeCategory: 'Hospitals'
+				},
+				geometry: { type: 'Point', coordinates: [-1.4, 54.9] }
+			}
+		]
+	}
+};
+
+describe('labelPointOfGeometry', () => {
+	test('returns points and the middle of a line as-is', () => {
+		assert.deepEqual(labelPointOfGeometry({ type: 'Point', coordinates: [-1, 54] }), [-1, 54]);
+		assert.deepEqual(
+			labelPointOfGeometry({
+				type: 'MultiPoint',
+				coordinates: [
+					[1, 2],
+					[3, 4]
+				]
+			}),
+			[1, 2]
+		);
+		assert.deepEqual(
+			labelPointOfGeometry({
+				type: 'LineString',
+				coordinates: [
+					[0, 0],
+					[1, 1],
+					[2, 2]
+				]
+			}),
+			[1, 1]
+		);
+	});
+
+	test('centres a polygon on its outer ring', () => {
+		assert.deepEqual(labelPointOfGeometry({ type: 'Polygon', coordinates: [SQUARE] }), [1, 1]);
+	});
+
+	test('picks the largest part of a MultiPolygon so one feature yields one label point', () => {
+		assert.deepEqual(
+			labelPointOfGeometry({
+				type: 'MultiPolygon',
+				coordinates: [[SMALL_SQUARE], [SQUARE], [SMALL_SQUARE]]
+			}),
+			[1, 1]
+		);
+	});
+
+	test('returns undefined for empty or unknown geometry', () => {
+		assert.equal(labelPointOfGeometry(undefined), undefined);
+		assert.equal(labelPointOfGeometry({ type: 'Polygon', coordinates: [[]] }), undefined);
+		assert.equal(labelPointOfGeometry({ type: 'GeometryCollection', geometries: [] }), undefined);
+	});
+});
+
+describe('labelPointCollection', () => {
+	test('emits one Point feature per input, keeping properties and dropping empties', () => {
+		const collection = labelPointCollection(DATASET.geojson.features);
+		assert.equal(collection.type, 'FeatureCollection');
+		assert.equal(collection.features.length, 2);
+		assert.deepEqual(collection.features[0].geometry, { type: 'Point', coordinates: [1, 1] });
+		assert.equal(collection.features[0].properties.name, DATASET.geojson.features[0].properties.name);
+		assert.deepEqual(collection.features[1].geometry, { type: 'Point', coordinates: [-1.4, 54.9] });
+	});
+
+	test('keeps only the first feature when the same consulteeId appears twice', () => {
+		const duplicate = {
+			...DATASET.geojson.features[0],
+			geometry: { type: 'Point', coordinates: [9, 9] }
+		};
+		const collection = labelPointCollection([DATASET.geojson.features[0], duplicate]);
+		assert.equal(collection.features.length, 1);
+		assert.deepEqual(collection.features[0].geometry.coordinates, [1, 1]);
+	});
+});
 
 // the leaf layers the datasets plugin draws for DATASET (fill + icon symbol) and the
 // source they share
@@ -258,15 +383,21 @@ describe('syncConsulteeLabels', () => {
 		syncConsulteeLabels(fakeMaplibre(LEAF_LAYERS), undefined);
 	});
 
-	test("no-ops until the dataset's layers give the source away", () => {
+	test("no-ops until the dataset's layers give the source away when there is no geojson", () => {
 		const map = fakeMaplibre([{ id: 'project-site', source: 'geojson-project' }]);
-		syncConsulteeLabels(map, pluginConfig());
+		const { geojson: _geojson, ...datasetWithoutGeojson } = DATASET;
+		syncConsulteeLabels(map, pluginConfig({ datasets: [datasetWithoutGeojson] }));
 		assert.equal(map.addLayer.mock.calls.length, 0);
 	});
 
-	test('adds one label layer per sublayer, sharing the dataset source and filter', () => {
+	test('adds a one-point-per-feature source and one label layer per sublayer', () => {
 		const map = fakeMaplibre([{ layout: {}, ...LEAF_LAYERS[0] }, ...LEAF_LAYERS.slice(1)]);
 		syncConsulteeLabels(map, pluginConfig());
+		assert.equal(map.addSource.mock.calls.length, 1);
+		assert.equal(map.addSource.mock.calls[0].arguments[0], 'consultee-areas-label-points');
+		assert.equal(map.addSource.mock.calls[0].arguments[1].type, 'geojson');
+		// MultiPolygon consultees contribute a single point, so names cannot repeat per part
+		assert.equal(map.addSource.mock.calls[0].arguments[1].data.features.length, 2);
 		assert.equal(map.addLayer.mock.calls.length, 2);
 		for (const [layerId, sublayer] of [
 			[LABEL_0, AREA_SUBLAYER],
@@ -274,7 +405,7 @@ describe('syncConsulteeLabels', () => {
 		]) {
 			const layer = map.layers.get(layerId);
 			assert.equal(layer.type, 'symbol');
-			assert.equal(layer.source, 'geojson-consultee-areas');
+			assert.equal(layer.source, 'consultee-areas-label-points');
 			assert.equal(layer.minzoom, 9);
 			assert.deepEqual(layer.filter, sublayer.filter);
 			assert.equal(layer.layout.visibility, 'visible');
@@ -287,11 +418,20 @@ describe('syncConsulteeLabels', () => {
 		assert.equal(map.layers.get(LABEL_0).minzoom, DEFAULT_LABEL_MIN_ZOOM);
 	});
 
-	test('leaves an existing label layer alone and only resyncs visibility', () => {
+	test('leaves an existing label source and layer alone and only resyncs visibility', () => {
 		const map = fakeMaplibre(LEAF_LAYERS);
 		syncConsulteeLabels(map, pluginConfig());
 		syncConsulteeLabels(map, pluginConfig());
+		assert.equal(map.addSource.mock.calls.length, 1);
 		assert.equal(map.addLayer.mock.calls.length, 2);
+	});
+
+	test('falls back to the dataset polygon source when the dataset has no geojson', () => {
+		const map = fakeMaplibre(LEAF_LAYERS);
+		const { geojson: _geojson, ...datasetWithoutGeojson } = DATASET;
+		syncConsulteeLabels(map, pluginConfig({ datasets: [datasetWithoutGeojson] }));
+		assert.equal(map.addSource.mock.calls.length, 0);
+		assert.equal(map.layers.get(LABEL_0).source, 'geojson-consultee-areas');
 	});
 
 	test('hides the labels of a sublayer its sibling layer hides', () => {
