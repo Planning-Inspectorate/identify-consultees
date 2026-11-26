@@ -162,11 +162,7 @@ export function reportMapView(
 async function categoryMap(
 	context: ReportMapsContext,
 	category: string
-): Promise<
-	Pick<MapPdfInput, 'image' | 'basemap' | 'metresPerPixel' | 'colours' | 'buffers' | 'mapNote'> & {
-		projectColours: Map<string, string>;
-	}
-> {
+): Promise<Pick<MapPdfInput, 'image' | 'basemap' | 'metresPerPixel' | 'colours' | 'buffers' | 'mapNote'>> {
 	const { service, project, ruleset, consultees, selection } = context;
 	const excluded = excludedMatchIds(selection.removed);
 	const added = addedMatchIds(selection.adds);
@@ -249,13 +245,7 @@ async function categoryMap(
 		metresPerPixel: metresPerPixel(view) / MAP_PIXEL_RATIO,
 		colours,
 		buffers: buffers.map(({ metres }) => formatBufferDistance(metres)),
-		...(mapNote ? { mapNote } : {}),
-		// the colour each Nearby NSIP is drawn in, by name, for the PDF to key it
-		projectColours: new Map(
-			map.consulteeGeojson.features
-				.filter((feature) => feature.properties.ownLayer === 'true')
-				.map((feature) => [feature.properties.name, feature.properties.colour])
-		)
+		...(mapNote ? { mapNote } : {})
 	};
 }
 
@@ -351,7 +341,7 @@ export async function buildReportZip({
 	// one at a time: the maps frame the same view, so they share basemap tiles - fetched once,
 	// then cached (see AGENTS.md)
 	for (const [index, section] of sections.entries()) {
-		const { projectColours, ...mapPart } = await categoryMap(context, section.category);
+		const mapPart = await categoryMap(context, section.category);
 		const pdf = await buildMapPdf({
 			caseName: report.caseName,
 			caseReference: report.caseReference,
@@ -360,10 +350,7 @@ export async function buildReportZip({
 			generatedAt: report.generatedAt,
 			category: section.category,
 			...mapPart,
-			consultees: section.consultees.map((consultee) => {
-				const colour = projectColours.get(consultee.name);
-				return colour ? { ...consultee, colour } : consultee;
-			})
+			consultees: section.consultees
 		});
 		const number = String(index + 1).padStart(2, '0');
 		files[`maps/${number} ${safeFileName(section.category)}.pdf`] = new Uint8Array(pdf);

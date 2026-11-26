@@ -14,7 +14,7 @@ export interface MapPdfConsultee {
 	identified: string[];
 	/** False for one added by hand that the map doesn't draw - see ReportConsultee.mapped. */
 	mapped: boolean;
-	/** The colour it alone is drawn in - a Nearby NSIP, each project its own (see nsipColours). */
+	/** The colour it alone is drawn in */
 	colour?: string;
 }
 
