@@ -39,6 +39,7 @@ names:
   england_pre_20240430: England (Pre 30 April 2024)
   england_wales_post_20240430: England and Wales (Post 30 April 2024)
   wales_pre_20240430: Wales (Pre 30 April 2024)
+  scotland_2027: Scotland (Pre 30 April 2024)
 
 consulteeTypes:
   # administrative boundaries - see the workbook's A-D_authorities sheet
