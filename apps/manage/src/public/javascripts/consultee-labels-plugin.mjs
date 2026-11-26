@@ -116,8 +116,7 @@ function ringCentroid(ring) {
 	if (!ring?.length) {
 		return undefined;
 	}
-	const closed =
-		ring.length > 1 && ring[0][0] === ring[ring.length - 1][0] && ring[0][1] === ring[ring.length - 1][1];
+	const closed = ring.length > 1 && ring[0][0] === ring[ring.length - 1][0] && ring[0][1] === ring[ring.length - 1][1];
 	const count = closed ? ring.length - 1 : ring.length;
 	if (count === 0) {
 		return undefined;
