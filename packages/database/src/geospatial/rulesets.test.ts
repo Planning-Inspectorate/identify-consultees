@@ -431,12 +431,13 @@ describe('isIdentified', () => {
 });
 
 describe('rulesets registry', () => {
-	test('loads the three rulesets from the workbook, England and Wales (Post 30 April 2024) first', () => {
+	test('loads the rulesets from the workbook, England and Wales (Post 30 April 2024) first', () => {
 		assert.deepEqual(
 			RULESETS.map((ruleset) => [ruleset.id, ruleset.name, ruleset.rules.length]),
 			[
 				['england-wales-post-20240430', 'England and Wales (Post 30 April 2024)', 34],
 				['england-pre-20240430', 'England (Pre 30 April 2024)', 31],
+				['scotland-2027', 'Scotland (2027)', 23],
 				['wales-pre-20240430', 'Wales (Pre 30 April 2024)', 23]
 			]
 		);
