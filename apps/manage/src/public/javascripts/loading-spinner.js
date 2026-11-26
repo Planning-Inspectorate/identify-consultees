@@ -11,7 +11,9 @@
  * plain navigations without it, so the no-JS journey is untouched and there is
  * no server-rendered markup to hide for noscript. It sits over the departing
  * page, which the browser keeps painted until the next document can render, so
- * it covers the POST, the redirect and the following page's load in one.
+ * it covers the POST, the redirect and the following page's load in one. While
+ * it is up the rest of the page is inert, so keyboard and assistive-technology
+ * users cannot reach the content beneath the spinner.
  *
  * A page pulled back out of the back/forward cache keeps the DOM it was
  * snapshotted with - overlay included - so it is dropped on pagehide (before
@@ -29,6 +31,10 @@ const DEFAULT_TEXT = 'Loading';
 // a little longer than the 160ms --leaving fade in govuk-overrides.scss, so the
 // removal lands after the transition's last frame rather than snapping it off
 const REMOVE_AFTER_MS = 220;
+
+// the elements applyLoadingInert made inert, per document, so clearLoadingInert
+// only ever lifts the attribute it added - a page that was already inert keeps it
+const inertedByDocument = new WeakMap();
 
 /**
  * The overlay DOM: the indicator spinner plus the message, announced politely -
@@ -64,6 +70,53 @@ function buildOverlay(documentTarget, text) {
 }
 
 /**
+ * The elements this module has made inert for `documentTarget`.
+ * @param {Document} documentTarget
+ * @returns {Set<Element>}
+ */
+function inertedSet(documentTarget) {
+	let tracked = inertedByDocument.get(documentTarget);
+	if (!tracked) {
+		tracked = new Set();
+		inertedByDocument.set(documentTarget, tracked);
+	}
+	return tracked;
+}
+
+/**
+ * Make everything on the page except `overlay` inert while it is up, so keyboard
+ * and assistive-technology users cannot tab or click into the content beneath the
+ * spinner. Elements that were already inert are left alone.
+ *
+ * @param {Document} documentTarget
+ * @param {HTMLElement} overlay
+ */
+function applyLoadingInert(documentTarget, overlay) {
+	const tracked = inertedSet(documentTarget);
+	for (const element of documentTarget.body.children) {
+		if (element === overlay || element.hasAttribute('inert')) {
+			continue;
+		}
+		element.setAttribute('inert', '');
+		tracked.add(element);
+	}
+}
+
+/**
+ * Undo applyLoadingInert once no overlay remains: drop `inert` only from the
+ * elements it added.
+ *
+ * @param {Document} documentTarget
+ */
+function clearLoadingInert(documentTarget) {
+	const tracked = inertedSet(documentTarget);
+	for (const element of tracked) {
+		element.removeAttribute('inert');
+	}
+	tracked.clear();
+}
+
+/**
  * Cover the page with the loading overlay. A second call while one is up does
  * nothing - two rapid submissions leave one overlay, not a stack.
  *
@@ -80,7 +133,9 @@ export function showLoadingOverlay(documentTarget, text = DEFAULT_TEXT) {
 	}
 	// a mid-fade overlay counts as gone - drop it and let the fresh one fade in
 	existing?.remove();
-	documentTarget.body.append(buildOverlay(documentTarget, text));
+	const overlay = buildOverlay(documentTarget, text);
+	documentTarget.body.append(overlay);
+	applyLoadingInert(documentTarget, overlay);
 }
 
 /**
@@ -98,7 +153,15 @@ export function removeLoadingOverlay(documentTarget) {
 		return;
 	}
 	overlay.classList.add(LEAVING_CLASS);
-	setTimeout(() => overlay.remove(), REMOVE_AFTER_MS);
+	setTimeout(() => {
+		overlay.remove();
+		// a replacement overlay's own removal lifts the inert state - this timer
+		// can outlive the overlay it was armed for when showLoadingOverlay swaps
+		// a mid-fade one out early
+		if (!documentTarget.querySelector(`.${OVERLAY_CLASS}`)) {
+			clearLoadingInert(documentTarget);
+		}
+	}, REMOVE_AFTER_MS);
 }
 
 /**

@@ -61,6 +61,52 @@ describe('showLoadingOverlay', () => {
 	});
 });
 
+describe('loading overlay inert', () => {
+	test('makes the rest of the page inert while the overlay is up, then restores it', async () => {
+		const document = documentWith(
+			'<header><a href="/">Home</a></header><main><a href="/somewhere">Link</a></main><footer>f</footer>'
+		);
+		showLoadingOverlay(document);
+		const overlay = overlayOf(document);
+
+		for (const element of document.body.children) {
+			assert.equal(element.hasAttribute('inert'), element !== overlay);
+		}
+
+		removeLoadingOverlay(document);
+		await new Promise((resolve) => setTimeout(resolve, 300));
+		for (const element of document.body.children) {
+			assert.equal(element.hasAttribute('inert'), false);
+		}
+	});
+
+	test('leaves an element that was already inert alone', async () => {
+		const document = documentWith('<div inert id="already"></div><a href="/somewhere">Link</a>');
+		showLoadingOverlay(document);
+		removeLoadingOverlay(document);
+		await new Promise((resolve) => setTimeout(resolve, 300));
+
+		assert.equal(document.getElementById('already').hasAttribute('inert'), true);
+		assert.equal(document.querySelector('a').hasAttribute('inert'), false);
+	});
+
+	test('a replacement overlay keeps the page inert until it is removed', async () => {
+		const document = documentWith('<a href="/somewhere">Link</a>');
+		showLoadingOverlay(document, 'First');
+		removeLoadingOverlay(document);
+		showLoadingOverlay(document, 'Second');
+
+		// the first overlay's fade timer fires while the second is still up
+		await new Promise((resolve) => setTimeout(resolve, 300));
+		assert.ok(overlayOf(document));
+		assert.equal(document.querySelector('a').hasAttribute('inert'), true);
+
+		removeLoadingOverlay(document);
+		await new Promise((resolve) => setTimeout(resolve, 300));
+		assert.equal(document.querySelector('a').hasAttribute('inert'), false);
+	});
+});
+
 describe('removeLoadingOverlay', () => {
 	test('fades the overlay out then removes it', async () => {
 		const document = documentWith();
