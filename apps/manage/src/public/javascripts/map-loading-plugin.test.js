@@ -164,6 +164,43 @@ describe('map-loading-plugin', () => {
 		plugin.dismiss();
 	});
 
+	test('the covered container is inert while the overlay is up, then restored on dismiss', async () => {
+		const dom = installDom(
+			'<!DOCTYPE html><html><body><div id="map"><button id="inside">Zoom in</button></div></body></html>'
+		);
+		const container = dom.window.document.getElementById('map');
+		const plugin = createMapLoadingPlugin({ container });
+
+		assert.equal(container.hasAttribute('inert'), true);
+		assert.equal(document.querySelector('.app-map-loading').hasAttribute('inert'), false);
+
+		plugin.dismiss();
+		await nextTask(300);
+		assert.equal(container.hasAttribute('inert'), false);
+	});
+
+	test('a container that was already inert stays inert after dismiss', async () => {
+		const dom = installDom(
+			'<!DOCTYPE html><html><body><div id="map" inert><button>Zoom in</button></div></body></html>'
+		);
+		const container = dom.window.document.getElementById('map');
+		const plugin = createMapLoadingPlugin({ container });
+
+		plugin.dismiss();
+		await nextTask(300);
+		assert.equal(container.hasAttribute('inert'), true);
+	});
+
+	test('a detached container keeps its overlay inside it, so it is not inerted', () => {
+		const dom = installDom();
+		const container = dom.window.document.createElement('div');
+		const plugin = createMapLoadingPlugin({ container });
+
+		assert.ok(container.querySelector('.app-map-loading'));
+		assert.equal(container.hasAttribute('inert'), false);
+		plugin.dismiss();
+	});
+
 	test('mutations without an error marker leave the overlay alone', async () => {
 		const dom = installDom('<!DOCTYPE html><html><body><div id="map"></div></body></html>');
 		const container = dom.window.document.getElementById('map');

@@ -23,7 +23,9 @@
  * Dismissal triggers on `map:firstidle` (the first MapLibre `idle`, when every
  * source and tile has settled - the provider emits it once), when the component
  * renders its `.im-c-error` failure markup, or when the caller's catch shows
- * the static fallback. The provider does not forward MapLibre `error` events,
+ * the static fallback. While the overlay is up the map container is inert, so
+ * keyboard and assistive-technology users cannot reach controls under the
+ * spinner. The provider does not forward MapLibre `error` events,
  * so a timeout dismisses anyway rather than leaving the overlay over a map that
  * will never reach idle.
  *
@@ -115,7 +117,12 @@ function dismissOverlay(state) {
 	// class still clears the overlay visually. Dismissals can race (idle event,
 	// error watcher, safety timeout) - a repeat call just re-arms the removal.
 	state.overlay.classList.add(LEAVING_CLASS);
-	setTimeout(() => state.overlay.remove(), REMOVE_AFTER_MS);
+	setTimeout(() => {
+		state.overlay.remove();
+		if (state.containerInerted) {
+			state.container.removeAttribute('inert');
+		}
+	}, REMOVE_AFTER_MS);
 }
 
 /**
@@ -145,7 +152,17 @@ export function createMapLoadingPlugin(options = {}) {
 	const overlay = container.querySelector(`.${OVERLAY_CLASS}`) ?? buildOverlay(text);
 	mountOverlayBeside(container, overlay);
 
-	const state = { overlay, timer: undefined, stopWatching: () => {} };
+	// while the overlay covers the map, the container - and the app mounting
+	// inside it - is inert, so keyboard and assistive-technology users cannot
+	// reach controls under the spinner. The overlay is a sibling, so it stays
+	// live. A detached container keeps the overlay inside itself; inerting it
+	// would take the overlay down with the content.
+	const containerInerted = !container.contains(overlay) && !container.hasAttribute('inert');
+	if (containerInerted) {
+		container.setAttribute('inert', '');
+	}
+
+	const state = { overlay, timer: undefined, stopWatching: () => {}, container, containerInerted };
 	state.timer = timeoutMs > 0 ? setTimeout(() => dismissOverlay(state), timeoutMs) : undefined;
 	// watchForMapError can call back synchronously (a pre-existing .im-c-error),
 	// so state has to exist before it is armed
