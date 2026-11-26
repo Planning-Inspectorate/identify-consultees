@@ -196,10 +196,41 @@ describe('labelPointOfGeometry', () => {
 			}),
 			[1, 1]
 		);
+		assert.deepEqual(labelPointOfGeometry({ type: 'LineString' }), undefined);
+		assert.equal(labelPointOfGeometry({ type: 'MultiPoint', coordinates: [] }), undefined);
 	});
 
-	test('centres a polygon on its outer ring', () => {
+	test('centres a polygon on its outer ring, closed or open', () => {
 		assert.deepEqual(labelPointOfGeometry({ type: 'Polygon', coordinates: [SQUARE] }), [1, 1]);
+		assert.deepEqual(
+			labelPointOfGeometry({
+				type: 'Polygon',
+				coordinates: [
+					[
+						[0, 0],
+						[0, 2],
+						[2, 2],
+						[2, 0]
+					]
+				]
+			}),
+			[1, 1]
+		);
+		// same longitude on the first and last vertex, different latitude - not closed
+		assert.deepEqual(
+			labelPointOfGeometry({
+				type: 'Polygon',
+				coordinates: [
+					[
+						[0, 0],
+						[2, 0],
+						[0, 2]
+					]
+				]
+			}),
+			[2 / 3, 2 / 3]
+		);
+		assert.deepEqual(labelPointOfGeometry({ type: 'Polygon', coordinates: [[[4, 5]]] }), [4, 5]);
 	});
 
 	test('picks the largest part of a MultiPolygon so one feature yields one label point', () => {
@@ -210,6 +241,31 @@ describe('labelPointOfGeometry', () => {
 			}),
 			[1, 1]
 		);
+		assert.equal(labelPointOfGeometry({ type: 'MultiPolygon' }), undefined);
+		assert.equal(labelPointOfGeometry({ type: 'MultiPolygon', coordinates: [null, [[]]] }), undefined);
+	});
+
+	test('picks the longest line of a MultiLineString', () => {
+		assert.deepEqual(
+			labelPointOfGeometry({
+				type: 'MultiLineString',
+				coordinates: [
+					[
+						[0, 0],
+						[1, 1]
+					],
+					[
+						[0, 0],
+						[1, 1],
+						[2, 2],
+						[3, 3]
+					]
+				]
+			}),
+			[2, 2]
+		);
+		assert.equal(labelPointOfGeometry({ type: 'MultiLineString' }), undefined);
+		assert.equal(labelPointOfGeometry({ type: 'MultiLineString', coordinates: [null, []] }), undefined);
 	});
 
 	test('returns undefined for empty or unknown geometry', () => {
@@ -237,6 +293,26 @@ describe('labelPointCollection', () => {
 		const collection = labelPointCollection([DATASET.geojson.features[0], duplicate]);
 		assert.equal(collection.features.length, 1);
 		assert.deepEqual(collection.features[0].geometry.coordinates, [1, 1]);
+	});
+
+	test('skips features without a label point and tolerates missing ids or properties', () => {
+		const collection = labelPointCollection([
+			{ geometry: { type: 'Polygon', coordinates: [[]] }, properties: { name: 'empty' } },
+			{ geometry: { type: 'Point', coordinates: [1, 2] } },
+			null,
+			{ id: 'by-id', geometry: { type: 'Point', coordinates: [3, 4] }, properties: { name: 'named' } },
+			{
+				id: 'from-null-props',
+				properties: null,
+				geometry: { type: 'Point', coordinates: [5, 6] }
+			}
+		]);
+		assert.equal(collection.features.length, 3);
+		assert.equal(collection.features[0].id, undefined);
+		assert.deepEqual(collection.features[0].geometry.coordinates, [1, 2]);
+		assert.equal(collection.features[1].id, 'by-id');
+		assert.deepEqual(collection.features[2].properties, {});
+		assert.deepEqual(labelPointCollection(undefined).features, []);
 	});
 });
 
@@ -432,6 +508,23 @@ describe('syncConsulteeLabels', () => {
 		syncConsulteeLabels(map, pluginConfig({ datasets: [datasetWithoutGeojson] }));
 		assert.equal(map.addSource.mock.calls.length, 0);
 		assert.equal(map.layers.get(LABEL_0).source, 'geojson-consultee-areas');
+	});
+
+	test('falls back to the dataset polygon source when geojson has no features', () => {
+		const map = fakeMaplibre(LEAF_LAYERS);
+		syncConsulteeLabels(
+			map,
+			pluginConfig({
+				datasets: [{ ...DATASET, geojson: { type: 'FeatureCollection', features: [] } }]
+			})
+		);
+		assert.equal(map.addSource.mock.calls.length, 0);
+		assert.equal(map.layers.get(LABEL_0).source, 'geojson-consultee-areas');
+
+		const mapWithoutFeatures = fakeMaplibre(LEAF_LAYERS);
+		syncConsulteeLabels(mapWithoutFeatures, pluginConfig({ datasets: [{ ...DATASET, geojson: {} }] }));
+		assert.equal(mapWithoutFeatures.addSource.mock.calls.length, 0);
+		assert.equal(mapWithoutFeatures.layers.get(LABEL_0).source, 'geojson-consultee-areas');
 	});
 
 	test('hides the labels of a sublayer its sibling layer hides', () => {

@@ -118,9 +118,6 @@ function ringCentroid(ring) {
 	}
 	const closed = ring.length > 1 && ring[0][0] === ring[ring.length - 1][0] && ring[0][1] === ring[ring.length - 1][1];
 	const count = closed ? ring.length - 1 : ring.length;
-	if (count === 0) {
-		return undefined;
-	}
 	let lng = 0;
 	let lat = 0;
 	for (let i = 0; i < count; i++) {
@@ -153,11 +150,12 @@ export function labelPointOfGeometry(geometry) {
 		}
 		case 'MultiLineString': {
 			let best;
-			let bestLength = -1;
+			let bestLength = 0;
 			for (const line of geometry.coordinates ?? []) {
-				if ((line?.length ?? 0) > bestLength) {
-					bestLength = line.length;
-					best = line[Math.floor(line.length / 2)];
+				const length = line?.length ?? 0;
+				if (length > bestLength) {
+					bestLength = length;
+					best = line[Math.floor(length / 2)];
 				}
 			}
 			return best;
