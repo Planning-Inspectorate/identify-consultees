@@ -2,7 +2,6 @@ import { copyFile, mkdir, readFile, readdir, rm, stat, writeFile } from 'node:fs
 import { createRequire } from 'node:module';
 import path from 'node:path';
 import { compressFileToSidecars, shouldCompress } from './fingerprint-assets.ts';
-import { minifyVendorChunkInPlace } from './minify-assets.ts';
 
 const require = createRequire(import.meta.url);
 // resolve() points at dist/umd/index.js — walk up to the package root
@@ -65,6 +64,9 @@ const SIDECAR_WRITE_CONCURRENCY = 8;
 export async function writeVendorCompressionSidecars(
 	roots: Readonly<Record<string, string>> = DEFRA_VENDOR_ROOTS
 ): Promise<void> {
+	// Lazy-load so runtime importers of DEFRA_VENDOR_ROOTS (maps/vendor) do not
+	// pull esbuild into the pruned production image.
+	const { minifyVendorChunkInPlace } = await import('./minify-assets.ts');
 	for (const root of Object.values(roots)) {
 		const compressible = (await readdir(root, { recursive: true, withFileTypes: true }))
 			.filter((entry) => entry.isFile() && shouldCompress(entry.name))

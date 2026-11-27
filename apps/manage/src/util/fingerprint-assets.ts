@@ -4,7 +4,6 @@ import { mkdir, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import path from 'node:path';
 import { pipeline } from 'node:stream/promises';
 import { createBrotliCompress, createGzip, constants as zlibConstants } from 'node:zlib';
-import { hashUnminifiedForMinify, minifyAssetContent, shouldMinifyAsset } from './minify-assets.ts';
 
 /** Content-hash segment used in fingerprinted filenames (8 hex chars). */
 const ASSET_HASH_PATTERN = /-[0-9a-f]{8}(?=\.[^.]+$)/i;
@@ -295,6 +294,9 @@ export async function fingerprintAndCompressStaticAssets(staticDir: string): Pro
 
 	const dependencies = await fingerprintedModuleDependencies(fingerprintable);
 	const hashedPaths = new Map<string, string>();
+	// Lazy-load minify helpers so the production image (npm prune --omit=dev)
+	// can import this module at runtime without shipping esbuild.
+	const { hashUnminifiedForMinify, minifyAssetContent, shouldMinifyAsset } = await import('./minify-assets.ts');
 
 	for (const relative of fingerprintOrder(fingerprintable.keys(), dependencies)) {
 		const absolutePath = fingerprintable.get(relative) as string;
