@@ -103,11 +103,13 @@ export function buildCategorySublayers(features, idPrefix) {
 		const category = feature.properties?.consulteeCategory || 'Other';
 		const nearbyOnly = feature.properties?.identified === 'false';
 		const role = nearbyOnly ? undefined : AUTHORITY_ROLES.find((entry) => entry === feature.properties?.authorityRole);
-		const key = `${nearbyOnly ? 1 : 0}${category}\n${role ?? ''}`;
+		const addedByHand = feature.properties?.addedByHand === 'true';
+		const key = `${nearbyOnly ? 1 : 0}${addedByHand ? 1 : 0}${category}\n${role ?? ''}`;
 		const group = groups.get(key) ?? {
 			category,
 			nearbyOnly,
 			role,
+			addedByHand,
 			members: []
 		};
 		group.members.push(feature);
@@ -129,7 +131,7 @@ export function buildCategorySublayers(features, idPrefix) {
 	// sublayers draw in order
 	sorted.sort((a, b) => a.opacity - b.opacity);
 
-	return sorted.map(({ category, nearbyOnly, role, members, opacity }, index) => {
+	return sorted.map(({ category, nearbyOnly, role, addedByHand, members, opacity }, index) => {
 		const colour = members[0].properties?.colour || DEFAULT_CONSULTEE_COLOUR;
 		const isPoints = members.every((feature) => POINT_TYPES.has(feature.geometry?.type));
 		let style;
@@ -146,12 +148,20 @@ export function buildCategorySublayers(features, idPrefix) {
 		const identifiedFilter = nearbyOnly
 			? ['==', ['get', 'identified'], 'false']
 			: ['!=', ['get', 'identified'], 'false'];
+
+		const addedByHandFilter = addedByHand
+			? ['==', ['get', 'addedByHand'], 'true']
+			: ['==', ['get', 'addedByHand'], 'false'];
+
 		let label = `${category} (${members.length})`;
 		if (nearbyOnly) {
 			label = `${category}: nearby, not identified (${members.length})`;
 		} else if (role) {
 			label = `${category}: ${ROLE_LABELS[role]} (${members.length})`;
+		} else if (addedByHand) {
+			label = `${category}: manually identified (${members.length})`;
 		}
+
 		return {
 			id: `${idPrefix}-${index}`,
 			// nearby context always starts shown, like the identified consultees - the Layers panel can hide it
@@ -162,7 +172,8 @@ export function buildCategorySublayers(features, idPrefix) {
 				'all',
 				['==', ['get', 'consulteeCategory'], category],
 				identifiedFilter,
-				...roleFilters(role, categoriesWithRoles.has(category))
+				...roleFilters(role, categoriesWithRoles.has(category)),
+				addedByHandFilter
 			],
 			style
 		};
@@ -260,7 +271,7 @@ export function buildDatasets(config) {
 		datasets.push({
 			id: 'ruleset-buffers',
 			label: 'Ruleset Buffers',
-			idProperty: 'bufferId', // TODO: check this
+			idProperty: 'bufferId',
 			geojson: config.bufferGeojson,
 			minZoom: 0,
 			maxZoom: 24,
@@ -300,10 +311,13 @@ export function buildDatasets(config) {
 			maxZoom: 24,
 			showInKey: true,
 			showInMenu: true,
+			// although this is an array, all features styles the same as the
+			// first feature, as only one feature, the project is sent,
+			// see `case-geojson.ts`
 			style: {
-				stroke: '#ff0000',
+				stroke: config.projectGeojson.features[0].properties?.stroke ?? '#ff0000',
 				strokeWidth: 1.5,
-				fill: translucent('#ff0000', 0.2)
+				fill: translucent(config.projectGeojson.features[0].properties?.stroke ?? '#ff0000', 0.2)
 			}
 		});
 	}

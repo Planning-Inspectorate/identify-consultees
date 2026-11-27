@@ -47,7 +47,7 @@ Solid fill; fill opacity `0.2`; border opacity `1.0`; border width `1.5px`. The 
 
 The sheet's mock-up legend also sketches per-group fill patterns (administrative boundaries a diagonal hatch, public bodies horizontal lines, energy a diagonal hatch, transport a dashed line, other constraints a cross-dot). The mock-up is marked approximate and AI-generated — the tables above are the source of truth for colours and opacities; treat the patterns as a differentiation aid where one colour per group is not enough on its own.
 
-Consultee areas on the maps should ultimately follow these group colours — the per-category palette in `apps/manage/src/app/maps/category-colours.ts` is an interim placeholder until group colouring lands.
+Consultee areas on the maps should ultimately follow these group colours — the interim config is `config/map-styles/consultee-map.yaml` and read by `apps/manage/src/app/maps/consultee-map-styles.ts`.
 
 ### All layers — labels and buffers
 

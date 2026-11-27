@@ -4,7 +4,6 @@ import type { Geometry } from '@pins/identify-consultees-database/src/geospatial
 import assert from 'node:assert';
 import { describe, it } from 'node:test';
 import { REPORT_CONFIG } from '../report-config.ts';
-import { AUTHORITY_ROLE_STYLES } from './authority-role-styles.ts';
 import {
 	addedBeyondRun,
 	authorityRoleOf,
@@ -19,7 +18,7 @@ import {
 	siteDisplayGeometry,
 	withAuthorityRoles
 } from './case-geojson.ts';
-import { CONSULTEE_CATEGORY_COLOURS, UNCATEGORISED } from './category-colours.ts';
+import { CONSULTEE_MAP_STYLES, UNCATEGORISED } from './consultee-map-styles.ts';
 import { computeFittedMapView } from './geometry-bounds.ts';
 import { MAP_VIEWPORT } from './sample-geojson.ts';
 
@@ -335,10 +334,10 @@ describe('buildCaseMapConfig with a search area', () => {
 		assert.deepStrictEqual(
 			config.consulteeGeojson.features.map((feature) => [feature.id, feature.properties.colour]),
 			[
-				['z', CONSULTEE_CATEGORY_COLOURS[0]],
-				['a', CONSULTEE_CATEGORY_COLOURS[0]],
+				['z', CONSULTEE_MAP_STYLES.consulteeCategoryStyles[0].colour],
+				['a', CONSULTEE_MAP_STYLES.consulteeCategoryStyles[0].colour],
 				// any other consultee uses the next colour
-				['rail', CONSULTEE_CATEGORY_COLOURS[1]]
+				['rail', CONSULTEE_MAP_STYLES.consulteeCategoryStyles[1].colour]
 			]
 		);
 	});
@@ -429,13 +428,18 @@ describe('host and bordering authorities', () => {
 		);
 		const byId = new Map(config.consulteeGeojson.features.map((feature) => [feature.id, feature.properties]));
 
-		assert.strictEqual(byId.get('in')?.colour, AUTHORITY_ROLE_STYLES.host.colour);
+		assert.strictEqual(byId.get('in')?.colour, CONSULTEE_MAP_STYLES.authorityStyles.host.colour);
 		assert.strictEqual(byId.get('in')?.authorityRole, 'host');
-		assert.strictEqual(byId.get('next door')?.colour, AUTHORITY_ROLE_STYLES.bordering.colour);
+		assert.strictEqual(byId.get('next door')?.colour, CONSULTEE_MAP_STYLES.authorityStyles.bordering.colour);
 		assert.strictEqual(byId.get('next door')?.authorityRole, 'bordering');
 		// the rest keep their category's colour, and carry no role
 		for (const id of ['railway', 'nearby']) {
-			assert.ok(CONSULTEE_CATEGORY_COLOURS.includes(byId.get(id)?.colour as never), id);
+			assert.ok(
+				CONSULTEE_MAP_STYLES.consulteeCategoryStyles
+					.map((style) => style.colour)
+					.includes(byId.get(id)?.colour as never),
+				id
+			);
 			assert.strictEqual(byId.get(id)?.authorityRole, undefined, id);
 		}
 	});

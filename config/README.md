@@ -12,8 +12,7 @@ What the service does, as opposed to how: which consultees each ruleset identifi
 | [`report.yaml`](./report.yaml) | Each report tab's columns, the metadata each category adds, and how much each category's map shows |
 | [`map-view.yaml`](./map-view.yaml) | How much the boundary page's map shows around the case's shapefiles |
 | [`map-styles/boundary-map.yaml`](./map-styles/boundary-map.yaml) | The boundary page's map colours: the newest file red, earlier ones blue |
-| [`map-styles/authority-roles.yaml`](./map-styles/authority-roles.yaml) | The consultee maps' colours for host authorities (the site is in them) and the authorities bordering them |
-| [`map-styles/consultee-map.example.yaml`](./map-styles/consultee-map.example.yaml) | **Not read yet**: proposed consultee map colours per category and sub-category |
+| [`map-styles/consultee-map.yaml`](./map-styles/authority-roles.yaml) | The consultee maps' colours for the project site, consultees, manually added consultees, host authorities (the site is in them) and the authorities bordering them|
 
 Each file explains its settings at the top.
 
