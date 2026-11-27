@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { describe, test } from 'node:test';
@@ -431,17 +431,18 @@ describe('isIdentified', () => {
 });
 
 describe('rulesets registry', () => {
-	test('loads the rulesets from the workbook, England and Wales (Post 30 April 2024) first', () => {
-		assert.deepEqual(
-			RULESETS.map((ruleset) => [ruleset.id, ruleset.name, ruleset.rules.length]),
-			[
-				['england-wales-post-20240430', 'England and Wales (Post 30 April 2024)', 34],
-				['england-pre-20240430', 'England (Pre 30 April 2024)', 31],
-				['scotland-2027', 'Scotland (2027)', 23],
-				['wales-pre-20240430', 'Wales (Pre 30 April 2024)', 23]
-			]
+	// checks only what holds for whichever rulesets are saved, so adding, removing or renaming one
+	// in config/rulesets needs no change here - loadRulesets's own tests pin the loading rules
+	test('loads one ruleset for each *_ruleset.csv in config/rulesets, the default first', () => {
+		const files = readdirSync(path.join(import.meta.dirname, '../../../../config/rulesets')).filter((file) =>
+			file.endsWith('_ruleset.csv')
 		);
+		assert.deepEqual(RULESETS.map((ruleset) => ruleset.id).sort(), files.map(rulesetIdFromFileName).sort());
 		assert.equal(RULESETS[0].id, rulesetIdFromFileName(`${RULESET_SETTINGS.default}_ruleset.csv`));
+		for (const ruleset of RULESETS) {
+			assert.ok(ruleset.name.trim(), `${ruleset.id} has no name`);
+			assert.ok(ruleset.rules.length > 0, `${ruleset.id} has no conditions`);
+		}
 	});
 
 	test('every condition matches a category the reference data has, or one deliberately awaiting data', () => {
@@ -505,8 +506,10 @@ groups:
 		assert.ok(longest <= 200, `longest condition id is ${longest} characters`);
 	});
 
-	test('getRuleset finds a known ruleset by id and returns undefined for an unknown one', () => {
-		assert.ok(getRuleset('wales-pre-20240430'));
+	test('getRuleset finds each ruleset by id and returns undefined for an unknown one', () => {
+		for (const ruleset of RULESETS) {
+			assert.equal(getRuleset(ruleset.id), ruleset);
+		}
 		assert.equal(getRuleset('not-a-real-ruleset'), undefined);
 	});
 });

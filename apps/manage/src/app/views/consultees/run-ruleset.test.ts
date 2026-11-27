@@ -242,7 +242,8 @@ describe('runRulesetSafely', () => {
 		const otherCase = project('55555555-5555-5555-5555-555555555555');
 		await runRulesetSafely(serviceWith(runner), project(), RULESETS[0], store);
 		await runRulesetSafely(serviceWith(runner), otherCase, RULESETS[0], store);
-		await runRulesetSafely(serviceWith(runner), otherCase, RULESETS[1], store);
+		// another ruleset by id - not RULESETS[1], so this holds however many rulesets are saved
+		await runRulesetSafely(serviceWith(runner), otherCase, { ...RULESETS[0], id: 'another-ruleset' }, store);
 		await runRulesetSafely(serviceWith(runner), project(), RULESETS[0], store);
 
 		assert.equal(runner.mock.callCount(), 4);
