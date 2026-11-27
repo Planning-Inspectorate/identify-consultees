@@ -95,6 +95,28 @@ describe('consultees-map client helpers', () => {
 		);
 	});
 
+	test('buildDatasets passes through the projectGeojson style', () => {
+		const datasets = buildDatasets({
+			projectGeojson: { features: [{ type: 'Feature', properties: { stroke: '#123456' } }] },
+			consulteeGeojson: {},
+			projectLayerLabel: 'Project',
+			consulteeLayerLabel: 'Consultees'
+		});
+		assert.equal(datasets.find((dataset) => dataset.id === 'project-site').style.stroke, '#123456');
+		assert.equal(datasets.find((dataset) => dataset.id === 'project-site').style.fill, 'rgba(18, 52, 86, 0.2)');
+	});
+
+	test('buildDatasets defaults to red when no projectGeojson style', () => {
+		const datasets = buildDatasets({
+			projectGeojson: { features: [{ type: 'Feature' }] },
+			consulteeGeojson: {},
+			projectLayerLabel: 'Project',
+			consulteeLayerLabel: 'Consultees'
+		});
+		assert.equal(datasets.find((dataset) => dataset.id === 'project-site').style.stroke, '#ff0000');
+		assert.equal(datasets.find((dataset) => dataset.id === 'project-site').style.fill, 'rgba(255, 0, 0, 0.2)');
+	});
+
 	test('buildDatasets fills the matches by category, one sublayer each, under the project site', () => {
 		const point = (category, colour) => ({
 			type: 'Feature',
@@ -135,7 +157,8 @@ describe('consultees-map client helpers', () => {
 		assert.deepEqual(matches.sublayers[0].filter, [
 			'all',
 			['==', ['get', 'consulteeCategory'], 'Hospitals operated by NHS trusts and NHS foundation trusts (England)'],
-			['!=', ['get', 'identified'], 'false']
+			['!=', ['get', 'identified'], 'false'],
+			['==', ['get', 'addedByHand'], 'false']
 		]);
 		// points as small circles
 		assert.equal(matches.sublayers[0].style.symbol, 'circle');
@@ -163,6 +186,7 @@ describe('consultees-map client helpers', () => {
 				// one added by hand has no role - nor does nearby context, whatever it carries
 				parish('added', { colour: '#28a197' }),
 				parish('nearby', { colour: '#28a197', identified: 'false', authorityRole: 'host' }),
+				parish('addedbyhand', { colour: '#28a197', addedByHand: 'true' }),
 				{
 					type: 'Feature',
 					properties: { consulteeCategory: 'Railways', consulteeId: 'railway', colour: '#1d70b8' },
@@ -181,6 +205,7 @@ describe('consultees-map client helpers', () => {
 				['Parish, town and community councils: host (1)', '#007a7a'],
 				['Parish, town and community councils: bordering (2)', '#f47738'],
 				['Parish, town and community councils (1)', '#28a197'],
+				['Parish, town and community councils: manually identified (1)', '#28a197'],
 				['Parish, town and community councils: nearby, not identified (1)', '#28a197'],
 				['Railways (1)', '#1d70b8']
 			]
@@ -189,13 +214,15 @@ describe('consultees-map client helpers', () => {
 			'all',
 			category,
 			identified,
-			['==', ['get', 'authorityRole'], 'host']
+			['==', ['get', 'authorityRole'], 'host'],
+			['==', ['get', 'addedByHand'], 'false']
 		]);
 		assert.deepEqual(byLabel.get('Parish, town and community councils: bordering (2)').filter, [
 			'all',
 			category,
 			identified,
-			['==', ['get', 'authorityRole'], 'bordering']
+			['==', ['get', 'authorityRole'], 'bordering'],
+			['==', ['get', 'addedByHand'], 'false']
 		]);
 		// the category's others take neither role's features
 		assert.deepEqual(byLabel.get('Parish, town and community councils (1)').filter, [
@@ -203,13 +230,24 @@ describe('consultees-map client helpers', () => {
 			category,
 			identified,
 			['!=', ['get', 'authorityRole'], 'host'],
-			['!=', ['get', 'authorityRole'], 'bordering']
+			['!=', ['get', 'authorityRole'], 'bordering'],
+			['==', ['get', 'addedByHand'], 'false']
 		]);
 		// and a category with no roles filters as it always has
 		assert.deepEqual(byLabel.get('Railways (1)').filter, [
 			'all',
 			['==', ['get', 'consulteeCategory'], 'Railways'],
-			identified
+			identified,
+			['==', ['get', 'addedByHand'], 'false']
+		]);
+
+		assert.deepEqual(byLabel.get('Parish, town and community councils: manually identified (1)').filter, [
+			'all',
+			category,
+			identified,
+			['!=', ['get', 'authorityRole'], 'host'],
+			['!=', ['get', 'authorityRole'], 'bordering'],
+			['==', ['get', 'addedByHand'], 'true']
 		]);
 	});
 

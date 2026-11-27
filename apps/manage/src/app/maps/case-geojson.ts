@@ -14,8 +14,8 @@ import { isIdentified } from '@pins/identify-consultees-database/src/geospatial/
 import type { Geometry } from '@pins/identify-consultees-database/src/geospatial/wkt.ts';
 import { REPORT_CONFIG } from '../report-config.ts';
 import { kilometres } from '../views/consultees/consultee-labels.ts';
-import { AUTHORITY_ROLE_STYLES } from './authority-role-styles.ts';
-import { assignCategoryColours, colourFor, UNCATEGORISED } from './category-colours.ts';
+import type { ColourMap } from './consultee-map-styles.ts';
+import { assignCategoryColours, colourFor, CONSULTEE_MAP_STYLES, UNCATEGORISED } from './consultee-map-styles.ts';
 import { computeBounds, computeFittedMapView } from './geometry-bounds.ts';
 import type { InteractiveBasemap } from './os-maps.ts';
 import { interactiveBasemap } from './os-maps.ts';
@@ -72,7 +72,8 @@ export function buildProjectGeojson(project: CaseBoundaryFeature): GeoJsonFeatur
 				properties: {
 					name: project.properties.caseName,
 					reference: project.properties.caseReference,
-					layer: 'project-site'
+					layer: 'project-site',
+					stroke: CONSULTEE_MAP_STYLES.projectSite.colour
 				},
 				geometry: roundGeometry(siteDisplayGeometry(project))
 			}
@@ -182,7 +183,7 @@ function isDrawable(match: MapMatch): match is DrawableMatch {
  * The consultees that have geometry to draw. A run's matches carry none (the function is never
  * asked for it), so these are drawn from display geometry (see buildCaseMapConfig).
  */
-function buildConsulteeMatchesGeojson(matches: MapMatch[], colours: Map<string, string>): GeoJsonFeatureCollection {
+function buildConsulteeMatchesGeojson(matches: MapMatch[], colours: ColourMap): GeoJsonFeatureCollection {
 	const drawable = matches.filter(isDrawable);
 	// a host or bordering authority is drawn in its role's colour, not its category's - only when
 	// it's drawn as identified, so faint nearby context keeps its category's
@@ -202,13 +203,15 @@ function buildConsulteeMatchesGeojson(matches: MapMatch[], colours: Map<string, 
 					// the "3.2 km" the details panel's Distance row shows - absent for an area
 					// added from beyond the run's reach, whose distanceMetres is a placeholder
 					...(match.beyondRun ? {} : { distance: kilometres(match.distanceMetres) }),
-					colour: role ? AUTHORITY_ROLE_STYLES[role].colour : colourFor(colours, categoryOf(match)),
+					colour: colourFor(colours, categoryOf(match), role, match.addedByHand ?? false),
 					// 'host' or 'bordering' for an identified administrative authority - the map keys each
 					// role's colour on its own (see consultees-map.js's buildCategorySublayers)
 					...(role ? { authorityRole: role } : {}),
 					// 'false' when only the nearby search found it, and no one added it: drawn fainter, as
 					// context (see withFillOpacity)
-					identified: String(isDrawnAsIdentified(match))
+					identified: String(isDrawnAsIdentified(match)),
+					// to separate the added by hand layer from the rest, the map keys each role's colour
+					addedByHand: String(match.addedByHand ?? false)
 				},
 				geometry: match.feature.geometry
 			};

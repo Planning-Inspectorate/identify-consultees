@@ -1,0 +1,25 @@
+version: 1
+
+projectSite:
+  colour: '#ff0000' # the sheet's "latest project geometries" red - no category should use it
+  description: 'red'
+
+consulteeCategoryStyles:
+  - colour: '#1d70b8'
+    description: 'blue'
+  - colour: '#f47738'
+    description: 'orange'
+
+manuallyAddedCategoryStyles:
+  - colour: '#003078'
+    description: 'dark blue'
+  - colour: '#552A14'
+    description: 'dark orange'
+
+authorityRoles:
+  host:
+    colour: '#007a7a'
+    description: teal
+  bordering:
+    colour: '#f47738'
+    description: orange
