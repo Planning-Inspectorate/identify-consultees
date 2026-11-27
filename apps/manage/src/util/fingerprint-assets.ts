@@ -1,9 +1,10 @@
 import { createHash } from 'node:crypto';
 import { createReadStream, createWriteStream, readFileSync } from 'node:fs';
-import { readdir, readFile, rename, rm, stat, writeFile } from 'node:fs/promises';
+import { mkdir, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { pipeline } from 'node:stream/promises';
 import { createBrotliCompress, createGzip, constants as zlibConstants } from 'node:zlib';
+import { hashUnminifiedForMinify, minifyAssetContent, shouldMinifyAsset } from './minify-assets.ts';
 
 /** Content-hash segment used in fingerprinted filenames (8 hex chars). */
 const ASSET_HASH_PATTERN = /-[0-9a-f]{8}(?=\.[^.]+$)/i;
@@ -51,10 +52,9 @@ export type AssetManifest = {
 export const ASSET_MANIFEST_FILENAME = 'asset-manifest.json';
 
 /**
- * Every asset path literal config-middleware.ts emits, bound to the logical path the
- * build fingerprints it under. The build rewrites the literals from this table and the
- * runtime resolves the same properties from the manifest - one source of truth so the
- * two can never disagree.
+ * Every `res.locals.config` asset property, bound to the logical path the build
+ * fingerprints it under. Runtime resolves these from `asset-manifest.json`; the
+ * same logical paths are the never-built fallbacks in config-middleware.ts.
  */
 export const LOCALS_ASSET_BINDINGS: { logical: string; property: string }[] = [
 	{ logical: 'style.css', property: 'styleFile' },
@@ -134,11 +134,6 @@ function insertHashBeforeExtension(relativePosixPath: string, hash: string): str
 	const ext = path.posix.extname(relativePosixPath);
 	const stem = relativePosixPath.slice(0, relativePosixPath.length - ext.length);
 	return `${stem}-${hash}${ext}`;
-}
-
-async function hashFile(absolutePath: string): Promise<string> {
-	const content = await readFile(absolutePath);
-	return hashContent(content);
 }
 
 function hashContent(content: string | Buffer): string {
@@ -303,19 +298,31 @@ export async function fingerprintAndCompressStaticAssets(staticDir: string): Pro
 
 	for (const relative of fingerprintOrder(fingerprintable.keys(), dependencies)) {
 		const absolutePath = fingerprintable.get(relative) as string;
-		let hash: string;
-		if (dependencies.has(relative)) {
-			// the specifier rewrite changes the content, so hash after rewriting;
-			// writeFile rather than rename - the file's bytes differ from disk
-			const rewritten = rewriteModuleSpecifiers(await readFile(absolutePath, 'utf8'), relative, hashedPaths);
-			hash = hashContent(rewritten);
-			await writeFile(path.join(staticDir, ...insertHashBeforeExtension(relative, hash).split('/')), rewritten);
-			await rm(absolutePath);
-		} else {
-			hash = await hashFile(absolutePath);
-			await rename(absolutePath, path.join(staticDir, ...insertHashBeforeExtension(relative, hash).split('/')));
+		let unminified = await readFile(absolutePath, 'utf8');
+		if (dependencies.has(relative) || MODULE_EXTENSIONS.has(path.posix.extname(relative).toLowerCase())) {
+			// rewrite relative ESM specifiers to hashed dependency names before
+			// hashing/minifying so the importer's content (and hash) depends on them
+			unminified = rewriteModuleSpecifiers(unminified, relative, hashedPaths);
+		}
+		const minify = shouldMinifyAsset(relative);
+		const hash = minify ? hashUnminifiedForMinify(unminified) : hashContent(unminified);
+		// Keep the unminified bytes unless minify saves a meaningful amount —
+		// already-bundled Defra entries can grow under Brotli after a tiny minify.
+		let output = unminified;
+		if (minify) {
+			try {
+				const candidate = minifyAssetContent(unminified, relative);
+				const saved = unminified.length - candidate.length;
+				if (saved >= 64 && candidate.length < unminified.length * 0.99) {
+					output = candidate;
+				}
+			} catch {
+				// minify failed — ship the unminified bytes under the same hash rule
+			}
 		}
 		const fingerprintedRelative = insertHashBeforeExtension(relative, hash);
+		await writeFile(path.join(staticDir, ...fingerprintedRelative.split('/')), output);
+		await rm(absolutePath);
 		manifest.assets[relative] = fingerprintedRelative;
 		hashedPaths.set(relative, fingerprintedRelative);
 	}
@@ -356,7 +363,7 @@ export async function fingerprintAndCompressStaticAssets(staticDir: string): Pro
 
 /**
  * Read the asset manifest a build left in `staticDir`. `null` when it is absent or
- * unreadable - callers fall back to the literals baked into config-middleware.ts,
+ * unreadable - callers fall back to the logical placeholders in config-middleware.ts,
  * which is the correct behaviour for a source tree that has never been built.
  */
 export function loadAssetManifest(staticDir: string): AssetManifest | null {
@@ -373,65 +380,26 @@ export function loadAssetManifest(staticDir: string): AssetManifest | null {
 }
 
 /**
- * Rewrite known asset path literals in a source file from the manifest.
- *
- * The file is amended literal-by-literal, never regenerated - so a torn or
- * empty file has nothing to amend and would be written back just as broken
- * (seen when a dev server's concurrent non-atomic write truncated it mid-way).
- * Failing the build instead forces a restore before the damage can be
- * committed and start 404ing fingerprinted assets.
+ * Binding properties whose logical path is missing from the manifest or whose
+ * fingerprinted file is not on disk under `staticDir`. Used by
+ * `npm run check-fingerprints` so CI fails when the build omits a page asset.
  */
-export async function applyAssetManifestToLocalsFile(localsFile: string, manifest: AssetManifest): Promise<void> {
-	const original = await readFile(localsFile, 'utf8');
-	if (original.trim() === '') {
-		throw new Error(
-			`${localsFile} is empty - the build amends asset literals in place rather than regenerating the file, so an empty file would be written back unchanged. Restore it (git checkout -- ${localsFile}) and rebuild.`
-		);
+export async function missingManifestBindings(staticDir: string, manifest: AssetManifest | null): Promise<string[]> {
+	if (!manifest) {
+		return LOCALS_ASSET_BINDINGS.map(({ property }) => property);
 	}
-	let content = original;
 	const missing: string[] = [];
-
 	for (const { logical, property } of LOCALS_ASSET_BINDINGS) {
 		const hashed = manifest.assets[logical];
 		if (!hashed) {
+			missing.push(property);
 			continue;
 		}
-		const propertyPattern = new RegExp(`(${property}\\s*:\\s*)'[^']*'`);
-		if (propertyPattern.test(content)) {
-			content = content.replace(propertyPattern, `$1'${hashed}'`);
-		} else {
+		if (!(await statOrNull(path.join(staticDir, ...hashed.split('/'))))) {
 			missing.push(property);
 		}
 	}
-
-	if (missing.length > 0) {
-		throw new Error(
-			`${localsFile} is missing asset literals for ${missing.join(', ')} - the build amends literals in place rather than regenerating the file, so a torn file cannot be healed. Restore it (git checkout -- ${localsFile}) or add the missing properties, then rebuild.`
-		);
-	}
-
-	// rebuilding without an asset change must not touch the file - the dev
-	// watcher keys off writes, and an unchanged rewrite would retrigger it
-	if (content !== original) {
-		// write-then-rename so a concurrent build or a mid-write kill can never
-		// leave a torn or empty locals file (rename is atomic on the same volume)
-		const tempFile = `${localsFile}.tmp`;
-		await writeFile(tempFile, content, 'utf8');
-		await rename(tempFile, localsFile);
-	}
-}
-
-/**
- * The bound properties whose literal in `content` differs from `manifest` - the
- * check `npm run check-fingerprints` fails on. An empty list means the literals
- * are exactly what a fresh build produced. A literal present without a manifest
- * entry is a dead binding and counts as stale.
- */
-export function staleLocalsAssetPaths(content: string, manifest: AssetManifest): string[] {
-	return LOCALS_ASSET_BINDINGS.filter(({ logical, property }) => {
-		const current = new RegExp(`${property}\\s*:\\s*'([^']*)'`).exec(content)?.[1];
-		return current !== manifest.assets[logical];
-	}).map(({ property }) => property);
+	return missing;
 }
 
 /**
@@ -439,6 +407,5 @@ export function staleLocalsAssetPaths(content: string, manifest: AssetManifest):
  */
 export async function ensureEmptyStaticMountDir(mountDir: string): Promise<void> {
 	await rm(mountDir, { recursive: true, force: true });
-	const { mkdir } = await import('node:fs/promises');
 	await mkdir(mountDir, { recursive: true });
 }

@@ -1,7 +1,8 @@
-import { copyFile, mkdir, readdir, rm, stat } from 'node:fs/promises';
+import { copyFile, mkdir, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import path from 'node:path';
 import { compressFileToSidecars, shouldCompress } from './fingerprint-assets.ts';
+import { minifyVendorChunkInPlace } from './minify-assets.ts';
 
 const require = createRequire(import.meta.url);
 // resolve() points at dist/umd/index.js — walk up to the package root
@@ -71,6 +72,16 @@ export async function writeVendorCompressionSidecars(
 		for (let index = 0; index < compressible.length; index += SIDECAR_WRITE_CONCURRENCY) {
 			await Promise.all(
 				compressible.slice(index, index + SIDECAR_WRITE_CONCURRENCY).map(async (filePath) => {
+					const base = path.basename(filePath);
+					// minify webpack lazy chunks in place only — entry index.* is
+					// already minified via the fingerprint pipeline after copy
+					if (!/^index\.(js|css)$/i.test(base) && /\.(js|mjs|css)$/i.test(base)) {
+						const source = await readFile(filePath, 'utf8');
+						const minified = minifyVendorChunkInPlace(source, filePath);
+						if (minified) {
+							await writeFile(filePath, minified, 'utf8');
+						}
+					}
 					if ((await stat(filePath)).size >= MIN_SIDECAR_BYTES) {
 						await compressFileToSidecars(filePath);
 					}

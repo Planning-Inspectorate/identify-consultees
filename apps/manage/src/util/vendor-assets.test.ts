@@ -41,20 +41,26 @@ describe('vendor-assets', () => {
 		await assert.rejects(stat(staleFile), { code: 'ENOENT' });
 	});
 
-	test('writes br/gz sidecars beside compressible vendor files only', async () => {
+	test('minifies lazy chunks in place then writes br/gz sidecars', async () => {
 		tempDir = await mkdtemp(path.join(tmpdir(), 'vendor-sidecars-'));
 		const nested = path.join(tempDir, 'chunks');
 		await mkdir(nested, { recursive: true });
 		const chunk = path.join(nested, '5300.js');
-		const chunkBody = `globalThis.chunk = ${'1'.repeat(4096)};\n`;
+		// string payload stays large after minify (numeric literals can collapse)
+		const chunkBody = `globalThis.chunk = "${'x'.repeat(4096)}";\n`;
 		await writeFile(chunk, chunkBody);
 		await writeFile(path.join(nested, 'tiny.js'), 'x=1');
 		await writeFile(path.join(nested, 'logo.png'), Buffer.from([137, 80, 78, 71]));
+		await writeFile(path.join(nested, 'index.js'), `globalThis.entry = "${'x'.repeat(4096)}";\n`);
 
 		await writeVendorCompressionSidecars({ 'test/js': tempDir });
 
-		assert.deepEqual(brotliDecompressSync(await readFile(`${chunk}.br`)).toString(), chunkBody);
-		assert.deepEqual(gunzipSync(await readFile(`${chunk}.gz`)).toString(), chunkBody);
+		const onDisk = await readFile(chunk, 'utf8');
+		assert.ok(onDisk.length < chunkBody.length, 'lazy chunk should be minified in place');
+		assert.deepEqual(brotliDecompressSync(await readFile(`${chunk}.br`)).toString(), onDisk);
+		assert.deepEqual(gunzipSync(await readFile(`${chunk}.gz`)).toString(), onDisk);
+		// entry index.js is fingerprinted elsewhere — leave bytes alone here
+		assert.equal(await readFile(path.join(nested, 'index.js'), 'utf8'), `globalThis.entry = "${'x'.repeat(4096)}";\n`);
 		// below the size floor, and non-compressible formats, get nothing
 		await assert.rejects(stat(`${path.join(nested, 'tiny.js')}.br`), { code: 'ENOENT' });
 		await assert.rejects(stat(`${path.join(nested, 'logo.png')}.gz`), { code: 'ENOENT' });
@@ -64,8 +70,8 @@ describe('vendor-assets', () => {
 		tempDir = await mkdtemp(path.join(tmpdir(), 'vendor-sidecars-'));
 		const chunk = path.join(tempDir, '5300.js');
 		const unchanged = path.join(tempDir, 'unchanged.js');
-		await writeFile(chunk, `globalThis.chunk = ${'1'.repeat(4096)};\n`);
-		await writeFile(unchanged, `globalThis.same = ${'1'.repeat(4096)};\n`);
+		await writeFile(chunk, `globalThis.chunk = "${'x'.repeat(4096)}";\n`);
+		await writeFile(unchanged, `globalThis.same = "${'y'.repeat(4096)}";\n`);
 
 		await writeVendorCompressionSidecars({ 'test/js': tempDir });
 		const unchangedBrMtime = (await stat(`${unchanged}.br`)).mtimeMs;
@@ -73,11 +79,11 @@ describe('vendor-assets', () => {
 		// the shape an upgraded package leaves: same filename, new bytes + mtime;
 		// the pause keeps the new mtime clearly ahead of the first sidecars
 		await new Promise((resolve) => setTimeout(resolve, 20));
-		await writeFile(chunk, `globalThis.chunk = ${'2'.repeat(4096)};\n`);
+		await writeFile(chunk, `globalThis.chunk = "${'z'.repeat(4096)}";\n`);
 		await writeVendorCompressionSidecars({ 'test/js': tempDir });
 
-		// the changed file was re-encoded; the unchanged one kept its sidecars
-		assert.equal(gunzipSync(await readFile(`${chunk}.gz`)).toString(), `globalThis.chunk = ${'2'.repeat(4096)};\n`);
+		const chunkOnDisk = await readFile(chunk, 'utf8');
+		assert.equal(gunzipSync(await readFile(`${chunk}.gz`)).toString(), chunkOnDisk);
 		assert.equal((await stat(`${unchanged}.br`)).mtimeMs, unchangedBrMtime);
 
 		// and a third run changes nothing at all
