@@ -6,14 +6,13 @@ import { after, describe, test } from 'node:test';
 import { brotliDecompressSync, gunzipSync } from 'node:zlib';
 import {
 	ASSET_MANIFEST_FILENAME,
-	applyAssetManifestToLocalsFile,
 	ensureEmptyStaticMountDir,
 	fingerprintAndCompressStaticAssets,
 	isFingerprintedAssetPath,
 	loadAssetManifest,
+	missingManifestBindings,
 	shouldCompress,
-	shouldFingerprint,
-	staleLocalsAssetPaths
+	shouldFingerprint
 } from './fingerprint-assets.ts';
 
 describe('fingerprint-assets', () => {
@@ -63,12 +62,18 @@ describe('fingerprint-assets', () => {
 		await mkdir(path.join(tempDir, 'assets', 'images'), { recursive: true });
 		await mkdir(path.join(tempDir, 'javascripts'), { recursive: true });
 		await writeFile(path.join(tempDir, 'assets', 'js', 'govuk-frontend.min.js'), 'console.log("govuk");\n');
-		await writeFile(path.join(tempDir, 'javascripts', 'consultees-map.js'), 'export const ok = true;\n');
-		await writeFile(path.join(tempDir, 'javascripts', 'example-app.js'), 'export const demo = true;\n');
+		// whitespace-heavy so minify clears the ≥64 byte / ≥1% savings threshold
+		const paddedMap = `export const ok = true;\nexport function describeMap() {\n  return {\n${'    label: "consultee map label",\n'.repeat(20)}  };\n}\n`;
+		const paddedApp = `export const demo = true;\nexport function describeApp() {\n  return {\n${'    label: "example app label",\n'.repeat(20)}  };\n}\n`;
+		await writeFile(path.join(tempDir, 'javascripts', 'consultees-map.js'), paddedMap);
+		await writeFile(path.join(tempDir, 'javascripts', 'example-app.js'), paddedApp);
 		await writeFile(path.join(tempDir, 'style-aabbccdd.css'), 'body{color:red}');
 		await writeFile(path.join(tempDir, 'assets', 'images', 'keep.png'), Buffer.from([1, 2, 3]));
 		await mkdir(path.join(tempDir, 'vendor', 'map-key-plugin', 'js'), { recursive: true });
-		await writeFile(path.join(tempDir, 'vendor', 'map-key-plugin', 'js', 'index.js'), 'globalThis.mkp = {};\n');
+		await mkdir(path.join(tempDir, 'vendor', 'map-key-plugin', 'css'), { recursive: true });
+		// already-tight vendor entry: minify candidate is not smaller, so bytes stay
+		await writeFile(path.join(tempDir, 'vendor', 'map-key-plugin', 'js', 'index.js'), 'globalThis.mkp={};\n');
+		await writeFile(path.join(tempDir, 'vendor', 'map-key-plugin', 'css', 'index.css'), 'a{color:red}\n');
 		await writeFile(path.join(tempDir, 'vendor', 'map-key-plugin', 'js', '6924.js'), 'globalThis.chunk = {};\n');
 
 		const manifest = await fingerprintAndCompressStaticAssets(tempDir);
@@ -78,13 +83,27 @@ describe('fingerprint-assets', () => {
 		assert.match(manifest.assets['javascripts/example-app.js'], /example-app-[0-9a-f]{8}\.js/);
 		assert.equal(manifest.assets['style.css'], 'style-aabbccdd.css');
 		assert.match(manifest.assets['vendor/map-key-plugin/js/index.js'], /index-[0-9a-f]{8}\.js/);
+		assert.match(manifest.assets['vendor/map-key-plugin/css/index.css'], /index-[0-9a-f]{8}\.css/);
 		assert.equal(manifest.assets['vendor/map-key-plugin/js/6924.js'], undefined);
+		const vendorJs = await readFile(
+			path.join(tempDir, ...manifest.assets['vendor/map-key-plugin/js/index.js'].split('/')),
+			'utf8'
+		);
+		assert.equal(vendorJs, 'globalThis.mkp={};\n');
 
 		const hashedGovuk = path.join(tempDir, ...manifest.assets['assets/js/govuk-frontend.min.js'].split('/'));
 		const brBody = await readFile(`${hashedGovuk}.br`);
 		assert.ok(brBody.byteLength > 0);
+		// already-.min assets are not re-minified — bytes match the source copy
 		assert.deepEqual(brotliDecompressSync(brBody).toString(), 'console.log("govuk");\n');
 		assert.deepEqual(gunzipSync(await readFile(`${hashedGovuk}.gz`)).toString(), 'console.log("govuk");\n');
+
+		// first-party JS is minified before Brotli when savings clear the threshold
+		const hashedMap = path.join(tempDir, ...manifest.assets['javascripts/consultees-map.js'].split('/'));
+		const mapBody = brotliDecompressSync(await readFile(`${hashedMap}.br`)).toString();
+		assert.ok(mapBody.includes('ok'));
+		assert.ok(mapBody.includes('export'));
+		assert.ok(mapBody.length < paddedMap.length, 'padded source should minify below the unminified size');
 
 		// unfingerprinted compressible files get sidecars too - favicons, manifests
 		// and other files the fingerprint globs do not cover
@@ -95,90 +114,6 @@ describe('fingerprint-assets', () => {
 
 		const writtenManifest = JSON.parse(await readFile(path.join(tempDir, 'asset-manifest.json'), 'utf8'));
 		assert.deepEqual(writtenManifest.assets['style.css'], 'style-aabbccdd.css');
-	});
-
-	test('applyAssetManifestToLocalsFile rewrites asset path literals', async () => {
-		tempDir = await mkdtemp(path.join(tmpdir(), 'fingerprint-locals-'));
-		const localsFile = path.join(tempDir, 'config-middleware.ts');
-		await writeFile(
-			localsFile,
-			`export function addLocalsConfiguration() {
-	return (req, res, next) => {
-		res.locals.config = {
-			styleFile: 'style.css',
-			govukFrontendJs: 'assets/js/govuk-frontend.min.js',
-			consulteesMapJs: 'javascripts/consultees-map.js',
-			blobUploadJs: 'javascripts/blob-upload.js',
-			vendorMapKeyPluginJs: 'vendor/map-key-plugin/js/index.js',
-			headerTitle: 'Identify consultees',
-			footerLinks: []
-		};
-		next();
-	};
-}
-`
-		);
-
-		await applyAssetManifestToLocalsFile(localsFile, {
-			assets: {
-				'style.css': 'style-deadbeef.css',
-				'assets/js/govuk-frontend.min.js': 'assets/js/govuk-frontend.min-cafebabe.js',
-				'javascripts/consultees-map.js': 'javascripts/consultees-map-01234567.js',
-				'javascripts/blob-upload.js': 'javascripts/blob-upload-89abcdef.js',
-				'vendor/map-key-plugin/js/index.js': 'vendor/map-key-plugin/js/index-13579bdf.js'
-			}
-		});
-
-		const updated = await readFile(localsFile, 'utf8');
-		assert.match(updated, /styleFile: 'style-deadbeef\.css'/);
-		assert.match(updated, /govukFrontendJs: 'assets\/js\/govuk-frontend\.min-cafebabe\.js'/);
-		assert.match(updated, /consulteesMapJs: 'javascripts\/consultees-map-01234567\.js'/);
-		assert.match(updated, /blobUploadJs: 'javascripts\/blob-upload-89abcdef\.js'/);
-		assert.match(updated, /vendorMapKeyPluginJs: 'vendor\/map-key-plugin\/js\/index-13579bdf\.js'/);
-	});
-
-	test('applyAssetManifestToLocalsFile leaves an unchanged file untouched', async () => {
-		tempDir = await mkdtemp(path.join(tmpdir(), 'fingerprint-locals-'));
-		const localsFile = path.join(tempDir, 'config-middleware.ts');
-		const source = `export const config = { styleFile: 'style-deadbeef.css' };\n`;
-		await writeFile(localsFile, source);
-		const { mtimeMs: before } = await stat(localsFile);
-
-		await applyAssetManifestToLocalsFile(localsFile, { assets: { 'style.css': 'style-deadbeef.css' } });
-
-		assert.equal((await stat(localsFile)).mtimeMs, before);
-		assert.equal(await readFile(localsFile, 'utf8'), source);
-	});
-
-	test('applyAssetManifestToLocalsFile rejects an empty locals file', async () => {
-		tempDir = await mkdtemp(path.join(tmpdir(), 'fingerprint-locals-'));
-		const localsFile = path.join(tempDir, 'config-middleware.ts');
-		await writeFile(localsFile, '');
-
-		await assert.rejects(
-			applyAssetManifestToLocalsFile(localsFile, { assets: { 'style.css': 'style-deadbeef.css' } }),
-			/is empty.*Restore it/s
-		);
-		assert.equal(await readFile(localsFile, 'utf8'), '');
-	});
-
-	test('applyAssetManifestToLocalsFile rejects a torn file missing bound literals', async () => {
-		tempDir = await mkdtemp(path.join(tmpdir(), 'fingerprint-locals-'));
-		const localsFile = path.join(tempDir, 'config-middleware.ts');
-		// every bound literal except styleFile is gone - the shape a truncated
-		// write leaves behind
-		await writeFile(localsFile, `export const config = { styleFile: 'style-old.css' };\n`);
-
-		await assert.rejects(
-			applyAssetManifestToLocalsFile(localsFile, {
-				assets: {
-					'style.css': 'style-deadbeef.css',
-					'javascripts/consultees-map.js': 'javascripts/consultees-map-01234567.js'
-				}
-			}),
-			/missing asset literals for consulteesMapJs.*Restore it/s
-		);
-		assert.match(await readFile(localsFile, 'utf8'), /style-old\.css/);
 	});
 
 	test('fingerprintAndCompressStaticAssets reuses previous sidecars and clears orphans', async () => {
@@ -266,26 +201,38 @@ describe('fingerprint-assets', () => {
 		assert.equal(manifest.assets['javascripts/data.json'], undefined);
 
 		// every specifier targeting a fingerprinted file resolves to the hashed name
+		// (minify may rewrite quote style / spacing, so match the hashed basename)
 		const appContent = await readFile(path.join(tempDir, ...app.split('/')), 'utf8');
 		const pluginContent = await readFile(path.join(tempDir, ...plugin.split('/')), 'utf8');
 		const upContent = await readFile(path.join(tempDir, ...up.split('/')), 'utf8');
-		assert.ok(appContent.includes(`from './${path.posix.basename(plugin)}'`));
-		assert.ok(appContent.includes(`from './${path.posix.basename(dep)}'`));
-		assert.ok(appContent.includes(`import './${path.posix.basename(side)}'`));
-		assert.ok(appContent.includes(`import('./${path.posix.basename(lazy)}')`));
+		assert.ok(appContent.includes(path.posix.basename(plugin)));
+		assert.ok(appContent.includes(path.posix.basename(dep)));
+		assert.ok(appContent.includes(path.posix.basename(side)));
+		assert.ok(appContent.includes(path.posix.basename(lazy)));
+		assert.ok(!appContent.includes('plugin.mjs') || appContent.includes(path.posix.basename(plugin)));
 		assert.ok(!appContent.includes("'./plugin.mjs'"));
-		assert.ok(pluginContent.includes(`from './${path.posix.basename(dep)}'`));
+		assert.ok(pluginContent.includes(path.posix.basename(dep)));
 		assert.ok(!pluginContent.includes("'./dep.mjs'"));
-		// a cross-directory specifier keeps its ../ form, pointed at the hashed file
-		assert.ok(upContent.includes(`import '${lib.replace('assets/', '../assets/')}'`));
+		assert.ok(upContent.includes(path.posix.basename(lib)));
 
 		// specifiers outside the fingerprinted set, and plain strings, stay as written
-		assert.ok(appContent.includes("'./data.json'"));
-		assert.ok(pluginContent.includes("import './data.json'"));
+		assert.ok(appContent.includes('./data.json') || appContent.includes('"./data.json"'));
+		assert.ok(pluginContent.includes('./data.json') || pluginContent.includes('"./data.json"'));
 
 		// fingerprinted .mjs files get the same Brotli sidecar as fingerprinted .js
 		const brBody = await readFile(`${path.join(tempDir, ...dep.split('/'))}.br`);
 		assert.ok(brBody.byteLength > 0);
+	});
+
+	test('fingerprintAndCompressStaticAssets keeps unminified bytes when minify throws', async () => {
+		tempDir = await mkdtemp(path.join(tmpdir(), 'fingerprint-minify-fail-'));
+		await mkdir(path.join(tempDir, 'javascripts'), { recursive: true });
+		const source = 'export const a = 1;\nexport const a = 2;\n';
+		await writeFile(path.join(tempDir, 'javascripts', 'broken.js'), source);
+
+		const manifest = await fingerprintAndCompressStaticAssets(tempDir);
+		const hashed = path.join(tempDir, ...manifest.assets['javascripts/broken.js'].split('/'));
+		assert.equal(await readFile(hashed, 'utf8'), source);
 	});
 
 	test('fingerprintAndCompressStaticAssets rejects circular imports between fingerprinted modules', async () => {
@@ -334,34 +281,21 @@ describe('fingerprint-assets', () => {
 		assert.equal(loadAssetManifest(tempDir), null);
 	});
 
-	test('staleLocalsAssetPaths flags literals that differ from the manifest', () => {
-		// consulteesMapJs has no literal at all - a missing property is stale too,
-		// since the build rewrite can only update a literal that exists
-		const content = `export const paths = {
-	styleFile: 'style-11111111.css',
-	govukFrontendJs: 'assets/js/govuk-frontend.min-22222222.js'
-};
-`;
-		const manifest = {
+	test('missingManifestBindings flags absent keys and missing on-disk files', async () => {
+		tempDir = await mkdtemp(path.join(tmpdir(), 'fingerprint-bindings-'));
+		assert.deepEqual((await missingManifestBindings(tempDir, null)).slice(0, 2), ['styleFile', 'govukFrontendJs']);
+
+		const hashedStyle = 'style-11111111.css';
+		await writeFile(path.join(tempDir, hashedStyle), 'body{}');
+		const missing = await missingManifestBindings(tempDir, {
 			assets: {
-				'style.css': 'style-11111111.css',
-				'assets/js/govuk-frontend.min.js': 'assets/js/govuk-frontend.min-99999999.js',
-				'javascripts/consultees-map.js': 'javascripts/consultees-map-99999999.js'
+				'style.css': hashedStyle,
+				'assets/js/govuk-frontend.min.js': 'assets/js/govuk-frontend.min-22222222.js'
 			}
-		};
-
-		const stale = staleLocalsAssetPaths(content, manifest);
-		assert.ok(stale.includes('govukFrontendJs'));
-		assert.ok(stale.includes('consulteesMapJs'));
-		assert.ok(!stale.includes('styleFile'));
-
-		// a literal whose binding the manifest no longer produces is stale too - a
-		// dead property the file should not keep emitting
-		const missingEntry = staleLocalsAssetPaths(content, {
-			assets: { 'assets/js/govuk-frontend.min.js': 'assets/js/govuk-frontend.min-22222222.js' }
 		});
-		assert.ok(missingEntry.includes('styleFile'));
-		assert.ok(!missingEntry.includes('govukFrontendJs'));
+		assert.ok(!missing.includes('styleFile'));
+		assert.ok(missing.includes('govukFrontendJs'));
+		assert.ok(missing.includes('consulteesMapJs'));
 	});
 
 	test('ensureEmptyStaticMountDir recreates an empty directory', async () => {

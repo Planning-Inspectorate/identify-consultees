@@ -50,6 +50,7 @@
     "@types/compression": "^1.8.1",
     "@types/multer": "*",
     "@types/pdfkit": "^0.17.7",
+    "esbuild": "^0.28.2",
     "nodemon": "*",
     "sass": "*"
   },

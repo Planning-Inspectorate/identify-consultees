@@ -3,7 +3,8 @@ import { cp, mkdir, rm } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import path from 'node:path';
 import { loadBuildConfig } from '../app/config.ts';
-import { applyAssetManifestToLocalsFile, fingerprintAndCompressStaticAssets } from './fingerprint-assets.ts';
+import { fingerprintAndCompressStaticAssets } from './fingerprint-assets.ts';
+import { emitFingerprintedStyleCss } from './minify-assets.ts';
 import { copyDefraVendorEntryAssets, writeVendorCompressionSidecars } from './vendor-assets.ts';
 
 /**
@@ -17,13 +18,22 @@ async function run(): Promise<void> {
 	const accessibleAutocompleteRoot = path.resolve(require.resolve('accessible-autocomplete'), '..');
 
 	const config = loadBuildConfig();
-	const localsFile = path.join(config.srcDir, 'util', 'config-middleware.ts');
+	// Do not pass localsFile: pages resolve fingerprinted names from
+	// asset-manifest.json at boot. Rewriting config-middleware.ts would create
+	// a second copy of hashes in git that drifts from the manifest.
 	await runBuild({
 		staticDir: config.staticDir,
 		srcDir: config.srcDir,
 		repoRoot,
-		accessibleAutocompleteRoot,
-		localsFile
+		accessibleAutocompleteRoot
+	});
+
+	// Replace core's compressed style-{hash}.css with expand → hash(unminified) →
+	// lightningcss minify so the style fingerprint matches the minify pipeline.
+	await emitFingerprintedStyleCss({
+		staticDir: config.staticDir,
+		srcDir: config.srcDir,
+		repoRoot
 	});
 
 	const javascriptsSource = path.join(config.srcDir, 'public', 'javascripts');
@@ -40,12 +50,11 @@ async function run(): Promise<void> {
 	// and stay on the /vendor express.static mounts
 	await copyDefraVendorEntryAssets(config.staticDir);
 
-	const manifest = await fingerprintAndCompressStaticAssets(config.staticDir);
+	await fingerprintAndCompressStaticAssets(config.staticDir);
 	// vendor lazy chunks keep stable names and stay in node_modules, so their
 	// sidecars are written beside them - a package update then replaces files
 	// and sidecars together and a stale variant can never be served
 	await writeVendorCompressionSidecars();
-	await applyAssetManifestToLocalsFile(localsFile, manifest);
 }
 
 // run the build, and write any errors to console

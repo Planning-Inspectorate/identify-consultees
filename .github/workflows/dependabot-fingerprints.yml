@@ -1,18 +1,8 @@
-# Regenerates the committed asset fingerprints on Dependabot branches.
-#
-# `npm run check-fingerprints` in the Azure PR pipeline fails whenever a
-# dependency bump changes the built bytes of a fingerprinted asset (vendored
-# @defra/interactive-map bundles, govuk-frontend, accessible-autocomplete, …)
-# because the fallback literals in apps/manage/src/util/config-middleware.ts no
-# longer match a fresh build. Dependabot cannot run that build itself, so this
-# workflow does it and pushes the regenerated file back onto the PR branch. The
-# push re-triggers the Azure PR build, which then validates the updated commit.
-#
-# This runs on `push` rather than `pull_request`: pull_request events from
-# Dependabot get a read-only GITHUB_TOKEN, while push events on the branch keep
-# the write permission needed to commit the regenerated file. The commit pushed
-# here does not re-trigger this workflow (it exits cleanly with no diff anyway),
-# but it does re-trigger the Azure Pipelines PR validation.
+# Previously rewrote hashed fallbacks in config-middleware.ts on Dependabot
+# branches. Fingerprinted names now live only in asset-manifest.json (written
+# by `npm run build` and resolved at boot), so there is nothing for Dependabot
+# to commit. This workflow is retained as a no-op guard so old branch filters
+# and pipeline docs that name it do not 404; it exits after confirming that.
 
 name: Dependabot asset fingerprints
 
@@ -22,7 +12,7 @@ on:
       - 'dependabot/**'
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: dependabot-fingerprints-${{ github.ref }}
@@ -30,30 +20,10 @@ concurrency:
 
 jobs:
   update-fingerprints:
-    name: Regenerate asset fingerprints
+    name: Asset fingerprints (manifest-only)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version-file: .nvmrc
-          cache: npm
-
-      - run: npm ci
-
-      # the build rewrites the stale literals in config-middleware.ts in place
-      - run: npm run update-fingerprints
-        working-directory: apps/manage
-
-      - name: Commit and push regenerated fingerprints
+      - name: No committed fingerprint literals
         run: |
-          if git diff --quiet -- apps/manage/src/util/config-middleware.ts; then
-            echo 'Asset fingerprints already current — nothing to commit.'
-            exit 0
-          fi
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add apps/manage/src/util/config-middleware.ts
-          git commit -m 'chore(manage): regenerate asset fingerprints'
-          git push
+          echo 'Fingerprinted asset names resolve from asset-manifest.json at boot.'
+          echo 'config-middleware.ts holds logical fallbacks only — nothing to regenerate on Dependabot PRs.'

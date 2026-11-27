@@ -1,17 +1,10 @@
 import assert from 'node:assert/strict';
-import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { after, describe, mock, test } from 'node:test';
-import { fileURLToPath } from 'node:url';
 import { addLocalsConfiguration } from './config-middleware.ts';
-import {
-	applyAssetManifestToLocalsFile,
-	ASSET_MANIFEST_FILENAME,
-	LOCALS_ASSET_BINDINGS
-} from './fingerprint-assets.ts';
-
-const localsFile = fileURLToPath(new URL('./config-middleware.ts', import.meta.url));
+import { ASSET_MANIFEST_FILENAME, LOCALS_ASSET_BINDINGS } from './fingerprint-assets.ts';
 
 /** Run the middleware once and return res.locals.config. */
 function localsConfig(staticDir?: string): Record<string, unknown> {
@@ -51,7 +44,7 @@ describe('config-middleware', () => {
 		}
 	});
 
-	test('entries missing from the manifest keep their fallback literals', async () => {
+	test('entries missing from the manifest keep their logical fallbacks', async () => {
 		tempDir = await mkdtemp(path.join(tmpdir(), 'config-partial-'));
 		const manifest = sentinelManifest();
 		delete manifest.assets['javascripts/consultees-map.js'];
@@ -59,13 +52,13 @@ describe('config-middleware', () => {
 
 		const config = localsConfig(tempDir);
 		assert.match(String(config.vendorDrawPluginJs), /^hashed-\d+$/);
-		assert.match(String(config.consulteesMapJs), /^javascripts\/consultees-map-[0-9a-f]{8}\.js$/);
+		assert.equal(config.consulteesMapJs, 'javascripts/consultees-map.js');
 	});
 
-	test('serves the checked-in fallbacks when no manifest can be read', () => {
+	test('serves logical fallbacks when no manifest can be read', () => {
 		const config = localsConfig();
-		assert.match(String(config.styleFile), /^style-[0-9a-f]{8}\.css$/);
-		assert.match(String(config.consulteesMapJs), /^javascripts\/consultees-map-[0-9a-f]{8}\.js$/);
+		assert.equal(config.styleFile, 'style.css');
+		assert.equal(config.consulteesMapJs, 'javascripts/consultees-map.js');
 		assert.equal(config.headerTitle, 'Identify consultees');
 		assert.equal(
 			config.metaDescription,
@@ -76,11 +69,10 @@ describe('config-middleware', () => {
 
 	test('a missing or malformed manifest under staticDir also falls back', async () => {
 		tempDir = await mkdtemp(path.join(tmpdir(), 'config-nomanifest-'));
-		const fallback = /^javascripts\/consultees-map-[0-9a-f]{8}\.js$/;
-		assert.match(String(localsConfig(tempDir).consulteesMapJs), fallback);
+		assert.equal(localsConfig(tempDir).consulteesMapJs, 'javascripts/consultees-map.js');
 
 		await writeFile(path.join(tempDir, ASSET_MANIFEST_FILENAME), 'not json');
-		assert.match(String(localsConfig(tempDir).consulteesMapJs), fallback);
+		assert.equal(localsConfig(tempDir).consulteesMapJs, 'javascripts/consultees-map.js');
 	});
 
 	test('logs an error in production when the manifest cannot be read', async () => {
@@ -130,27 +122,10 @@ describe('config-middleware', () => {
 		assert.match(String(res.locals.config?.consulteesMapJs), /^hashed-\d+$/);
 	});
 
-	test('every binding has a literal the build rewrite can find in the real file', async () => {
-		const source = await readFile(localsFile, 'utf8');
-		for (const { property } of LOCALS_ASSET_BINDINGS) {
-			assert.match(
-				source,
-				new RegExp(`${property}\\s*:\\s*'[^']*'`),
-				`${property} needs a 'value' literal for the build to rewrite`
-			);
-		}
-	});
-
-	test('the build rewrite updates every property in the real file', async () => {
-		tempDir = await mkdtemp(path.join(tmpdir(), 'config-rewrite-'));
-		const copy = path.join(tempDir, 'config-middleware.ts');
-		await mkdir(tempDir, { recursive: true });
-		await writeFile(copy, await readFile(localsFile, 'utf8'));
-
-		await applyAssetManifestToLocalsFile(copy, sentinelManifest());
-		const rewritten = await readFile(copy, 'utf8');
-		for (const { property } of LOCALS_ASSET_BINDINGS) {
-			assert.match(rewritten, new RegExp(`${property}\\s*:\\s*'hashed-\\d+'`), `${property} was not rewritten`);
+	test('every LOCALS_ASSET_BINDING has a logical fallback property', () => {
+		const config = localsConfig();
+		for (const { logical, property } of LOCALS_ASSET_BINDINGS) {
+			assert.equal(config[property], logical, `${property} fallback should be the logical path`);
 		}
 	});
 });
